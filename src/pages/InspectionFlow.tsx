@@ -7,8 +7,11 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { VehicleDiagram } from "@/components/VehicleDiagram";
+import { VehicleDamageModal } from "@/components/VehicleDamageModal";
 import { useNavigate, useParams } from "react-router-dom";
-import { ChevronLeft, ChevronRight, Camera, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Camera, Plus, X } from "lucide-react";
 
 interface InspectionData {
   odometer: string;
@@ -35,7 +38,16 @@ interface InspectionData {
   evChargingCables: string;
   aerial: string;
   customerPaperwork: string;
-  damages: any[];
+  damages: Array<{
+    id: string;
+    x: number;
+    y: number;
+    area: string;
+    location: string;
+    item: string;
+    damageTypes: string[];
+    notes: string;
+  }>;
   photos: any[];
 }
 
@@ -43,6 +55,8 @@ export const InspectionFlow = () => {
   const navigate = useNavigate();
   const { jobId } = useParams();
   const [currentStep, setCurrentStep] = useState(1);
+  const [showDamageModal, setShowDamageModal] = useState(false);
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [inspectionData, setInspectionData] = useState<InspectionData>({
     odometer: "",
     fuelLevel: "",
@@ -78,8 +92,30 @@ export const InspectionFlow = () => {
     setInspectionData(prev => ({ ...prev, [field]: value }));
   };
 
+  const addDamage = (position: { x: number; y: number }) => {
+    setShowDamageModal(true);
+    // Store position temporarily for when modal submits
+    (window as any).tempDamagePosition = position;
+  };
+
+  const handleDamageSubmit = (damage: any) => {
+    const position = (window as any).tempDamagePosition || { x: 0, y: 0 };
+    const newDamage = {
+      id: Date.now().toString(),
+      x: position.x,
+      y: position.y,
+      ...damage
+    };
+    setInspectionData(prev => ({
+      ...prev,
+      damages: [...prev.damages, newDamage]
+    }));
+  };
+
   const nextStep = () => {
-    if (currentStep < totalSteps) {
+    if (currentStep === 4) {
+      setShowConfirmationModal(true);
+    } else if (currentStep < totalSteps) {
       setCurrentStep(currentStep + 1);
     }
   };
@@ -361,62 +397,10 @@ export const InspectionFlow = () => {
   );
 
   const renderStep3 = () => (
-    <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-center">Section 3</h2>
-      <p className="text-center text-muted-foreground">Please upload images for the following:</p>
-      
-      <div className="space-y-4">
-        <h3 className="font-medium">Damages (optional)</h3>
-        
-        {inspectionData.damages.length === 0 ? (
-          <Card className="p-6 text-center">
-            <div className="space-y-4">
-              <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto">
-                <span className="text-2xl text-muted-foreground">0</span>
-              </div>
-              <p className="text-muted-foreground">No damages recorded for this job</p>
-              <Button variant="outline" className="gap-2">
-                <Plus className="h-4 w-4" />
-                Add Damage
-              </Button>
-            </div>
-          </Card>
-        ) : (
-          <div className="space-y-2">
-            {inspectionData.damages.map((damage, index) => (
-              <Card key={index} className="p-4">
-                <p>Damage {index + 1}</p>
-              </Card>
-            ))}
-            <Button variant="outline" className="w-full gap-2">
-              <Plus className="h-4 w-4" />
-              Add Damage
-            </Button>
-          </div>
-        )}
-
-        <div className="grid grid-cols-2 gap-4 mt-8">
-          {[
-            'Front of Vehicle',
-            'Driver\'s Side', 
-            'Passenger Side',
-            'Back of Vehicle',
-            'Odometer'
-          ].map((photoType) => (
-            <Card key={photoType} className="p-4 text-center">
-              <h4 className="font-medium mb-2">{photoType}</h4>
-              <div className="w-full h-24 bg-muted rounded-lg flex items-center justify-center mb-2">
-                <Camera className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Plus className="h-4 w-4" />
-                Add Photo
-              </Button>
-            </Card>
-          ))}
-        </div>
-      </div>
-    </div>
+    <VehicleDiagram 
+      onAddDamage={addDamage}
+      damages={inspectionData.damages}
+    />
   );
 
   const renderStep4 = () => (
@@ -522,6 +506,54 @@ export const InspectionFlow = () => {
           ) : null}
         </div>
       </div>
+
+      {/* Vehicle Damage Modal */}
+      <VehicleDamageModal
+        isOpen={showDamageModal}
+        onClose={() => setShowDamageModal(false)}
+        onSubmit={handleDamageSubmit}
+      />
+
+      {/* Confirmation Modal */}
+      <Dialog open={showConfirmationModal} onOpenChange={setShowConfirmationModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              Confirmation
+              <Button variant="ghost" size="sm" onClick={() => setShowConfirmationModal(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <p className="text-sm">Please ensure all provided information is correct</p>
+            <p className="text-sm">You will not be able to make any changes past this point</p>
+            <p className="text-sm text-destructive font-medium">
+              After confirming please pass the device to the customer so they can review any details
+            </p>
+            
+            <div className="flex gap-3 pt-4">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowConfirmationModal(false)}
+                className="flex-1"
+              >
+                CLOSE
+              </Button>
+              <Button 
+                onClick={() => {
+                  setShowConfirmationModal(false);
+                  navigate('/jobs');
+                }}
+                className="flex-1"
+              >
+                CONFIRM
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

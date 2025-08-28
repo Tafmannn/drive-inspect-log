@@ -25,24 +25,21 @@ export const AppHeader = ({ title, showBack = false, onBack, children }: AppHead
         {title && <h1 className="text-lg font-medium">{title}</h1>}
       </div>
       
-      <div className="flex items-center gap-2">
-        {children}
-        <div className="flex flex-col items-center">
-          <div className="w-8 h-6 bg-primary rounded-sm flex items-center justify-center">
-            <div className="w-6 h-4 bg-app-header rounded-xs flex items-center justify-center">
-              <span className="text-primary text-xs font-bold">AM</span>
+        <div className="flex items-center gap-2">
+          {children}
+          <div className="flex flex-col items-center">
+            <div className="text-lg font-bold text-app-header-foreground">
+              AXENTRA
             </div>
           </div>
-          <span className="text-xs mt-1">VEHICLE</span>
+          <Button 
+            variant="ghost" 
+            size="sm"
+            className="text-app-header-foreground hover:bg-white/20 p-2 h-auto"
+          >
+            <Share className="h-5 w-5" />
+          </Button>
         </div>
-        <Button 
-          variant="ghost" 
-          size="sm"
-          className="text-app-header-foreground hover:bg-white/20 p-2 h-auto"
-        >
-          <Share className="h-5 w-5" />
-        </Button>
-      </div>
     </header>
   );
 };
