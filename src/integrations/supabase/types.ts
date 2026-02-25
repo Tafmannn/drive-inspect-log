@@ -14,7 +14,363 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      damage_items: {
+        Row: {
+          area: string | null
+          created_at: string
+          damage_types: string[] | null
+          id: string
+          inspection_id: string
+          item: string | null
+          location: string | null
+          notes: string | null
+          photo_url: string | null
+          x: number | null
+          y: number | null
+        }
+        Insert: {
+          area?: string | null
+          created_at?: string
+          damage_types?: string[] | null
+          id?: string
+          inspection_id: string
+          item?: string | null
+          location?: string | null
+          notes?: string | null
+          photo_url?: string | null
+          x?: number | null
+          y?: number | null
+        }
+        Update: {
+          area?: string | null
+          created_at?: string
+          damage_types?: string[] | null
+          id?: string
+          inspection_id?: string
+          item?: string | null
+          location?: string | null
+          notes?: string | null
+          photo_url?: string | null
+          x?: number | null
+          y?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "damage_items_inspection_id_fkey"
+            columns: ["inspection_id"]
+            isOneToOne: false
+            referencedRelation: "inspections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inspections: {
+        Row: {
+          aerial: string | null
+          alloys_damaged: string | null
+          alloys_or_trims: string | null
+          created_at: string
+          customer_paperwork: string | null
+          customer_signature_url: string | null
+          driver_signature_url: string | null
+          ev_charging_cables: string | null
+          fuel_level_percent: number | null
+          handbook: string | null
+          has_damage: boolean
+          id: string
+          inspected_at: string | null
+          inspected_by_name: string | null
+          job_id: string
+          light_condition: string | null
+          locking_wheel_nut: string | null
+          mot: string | null
+          notes: string | null
+          number_of_keys: string | null
+          odometer: number | null
+          oil_level_status: string | null
+          parcel_shelf: string | null
+          sat_nav_working: string | null
+          service_book: string | null
+          spare_wheel_status: string | null
+          tool_kit: string | null
+          type: string
+          tyre_inflation_kit: string | null
+          updated_at: string
+          v5: string | null
+          vehicle_condition: string | null
+          water_level_status: string | null
+          wheel_trims_damaged: string | null
+        }
+        Insert: {
+          aerial?: string | null
+          alloys_damaged?: string | null
+          alloys_or_trims?: string | null
+          created_at?: string
+          customer_paperwork?: string | null
+          customer_signature_url?: string | null
+          driver_signature_url?: string | null
+          ev_charging_cables?: string | null
+          fuel_level_percent?: number | null
+          handbook?: string | null
+          has_damage?: boolean
+          id?: string
+          inspected_at?: string | null
+          inspected_by_name?: string | null
+          job_id: string
+          light_condition?: string | null
+          locking_wheel_nut?: string | null
+          mot?: string | null
+          notes?: string | null
+          number_of_keys?: string | null
+          odometer?: number | null
+          oil_level_status?: string | null
+          parcel_shelf?: string | null
+          sat_nav_working?: string | null
+          service_book?: string | null
+          spare_wheel_status?: string | null
+          tool_kit?: string | null
+          type: string
+          tyre_inflation_kit?: string | null
+          updated_at?: string
+          v5?: string | null
+          vehicle_condition?: string | null
+          water_level_status?: string | null
+          wheel_trims_damaged?: string | null
+        }
+        Update: {
+          aerial?: string | null
+          alloys_damaged?: string | null
+          alloys_or_trims?: string | null
+          created_at?: string
+          customer_paperwork?: string | null
+          customer_signature_url?: string | null
+          driver_signature_url?: string | null
+          ev_charging_cables?: string | null
+          fuel_level_percent?: number | null
+          handbook?: string | null
+          has_damage?: boolean
+          id?: string
+          inspected_at?: string | null
+          inspected_by_name?: string | null
+          job_id?: string
+          light_condition?: string | null
+          locking_wheel_nut?: string | null
+          mot?: string | null
+          notes?: string | null
+          number_of_keys?: string | null
+          odometer?: number | null
+          oil_level_status?: string | null
+          parcel_shelf?: string | null
+          sat_nav_working?: string | null
+          service_book?: string | null
+          spare_wheel_status?: string | null
+          tool_kit?: string | null
+          type?: string
+          tyre_inflation_kit?: string | null
+          updated_at?: string
+          v5?: string | null
+          vehicle_condition?: string | null
+          water_level_status?: string | null
+          wheel_trims_damaged?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inspections_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_activity_log: {
+        Row: {
+          action: string
+          created_at: string
+          from_status: string | null
+          id: string
+          job_id: string
+          notes: string | null
+          to_status: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          from_status?: string | null
+          id?: string
+          job_id: string
+          notes?: string | null
+          to_status?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          from_status?: string | null
+          id?: string
+          job_id?: string
+          notes?: string | null
+          to_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_activity_log_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      jobs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          delivery_address_line1: string
+          delivery_address_line2: string | null
+          delivery_city: string
+          delivery_company: string | null
+          delivery_contact_name: string
+          delivery_contact_phone: string
+          delivery_notes: string | null
+          delivery_postcode: string
+          earliest_delivery_date: string | null
+          external_job_number: string | null
+          has_delivery_inspection: boolean
+          has_pickup_inspection: boolean
+          id: string
+          pickup_address_line1: string
+          pickup_address_line2: string | null
+          pickup_city: string
+          pickup_company: string | null
+          pickup_contact_name: string
+          pickup_contact_phone: string
+          pickup_notes: string | null
+          pickup_postcode: string
+          status: string
+          updated_at: string
+          vehicle_colour: string
+          vehicle_make: string
+          vehicle_model: string
+          vehicle_reg: string
+          vehicle_year: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          delivery_address_line1: string
+          delivery_address_line2?: string | null
+          delivery_city: string
+          delivery_company?: string | null
+          delivery_contact_name: string
+          delivery_contact_phone: string
+          delivery_notes?: string | null
+          delivery_postcode: string
+          earliest_delivery_date?: string | null
+          external_job_number?: string | null
+          has_delivery_inspection?: boolean
+          has_pickup_inspection?: boolean
+          id?: string
+          pickup_address_line1: string
+          pickup_address_line2?: string | null
+          pickup_city: string
+          pickup_company?: string | null
+          pickup_contact_name: string
+          pickup_contact_phone: string
+          pickup_notes?: string | null
+          pickup_postcode: string
+          status?: string
+          updated_at?: string
+          vehicle_colour: string
+          vehicle_make: string
+          vehicle_model: string
+          vehicle_reg: string
+          vehicle_year?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          delivery_address_line1?: string
+          delivery_address_line2?: string | null
+          delivery_city?: string
+          delivery_company?: string | null
+          delivery_contact_name?: string
+          delivery_contact_phone?: string
+          delivery_notes?: string | null
+          delivery_postcode?: string
+          earliest_delivery_date?: string | null
+          external_job_number?: string | null
+          has_delivery_inspection?: boolean
+          has_pickup_inspection?: boolean
+          id?: string
+          pickup_address_line1?: string
+          pickup_address_line2?: string | null
+          pickup_city?: string
+          pickup_company?: string | null
+          pickup_contact_name?: string
+          pickup_contact_phone?: string
+          pickup_notes?: string | null
+          pickup_postcode?: string
+          status?: string
+          updated_at?: string
+          vehicle_colour?: string
+          vehicle_make?: string
+          vehicle_model?: string
+          vehicle_reg?: string
+          vehicle_year?: string | null
+        }
+        Relationships: []
+      }
+      photos: {
+        Row: {
+          backend: string
+          backend_ref: string | null
+          created_at: string
+          id: string
+          inspection_id: string | null
+          job_id: string
+          thumbnail_url: string | null
+          type: string
+          url: string
+        }
+        Insert: {
+          backend?: string
+          backend_ref?: string | null
+          created_at?: string
+          id?: string
+          inspection_id?: string | null
+          job_id: string
+          thumbnail_url?: string | null
+          type: string
+          url: string
+        }
+        Update: {
+          backend?: string
+          backend_ref?: string | null
+          created_at?: string
+          id?: string
+          inspection_id?: string | null
+          job_id?: string
+          thumbnail_url?: string | null
+          type?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "photos_inspection_id_fkey"
+            columns: ["inspection_id"]
+            isOneToOne: false
+            referencedRelation: "inspections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "photos_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

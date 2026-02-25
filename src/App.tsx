@@ -5,7 +5,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Dashboard } from "./pages/Dashboard";
 import { JobList } from "./pages/JobList";
+import { JobForm } from "./pages/JobForm";
+import { JobDetail } from "./pages/JobDetail";
+import { CompletedJobs } from "./pages/CompletedJobs";
+import { PendingJobs } from "./pages/PendingJobs";
 import { InspectionFlow } from "./pages/InspectionFlow";
+import { PodReport } from "./pages/PodReport";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -19,10 +24,13 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/jobs" element={<JobList />} />
-          <Route path="/inspection/:jobId" element={<InspectionFlow />} />
-          <Route path="/completed" element={<Dashboard />} />
-          <Route path="/pending" element={<Dashboard />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="/jobs/new" element={<JobForm />} />
+          <Route path="/jobs/completed" element={<CompletedJobs />} />
+          <Route path="/jobs/pending" element={<PendingJobs />} />
+          <Route path="/jobs/:jobId" element={<JobDetail />} />
+          <Route path="/jobs/:jobId/edit" element={<JobForm />} />
+          <Route path="/jobs/:jobId/pod" element={<PodReport />} />
+          <Route path="/inspection/:jobId/:inspectionType" element={<InspectionFlow />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

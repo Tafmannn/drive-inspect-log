@@ -1,0 +1,218 @@
+import { supabase } from '@/integrations/supabase/client';
+import type {
+  Job,
+  JobWithRelations,
+  Inspection,
+  DamageItem,
+  Photo,
+  JobActivityLog,
+  InspectionType,
+  JobStatus,
+} from './types';
+
+// ─── Jobs ────────────────────────────────────────────────────────────
+
+export async function listJobs(filter?: { statuses?: string[] }): Promise<Job[]> {
+  let query = supabase.from('jobs').select('*').order('created_at', { ascending: false });
+  if (filter?.statuses?.length) {
+    query = query.in('status', filter.statuses);
+  }
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []) as Job[];
+}
+
+export async function listActiveJobs(): Promise<Job[]> {
+  return listJobs({
+    statuses: ['ready_for_pickup', 'pickup_in_progress', 'pickup_complete', 'in_transit', 'delivery_in_progress'],
+  });
+}
+
+export async function listCompletedJobs(): Promise<Job[]> {
+  const fourteenDaysAgo = new Date();
+  fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+  const { data, error } = await supabase
+    .from('jobs')
+    .select('*')
+    .not('completed_at', 'is', null)
+    .gte('completed_at', fourteenDaysAgo.toISOString())
+    .order('completed_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as Job[];
+}
+
+export async function listPendingJobs(): Promise<Job[]> {
+  return listJobs({ statuses: ['pod_ready', 'delivery_complete'] });
+}
+
+export async function getJob(jobId: string): Promise<Job> {
+  const { data, error } = await supabase.from('jobs').select('*').eq('id', jobId).single();
+  if (error) throw error;
+  return data as Job;
+}
+
+export async function getJobWithRelations(jobId: string): Promise<JobWithRelations> {
+  const [jobRes, inspRes, photoRes, actRes] = await Promise.all([
+    supabase.from('jobs').select('*').eq('id', jobId).single(),
+    supabase.from('inspections').select('*').eq('job_id', jobId),
+    supabase.from('photos').select('*').eq('job_id', jobId),
+    supabase.from('job_activity_log').select('*').eq('job_id', jobId).order('created_at', { ascending: true }),
+  ]);
+  if (jobRes.error) throw jobRes.error;
+
+  const inspections = (inspRes.data ?? []) as Inspection[];
+  const inspectionIds = inspections.map((i) => i.id);
+
+  let damageItems: DamageItem[] = [];
+  if (inspectionIds.length > 0) {
+    const { data } = await supabase.from('damage_items').select('*').in('inspection_id', inspectionIds);
+    damageItems = (data ?? []) as DamageItem[];
+  }
+
+  return {
+    ...(jobRes.data as Job),
+    inspections,
+    photos: (photoRes.data ?? []) as Photo[],
+    damage_items: damageItems,
+    activity_log: (actRes.data ?? []) as JobActivityLog[],
+  };
+}
+
+export async function createJob(input: Omit<Job, 'id' | 'status' | 'has_pickup_inspection' | 'has_delivery_inspection' | 'completed_at' | 'created_at' | 'updated_at'>): Promise<Job> {
+  const { data, error } = await supabase.from('jobs').insert(input).select().single();
+  if (error) throw error;
+  await logJobActivity(data.id, 'job_created', undefined, 'ready_for_pickup');
+  return data as Job;
+}
+
+export async function updateJob(jobId: string, input: Partial<Job>): Promise<Job> {
+  const { data, error } = await supabase.from('jobs').update(input).eq('id', jobId).select().single();
+  if (error) throw error;
+  return data as Job;
+}
+
+// ─── Inspections ─────────────────────────────────────────────────────
+
+export async function getInspection(jobId: string, type: InspectionType): Promise<Inspection | null> {
+  const { data, error } = await supabase
+    .from('inspections')
+    .select('*')
+    .eq('job_id', jobId)
+    .eq('type', type)
+    .maybeSingle();
+  if (error) throw error;
+  return data as Inspection | null;
+}
+
+export async function upsertInspection(
+  jobId: string,
+  type: InspectionType,
+  payload: Partial<Inspection>
+): Promise<Inspection> {
+  const existing = await getInspection(jobId, type);
+
+  if (existing) {
+    const { data, error } = await supabase
+      .from('inspections')
+      .update({ ...payload, updated_at: new Date().toISOString() })
+      .eq('id', existing.id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as Inspection;
+  } else {
+    const { data, error } = await supabase
+      .from('inspections')
+      .insert({ job_id: jobId, type, ...payload })
+      .select()
+      .single();
+    if (error) throw error;
+    return data as Inspection;
+  }
+}
+
+export async function submitInspection(
+  jobId: string,
+  type: InspectionType,
+  inspectionPayload: Partial<Inspection>,
+  damageItems: Array<Omit<DamageItem, 'id' | 'inspection_id' | 'created_at'>>,
+): Promise<void> {
+  // 1. Upsert inspection
+  const inspection = await upsertInspection(jobId, type, {
+    ...inspectionPayload,
+    inspected_at: new Date().toISOString(),
+    has_damage: damageItems.length > 0,
+  });
+
+  // 2. Delete old damage items, insert new
+  await supabase.from('damage_items').delete().eq('inspection_id', inspection.id);
+  if (damageItems.length > 0) {
+    const items = damageItems.map((d) => ({ ...d, inspection_id: inspection.id }));
+    const { error } = await supabase.from('damage_items').insert(items);
+    if (error) throw error;
+  }
+
+  // 3. Update job
+  const job = await getJob(jobId);
+  const fromStatus = job.status;
+  let toStatus: JobStatus = job.status;
+
+  if (type === 'pickup') {
+    toStatus = 'pickup_complete';
+    await updateJob(jobId, { has_pickup_inspection: true, status: toStatus } as Partial<Job>);
+  } else {
+    toStatus = job.has_pickup_inspection ? 'pod_ready' : 'delivery_complete';
+    await updateJob(jobId, {
+      has_delivery_inspection: true,
+      status: toStatus,
+      completed_at: new Date().toISOString(),
+    } as Partial<Job>);
+  }
+
+  await logJobActivity(jobId, `${type}_inspection_submitted`, fromStatus, toStatus);
+}
+
+// ─── Photos ──────────────────────────────────────────────────────────
+
+export async function insertPhoto(payload: Omit<Photo, 'id' | 'created_at'>): Promise<Photo> {
+  const { data, error } = await supabase.from('photos').insert(payload).select().single();
+  if (error) throw error;
+  return data as Photo;
+}
+
+// ─── Activity Log ────────────────────────────────────────────────────
+
+export async function logJobActivity(
+  jobId: string,
+  action: string,
+  fromStatus?: string,
+  toStatus?: string,
+  notes?: string,
+): Promise<void> {
+  await supabase.from('job_activity_log').insert({
+    job_id: jobId,
+    action,
+    from_status: fromStatus ?? null,
+    to_status: toStatus ?? null,
+    notes: notes ?? null,
+  });
+}
+
+// ─── Dashboard Counts ────────────────────────────────────────────────
+
+export async function getDashboardCounts(): Promise<{
+  activeJobs: number;
+  completedLast14Days: number;
+  pending: number;
+}> {
+  const [active, completed, pending] = await Promise.all([
+    listActiveJobs(),
+    listCompletedJobs(),
+    listPendingJobs(),
+  ]);
+  return {
+    activeJobs: active.length,
+    completedLast14Days: completed.length,
+    pending: pending.length,
+  };
+}

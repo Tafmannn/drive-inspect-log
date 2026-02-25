@@ -1,48 +1,21 @@
 import { AppHeader } from "@/components/AppHeader";
 import { JobCard } from "@/components/JobCard";
 import { useNavigate } from "react-router-dom";
+import { useActiveJobs } from "@/hooks/useJobs";
+import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
+import type { Job } from "@/lib/types";
 
-const mockJobs = [
-  {
-    jobId: "320667",
-    plateNumber: "WF25KLJ",
-    collectFrom: {
-      name: "Chester",
-      email: "thrifty.chester@thrifty.co.uk",
-      phone: "01244374600",
-      company: "Switch Car Rental Chester",
-      address: "21 Bumpers Lane Sealands Industrial Estate, Chester, CH1 4LT"
-    },
-    deliverTo: {
-      name: "York",
-      email: "thrifty.york@thrifty.co.uk", 
-      phone: "01904438844",
-      company: "Switch Car Rental York",
-      address: "Unit 2 Bentley Park, York, YO10 3JA"
-    },
-    instructions: "PLEASE TAKE INTERNAL PICTURES OF THE VEHICLE (INCLUDING THE BOOT) ON COLLECTION TO PROVE THAT NOTHING HAS BEEN LEFT IN THE VEHICLE !!!! IF DIRTY INSIDE, TAKE PHOTOS ON THE APP AND CALL THE OFFICE - THIS VEHICLE MAY BE DIVERTED TO DONCASTER THRIFTY - NO EXCUSES PLEASE OR WE WILL BE FORCED INTO BUYING THE VEHICLE !!!!!",
-    deadline: "01/09/2025"
-  },
-  {
-    jobId: "320522", 
-    plateNumber: "DL25KVJ",
-    collectFrom: {
-      name: "Mr Sean Steward",
-      phone: "01628 528034",
-      company: "Modul-System Limited (Service Centre)",
-      address: "Unit 4a, Hessay Industrial Estate, New Road, Hessay, York, North Yorkshire, YO26 8LE"
-    },
-    deliverTo: {
-      name: "Mr Neil Powell",
-      phone: "07814234778", 
-      company: "Sanctuary Housing",
-      address: "Unit 2-3, Union Park, Navigation Way, WV2 1PE"
-    }
-  }
-];
+function getJobCta(job: Job): { label: string; route: string } {
+  if (!job.has_pickup_inspection) return { label: 'Start Pickup', route: `/inspection/${job.id}/pickup` };
+  if (!job.has_delivery_inspection) return { label: 'Start Delivery', route: `/inspection/${job.id}/delivery` };
+  return { label: 'View POD', route: `/jobs/${job.id}/pod` };
+}
 
 export const JobList = () => {
   const navigate = useNavigate();
+  const { data: jobs, isLoading } = useActiveJobs();
 
   return (
     <div className="min-h-screen bg-background">
@@ -50,16 +23,53 @@ export const JobList = () => {
         title="Your Current Jobs"
         showBack
         onBack={() => navigate('/')}
-      />
+      >
+        <Button size="sm" variant="ghost" className="text-app-header-foreground hover:bg-white/20" onClick={() => navigate('/jobs/new')}>
+          <Plus className="h-5 w-5" />
+        </Button>
+      </AppHeader>
       
       <div className="p-4">
-        {mockJobs.map((job) => (
-          <JobCard
-            key={job.jobId}
-            {...job}
-            onStartInspection={() => navigate(`/inspection/${job.jobId}`)}
-          />
-        ))}
+        {isLoading && (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        )}
+
+        {!isLoading && (!jobs || jobs.length === 0) && (
+          <div className="text-center py-12 space-y-4">
+            <p className="text-muted-foreground">No active jobs found.</p>
+            <Button onClick={() => navigate('/jobs/new')}>Create Job</Button>
+          </div>
+        )}
+
+        {jobs?.map((job) => {
+          const cta = getJobCta(job);
+          return (
+            <JobCard
+              key={job.id}
+              jobId={job.external_job_number || job.id.slice(0, 8)}
+              plateNumber={job.vehicle_reg}
+              collectFrom={{
+                name: job.pickup_contact_name,
+                phone: job.pickup_contact_phone,
+                company: job.pickup_company ?? undefined,
+                address: [job.pickup_address_line1, job.pickup_address_line2, job.pickup_city, job.pickup_postcode].filter(Boolean).join(', '),
+              }}
+              deliverTo={{
+                name: job.delivery_contact_name,
+                phone: job.delivery_contact_phone,
+                company: job.delivery_company ?? undefined,
+                address: [job.delivery_address_line1, job.delivery_address_line2, job.delivery_city, job.delivery_postcode].filter(Boolean).join(', '),
+              }}
+              instructions={job.pickup_notes ?? undefined}
+              deadline={job.earliest_delivery_date ?? undefined}
+              ctaLabel={cta.label}
+              onStartInspection={() => navigate(cta.route)}
+              onCardClick={() => navigate(`/jobs/${job.id}`)}
+            />
+          );
+        })}
       </div>
     </div>
   );
