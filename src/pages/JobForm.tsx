@@ -1,13 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCreateJob, useUpdateJob, useJob } from "@/hooks/useJobs";
 import { toast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { CAR_MAKES, getModelsForMake } from "@/lib/carData";
 
 export const JobForm = () => {
   const navigate = useNavigate();
@@ -43,52 +45,85 @@ export const JobForm = () => {
     earliest_delivery_date: '',
   });
 
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [customMake, setCustomMake] = useState(false);
+  const [customModel, setCustomModel] = useState(false);
+
   // Populate form when editing
   const [populated, setPopulated] = useState(false);
-  if (isEdit && existingJob && !populated) {
-    setForm({
-      external_job_number: existingJob.external_job_number ?? '',
-      vehicle_reg: existingJob.vehicle_reg,
-      vehicle_make: existingJob.vehicle_make,
-      vehicle_model: existingJob.vehicle_model,
-      vehicle_colour: existingJob.vehicle_colour,
-      vehicle_year: existingJob.vehicle_year ?? '',
-      pickup_contact_name: existingJob.pickup_contact_name,
-      pickup_contact_phone: existingJob.pickup_contact_phone,
-      pickup_company: existingJob.pickup_company ?? '',
-      pickup_address_line1: existingJob.pickup_address_line1,
-      pickup_address_line2: existingJob.pickup_address_line2 ?? '',
-      pickup_city: existingJob.pickup_city,
-      pickup_postcode: existingJob.pickup_postcode,
-      pickup_notes: existingJob.pickup_notes ?? '',
-      delivery_contact_name: existingJob.delivery_contact_name,
-      delivery_contact_phone: existingJob.delivery_contact_phone,
-      delivery_company: existingJob.delivery_company ?? '',
-      delivery_address_line1: existingJob.delivery_address_line1,
-      delivery_address_line2: existingJob.delivery_address_line2 ?? '',
-      delivery_city: existingJob.delivery_city,
-      delivery_postcode: existingJob.delivery_postcode,
-      delivery_notes: existingJob.delivery_notes ?? '',
-      earliest_delivery_date: existingJob.earliest_delivery_date ?? '',
-    });
-    setPopulated(true);
-  }
+  useEffect(() => {
+    if (isEdit && existingJob && !populated) {
+      const makeKnown = CAR_MAKES.includes(existingJob.vehicle_make);
+      const modelKnown = makeKnown && getModelsForMake(existingJob.vehicle_make).includes(existingJob.vehicle_model);
+      setCustomMake(!makeKnown);
+      setCustomModel(!modelKnown);
+      setForm({
+        external_job_number: existingJob.external_job_number ?? '',
+        vehicle_reg: existingJob.vehicle_reg,
+        vehicle_make: existingJob.vehicle_make,
+        vehicle_model: existingJob.vehicle_model,
+        vehicle_colour: existingJob.vehicle_colour,
+        vehicle_year: existingJob.vehicle_year ?? '',
+        pickup_contact_name: existingJob.pickup_contact_name,
+        pickup_contact_phone: existingJob.pickup_contact_phone,
+        pickup_company: existingJob.pickup_company ?? '',
+        pickup_address_line1: existingJob.pickup_address_line1,
+        pickup_address_line2: existingJob.pickup_address_line2 ?? '',
+        pickup_city: existingJob.pickup_city,
+        pickup_postcode: existingJob.pickup_postcode,
+        pickup_notes: existingJob.pickup_notes ?? '',
+        delivery_contact_name: existingJob.delivery_contact_name,
+        delivery_contact_phone: existingJob.delivery_contact_phone,
+        delivery_company: existingJob.delivery_company ?? '',
+        delivery_address_line1: existingJob.delivery_address_line1,
+        delivery_address_line2: existingJob.delivery_address_line2 ?? '',
+        delivery_city: existingJob.delivery_city,
+        delivery_postcode: existingJob.delivery_postcode,
+        delivery_notes: existingJob.delivery_notes ?? '',
+        earliest_delivery_date: existingJob.earliest_delivery_date ?? '',
+      });
+      setPopulated(true);
+    }
+  }, [isEdit, existingJob, populated]);
 
-  const update = (field: string, value: string) => setForm((prev) => ({ ...prev, [field]: value }));
+  const update = (field: string, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    setErrors((prev) => { const next = { ...prev }; delete next[field]; return next; });
+  };
+
+  const models = getModelsForMake(form.vehicle_make);
+
+  const validate = (): boolean => {
+    const e: Record<string, string> = {};
+    const required: [string, string][] = [
+      ['vehicle_reg', 'Registration is required'],
+      ['vehicle_make', 'Make is required'],
+      ['vehicle_model', 'Model is required'],
+      ['vehicle_colour', 'Colour is required'],
+      ['pickup_contact_name', 'Pickup contact name is required'],
+      ['pickup_contact_phone', 'Pickup phone is required'],
+      ['pickup_address_line1', 'Pickup address is required'],
+      ['pickup_city', 'Pickup city is required'],
+      ['pickup_postcode', 'Pickup postcode is required'],
+      ['delivery_contact_name', 'Delivery contact name is required'],
+      ['delivery_contact_phone', 'Delivery phone is required'],
+      ['delivery_address_line1', 'Delivery address is required'],
+      ['delivery_city', 'Delivery city is required'],
+      ['delivery_postcode', 'Delivery postcode is required'],
+    ];
+    for (const [f, msg] of required) {
+      if (!(form as Record<string, string>)[f]?.trim()) e[f] = msg;
+    }
+    setErrors(e);
+    if (Object.keys(e).length > 0) {
+      toast({ title: 'Validation Error', description: `${Object.keys(e).length} field(s) require attention.`, variant: 'destructive' });
+      return false;
+    }
+    return true;
+  };
 
   const handleSubmit = async () => {
-    if (!form.vehicle_reg || !form.vehicle_make || !form.vehicle_model || !form.vehicle_colour) {
-      toast({ title: 'Validation Error', description: 'Vehicle details are required.', variant: 'destructive' });
-      return;
-    }
-    if (!form.pickup_contact_name || !form.pickup_contact_phone || !form.pickup_address_line1 || !form.pickup_city || !form.pickup_postcode) {
-      toast({ title: 'Validation Error', description: 'Pickup contact & address are required.', variant: 'destructive' });
-      return;
-    }
-    if (!form.delivery_contact_name || !form.delivery_contact_phone || !form.delivery_address_line1 || !form.delivery_city || !form.delivery_postcode) {
-      toast({ title: 'Validation Error', description: 'Delivery contact & address are required.', variant: 'destructive' });
-      return;
-    }
+    if (!validate()) return;
 
     try {
       const payload = {
@@ -110,11 +145,11 @@ export const JobForm = () => {
         navigate(`/jobs/${jobId}`);
       } else {
         const job = await createMutation.mutateAsync(payload);
-        toast({ title: 'Job Created' });
+        toast({ title: 'Job Created', description: `${job.external_job_number ?? ''} – ${job.vehicle_reg}` });
         navigate(`/jobs/${job.id}`);
       }
-    } catch (e: any) {
-      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    } catch (e: unknown) {
+      toast({ title: 'Error', description: e instanceof Error ? e.message : 'Unknown error', variant: 'destructive' });
     }
   };
 
@@ -133,26 +168,70 @@ export const JobForm = () => {
       <Label className="text-sm font-medium">{label}{required && ' *'}</Label>
       <Input
         type={type ?? 'text'}
-        value={(form as any)[field]}
+        value={(form as Record<string, string>)[field] ?? ''}
         onChange={(e) => update(field, e.target.value)}
         placeholder={placeholder ?? label}
         className="mt-1"
       />
+      {errors[field] && <p className="text-xs text-destructive mt-1">{errors[field]}</p>}
     </div>
   );
 
   return (
     <div className="min-h-screen bg-background">
-      <AppHeader title={isEdit ? 'Edit Job' : 'New Job'} showBack onBack={() => navigate(-1 as any)} />
+      <AppHeader title={isEdit ? 'Edit Job' : 'New Job'} showBack onBack={() => navigate(-1)} />
       <div className="p-4 space-y-6 max-w-lg mx-auto">
         <div className="space-y-4">
           <h3 className="font-semibold text-lg">Vehicle Details</h3>
-          <Field label="Job Number" field="external_job_number" placeholder="External reference" />
+          <Field label="Job Number" field="external_job_number" placeholder="Auto-generated if blank" />
           <Field label="Registration" field="vehicle_reg" required />
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Make" field="vehicle_make" required />
-            <Field label="Model" field="vehicle_model" required />
+          
+          {/* Make dropdown */}
+          <div>
+            <Label className="text-sm font-medium">Make *</Label>
+            {customMake ? (
+              <div className="flex gap-2 mt-1">
+                <Input value={form.vehicle_make} onChange={(e) => update('vehicle_make', e.target.value)} placeholder="Enter make" />
+                <Button variant="outline" size="sm" onClick={() => setCustomMake(false)}>List</Button>
+              </div>
+            ) : (
+              <Select value={form.vehicle_make} onValueChange={(v) => {
+                if (v === '__other__') { setCustomMake(true); update('vehicle_make', ''); update('vehicle_model', ''); }
+                else { update('vehicle_make', v); update('vehicle_model', ''); setCustomModel(false); }
+              }}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Select make" /></SelectTrigger>
+                <SelectContent>
+                  {CAR_MAKES.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                  <SelectItem value="__other__">Other…</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+            {errors.vehicle_make && <p className="text-xs text-destructive mt-1">{errors.vehicle_make}</p>}
           </div>
+
+          {/* Model dropdown */}
+          <div>
+            <Label className="text-sm font-medium">Model *</Label>
+            {customModel || customMake ? (
+              <div className="flex gap-2 mt-1">
+                <Input value={form.vehicle_model} onChange={(e) => update('vehicle_model', e.target.value)} placeholder="Enter model" />
+                {!customMake && <Button variant="outline" size="sm" onClick={() => setCustomModel(false)}>List</Button>}
+              </div>
+            ) : (
+              <Select value={form.vehicle_model} onValueChange={(v) => {
+                if (v === '__other__') { setCustomModel(true); update('vehicle_model', ''); }
+                else update('vehicle_model', v);
+              }} disabled={!form.vehicle_make}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder={form.vehicle_make ? "Select model" : "Select make first"} /></SelectTrigger>
+                <SelectContent>
+                  {models.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                  <SelectItem value="__other__">Other…</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+            {errors.vehicle_model && <p className="text-xs text-destructive mt-1">{errors.vehicle_model}</p>}
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <Field label="Colour" field="vehicle_colour" required />
             <Field label="Year" field="vehicle_year" />

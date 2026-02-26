@@ -10,13 +10,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { VehicleDiagram } from "@/components/VehicleDiagram";
 import { VehicleDamageModal } from "@/components/VehicleDamageModal";
 import { useNavigate, useParams } from "react-router-dom";
-import { ChevronLeft, ChevronRight, Camera, X, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Camera, X, Loader2, Plus, Trash2 } from "lucide-react";
 import { useJob, useSubmitInspection } from "@/hooks/useJobs";
 import { storageService } from "@/lib/storage";
 import { insertPhoto } from "@/lib/api";
+import { addPendingUpload } from "@/lib/pendingUploads";
 import { toast } from "@/hooks/use-toast";
-import { FUEL_LEVEL_MAP, FUEL_PERCENT_TO_LABEL } from "@/lib/types";
-import type { InspectionType, DamageItemDraft, PhotoType } from "@/lib/types";
+import { FUEL_LEVEL_MAP } from "@/lib/types";
+import type { InspectionType, DamageItemDraft, AdditionalPhotoDraft } from "@/lib/types";
 
 interface InspectionFormState {
   odometer: string;
@@ -46,6 +47,9 @@ interface InspectionFormState {
   damages: DamageItemDraft[];
   standardPhotos: Record<string, File | null>;
   standardPhotoUrls: Record<string, string>;
+  additionalPhotos: AdditionalPhotoDraft[];
+  driverName: string;
+  customerName: string;
 }
 
 const PHOTO_TYPES_BY_INSPECTION: Record<InspectionType, { key: string; label: string }[]> = {
@@ -82,47 +86,30 @@ export const InspectionFlow = () => {
   const [pendingDamagePosition, setPendingDamagePosition] = useState<{ x: number; y: number } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Signature refs
   const driverCanvasRef = useRef<HTMLCanvasElement>(null);
   const customerCanvasRef = useRef<HTMLCanvasElement>(null);
   const [driverSigned, setDriverSigned] = useState(false);
   const [customerSigned, setCustomerSigned] = useState(false);
 
   const [formState, setFormState] = useState<InspectionFormState>({
-    odometer: '',
-    fuelLevel: '',
-    vehicleCondition: '',
-    lightCondition: '',
-    oilLevel: '',
-    waterLevel: '',
-    notes: '',
-    handbook: '',
-    serviceBook: '',
-    mot: '',
-    v5: '',
-    parcelShelf: '',
-    spareWheel: '',
-    toolKit: '',
-    tyreInflationKit: '',
-    lockingWheelNut: '',
-    satNavWorking: '',
-    alloysOrTrims: '',
-    alloysDamaged: '',
-    wheelTrimsDamaged: '',
-    numberOfKeys: '',
-    evChargingCables: '',
-    aerial: '',
-    customerPaperwork: '',
-    damages: [],
-    standardPhotos: {},
-    standardPhotoUrls: {},
+    odometer: '', fuelLevel: '', vehicleCondition: '', lightCondition: '',
+    oilLevel: '', waterLevel: '', notes: '',
+    handbook: '', serviceBook: '', mot: '', v5: '', parcelShelf: '',
+    spareWheel: '', toolKit: '', tyreInflationKit: '', lockingWheelNut: '',
+    satNavWorking: '', alloysOrTrims: '', alloysDamaged: '', wheelTrimsDamaged: '',
+    numberOfKeys: '', evChargingCables: '', aerial: '', customerPaperwork: '',
+    damages: [], standardPhotos: {}, standardPhotoUrls: {}, additionalPhotos: [],
+    driverName: '', customerName: '',
   });
 
-  const totalSteps = 6;
+  // Typed step lists per inspection type
+  const pickupStepCount = 6;
+  const deliveryStepCount = 4;
+  const totalSteps = type === 'pickup' ? pickupStepCount : deliveryStepCount;
 
-  const updateField = (field: keyof InspectionFormState, value: string) => {
+  const updateField = useCallback((field: keyof InspectionFormState, value: string) => {
     setFormState((prev) => ({ ...prev, [field]: value }));
-  };
+  }, []);
 
   const addDamage = (position: { x: number; y: number }) => {
     setPendingDamagePosition(position);
@@ -132,18 +119,16 @@ export const InspectionFlow = () => {
   const handleDamageSubmit = (damage: { area: string; location: string; item: string; damageTypes: string[]; notes: string; photo?: File }) => {
     const pos = pendingDamagePosition || { x: 50, y: 50 };
     const draft: DamageItemDraft = {
-      tempId: Date.now().toString(),
-      x: pos.x,
-      y: pos.y,
-      area: damage.area,
-      location: damage.location,
-      item: damage.item,
-      damageTypes: damage.damageTypes,
-      notes: damage.notes,
-      photo: damage.photo,
+      tempId: Date.now().toString(), x: pos.x, y: pos.y,
+      area: damage.area, location: damage.location, item: damage.item,
+      damageTypes: damage.damageTypes, notes: damage.notes, photo: damage.photo,
     };
     setFormState((prev) => ({ ...prev, damages: [...prev.damages, draft] }));
     setPendingDamagePosition(null);
+  };
+
+  const removeDamage = (tempId: string) => {
+    setFormState((prev) => ({ ...prev, damages: prev.damages.filter((d) => d.tempId !== tempId) }));
   };
 
   const handlePhotoCapture = (photoKey: string, file: File) => {
@@ -153,6 +138,17 @@ export const InspectionFlow = () => {
       standardPhotos: { ...prev.standardPhotos, [photoKey]: file },
       standardPhotoUrls: { ...prev.standardPhotoUrls, [photoKey]: url },
     }));
+  };
+
+  const addAdditionalPhoto = (file: File, label: string) => {
+    const draft: AdditionalPhotoDraft = {
+      tempId: Date.now().toString(), file, label, previewUrl: URL.createObjectURL(file),
+    };
+    setFormState((prev) => ({ ...prev, additionalPhotos: [...prev.additionalPhotos, draft] }));
+  };
+
+  const removeAdditionalPhoto = (tempId: string) => {
+    setFormState((prev) => ({ ...prev, additionalPhotos: prev.additionalPhotos.filter((p) => p.tempId !== tempId) }));
   };
 
   // Signature drawing
@@ -170,81 +166,102 @@ export const InspectionFlow = () => {
       return { x: clientX - rect.left, y: clientY - rect.top };
     };
 
-    const start = (e: MouseEvent | TouchEvent) => {
-      e.preventDefault();
-      drawing = true;
-      const pos = getPos(e);
-      ctx.beginPath();
-      ctx.moveTo(pos.x, pos.y);
-    };
-    const move = (e: MouseEvent | TouchEvent) => {
-      if (!drawing) return;
-      e.preventDefault();
-      const pos = getPos(e);
-      ctx.lineTo(pos.x, pos.y);
-      ctx.strokeStyle = 'hsl(215 28% 17%)';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    };
-    const end = () => {
-      drawing = false;
-      if (isDriver) setDriverSigned(true);
-      else setCustomerSigned(true);
-    };
+    const start = (e: MouseEvent | TouchEvent) => { e.preventDefault(); drawing = true; const pos = getPos(e); ctx.beginPath(); ctx.moveTo(pos.x, pos.y); };
+    const move = (e: MouseEvent | TouchEvent) => { if (!drawing) return; e.preventDefault(); const pos = getPos(e); ctx.lineTo(pos.x, pos.y); ctx.strokeStyle = 'hsl(215 28% 17%)'; ctx.lineWidth = 2; ctx.stroke(); };
+    const end = () => { drawing = false; if (isDriver) setDriverSigned(true); else setCustomerSigned(true); };
 
     canvas.addEventListener('mousedown', start);
     canvas.addEventListener('mousemove', move);
     canvas.addEventListener('mouseup', end);
     canvas.addEventListener('mouseleave', end);
-    canvas.addEventListener('touchstart', start);
-    canvas.addEventListener('touchmove', move);
+    canvas.addEventListener('touchstart', start, { passive: false });
+    canvas.addEventListener('touchmove', move, { passive: false });
     canvas.addEventListener('touchend', end);
   }, []);
 
   const canvasToFile = async (canvas: HTMLCanvasElement, name: string): Promise<File> => {
     return new Promise((resolve) => {
-      canvas.toBlob((blob) => {
-        resolve(new File([blob!], name, { type: 'image/png' }));
-      }, 'image/png');
+      canvas.toBlob((blob) => { resolve(new File([blob!], name, { type: 'image/png' })); }, 'image/png');
     });
+  };
+
+  async function tryUploadPhoto(file: File, pathHint: string, photoType: string, label: string | null): Promise<{ url: string; backend: string; backendRef: string | null } | null> {
+    try {
+      const result = await storageService.uploadImage(file, pathHint);
+      return { url: result.url, backend: result.backend, backendRef: result.backendRef ?? null };
+    } catch {
+      await addPendingUpload(file, {
+        id: Date.now().toString() + Math.random().toString(36).slice(2),
+        jobId: jobId!,
+        inspectionType: type,
+        photoType,
+        label,
+      });
+      return null;
+    }
+  }
+
+  const validateBeforeSubmit = (): string[] => {
+    const missing: string[] = [];
+    if (!formState.odometer) missing.push('Odometer');
+    if (!formState.fuelLevel) missing.push('Fuel level');
+    if (!formState.driverName) missing.push('Driver name');
+    if (!driverSigned) missing.push('Driver signature');
+    if (!formState.customerName) missing.push('Customer name');
+    if (!customerSigned) missing.push('Customer signature');
+    return missing;
   };
 
   const handleFinalSubmit = async () => {
     if (!jobId) return;
+    const missing = validateBeforeSubmit();
+    if (missing.length > 0) {
+      toast({ title: 'Missing fields', description: missing.join(', '), variant: 'destructive' });
+      return;
+    }
+
     setSubmitting(true);
+    let pendingCount = 0;
     try {
       // 1. Upload standard photos
       const photoTypes = PHOTO_TYPES_BY_INSPECTION[type];
       for (const pt of photoTypes) {
         const file = formState.standardPhotos[pt.key];
         if (file) {
-          const result = await storageService.uploadImage(file, `jobs/${jobId}/${type}/${pt.key}/${Date.now()}`);
-          await insertPhoto({ job_id: jobId, inspection_id: null, type: pt.key, url: result.url, thumbnail_url: null, backend: result.backend, backend_ref: result.backendRef ?? null });
+          const result = await tryUploadPhoto(file, `jobs/${jobId}/${type}/${pt.key}/${Date.now()}`, pt.key, null);
+          if (result) {
+            await insertPhoto({ job_id: jobId, inspection_id: null, type: pt.key, url: result.url, thumbnail_url: null, backend: result.backend, backend_ref: result.backendRef, label: null });
+          } else { pendingCount++; }
         }
       }
 
-      // 2. Upload damage photos
+      // 2. Upload additional photos
+      for (const ap of formState.additionalPhotos) {
+        const photoKey = type === 'pickup' ? 'pickup_other' : 'delivery_other';
+        const result = await tryUploadPhoto(ap.file, `jobs/${jobId}/${type}/additional/${ap.tempId}`, photoKey, ap.label);
+        if (result) {
+          await insertPhoto({ job_id: jobId, inspection_id: null, type: photoKey, url: result.url, thumbnail_url: null, backend: result.backend, backend_ref: result.backendRef, label: ap.label });
+        } else { pendingCount++; }
+      }
+
+      // 3. Upload damage photos
       const damageItemsPayload = [];
       for (const d of formState.damages) {
         let photoUrl: string | null = null;
         if (d.photo) {
-          const result = await storageService.uploadImage(d.photo, `jobs/${jobId}/${type}/damage/${d.tempId}`);
-          await insertPhoto({ job_id: jobId, inspection_id: null, type: 'damage_close_up', url: result.url, thumbnail_url: null, backend: result.backend, backend_ref: result.backendRef ?? null });
-          photoUrl = result.url;
+          const result = await tryUploadPhoto(d.photo, `jobs/${jobId}/${type}/damage/${d.tempId}`, 'damage_close_up', null);
+          if (result) {
+            await insertPhoto({ job_id: jobId, inspection_id: null, type: 'damage_close_up', url: result.url, thumbnail_url: null, backend: result.backend, backend_ref: result.backendRef, label: null });
+            photoUrl = result.url;
+          } else { pendingCount++; }
         }
         damageItemsPayload.push({
-          x: d.x,
-          y: d.y,
-          area: d.area,
-          location: d.location,
-          item: d.item,
-          damage_types: d.damageTypes,
-          notes: d.notes,
-          photo_url: photoUrl,
+          x: d.x, y: d.y, area: d.area, location: d.location,
+          item: d.item, damage_types: d.damageTypes, notes: d.notes, photo_url: photoUrl,
         });
       }
 
-      // 3. Upload signatures
+      // 4. Upload signatures
       let driverSigUrl: string | null = null;
       let customerSigUrl: string | null = null;
       if (driverCanvasRef.current && driverSigned) {
@@ -258,18 +275,23 @@ export const InspectionFlow = () => {
         customerSigUrl = result.url;
       }
 
-      // 4. Submit inspection
-      await submitMutation.mutateAsync({
-        jobId,
-        type,
-        inspection: {
-          odometer: formState.odometer ? parseInt(formState.odometer) : null,
-          fuel_level_percent: FUEL_LEVEL_MAP[formState.fuelLevel] ?? null,
+      // 5. Submit inspection
+      const inspPayload: Record<string, unknown> = {
+        odometer: formState.odometer ? parseInt(formState.odometer) : null,
+        fuel_level_percent: FUEL_LEVEL_MAP[formState.fuelLevel] ?? null,
+        inspected_by_name: formState.driverName || null,
+        customer_name: formState.customerName || null,
+        driver_signature_url: driverSigUrl,
+        customer_signature_url: customerSigUrl,
+        notes: formState.notes || null,
+      };
+
+      if (type === 'pickup') {
+        Object.assign(inspPayload, {
           vehicle_condition: formState.vehicleCondition || null,
           light_condition: formState.lightCondition || null,
           oil_level_status: formState.oilLevel || null,
           water_level_status: formState.waterLevel || null,
-          notes: formState.notes || null,
           handbook: formState.handbook || null,
           service_book: formState.serviceBook || null,
           mot: formState.mot || null,
@@ -287,16 +309,21 @@ export const InspectionFlow = () => {
           ev_charging_cables: formState.evChargingCables || null,
           aerial: formState.aerial || null,
           customer_paperwork: formState.customerPaperwork || null,
-          driver_signature_url: driverSigUrl,
-          customer_signature_url: customerSigUrl,
-        },
-        damageItems: damageItemsPayload,
+        });
+      }
+
+      await submitMutation.mutateAsync({
+        jobId, type, inspection: inspPayload as any, damageItems: damageItemsPayload,
       });
 
-      toast({ title: 'Success', description: `${type === 'pickup' ? 'Pickup' : 'Delivery'} inspection submitted.` });
+      const jobRef = job?.external_job_number || jobId.slice(0, 8);
+      const reg = job?.vehicle_reg || '';
+      let desc = `${type === 'pickup' ? 'Pickup' : 'Delivery'} inspection submitted for ${jobRef} (${reg}).`;
+      if (pendingCount > 0) desc += ` ${pendingCount} photo(s) pending upload.`;
+      toast({ title: 'Success', description: desc });
       navigate(`/jobs/${jobId}`);
-    } catch (e: any) {
-      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    } catch (e: unknown) {
+      toast({ title: 'Error', description: e instanceof Error ? e.message : 'Submission failed', variant: 'destructive' });
     } finally {
       setSubmitting(false);
     }
@@ -310,24 +337,20 @@ export const InspectionFlow = () => {
     );
   }
 
-  const nextStep = () => {
-    if (currentStep < totalSteps) setCurrentStep(currentStep + 1);
-  };
-  const prevStep = () => {
-    if (currentStep > 1) setCurrentStep(currentStep - 1);
-  };
+  const nextStep = () => { if (currentStep < totalSteps) setCurrentStep(currentStep + 1); };
+  const prevStep = () => { if (currentStep > 1) setCurrentStep(currentStep - 1); };
 
-  // ─── Step 1: Odometer & Fuel ───
-  const renderStep1 = () => (
+  // ─── SHARED COMPONENTS ───
+  const OdometerFuel = () => (
     <div className="space-y-6">
       <h2 className="text-xl font-semibold text-center">Odometer & Fuel Level</h2>
       <div className="space-y-4">
         <div>
-          <Label htmlFor="odometer" className="text-base font-medium">Odometer</Label>
-          <Input id="odometer" type="number" placeholder="Enter mileage" value={formState.odometer} onChange={(e) => updateField('odometer', e.target.value)} className="mt-1" />
+          <Label htmlFor="odometer" className="text-base font-medium">Odometer *</Label>
+          <Input id="odometer" type="number" inputMode="numeric" placeholder="Enter mileage" value={formState.odometer} onChange={(e) => updateField('odometer', e.target.value)} className="mt-1" />
         </div>
         <div>
-          <Label className="text-base font-medium">Fuel Level</Label>
+          <Label className="text-base font-medium">Fuel Level *</Label>
           <RadioGroup value={formState.fuelLevel} onValueChange={(v) => updateField('fuelLevel', v)} className="mt-2">
             {['Empty', '1/4', '1/2', '3/4', 'Full'].map((level) => (
               <div key={level} className="flex items-center space-x-2">
@@ -341,8 +364,153 @@ export const InspectionFlow = () => {
     </div>
   );
 
-  // ─── Step 2: Checklist ───
-  const renderStep2 = () => (
+  const DamageStep = () => (
+    <div className="space-y-4">
+      <h2 className="text-xl font-semibold text-center">{type === 'pickup' ? 'Pickup' : 'Delivery'} Damage</h2>
+      <VehicleDiagram onAddDamage={addDamage} damages={formState.damages.map((d) => ({ id: d.tempId, x: d.x, y: d.y, area: d.area, item: d.item, damageTypes: d.damageTypes }))} />
+      {formState.damages.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="font-medium text-sm">Recorded Damages ({formState.damages.length})</h3>
+          {formState.damages.map((d) => (
+            <div key={d.tempId} className="flex items-center justify-between p-2 bg-muted rounded text-sm">
+              <span>{d.area} – {d.item}: {d.damageTypes.join(', ')}</span>
+              <Button variant="ghost" size="sm" onClick={() => removeDamage(d.tempId)}><Trash2 className="h-3 w-3" /></Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  const PhotosStep = () => {
+    const photoTypes = PHOTO_TYPES_BY_INSPECTION[type];
+    const [newLabel, setNewLabel] = useState('');
+    return (
+      <div className="space-y-6">
+        <h2 className="text-xl font-semibold text-center">Photos</h2>
+        <p className="text-center text-muted-foreground">Capture required vehicle photos</p>
+        <div className="grid grid-cols-2 gap-4">
+          {photoTypes.map((pt) => (
+            <div key={pt.key} className="space-y-2">
+              <Label className="text-sm font-medium">{pt.label}</Label>
+              {formState.standardPhotoUrls[pt.key] ? (
+                <img src={formState.standardPhotoUrls[pt.key]} alt={pt.label} className="w-full h-24 object-cover rounded border" />
+              ) : (
+                <div className="w-full h-24 bg-muted rounded border flex items-center justify-center">
+                  <Camera className="h-6 w-6 text-muted-foreground" />
+                </div>
+              )}
+              <input type="file" accept="image/*" capture="environment" className="hidden" id={`photo-${pt.key}`} onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhotoCapture(pt.key, f); }} />
+              <Label htmlFor={`photo-${pt.key}`} className="cursor-pointer">
+                <Button variant="outline" size="sm" className="w-full gap-1" asChild><span><Camera className="h-3 w-3" />{formState.standardPhotoUrls[pt.key] ? 'Retake' : 'Capture'}</span></Button>
+              </Label>
+            </div>
+          ))}
+        </div>
+
+        {/* Additional labelled photos */}
+        <div className="space-y-3 pt-4 border-t">
+          <h3 className="font-medium">Additional Photos</h3>
+          {formState.additionalPhotos.map((ap) => (
+            <div key={ap.tempId} className="flex items-center gap-3 p-2 bg-muted rounded">
+              <img src={ap.previewUrl} alt={ap.label} className="w-12 h-12 object-cover rounded" />
+              <span className="text-sm flex-1">{ap.label || 'Unlabelled'}</span>
+              <Button variant="ghost" size="sm" onClick={() => removeAdditionalPhoto(ap.tempId)}><Trash2 className="h-3 w-3" /></Button>
+            </div>
+          ))}
+          <div className="flex gap-2">
+            <Input placeholder="Label (e.g. Boot interior)" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} className="flex-1" />
+            <input type="file" accept="image/*" capture="environment" className="hidden" id="additional-photo-input" onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) { addAdditionalPhoto(f, newLabel || 'Unlabelled'); setNewLabel(''); }
+              e.target.value = '';
+            }} />
+            <Label htmlFor="additional-photo-input" className="cursor-pointer">
+              <Button variant="outline" size="sm" asChild><span><Plus className="h-4 w-4" /></span></Button>
+            </Label>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const SignaturesStep = () => (
+    <div className="space-y-6">
+      <h2 className="text-xl font-semibold text-center">Signatures</h2>
+      <Card className="p-4 space-y-3">
+        <h3 className="font-medium">Driver</h3>
+        <div>
+          <Label className="text-sm">Driver Name *</Label>
+          <Input value={formState.driverName} onChange={(e) => updateField('driverName', e.target.value)} placeholder="Driver full name" className="mt-1" />
+        </div>
+        <canvas ref={(el) => { (driverCanvasRef as React.MutableRefObject<HTMLCanvasElement | null>).current = el; setupCanvas(el); }} width={320} height={120} className="w-full border-2 border-dashed border-muted-foreground/25 rounded-lg bg-white touch-none" />
+        {driverSigned && <p className="text-xs text-success">Signed ✓</p>}
+      </Card>
+      <div className="bg-warning/10 border border-warning/20 rounded-lg p-4">
+        <p className="text-sm text-warning font-medium">Please pass the device to the customer for their signature.</p>
+      </div>
+      <Card className="p-4 space-y-3">
+        <h3 className="font-medium">Customer</h3>
+        <div>
+          <Label className="text-sm">Customer Name *</Label>
+          <Input value={formState.customerName} onChange={(e) => updateField('customerName', e.target.value)} placeholder="Customer full name" className="mt-1" />
+        </div>
+        <canvas ref={(el) => { (customerCanvasRef as React.MutableRefObject<HTMLCanvasElement | null>).current = el; setupCanvas(el); }} width={320} height={120} className="w-full border-2 border-dashed border-muted-foreground/25 rounded-lg bg-white touch-none" />
+        {customerSigned && <p className="text-xs text-success">Signed ✓</p>}
+      </Card>
+    </div>
+  );
+
+  const ReviewStep = () => {
+    const photoCount = Object.values(formState.standardPhotos).filter(Boolean).length;
+    const additionalCount = formState.additionalPhotos.length;
+    const jobRef = job?.external_job_number || jobId?.slice(0, 8);
+
+    return (
+      <div className="space-y-6">
+        <h2 className="text-xl font-semibold text-center">Review & Submit</h2>
+        <Card className="p-6 space-y-3">
+          <h3 className="font-medium">Inspection Summary</h3>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between"><span className="text-muted-foreground">Job:</span><span className="font-medium">{jobRef} – {job?.vehicle_reg}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Type:</span><span className="capitalize font-medium">{type}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Odometer:</span><span>{formState.odometer || '—'}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Fuel Level:</span><span>{formState.fuelLevel || '—'}</span></div>
+            {type === 'pickup' && (
+              <>
+                <div className="flex justify-between"><span className="text-muted-foreground">Condition:</span><span>{formState.vehicleCondition || '—'}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Light:</span><span>{formState.lightCondition || '—'}</span></div>
+              </>
+            )}
+            <div className="flex justify-between"><span className="text-muted-foreground">Damages:</span><span>{formState.damages.length}</span></div>
+            {formState.damages.length > 0 && (
+              <ul className="list-disc list-inside text-xs text-muted-foreground pl-2">
+                {formState.damages.map((d) => <li key={d.tempId}>{d.area} – {d.item}</li>)}
+              </ul>
+            )}
+            <div className="flex justify-between"><span className="text-muted-foreground">Standard Photos:</span><span>{photoCount}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Additional Photos:</span><span>{additionalCount}</span></div>
+            {formState.additionalPhotos.length > 0 && (
+              <ul className="list-disc list-inside text-xs text-muted-foreground pl-2">
+                {formState.additionalPhotos.map((p) => <li key={p.tempId}>{p.label}</li>)}
+              </ul>
+            )}
+            <div className="flex justify-between"><span className="text-muted-foreground">Driver:</span><span>{formState.driverName || '—'} {driverSigned ? '✓' : '—'}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Customer:</span><span>{formState.customerName || '—'} {customerSigned ? '✓' : '—'}</span></div>
+          </div>
+        </Card>
+        <div className="bg-warning/10 border border-warning/20 rounded-lg p-4">
+          <p className="text-sm text-warning">Please ensure all provided information is correct. You will not be able to make changes after submission.</p>
+        </div>
+        <Button className="w-full" size="lg" onClick={() => setShowConfirmationModal(true)} disabled={submitting}>
+          {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Submitting...</> : 'Submit Report'}
+        </Button>
+      </div>
+    );
+  };
+
+  // ─── Step 2: Collection Checklist (PICKUP ONLY) ───
+  const CollectionChecklist = () => (
     <div className="space-y-6">
       <h2 className="text-xl font-semibold text-center">Collection Checklist</h2>
       <div className="space-y-6">
@@ -382,10 +550,9 @@ export const InspectionFlow = () => {
           <Label htmlFor="notes" className="text-base font-medium">Notes</Label>
           <Textarea id="notes" placeholder="Notes" value={formState.notes} onChange={(e) => updateField('notes', e.target.value)} className="mt-1" />
         </div>
-
         <div className="space-y-4">
           <h3 className="font-medium">Equipment Checklist</h3>
-          {[
+          {([
             { key: 'handbook' as const, label: 'Handbook' },
             { key: 'serviceBook' as const, label: 'Service Book' },
             { key: 'mot' as const, label: 'MOT' },
@@ -397,17 +564,16 @@ export const InspectionFlow = () => {
             { key: 'evChargingCables' as const, label: 'EV Charging Cables', hasNA: true },
             { key: 'aerial' as const, label: 'Aerial', hasNA: true },
             { key: 'customerPaperwork' as const, label: 'Customer Paperwork' },
-          ].map((item) => (
+          ] as const).map((item) => (
             <div key={item.key}>
               <Label className="text-sm font-medium">{item.label}</Label>
-              <RadioGroup value={formState[item.key]} onValueChange={(v) => updateField(item.key, v)} className="mt-1 flex gap-6">
+              <RadioGroup value={formState[item.key] as string} onValueChange={(v) => updateField(item.key, v)} className="mt-1 flex gap-6">
                 <div className="flex items-center space-x-2"><RadioGroupItem value="Present" id={`${item.key}-p`} /><Label htmlFor={`${item.key}-p`}>Present</Label></div>
                 <div className="flex items-center space-x-2"><RadioGroupItem value="Not Present" id={`${item.key}-np`} /><Label htmlFor={`${item.key}-np`}>Not Present</Label></div>
-                {item.hasNA && <div className="flex items-center space-x-2"><RadioGroupItem value="N/A" id={`${item.key}-na`} /><Label htmlFor={`${item.key}-na`}>N/A</Label></div>}
+                {'hasNA' in item && item.hasNA && <div className="flex items-center space-x-2"><RadioGroupItem value="N/A" id={`${item.key}-na`} /><Label htmlFor={`${item.key}-na`}>N/A</Label></div>}
               </RadioGroup>
             </div>
           ))}
-
           <div>
             <Label className="text-sm font-medium">Spare Wheel</Label>
             <RadioGroup value={formState.spareWheel} onValueChange={(v) => updateField('spareWheel', v)} className="mt-1 flex flex-wrap gap-4">
@@ -416,7 +582,6 @@ export const InspectionFlow = () => {
               ))}
             </RadioGroup>
           </div>
-
           <div>
             <Label className="text-sm font-medium">Sat Nav Working</Label>
             <RadioGroup value={formState.satNavWorking} onValueChange={(v) => updateField('satNavWorking', v)} className="mt-1 flex gap-6">
@@ -425,7 +590,6 @@ export const InspectionFlow = () => {
               ))}
             </RadioGroup>
           </div>
-
           <div>
             <Label className="text-sm font-medium">Alloys or Wheel Trims</Label>
             <RadioGroup value={formState.alloysOrTrims} onValueChange={(v) => updateField('alloysOrTrims', v)} className="mt-1 flex gap-6">
@@ -433,7 +597,6 @@ export const InspectionFlow = () => {
               <div className="flex items-center space-x-2"><RadioGroupItem value="Wheel Trims" id="at-wt" /><Label htmlFor="at-wt">Wheel Trims</Label></div>
             </RadioGroup>
           </div>
-
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label className="text-sm font-medium">Alloys Damaged</Label>
@@ -452,97 +615,41 @@ export const InspectionFlow = () => {
               </RadioGroup>
             </div>
           </div>
-
           <div>
             <Label htmlFor="numberOfKeys" className="text-sm font-medium">Number of Keys</Label>
-            <Input id="numberOfKeys" placeholder="Number of Keys" value={formState.numberOfKeys} onChange={(e) => updateField('numberOfKeys', e.target.value)} className="mt-1" />
+            <Input id="numberOfKeys" inputMode="numeric" placeholder="Number of Keys" value={formState.numberOfKeys} onChange={(e) => updateField('numberOfKeys', e.target.value)} className="mt-1" />
           </div>
         </div>
       </div>
     </div>
   );
 
-  // ─── Step 3: Damage ───
-  const renderStep3 = () => (
-    <VehicleDiagram onAddDamage={addDamage} damages={formState.damages.map((d) => ({ id: d.tempId, x: d.x, y: d.y, area: d.area, item: d.item, damageTypes: d.damageTypes }))} />
-  );
-
-  // ─── Step 4: Photos ───
-  const renderStep4 = () => {
-    const photoTypes = PHOTO_TYPES_BY_INSPECTION[type];
-    return (
-      <div className="space-y-6">
-        <h2 className="text-xl font-semibold text-center">Photos</h2>
-        <p className="text-center text-muted-foreground">Capture required vehicle photos</p>
-        <div className="grid grid-cols-2 gap-4">
-          {photoTypes.map((pt) => (
-            <div key={pt.key} className="space-y-2">
-              <Label className="text-sm font-medium">{pt.label}</Label>
-              {formState.standardPhotoUrls[pt.key] ? (
-                <img src={formState.standardPhotoUrls[pt.key]} alt={pt.label} className="w-full h-24 object-cover rounded border" />
-              ) : (
-                <div className="w-full h-24 bg-muted rounded border flex items-center justify-center">
-                  <Camera className="h-6 w-6 text-muted-foreground" />
-                </div>
-              )}
-              <input type="file" accept="image/*" capture="environment" className="hidden" id={`photo-${pt.key}`} onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhotoCapture(pt.key, f); }} />
-              <Label htmlFor={`photo-${pt.key}`} className="cursor-pointer">
-                <Button variant="outline" size="sm" className="w-full gap-1" asChild><span><Camera className="h-3 w-3" />{formState.standardPhotoUrls[pt.key] ? 'Retake' : 'Capture'}</span></Button>
-              </Label>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+  // ─── STEP RENDERING BY TYPE ───
+  const renderPickupStep = (step: number) => {
+    switch (step) {
+      case 1: return <OdometerFuel />;
+      case 2: return <CollectionChecklist />;
+      case 3: return <DamageStep />;
+      case 4: return <PhotosStep />;
+      case 5: return <SignaturesStep />;
+      case 6: return <ReviewStep />;
+      default: return null;
+    }
   };
 
-  // ─── Step 5: Signatures ───
-  const renderStep5 = () => (
-    <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-center">Signatures</h2>
-      <Card className="p-4">
-        <h3 className="font-medium mb-2">Driver Signature</h3>
-        <canvas ref={(el) => { (driverCanvasRef as any).current = el; setupCanvas(el); }} width={320} height={120} className="w-full border-2 border-dashed border-muted-foreground/25 rounded-lg bg-white touch-none" />
-        {driverSigned && <p className="text-xs text-success mt-1">Signed</p>}
-      </Card>
-      <div className="bg-warning/10 border border-warning/20 rounded-lg p-4">
-        <p className="text-sm text-warning font-medium">Please pass the device to the customer for their signature.</p>
-      </div>
-      <Card className="p-4">
-        <h3 className="font-medium mb-2">Customer Signature</h3>
-        <canvas ref={(el) => { (customerCanvasRef as any).current = el; setupCanvas(el); }} width={320} height={120} className="w-full border-2 border-dashed border-muted-foreground/25 rounded-lg bg-white touch-none" />
-        {customerSigned && <p className="text-xs text-success mt-1">Signed</p>}
-      </Card>
-    </div>
-  );
+  const renderDeliveryStep = (step: number) => {
+    switch (step) {
+      case 1: return <OdometerFuel />;
+      case 2: return <DamageStep />;
+      case 3: return <SignaturesStep />;
+      case 4: return <ReviewStep />;
+      default: return null;
+    }
+  };
 
-  // ─── Step 6: Summary ───
-  const renderStep6 = () => (
-    <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-center">Review & Submit</h2>
-      <Card className="p-6 space-y-4">
-        <h3 className="font-medium">Inspection Summary</h3>
-        <div className="space-y-2 text-sm">
-          <div className="flex justify-between"><span>Type:</span><span className="capitalize">{type}</span></div>
-          <div className="flex justify-between"><span>Odometer:</span><span>{formState.odometer || 'Not set'}</span></div>
-          <div className="flex justify-between"><span>Fuel Level:</span><span>{formState.fuelLevel || 'Not set'}</span></div>
-          <div className="flex justify-between"><span>Condition:</span><span>{formState.vehicleCondition || 'Not set'}</span></div>
-          <div className="flex justify-between"><span>Damages:</span><span>{formState.damages.length}</span></div>
-          <div className="flex justify-between"><span>Photos:</span><span>{Object.values(formState.standardPhotos).filter(Boolean).length}</span></div>
-          <div className="flex justify-between"><span>Driver Signature:</span><span>{driverSigned ? '✓' : '—'}</span></div>
-          <div className="flex justify-between"><span>Customer Signature:</span><span>{customerSigned ? '✓' : '—'}</span></div>
-        </div>
-      </Card>
-      <div className="bg-warning/10 border border-warning/20 rounded-lg p-4">
-        <p className="text-sm text-warning">Please ensure all provided information is correct. You will not be able to make any changes past this point.</p>
-      </div>
-      <Button className="w-full" size="lg" onClick={() => setShowConfirmationModal(true)} disabled={submitting}>
-        {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Submitting...</> : 'Submit Report'}
-      </Button>
-    </div>
-  );
-
-  const steps = [renderStep1, renderStep2, renderStep3, renderStep4, renderStep5, renderStep6];
+  const renderCurrentStep = () => {
+    return type === 'pickup' ? renderPickupStep(currentStep) : renderDeliveryStep(currentStep);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -555,7 +662,7 @@ export const InspectionFlow = () => {
       </div>
 
       <div className="p-4">
-        {steps[currentStep - 1]()}
+        {renderCurrentStep()}
 
         <div className="flex justify-between mt-8 pt-6 border-t">
           <Button variant="outline" onClick={prevStep} disabled={currentStep === 1} className="gap-2">
@@ -578,9 +685,8 @@ export const InspectionFlow = () => {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <p className="text-sm">Please ensure all provided information is correct.</p>
-            <p className="text-sm">You will not be able to make any changes past this point.</p>
-            <p className="text-sm text-destructive font-medium">After confirming, please pass the device to the customer so they can review any details.</p>
+            <p className="text-sm">Please confirm that <strong>{formState.driverName}</strong> (driver) and <strong>{formState.customerName}</strong> (customer) have reviewed all details.</p>
+            <p className="text-sm text-destructive font-medium">You will not be able to make any changes after confirming.</p>
             <div className="flex gap-3 pt-4">
               <Button variant="outline" onClick={() => setShowConfirmationModal(false)} className="flex-1">CLOSE</Button>
               <Button onClick={() => { setShowConfirmationModal(false); handleFinalSubmit(); }} className="flex-1" disabled={submitting}>

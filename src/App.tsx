@@ -11,9 +11,17 @@ import { CompletedJobs } from "./pages/CompletedJobs";
 import { PendingJobs } from "./pages/PendingJobs";
 import { InspectionFlow } from "./pages/InspectionFlow";
 import { PodReport } from "./pages/PodReport";
+import { PendingUploads } from "./pages/PendingUploads";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      retry: 2,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -31,6 +39,7 @@ const App = () => (
           <Route path="/jobs/:jobId/edit" element={<JobForm />} />
           <Route path="/jobs/:jobId/pod" element={<PodReport />} />
           <Route path="/inspection/:jobId/:inspectionType" element={<InspectionFlow />} />
+          <Route path="/pending-uploads" element={<PendingUploads />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
