@@ -523,7 +523,7 @@ export const InspectionFlow = () => {
       await submitMutation.mutateAsync({
         jobId,
         type,
-        inspection: inspPayload as any,
+        inspectionPayload: inspPayload as any,
         damageItems: damageItemsPayload,
       });
 
