@@ -13,7 +13,7 @@ import type {
 // ─── Jobs ────────────────────────────────────────────────────────────
 
 export async function listJobs(filter?: { statuses?: string[] }): Promise<Job[]> {
-  let query = supabase.from('jobs').select('*').order('created_at', { ascending: false });
+  let query = supabase.from('jobs').select('*').eq('is_hidden', false).order('created_at', { ascending: false });
   if (filter?.statuses?.length) {
     query = query.in('status', filter.statuses);
   }
@@ -34,6 +34,7 @@ export async function listCompletedJobs(): Promise<Job[]> {
   const { data, error } = await supabase
     .from('jobs')
     .select('*')
+    .eq('is_hidden', false)
     .not('completed_at', 'is', null)
     .gte('completed_at', fourteenDaysAgo.toISOString())
     .order('completed_at', { ascending: false });
@@ -109,6 +110,18 @@ export async function updateJob(jobId: string, input: Partial<Job>): Promise<Job
   const { data, error } = await supabase.from('jobs').update(input).eq('id', jobId).select().single();
   if (error) throw error;
   return data as Job;
+}
+
+// ─── Archive ─────────────────────────────────────────────────────────
+
+export async function archiveJob(jobId: string): Promise<void> {
+  const { error } = await supabase.from('jobs').update({ is_hidden: true } as any).eq('id', jobId);
+  if (error) throw error;
+}
+
+export async function restoreJob(jobId: string): Promise<void> {
+  const { error } = await supabase.from('jobs').update({ is_hidden: false } as any).eq('id', jobId);
+  if (error) throw error;
 }
 
 // ─── Inspections ─────────────────────────────────────────────────────

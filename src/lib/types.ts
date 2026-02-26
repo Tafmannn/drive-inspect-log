@@ -65,6 +65,7 @@ export interface Job {
   completed_at: string | null;
   created_at: string;
   updated_at: string;
+  is_hidden?: boolean;
 }
 
 export interface Inspection {

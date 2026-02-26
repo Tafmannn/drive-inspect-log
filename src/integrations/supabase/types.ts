@@ -129,6 +129,7 @@ export type Database = {
           date: string
           driver_id: string | null
           id: string
+          is_hidden: boolean
           job_id: string
           label: string | null
           notes: string | null
@@ -144,6 +145,7 @@ export type Database = {
           date?: string
           driver_id?: string | null
           id?: string
+          is_hidden?: boolean
           job_id: string
           label?: string | null
           notes?: string | null
@@ -159,6 +161,7 @@ export type Database = {
           date?: string
           driver_id?: string | null
           id?: string
+          is_hidden?: boolean
           job_id?: string
           label?: string | null
           notes?: string | null
@@ -353,6 +356,7 @@ export type Database = {
           has_delivery_inspection: boolean
           has_pickup_inspection: boolean
           id: string
+          is_hidden: boolean
           notify_customer_on_arrival: boolean
           notify_customer_on_complete: boolean
           notify_customer_on_start: boolean
@@ -388,6 +392,7 @@ export type Database = {
           has_delivery_inspection?: boolean
           has_pickup_inspection?: boolean
           id?: string
+          is_hidden?: boolean
           notify_customer_on_arrival?: boolean
           notify_customer_on_complete?: boolean
           notify_customer_on_start?: boolean
@@ -423,6 +428,7 @@ export type Database = {
           has_delivery_inspection?: boolean
           has_pickup_inspection?: boolean
           id?: string
+          is_hidden?: boolean
           notify_customer_on_arrival?: boolean
           notify_customer_on_complete?: boolean
           notify_customer_on_start?: boolean
