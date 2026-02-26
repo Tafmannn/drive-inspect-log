@@ -1,3 +1,4 @@
+import { supabase } from "@/lib/supabaseClient";
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
