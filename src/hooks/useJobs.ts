@@ -80,3 +80,34 @@ export function useSubmitInspection() {
     },
   });
 }
+// Dashboard counts – small helper hook so the dashboard can render
+// without crashing, even if counts are simple for now.
+export function useDashboardCounts() {
+  return useQuery({
+    queryKey: ["dashboard-counts"],
+    queryFn: async () => {
+      // We keep this defensive and generic so it works with the
+      // current jobs shape without needing any DB changes.
+      const jobs = await api.listJobs();
+
+      const totalJobs = jobs.length;
+
+      const withPickup = jobs.filter((j: any) =>
+        j?.inspections?.some((i: any) => i?.type === "pickup")
+      ).length;
+
+      const withDelivery = jobs.filter((j: any) =>
+        j?.inspections?.some((i: any) => i?.type === "delivery")
+      ).length;
+
+      return {
+        totalJobs,
+        pickupCompleted: withPickup,
+        deliveryCompleted: withDelivery,
+        fullyCompleted: withDelivery,
+        pendingPickup: totalJobs - withPickup,
+        pendingDelivery: totalJobs - withDelivery,
+      };
+    },
+  });
+}
