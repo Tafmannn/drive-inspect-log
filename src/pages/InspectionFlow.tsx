@@ -31,6 +31,7 @@ import type {
   AdditionalPhotoDraft,
 } from "@/lib/types";
 import { PhotoViewer } from "@/components/PhotoViewer";
+import { useAuth } from "@/context/AuthContext";
 
 interface InspectionFormState {
   odometer: string;
@@ -91,6 +92,7 @@ const PHOTO_TYPES_BY_INSPECTION: Record<
 
 export const InspectionFlow = () => {
   const navigate = useNavigate();
+  const { canUseGallery } = useAuth();
   const { jobId, inspectionType } = useParams<{
     jobId: string;
     inspectionType: string;
@@ -98,6 +100,9 @@ export const InspectionFlow = () => {
 
   const type: InspectionType =
     (inspectionType as InspectionType) === "delivery" ? "delivery" : "pickup";
+
+  // Role-based: only admin can pick from gallery; drivers get camera only
+  const captureAttr = canUseGallery ? undefined : ("environment" as const);
 
   const { data: job, isLoading: jobLoading } = useJob(jobId ?? "");
   const submitMutation = useSubmitInspection();
@@ -721,7 +726,7 @@ export const InspectionFlow = () => {
               <input
                 type="file"
                 accept="image/*"
-                capture="environment"
+                capture={captureAttr}
                 className="hidden"
                 id={`photo-${pt.key}`}
                 onChange={(e) => {
@@ -776,7 +781,7 @@ export const InspectionFlow = () => {
             <input
               type="file"
               accept="image/*"
-              capture="environment"
+              capture={captureAttr}
               className="hidden"
               id="additional-photo-input"
               onChange={(e) => {

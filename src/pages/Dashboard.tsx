@@ -1,6 +1,6 @@
 import { AppHeader } from "@/components/AppHeader";
 import { DashboardCard } from "@/components/DashboardCard";
-import { Truck, Clock, AlertTriangle, Download, FileDown, Receipt } from "lucide-react";
+import { Truck, Clock, AlertTriangle, Download, FileDown, Receipt, ShieldCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useDashboardCounts } from "@/hooks/useJobs";
 import { toast } from "@/hooks/use-toast";
@@ -30,7 +30,7 @@ export const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <AppHeader title="v1.0.0" />
+      <AppHeader title="AXENTRA" />
       
       <div className="p-4 space-y-4">
         <DashboardCard
@@ -71,6 +71,13 @@ export const Dashboard = () => {
           onClick={() => {
             toast({ title: "Sync", description: "Job sync is a stub — connect external source to enable." });
           }}
+        />
+
+        <DashboardCard
+          icon={<ShieldCheck className="h-6 w-6" />}
+          title="Admin Dashboard"
+          subtitle="Stats, timesheets & management"
+          onClick={() => navigate('/admin')}
         />
 
         <div className="pt-2 space-y-2">

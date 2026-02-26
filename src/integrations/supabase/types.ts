@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value?: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
       damage_items: {
         Row: {
           area: string | null
@@ -335,6 +353,9 @@ export type Database = {
           has_delivery_inspection: boolean
           has_pickup_inspection: boolean
           id: string
+          notify_customer_on_arrival: boolean
+          notify_customer_on_complete: boolean
+          notify_customer_on_start: boolean
           pickup_address_line1: string
           pickup_address_line2: string | null
           pickup_city: string
@@ -367,6 +388,9 @@ export type Database = {
           has_delivery_inspection?: boolean
           has_pickup_inspection?: boolean
           id?: string
+          notify_customer_on_arrival?: boolean
+          notify_customer_on_complete?: boolean
+          notify_customer_on_start?: boolean
           pickup_address_line1: string
           pickup_address_line2?: string | null
           pickup_city: string
@@ -399,6 +423,9 @@ export type Database = {
           has_delivery_inspection?: boolean
           has_pickup_inspection?: boolean
           id?: string
+          notify_customer_on_arrival?: boolean
+          notify_customer_on_complete?: boolean
+          notify_customer_on_start?: boolean
           pickup_address_line1?: string
           pickup_address_line2?: string | null
           pickup_city?: string
@@ -464,6 +491,50 @@ export type Database = {
           },
           {
             foreignKeyName: "photos_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qr_confirmations: {
+        Row: {
+          confirmed_at: string | null
+          created_at: string
+          customer_name: string | null
+          event_type: string
+          expires_at: string
+          id: string
+          job_id: string
+          notes: string | null
+          token: string
+        }
+        Insert: {
+          confirmed_at?: string | null
+          created_at?: string
+          customer_name?: string | null
+          event_type: string
+          expires_at?: string
+          id?: string
+          job_id: string
+          notes?: string | null
+          token?: string
+        }
+        Update: {
+          confirmed_at?: string | null
+          created_at?: string
+          customer_name?: string | null
+          event_type?: string
+          expires_at?: string
+          id?: string
+          job_id?: string
+          notes?: string | null
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qr_confirmations_job_id_fkey"
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
