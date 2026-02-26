@@ -35,7 +35,7 @@ export const Dashboard = () => {
           icon={<Truck className="h-6 w-6" />}
           title="My Jobs"
           subtitle="View your current jobs"
-          count={isLoading ? undefined : counts?.activeJobs ?? 0}
+          count={isLoading ? undefined : counts?.totalJobs ?? 0}
           onClick={() => navigate('/jobs')}
         />
         
@@ -43,7 +43,7 @@ export const Dashboard = () => {
           icon={<Clock className="h-6 w-6" />}
           title="Last 14 days"
           subtitle="Completed jobs within the last 2 weeks"
-          count={isLoading ? undefined : counts?.completedLast14Days ?? 0}
+          count={isLoading ? undefined : counts?.fullyCompleted ?? 0}
           onClick={() => navigate('/jobs/completed')}
         />
         
@@ -51,7 +51,7 @@ export const Dashboard = () => {
           icon={<AlertTriangle className="h-6 w-6" />}
           title="Pending"
           subtitle="View all pending items"
-          count={isLoading ? undefined : counts?.pending ?? 0}
+          count={isLoading ? undefined : counts?.pendingPickup ?? 0}
           onClick={() => navigate('/jobs/pending')}
         />
         

@@ -30,9 +30,6 @@ export function useInspection(jobId: string, type: InspectionType) {
   });
 }
 
-export function useDashboardCounts() {
-  return useQuery({ queryKey: ["dashboard", "counts"], queryFn: api.getDashboardCounts });
-}
 
 export function useCreateJob() {
   const qc = useQueryClient();
