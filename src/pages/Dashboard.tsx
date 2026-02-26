@@ -1,10 +1,11 @@
 import { AppHeader } from "@/components/AppHeader";
 import { DashboardCard } from "@/components/DashboardCard";
-import { Truck, Clock, AlertTriangle, Download, FileDown } from "lucide-react";
+import { Truck, Clock, AlertTriangle, Download, FileDown, Receipt } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useDashboardCounts } from "@/hooks/useJobs";
 import { toast } from "@/hooks/use-toast";
 import { exportJobsCsv, exportInspectionsCsv } from "@/lib/export";
+import { exportExpensesCsv } from "@/lib/expenseApi";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
@@ -13,11 +14,12 @@ export const Dashboard = () => {
   const { data: counts, isLoading } = useDashboardCounts();
   const [exporting, setExporting] = useState(false);
 
-  const handleExport = async (type: 'jobs' | 'inspections') => {
+  const handleExport = async (type: 'jobs' | 'inspections' | 'expenses') => {
     setExporting(true);
     try {
       if (type === 'jobs') await exportJobsCsv();
-      else await exportInspectionsCsv();
+      else if (type === 'inspections') await exportInspectionsCsv();
+      else await exportExpensesCsv();
       toast({ title: 'Exported', description: `${type} CSV downloaded.` });
     } catch (e: unknown) {
       toast({ title: 'Export failed', description: e instanceof Error ? e.message : 'Unknown error', variant: 'destructive' });
@@ -54,6 +56,13 @@ export const Dashboard = () => {
           count={isLoading ? undefined : counts?.pendingUploads ?? 0}
           onClick={() => navigate('/pending-uploads')}
         />
+
+        <DashboardCard
+          icon={<Receipt className="h-6 w-6" />}
+          title="Expenses"
+          subtitle="Log and view your expenses"
+          onClick={() => navigate('/expenses')}
+        />
         
         <DashboardCard
           icon={<Download className="h-6 w-6" />}
@@ -66,12 +75,15 @@ export const Dashboard = () => {
 
         <div className="pt-2 space-y-2">
           <h3 className="text-sm font-semibold text-muted-foreground">Exports</h3>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <Button variant="outline" onClick={() => handleExport('jobs')} disabled={exporting}>
-              <FileDown className="h-4 w-4 mr-2" /> Jobs CSV
+              <FileDown className="h-4 w-4 mr-1" /> Jobs
             </Button>
             <Button variant="outline" onClick={() => handleExport('inspections')} disabled={exporting}>
-              <FileDown className="h-4 w-4 mr-2" /> Inspections CSV
+              <FileDown className="h-4 w-4 mr-1" /> Inspections
+            </Button>
+            <Button variant="outline" onClick={() => handleExport('expenses')} disabled={exporting}>
+              <FileDown className="h-4 w-4 mr-1" /> Expenses
             </Button>
           </div>
         </div>

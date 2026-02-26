@@ -64,6 +64,100 @@ export type Database = {
           },
         ]
       }
+      expense_receipts: {
+        Row: {
+          backend: string
+          backend_ref: string | null
+          created_at: string
+          expense_id: string
+          id: string
+          thumbnail_url: string | null
+          url: string
+        }
+        Insert: {
+          backend?: string
+          backend_ref?: string | null
+          created_at?: string
+          expense_id: string
+          id?: string
+          thumbnail_url?: string | null
+          url: string
+        }
+        Update: {
+          backend?: string
+          backend_ref?: string | null
+          created_at?: string
+          expense_id?: string
+          id?: string
+          thumbnail_url?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_receipts_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
+            referencedRelation: "expenses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      expenses: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          currency: string
+          date: string
+          driver_id: string | null
+          id: string
+          job_id: string
+          label: string | null
+          notes: string | null
+          time: string | null
+          updated_at: string
+          upload_status: string
+        }
+        Insert: {
+          amount: number
+          category: string
+          created_at?: string
+          currency?: string
+          date?: string
+          driver_id?: string | null
+          id?: string
+          job_id: string
+          label?: string | null
+          notes?: string | null
+          time?: string | null
+          updated_at?: string
+          upload_status?: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          currency?: string
+          date?: string
+          driver_id?: string | null
+          id?: string
+          job_id?: string
+          label?: string | null
+          notes?: string | null
+          time?: string | null
+          updated_at?: string
+          upload_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inspections: {
         Row: {
           aerial: string | null

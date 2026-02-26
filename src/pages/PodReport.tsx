@@ -5,7 +5,8 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { PhotoViewer } from "@/components/PhotoViewer";
 import { useJob } from "@/hooks/useJobs";
-import { useParams } from "react-router-dom";
+import { useJobExpenses } from "@/hooks/useExpenses";
+import { useNavigate, useParams } from "react-router-dom";
 import { Loader2, Mail, Share2, FileDown } from "lucide-react";
 import { openPodEmail, generatePodEmailBody } from "@/lib/podEmail";
 import { sharePodPdf, emailPodPdf } from "@/lib/podPdf";
@@ -66,9 +67,12 @@ function getChecklistItems(inspection: Inspection | undefined) {
 }
 
 export const PodReport = () => {
+  const navigate = useNavigate();
   const { jobId } = useParams<{ jobId: string }>();
   const { data: job, isLoading } = useJob(jobId ?? "");
+  const { data: jobExpenses } = useJobExpenses(jobId ?? "");
   const [pdfLoading, setPdfLoading] = useState(false);
+  const expenseTotal = jobExpenses?.reduce((sum, e) => sum + Number(e.amount), 0) ?? 0;
 
   const handleShare = async () => {
     if (!job) return;
@@ -151,7 +155,6 @@ export const PodReport = () => {
   const pickupChecklistItems = getChecklistItems(pickup);
   const deliveryChecklistItems = getChecklistItems(delivery);
 
-  // Helper to render a detail row
   const DetailRow = ({ label, value }: { label: string; value: string }) => (
     <div className="flex justify-between py-1">
       <span className="text-xs text-muted-foreground">{label}</span>
@@ -180,7 +183,6 @@ export const PodReport = () => {
 
       <main className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto py-6 px-3 sm:px-6 space-y-4">
-          {/* Top banner */}
           <Card className="border border-border shadow-sm">
             <div className="flex items-center justify-between px-6 py-4 bg-foreground text-background rounded-t-lg">
               <div className="flex flex-col">
@@ -194,7 +196,6 @@ export const PodReport = () => {
             </div>
 
             <div className="p-6 space-y-6">
-              {/* ── Vehicle Details ── */}
               <Card className="p-4 space-y-1">
                 <h3 className="text-sm font-semibold mb-2">Vehicle Details</h3>
                 <DetailRow label="Registration" value={job.vehicle_reg} />
@@ -210,7 +211,6 @@ export const PodReport = () => {
 
               <Separator />
 
-              {/* ── Pickup Details ── */}
               <Card className="p-4 space-y-1">
                 <h3 className="text-sm font-semibold mb-2">Pickup Details</h3>
                 <DetailRow label="Contact" value={`${job.pickup_contact_name} (${job.pickup_contact_phone})`} />
@@ -225,7 +225,6 @@ export const PodReport = () => {
                 <DetailRow label="Photos" value={String(pickupPhotos.length)} />
               </Card>
 
-              {/* ── Pickup Checklist ── */}
               {pickup && pickupChecklistItems.length > 0 && (
                 <Card className="p-4 space-y-2">
                   <h3 className="text-sm font-semibold">Pickup Checklist</h3>
@@ -243,7 +242,6 @@ export const PodReport = () => {
                 </Card>
               )}
 
-              {/* ── Delivery Details ── */}
               <Card className="p-4 space-y-1">
                 <h3 className="text-sm font-semibold mb-2">Delivery Details</h3>
                 <DetailRow label="Contact" value={`${job.delivery_contact_name} (${job.delivery_contact_phone})`} />
@@ -258,7 +256,6 @@ export const PodReport = () => {
                 <DetailRow label="Photos" value={String(deliveryPhotos.length)} />
               </Card>
 
-              {/* ── Delivery Checklist ── */}
               {delivery && deliveryChecklistItems.length > 0 && (
                 <Card className="p-4 space-y-2">
                   <h3 className="text-sm font-semibold">Delivery Checklist</h3>
@@ -276,7 +273,6 @@ export const PodReport = () => {
                 </Card>
               )}
 
-              {/* ── Damage Summary ── */}
               {(pickupDamages.length > 0 || deliveryDamages.length > 0) && (
                 <Card className="p-4 space-y-2">
                   <h3 className="text-sm font-semibold">Damage Summary</h3>
@@ -289,7 +285,6 @@ export const PodReport = () => {
                 </Card>
               )}
 
-              {/* ── Photos ── */}
               <Card className="p-4 space-y-4">
                 <h3 className="text-sm font-semibold">Photos</h3>
                 <PhotoViewer
@@ -309,7 +304,6 @@ export const PodReport = () => {
                 </p>
               </Card>
 
-              {/* ── Signatures ── */}
               <Card className="p-4 space-y-2">
                 <h3 className="text-sm font-semibold">Signatures</h3>
                 <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
@@ -332,7 +326,27 @@ export const PodReport = () => {
                 </div>
               </Card>
 
-              {/* ── Declaration ── */}
+              {/* ── Expenses ── */}
+              <Card className="p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold">Expenses for this Job</h3>
+                  <span className="text-xs font-medium text-foreground">{jobExpenses?.length ?? 0} expenses – £{expenseTotal.toFixed(2)}</span>
+                </div>
+                {jobExpenses && jobExpenses.length > 0 ? (
+                  <div className="space-y-1">
+                    {jobExpenses.map(e => (
+                      <div key={e.id} className="flex justify-between text-xs py-0.5">
+                        <span className="text-muted-foreground">{e.category}{e.label ? ` – ${e.label}` : ''}</span>
+                        <span className="font-medium">£{Number(e.amount).toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">No expenses recorded</p>
+                )}
+                <Button size="sm" variant="outline" onClick={() => navigate(`/expenses/new?jobId=${jobId}`)}>Add Expense</Button>
+              </Card>
+
               <Card className="p-4 space-y-2 text-xs text-muted-foreground">
                 <h3 className="text-sm font-semibold text-foreground">Customer Declaration</h3>
                 <p>
@@ -341,7 +355,6 @@ export const PodReport = () => {
                 </p>
               </Card>
 
-              {/* Footer */}
               <div className="flex items-center justify-between pt-2 text-[10px] text-muted-foreground">
                 <span>Generated by Axentra Vehicle Logistics</span>
                 <span>{new Date().toLocaleString("en-GB")} • Job {ref}</span>
