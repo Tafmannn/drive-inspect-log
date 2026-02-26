@@ -1,110 +1,277 @@
-import { get, set, del, keys, values } from 'idb-keyval';
-import { storageService } from './storage';
-import { insertPhoto } from './api';
+import { useState, useEffect, useMemo } from "react";
+import { AppHeader } from "@/components/AppHeader";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { useNavigate } from "react-router-dom";
+import {
+  getAllPendingUploads,
+  retryUpload,
+  retryAllPending,
+  type PendingUpload,
+} from "@/lib/pendingUploads";
+import {
+  Loader2,
+  RefreshCw,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Trash2,
+  Info,
+} from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
-export interface PendingUpload {
-  id: string;
-  jobId: string;
-  inspectionType: 'pickup' | 'delivery';
-  photoType: string;
-  label: string | null;
-  fileName: string;
-  createdAt: string;
-  status: 'pending' | 'uploading' | 'failed' | 'done';
-  errorMessage?: string;
-}
+// Optional: extend PendingUpload locally for TS hints (doesn't change actual storage)
+type PendingUploadWithJob = PendingUpload & {
+  jobNumber?: string | null;
+  vehicleReg?: string | null;
+};
 
-const PREFIX = 'pending-upload-';
-const fileKey = (id: string) => `${PREFIX}file-${id}`;
-const metaKey = (id: string) => `${PREFIX}meta-${id}`;
+export const PendingUploads = () => {
+  const navigate = useNavigate();
+  const [uploads, setUploads] = useState<PendingUploadWithJob[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [retrying, setRetrying] = useState<string | null>(null);
+  const [retryingAll, setRetryingAll] = useState(false);
+  const [clearing, setClearing] = useState<string | null>(null);
 
-export async function addPendingUpload(
-  file: File,
-  meta: Omit<PendingUpload, 'status' | 'createdAt' | 'fileName'>
-): Promise<PendingUpload> {
-  const entry: PendingUpload = {
-    ...meta,
-    fileName: file.name,
-    status: 'pending',
-    createdAt: new Date().toISOString(),
+  const refresh = async () => {
+    setLoading(true);
+    const items = await getAllPendingUploads();
+    setUploads(items as PendingUploadWithJob[]);
+    setLoading(false);
   };
-  await set(metaKey(meta.id), entry);
-  await set(fileKey(meta.id), file);
-  return entry;
-}
 
-export async function getAllPendingUploads(): Promise<PendingUpload[]> {
-  const allKeys = await keys();
-  const metaKeys = (allKeys as string[]).filter((k) => k.startsWith(`${PREFIX}meta-`));
-  const items: PendingUpload[] = [];
-  for (const k of metaKeys) {
-    const v = await get<PendingUpload>(k);
-    if (v && v.status !== 'done') items.push(v);
-  }
-  return items.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-}
+  useEffect(() => {
+    void refresh();
+  }, []);
 
-export async function getPendingCountForJob(jobId: string): Promise<number> {
-  const all = await getAllPendingUploads();
-  return all.filter((u) => u.jobId === jobId && u.status !== 'done').length;
-}
-
-export async function retryUpload(id: string): Promise<boolean> {
-  const meta = await get<PendingUpload>(metaKey(id));
-  const file = await get<File>(fileKey(id));
-  if (!meta || !file) return false;
-
-  meta.status = 'uploading';
-  await set(metaKey(id), meta);
-
-  try {
-    const result = await storageService.uploadImage(
-      file,
-      `jobs/${meta.jobId}/${meta.inspectionType}/${meta.photoType}/${meta.id}`
-    );
-    await insertPhoto({
-      job_id: meta.jobId,
-      inspection_id: null,
-      type: meta.photoType,
-      url: result.url,
-      thumbnail_url: null,
-      backend: result.backend,
-      backend_ref: result.backendRef ?? null,
-      label: meta.label,
-    });
-    meta.status = 'done';
-    await set(metaKey(id), meta);
-    await del(fileKey(id));
-    return true;
-  } catch (e: unknown) {
-    meta.status = 'failed';
-    meta.errorMessage = e instanceof Error ? e.message : 'Unknown error';
-    await set(metaKey(id), meta);
-    return false;
-  }
-}
-
-export async function retryAllPending(): Promise<{ succeeded: number; failed: number }> {
-  const all = await getAllPendingUploads();
-  let succeeded = 0;
-  let failed = 0;
-  for (const item of all) {
-    if (item.status === 'done') continue;
-    const ok = await retryUpload(item.id);
-    if (ok) succeeded++;
-    else failed++;
-  }
-  return { succeeded, failed };
-}
-
-export async function clearDoneUploads(): Promise<void> {
-  const allKeys = await keys();
-  const metaKeys = (allKeys as string[]).filter((k) => k.startsWith(`${PREFIX}meta-`));
-  for (const k of metaKeys) {
-    const v = await get<PendingUpload>(k);
-    if (v && v.status === 'done') {
-      await del(k);
-      await del(fileKey(v.id));
+  const handleRetry = async (id: string) => {
+    setRetrying(id);
+    const ok = await retryUpload(id);
+    if (ok) {
+      toast({ title: "Upload succeeded" });
+    } else {
+      toast({ title: "Upload failed", variant: "destructive" });
     }
-  }
-}
+    await refresh();
+    setRetrying(null);
+  };
+
+  const handleRetryAll = async () => {
+    setRetryingAll(true);
+    const { succeeded, failed } = await retryAllPending();
+    toast({
+      title: "Retry complete",
+      description: `${succeeded} succeeded, ${failed} failed.`,
+    });
+    await refresh();
+    setRetryingAll(false);
+  };
+
+  // If you later add a "deletePendingUpload" helper, wire it here.
+  const handleClear = async (u: PendingUploadWithJob) => {
+    // Placeholder UX only – actual delete helper to be implemented in pendingUploads.ts
+    toast({
+      title: "Not implemented yet",
+      description:
+        "Clear/remove action will be wired once deletePendingUpload is available.",
+      variant: "destructive",
+    });
+  };
+
+  const statusIcon = (status: string) => {
+    switch (status) {
+      case "pending":
+        return <Clock className="h-4 w-4 text-warning" />;
+      case "uploading":
+        return <Loader2 className="h-4 w-4 animate-spin text-primary" />;
+      case "failed":
+        return <XCircle className="h-4 w-4 text-destructive" />;
+      case "done":
+        return <CheckCircle className="h-4 w-4 text-success" />;
+      default:
+        return null;
+    }
+  };
+
+  // Group uploads by job for clearer context
+  const grouped = useMemo(() => {
+    const byJob: Record<
+      string,
+      { key: string; jobNumber?: string | null; vehicleReg?: string | null; items: PendingUploadWithJob[] }
+    > = {};
+
+    for (const u of uploads) {
+      const key =
+        (u.jobNumber || u.vehicleReg || u.jobId || "unknown") as string;
+      if (!byJob[key]) {
+        byJob[key] = {
+          key,
+          jobNumber: u.jobNumber,
+          vehicleReg: u.vehicleReg,
+          items: [],
+        };
+      }
+      byJob[key].items.push(u);
+    }
+
+    return Object.values(byJob);
+  }, [uploads]);
+
+  const totalPending = uploads.length;
+
+  return (
+    <div className="min-h-screen bg-background">
+      <AppHeader
+        title="Pending Uploads"
+        showBack
+        onBack={() => navigate(-1)}
+      />
+      <div className="p-4 space-y-4 max-w-lg mx-auto">
+        {/* Summary / info */}
+        <Card className="p-3 flex items-start gap-2">
+          <Info className="h-4 w-4 mt-0.5 text-muted-foreground" />
+          <div className="text-xs text-muted-foreground space-y-1">
+            <p>
+              When signal is weak, Axentra stores photos locally and retries
+              them when you&apos;re back online.
+            </p>
+            <p>
+              Use <strong>Retry</strong> on individual items or{" "}
+              <strong>Retry All</strong> to push everything again.
+            </p>
+          </div>
+        </Card>
+
+        {totalPending > 0 && (
+          <Button
+            onClick={handleRetryAll}
+            disabled={retryingAll}
+            className="w-full"
+          >
+            {retryingAll ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="mr-2 h-4 w-4" />
+            )}
+            Retry All ({totalPending})
+          </Button>
+        )}
+
+        {loading && (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        )}
+
+        {!loading && totalPending === 0 && (
+          <p className="text-center py-12 text-muted-foreground">
+            No pending uploads. All photos are synced.
+          </p>
+        )}
+
+        {/* Grouped by job */}
+        {!loading &&
+          grouped.map((group) => {
+            const first = group.items[0];
+            const jobLabel =
+              group.jobNumber && group.vehicleReg
+                ? `${group.jobNumber} – ${group.vehicleReg}`
+                : group.jobNumber || group.vehicleReg || "Unknown job";
+
+            const pickupCount = group.items.filter(
+              (u) => u.inspectionType === "pickup",
+            ).length;
+            const deliveryCount = group.items.filter(
+              (u) => u.inspectionType === "delivery",
+            ).length;
+
+            return (
+              <div key={group.key} className="space-y-2">
+                <div className="flex items-center justify-between px-1">
+                  <div className="flex flex-col">
+                    <p className="text-sm font-semibold">{jobLabel}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Pickup: {pickupCount} · Delivery: {deliveryCount}
+                    </p>
+                  </div>
+                  {first.jobId && (
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      onClick={() => navigate(`/jobs/${first.jobId}`)}
+                    >
+                      View job
+                    </Button>
+                  )}
+                </div>
+
+                {group.items.map((u) => (
+                  <Card
+                    key={u.id}
+                    className="p-4 flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      {statusIcon(u.status)}
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {u.photoType}
+                          {u.label ? ` – ${u.label}` : ""}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {u.inspectionType} ·{" "}
+                          {new Date(u.createdAt).toLocaleString()}
+                        </p>
+                        {u.errorMessage && (
+                          <p className="text-xs text-destructive">
+                            {u.errorMessage}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant={
+                          u.status === "failed"
+                            ? "destructive"
+                            : "secondary"
+                        }
+                        className="capitalize"
+                      >
+                        {u.status}
+                      </Badge>
+                      {(u.status === "pending" ||
+                        u.status === "failed") && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleRetry(u.id)}
+                          disabled={retrying === u.id}
+                        >
+                          {retrying === u.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-3 w-3" />
+                          )}
+                        </Button>
+                      )}
+                      {/* Future: clear/remove when delete helper exists */}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleClear(u)}
+                        disabled={clearing === u.id}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            );
+          })}
+      </div>
+    </div>
+  );
+};
