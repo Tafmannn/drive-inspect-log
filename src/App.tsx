@@ -13,6 +13,7 @@ import { InspectionFlow } from "./pages/InspectionFlow";
 import { PodReport } from "./pages/PodReport";
 import { PendingUploads } from "./pages/PendingUploads";
 import NotFound from "./pages/NotFound";
+import { AppErrorBoundary } from "./components/AppErrorBoundary";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -28,21 +29,26 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/jobs" element={<JobList />} />
-          <Route path="/jobs/new" element={<JobForm />} />
-          <Route path="/jobs/completed" element={<CompletedJobs />} />
-          <Route path="/jobs/pending" element={<PendingJobs />} />
-          <Route path="/jobs/:jobId" element={<JobDetail />} />
-          <Route path="/jobs/:jobId/edit" element={<JobForm />} />
-          <Route path="/jobs/:jobId/pod" element={<PodReport />} />
-          <Route path="/inspection/:jobId/:inspectionType" element={<InspectionFlow />} />
-          <Route path="/pending-uploads" element={<PendingUploads />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
+      <AppErrorBoundary>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/jobs" element={<JobList />} />
+            <Route path="/jobs/new" element={<JobForm />} />
+            <Route path="/jobs/completed" element={<CompletedJobs />} />
+            <Route path="/jobs/pending" element={<PendingJobs />} />
+            <Route path="/jobs/:jobId" element={<JobDetail />} />
+            <Route path="/jobs/:jobId/edit" element={<JobForm />} />
+            <Route path="/jobs/:jobId/pod" element={<PodReport />} />
+            <Route
+              path="/inspection/:jobId/:inspectionType"
+              element={<InspectionFlow />}
+            />
+            <Route path="/pending-uploads" element={<PendingUploads />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </AppErrorBoundary>
     </TooltipProvider>
   </QueryClientProvider>
 );
