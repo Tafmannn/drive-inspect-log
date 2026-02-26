@@ -47,19 +47,6 @@ export function generatePodEmailBody(
 
   const pickupOdo = pickup?.odometer ?? null;
   const deliveryOdo = delivery?.odometer ?? null;
-  const journeyMiles =
-    pickupOdo != null && deliveryOdo != null
-      ? deliveryOdo - pickupOdo
-      : null;
-
-  const journeyLine =
-    journeyMiles != null && journeyMiles >= 0
-      ? `${pickupOdo?.toLocaleString("en-GB")} → ${deliveryOdo?.toLocaleString(
-          "en-GB"
-        )} miles (approx. ${journeyMiles.toLocaleString(
-          "en-GB"
-        )} miles driven)`
-      : "N/A";
 
   const lines: string[] = [];
 
@@ -88,7 +75,8 @@ export function generatePodEmailBody(
   );
   lines.push(`Pickup postcode: ${job.pickup_postcode}`);
   lines.push(`Delivery postcode: ${job.delivery_postcode}`);
-  lines.push(`Mileage: ${journeyLine}`);
+  lines.push(`Pickup odometer: ${pickupOdo != null ? pickupOdo.toLocaleString("en-GB") : "N/A"}`);
+  lines.push(`Delivery odometer: ${deliveryOdo != null ? deliveryOdo.toLocaleString("en-GB") : "N/A"}`);
   lines.push("");
 
   // Pickup block

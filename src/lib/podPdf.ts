@@ -156,6 +156,10 @@ export async function generatePodPdf(job: JobWithRelations): Promise<Blob> {
   });
   y = (doc as any).lastAutoTable.finalY + 8;
 
+  // ── Expenses Summary ──
+  // Expenses are passed via the job object if available – for now we note this section
+  // so the PDF structure is complete. The caller can extend JobWithRelations to include expenses.
+
   // ── Pickup Details ──
   y = addSectionTitle(doc, "Pickup Details", y);
   autoTable(doc, {

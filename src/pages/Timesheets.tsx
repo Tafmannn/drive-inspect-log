@@ -126,8 +126,9 @@ export const Timesheets = () => {
       r.date, formatTime(r.firstActivity), formatTime(r.lastActivity),
       String(r.totalJobs), String(r.totalMileage), r.totalExpenses.toFixed(2),
     ].join(","));
+    const BOM = '\uFEFF';
     const csv = [headers.join(","), ...csvRows].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
+    const blob = new Blob([BOM + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;

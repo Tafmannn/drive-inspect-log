@@ -13,9 +13,11 @@ import { EXPENSE_CATEGORIES, getExpensesForJob } from "@/lib/expenseApi";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Camera, ImagePlus, X } from "lucide-react";
 import type { Job } from "@/lib/types";
+import { useAuth } from "@/context/AuthContext";
 
 export const ExpenseForm = () => {
   const navigate = useNavigate();
+  const { canUseGallery } = useAuth();
   const { expenseId } = useParams<{ expenseId: string }>();
   const [searchParams] = useSearchParams();
   const preselectedJobId = searchParams.get("jobId") || "";
@@ -239,9 +241,11 @@ export const ExpenseForm = () => {
             <Button type="button" variant="outline" size="sm" onClick={() => cameraInputRef.current?.click()}>
               <Camera className="h-4 w-4 mr-1" /> Camera
             </Button>
-            <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
-              <ImagePlus className="h-4 w-4 mr-1" /> Gallery
-            </Button>
+            {canUseGallery && (
+              <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                <ImagePlus className="h-4 w-4 mr-1" /> Gallery
+              </Button>
+            )}
           </div>
           <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => handleFileSelect(e.target.files)} />
           <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={e => handleFileSelect(e.target.files)} />
