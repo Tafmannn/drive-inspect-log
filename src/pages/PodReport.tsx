@@ -81,18 +81,17 @@ export const PodReport = () => {
       <AppHeader
         title="POD Report"
         showBack
-        rightSlot={
-          <Button
-            size="sm"
-            variant="ghost"
-            className="gap-1"
-            onClick={() => openPodEmail(job)}
-          >
-            <Mail className="h-4 w-4" />
-            Email POD
-          </Button>
-        }
-      />
+      >
+        <Button
+          size="sm"
+          variant="ghost"
+          className="gap-1"
+          onClick={() => openPodEmail(job)}
+        >
+          <Mail className="h-4 w-4" />
+          Email POD
+        </Button>
+      </AppHeader>
 
       <main className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto py-6 px-3 sm:px-6 space-y-4">

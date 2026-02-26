@@ -1,51 +1,82 @@
-// src/hooks/useJobs.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as api from "@/lib/api";
 import type { Job, InspectionType, Inspection, DamageItem } from "@/lib/types";
 
-// … keep the queries above as they are …
+export function useActiveJobs() {
+  return useQuery({ queryKey: ["jobs", "active"], queryFn: api.listActiveJobs });
+}
+
+export function useCompletedJobs() {
+  return useQuery({ queryKey: ["jobs", "completed"], queryFn: api.listCompletedJobs });
+}
+
+export function usePendingJobs() {
+  return useQuery({ queryKey: ["jobs", "pending"], queryFn: api.listPendingJobs });
+}
+
+export function useJob(jobId: string) {
+  return useQuery({
+    queryKey: ["job", jobId],
+    queryFn: () => api.getJobWithRelations(jobId),
+    enabled: !!jobId,
+  });
+}
+
+export function useInspection(jobId: string, type: InspectionType) {
+  return useQuery({
+    queryKey: ["inspection", jobId, type],
+    queryFn: () => api.getInspection(jobId, type),
+    enabled: !!jobId,
+  });
+}
+
+export function useDashboardCounts() {
+  return useQuery({ queryKey: ["dashboard", "counts"], queryFn: api.getDashboardCounts });
+}
 
 export function useCreateJob() {
-  const queryClient = useQueryClient();
-
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: Omit<Job, "id" | "created_at" | "updated_at">) => {
-      try {
-        const job = await api.createJob(input);
-        return job;
-      } catch (e: unknown) {
-        // Log to console so we can see the real supabase error in Lovable
-        // (open the DevTools / console tab when you press "Create Job").
-        // eslint-disable-next-line no-console
-        console.error("[createJob] error", e);
-
-        // Normalise various error shapes into a readable message
-        if (e instanceof Error) {
-          throw e;
-        }
-
-        if (typeof e === "string") {
-          throw new Error(e);
-        }
-
-        if (e && typeof e === "object") {
-          const anyErr = e as any;
-          const message =
-            anyErr.message ||
-            anyErr.error ||
-            anyErr.details ||
-            anyErr.hint ||
-            JSON.stringify(anyErr);
-
-          throw new Error(message || "Job creation failed");
-        }
-
-        throw new Error("Job creation failed");
-      }
+    mutationFn: (input: Parameters<typeof api.createJob>[0]) => api.createJob(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
-    onSuccess: (job) => {
-      queryClient.invalidateQueries({ queryKey: ["jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["job", job.id] });
+  });
+}
+
+export function useUpdateJob() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ jobId, input }: { jobId: string; input: Partial<Job> }) =>
+      api.updateJob(jobId, input),
+    onSuccess: (_, { jobId }) => {
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      qc.invalidateQueries({ queryKey: ["job", jobId] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+}
+
+export function useSubmitInspection() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      jobId,
+      type,
+      inspection,
+      damageItems,
+    }: {
+      jobId: string;
+      type: InspectionType;
+      inspection: Partial<Inspection>;
+      damageItems: Array<Omit<DamageItem, "id" | "inspection_id" | "created_at">>;
+    }) => api.submitInspection(jobId, type, inspection, damageItems),
+    onSuccess: (_, { jobId }) => {
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      qc.invalidateQueries({ queryKey: ["job", jobId] });
+      qc.invalidateQueries({ queryKey: ["inspection"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });
 }
