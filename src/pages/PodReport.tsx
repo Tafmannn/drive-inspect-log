@@ -1,10 +1,12 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { useJob } from "@/hooks/useJobs";
-import { Loader2, Printer } from "lucide-react";
+import { Loader2, Printer, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FUEL_PERCENT_TO_LABEL } from "@/lib/types";
+import { openPodEmail } from "@/lib/podEmail";
+import type { Inspection, DamageItem } from "@/lib/types";
 
 export const PodReport = () => {
   const navigate = useNavigate();
@@ -14,7 +16,7 @@ export const PodReport = () => {
   if (isLoading || !job) {
     return (
       <div className="min-h-screen bg-background">
-        <AppHeader title="POD Report" showBack onBack={() => navigate(-1 as any)} />
+        <AppHeader title="POD Report" showBack onBack={() => navigate(-1)} />
         <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
       </div>
     );
@@ -27,19 +29,21 @@ export const PodReport = () => {
   const damagePhotos = job.photos.filter((p) => p.type === 'damage_close_up');
   const pickupDamages = job.damage_items.filter((d) => pickup && d.inspection_id === pickup.id);
   const deliveryDamages = job.damage_items.filter((d) => delivery && d.inspection_id === delivery.id);
+  const additionalPhotos = job.photos.filter((p) => p.label);
 
-  const InspectionSection = ({ title, inspection, photos, damages }: { title: string; inspection: typeof pickup; photos: typeof pickupPhotos; damages: typeof pickupDamages }) => {
+  const InspectionSection = ({ title, inspection, photoCount, damages }: { title: string; inspection: Inspection | undefined; photoCount: number; damages: DamageItem[] }) => {
     if (!inspection) return <Card className="p-4"><p className="text-sm text-muted-foreground">{title}: Not completed</p></Card>;
     return (
       <Card className="p-4 space-y-3 print:break-inside-avoid">
         <h3 className="font-semibold text-base">{title}</h3>
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div><span className="text-muted-foreground">Date:</span> {inspection.inspected_at ? new Date(inspection.inspected_at).toLocaleString() : '—'}</div>
-          <div><span className="text-muted-foreground">Inspector:</span> {inspection.inspected_by_name || '—'}</div>
+          <div><span className="text-muted-foreground">Driver:</span> {inspection.inspected_by_name || '—'}</div>
+          <div><span className="text-muted-foreground">Customer:</span> {inspection.customer_name || '—'}</div>
           <div><span className="text-muted-foreground">Odometer:</span> {inspection.odometer ?? '—'}</div>
           <div><span className="text-muted-foreground">Fuel:</span> {inspection.fuel_level_percent != null ? (FUEL_PERCENT_TO_LABEL[inspection.fuel_level_percent] ?? `${inspection.fuel_level_percent}%`) : '—'}</div>
-          <div><span className="text-muted-foreground">Condition:</span> {inspection.vehicle_condition || '—'}</div>
-          <div><span className="text-muted-foreground">Light:</span> {inspection.light_condition || '—'}</div>
+          {inspection.vehicle_condition && <div><span className="text-muted-foreground">Condition:</span> {inspection.vehicle_condition}</div>}
+          {inspection.light_condition && <div><span className="text-muted-foreground">Light:</span> {inspection.light_condition}</div>}
         </div>
         {damages.length > 0 && (
           <div>
@@ -51,35 +55,31 @@ export const PodReport = () => {
             </ul>
           </div>
         )}
-        {photos.length > 0 && (
-          <div>
-            <p className="text-sm font-medium mb-2">Photos ({photos.length}):</p>
-            <div className="grid grid-cols-3 gap-2">
-              {photos.map((p) => (
-                <img key={p.id} src={p.url} alt={p.type} className="w-full h-20 object-cover rounded border" />
-              ))}
+        <div className="text-sm text-muted-foreground">
+          Photos: {photoCount}
+        </div>
+        {/* Signatures */}
+        <div className="grid grid-cols-2 gap-4">
+          {inspection.driver_signature_url && (
+            <div>
+              <p className="text-sm font-medium">Driver: {inspection.inspected_by_name}</p>
+              <img src={inspection.driver_signature_url} alt="Driver signature" className="h-16 border rounded" />
             </div>
-          </div>
-        )}
-        {inspection.driver_signature_url && (
-          <div>
-            <p className="text-sm font-medium">Driver Signature:</p>
-            <img src={inspection.driver_signature_url} alt="Driver signature" className="h-16 border rounded" />
-          </div>
-        )}
-        {inspection.customer_signature_url && (
-          <div>
-            <p className="text-sm font-medium">Customer Signature:</p>
-            <img src={inspection.customer_signature_url} alt="Customer signature" className="h-16 border rounded" />
-          </div>
-        )}
+          )}
+          {inspection.customer_signature_url && (
+            <div>
+              <p className="text-sm font-medium">Customer: {inspection.customer_name}</p>
+              <img src={inspection.customer_signature_url} alt="Customer signature" className="h-16 border rounded" />
+            </div>
+          )}
+        </div>
       </Card>
     );
   };
 
   return (
     <div className="min-h-screen bg-background">
-      <AppHeader title="POD Report" showBack onBack={() => navigate(-1 as any)}>
+      <AppHeader title="POD Report" showBack onBack={() => navigate(-1)}>
         <Button size="sm" variant="ghost" className="text-app-header-foreground hover:bg-white/20 print:hidden" onClick={() => window.print()}>
           <Printer className="h-5 w-5" />
         </Button>
@@ -115,23 +115,33 @@ export const PodReport = () => {
           </Card>
         </div>
 
-        <InspectionSection title="Pickup Inspection" inspection={pickup} photos={pickupPhotos} damages={pickupDamages} />
-        <InspectionSection title="Delivery Inspection" inspection={delivery} photos={deliveryPhotos} damages={deliveryDamages} />
+        <InspectionSection title="Pickup Inspection" inspection={pickup} photoCount={pickupPhotos.length} damages={pickupDamages} />
+        <InspectionSection title="Delivery Inspection" inspection={delivery} photoCount={deliveryPhotos.length} damages={deliveryDamages} />
 
-        {damagePhotos.length > 0 && (
-          <Card className="p-4 print:break-inside-avoid">
-            <h3 className="font-semibold mb-2">Damage Close-ups</h3>
-            <div className="grid grid-cols-3 gap-2">
-              {damagePhotos.map((p) => (
-                <img key={p.id} src={p.url} alt="Damage" className="w-full h-20 object-cover rounded border" />
-              ))}
+        {/* Photo summary counts only - no heavy images */}
+        <Card className="p-4 print:break-inside-avoid">
+          <h3 className="font-semibold mb-2">Photo Summary</h3>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <div>Pickup photos: <strong>{pickupPhotos.length}</strong></div>
+            <div>Delivery photos: <strong>{deliveryPhotos.length}</strong></div>
+            <div>Damage close-ups: <strong>{damagePhotos.length}</strong></div>
+            <div>Additional labelled: <strong>{additionalPhotos.length}</strong></div>
+          </div>
+          {additionalPhotos.length > 0 && (
+            <div className="mt-2">
+              <p className="text-xs text-muted-foreground">Labels: {additionalPhotos.map((p) => p.label).join(', ')}</p>
             </div>
-          </Card>
-        )}
+          )}
+        </Card>
 
-        <Button className="w-full print:hidden" onClick={() => window.print()}>
-          <Printer className="h-4 w-4 mr-2" /> Print Report
-        </Button>
+        <div className="flex gap-3 print:hidden">
+          <Button className="flex-1" onClick={() => window.print()}>
+            <Printer className="h-4 w-4 mr-2" /> Print Report
+          </Button>
+          <Button variant="outline" className="flex-1" onClick={() => openPodEmail(job)}>
+            <Mail className="h-4 w-4 mr-2" /> Email POD
+          </Button>
+        </div>
       </div>
     </div>
   );

@@ -98,6 +98,7 @@ export interface Inspection {
   has_damage: boolean;
   inspected_at: string | null;
   inspected_by_name: string | null;
+  customer_name: string | null;
   driver_signature_url: string | null;
   customer_signature_url: string | null;
   created_at: string;
@@ -127,6 +128,7 @@ export interface Photo {
   thumbnail_url: string | null;
   backend: string;
   backend_ref: string | null;
+  label: string | null;
   created_at: string;
 }
 
@@ -158,6 +160,13 @@ export interface DamageItemDraft {
   notes: string;
   photo?: File;
   photoUrl?: string;
+}
+
+export interface AdditionalPhotoDraft {
+  tempId: string;
+  file: File;
+  label: string;
+  previewUrl: string;
 }
 
 export interface StoredFileInfo {

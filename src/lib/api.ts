@@ -78,8 +78,28 @@ export async function getJobWithRelations(jobId: string): Promise<JobWithRelatio
   };
 }
 
+async function generateJobNumber(): Promise<string> {
+  const { data } = await supabase
+    .from('jobs')
+    .select('external_job_number')
+    .like('external_job_number', 'AX%')
+    .order('external_job_number', { ascending: false })
+    .limit(1);
+
+  let next = 1;
+  if (data && data.length > 0 && data[0].external_job_number) {
+    const match = data[0].external_job_number.match(/^AX(\d+)$/);
+    if (match) next = parseInt(match[1], 10) + 1;
+  }
+  return `AX${String(next).padStart(4, '0')}`;
+}
+
 export async function createJob(input: Omit<Job, 'id' | 'status' | 'has_pickup_inspection' | 'has_delivery_inspection' | 'completed_at' | 'created_at' | 'updated_at'>): Promise<Job> {
-  const { data, error } = await supabase.from('jobs').insert(input).select().single();
+  const payload = { ...input };
+  if (!payload.external_job_number) {
+    (payload as Record<string, unknown>).external_job_number = await generateJobNumber();
+  }
+  const { data, error } = await supabase.from('jobs').insert(payload).select().single();
   if (error) throw error;
   await logJobActivity(data.id, 'job_created', undefined, 'ready_for_pickup');
   return data as Job;
@@ -137,14 +157,12 @@ export async function submitInspection(
   inspectionPayload: Partial<Inspection>,
   damageItems: Array<Omit<DamageItem, 'id' | 'inspection_id' | 'created_at'>>,
 ): Promise<void> {
-  // 1. Upsert inspection
   const inspection = await upsertInspection(jobId, type, {
     ...inspectionPayload,
     inspected_at: new Date().toISOString(),
     has_damage: damageItems.length > 0,
   });
 
-  // 2. Delete old damage items, insert new
   await supabase.from('damage_items').delete().eq('inspection_id', inspection.id);
   if (damageItems.length > 0) {
     const items = damageItems.map((d) => ({ ...d, inspection_id: inspection.id }));
@@ -152,7 +170,6 @@ export async function submitInspection(
     if (error) throw error;
   }
 
-  // 3. Update job
   const job = await getJob(jobId);
   const fromStatus = job.status;
   let toStatus: JobStatus = job.status;

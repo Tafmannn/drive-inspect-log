@@ -70,6 +70,7 @@ export type Database = {
           alloys_damaged: string | null
           alloys_or_trims: string | null
           created_at: string
+          customer_name: string | null
           customer_paperwork: string | null
           customer_signature_url: string | null
           driver_signature_url: string | null
@@ -106,6 +107,7 @@ export type Database = {
           alloys_damaged?: string | null
           alloys_or_trims?: string | null
           created_at?: string
+          customer_name?: string | null
           customer_paperwork?: string | null
           customer_signature_url?: string | null
           driver_signature_url?: string | null
@@ -142,6 +144,7 @@ export type Database = {
           alloys_damaged?: string | null
           alloys_or_trims?: string | null
           created_at?: string
+          customer_name?: string | null
           customer_paperwork?: string | null
           customer_signature_url?: string | null
           driver_signature_url?: string | null
@@ -328,6 +331,7 @@ export type Database = {
           id: string
           inspection_id: string | null
           job_id: string
+          label: string | null
           thumbnail_url: string | null
           type: string
           url: string
@@ -339,6 +343,7 @@ export type Database = {
           id?: string
           inspection_id?: string | null
           job_id: string
+          label?: string | null
           thumbnail_url?: string | null
           type: string
           url: string
@@ -350,6 +355,7 @@ export type Database = {
           id?: string
           inspection_id?: string | null
           job_id?: string
+          label?: string | null
           thumbnail_url?: string | null
           type?: string
           url?: string
