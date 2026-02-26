@@ -1,3 +1,5 @@
+// src/pages/InspectionFlow.tsx
+
 import {
   useState,
   useRef,
@@ -107,7 +109,7 @@ const PHOTO_TYPES_BY_INSPECTION: Record<
 };
 
 // ─────────────────────────────────────────────────────────────
-// STEP COMPONENTS (TOP LEVEL, STABLE)
+// STEP COMPONENTS
 // ─────────────────────────────────────────────────────────────
 
 interface OdometerFuelProps {
@@ -639,7 +641,9 @@ const CollectionChecklist = ({
           </RadioGroup>
         </div>
         <div>
-          <Label className="text-base font-medium">Water Level</Label>
+          <Label className="text-base font-medium">
+            Water Level
+          </Label>
           <RadioGroup
             value={formState.waterLevel}
             onValueChange={(v) => updateField("waterLevel", v)}
@@ -696,10 +700,7 @@ const CollectionChecklist = ({
             <RadioGroup
               value={formState[item.key] as string}
               onValueChange={(v) =>
-                updateField(
-                  item.key as keyof InspectionFormState,
-                  v,
-                )
+                updateField(item.key as keyof InspectionFormState, v)
               }
               className="mt-1 flex gap-6"
             >
@@ -923,7 +924,9 @@ export const InspectionFlow = () => {
     customerName: "",
   });
 
+  // Pickup: Odometer → Checklist → Damage → Photos → Signatures → Review
   const pickupStepCount = 6;
+  // Delivery: Odometer → Damage → Photos → Signatures → Review
   const deliveryStepCount = 5;
   const totalSteps =
     type === "pickup" ? pickupStepCount : deliveryStepCount;
@@ -1018,7 +1021,8 @@ export const InspectionFlow = () => {
 
     // Local-first: store additional photo immediately
     if (jobId) {
-      const photoType = type === "pickup" ? "pickup_other" : "delivery_other";
+      const photoType =
+        type === "pickup" ? "pickup_other" : "delivery_other";
       void addPendingUpload(file, {
         jobId,
         inspectionType: type,
@@ -1130,6 +1134,8 @@ export const InspectionFlow = () => {
     let succeeded = 0;
     let failed = 0;
     for (const u of relevant) {
+      // sequential to avoid hammering network
+      // eslint-disable-next-line no-await-in-loop
       const ok = await retryUpload(u.id);
       if (ok) succeeded++;
       else failed++;
@@ -1157,7 +1163,7 @@ export const InspectionFlow = () => {
         type,
       );
 
-      // 2. Build damage payload (no photo URLs here – photos are in photo table)
+      // 2. Build damage payload (photos live in photos table)
       const damageItemsPayload = formState.damages.map((d) => ({
         x: d.x,
         y: d.y,
@@ -1169,7 +1175,7 @@ export const InspectionFlow = () => {
         photo_url: null as string | null,
       }));
 
-      // 3. Upload signatures (direct to storage – usually done with device in hand)
+      // 3. Upload signatures
       let driverSigUrl: string | null = null;
       let customerSigUrl: string | null = null;
       if (driverCanvasRef.current && driverSigned) {
@@ -1382,6 +1388,17 @@ export const InspectionFlow = () => {
         );
       case 3:
         return (
+          <PhotosStep
+            inspectionType={type}
+            standardPhotoUrls={formState.standardPhotoUrls}
+            onCaptureStandard={handlePhotoCapture}
+            additionalPhotos={formState.additionalPhotos}
+            onAddAdditional={addAdditionalPhoto}
+            onRemoveAdditional={removeAdditionalPhoto}
+          />
+        );
+      case 4:
+        return (
           <SignaturesStep
             driverName={formState.driverName}
             customerName={formState.customerName}
@@ -1395,7 +1412,7 @@ export const InspectionFlow = () => {
             customerSigned={customerSigned}
           />
         );
-      case 4: {
+      case 5: {
         const jobRef =
           job?.external_job_number || jobId?.slice(0, 8);
         return (
