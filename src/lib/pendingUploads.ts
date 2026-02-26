@@ -1,25 +1,21 @@
 // src/lib/pendingUploads.ts
 // Local-first photo upload queue for Axentra inspections.
 // Stores images in localStorage while offline / low signal,
-// then replays them to Supabase (and Google Drive if configured).
+// then replays them to your normal storageService + Supabase.
 
 import { storageService } from "./storage";
 import { insertPhoto } from "./api";
-import type {
-  InspectionType,
-  PhotoType,
-  StorageBackend,
-} from "./types";
+import type { InspectionType } from "./types";
 
 const STORAGE_KEY = "axentra.pendingUploads.v1";
 
-export type PendingUploadStatus = "pending" | "uploading" | "failed" | "done";
+export type PendingUploadStatus = "pending" | "uploading" | "failed";
 
 export interface PendingUpload {
   id: string;
   jobId: string;
   inspectionType: InspectionType;
-  photoType: PhotoType | string;
+  photoType: string;
   label: string | null;
   createdAt: string;
   status: PendingUploadStatus;
@@ -28,9 +24,7 @@ export interface PendingUpload {
   // Local-only data for reconstructing the file
   fileDataUrl: string;
 
-  // Optional metadata that can be attached later
-  backend?: StorageBackend;
-  backendRef?: string | null;
+  // Optional metadata for nicer UX
   jobNumber?: string | null;
   vehicleReg?: string | null;
 }
@@ -68,7 +62,7 @@ function saveAll(items: PendingUpload[]): void {
   try {
     storage.setItem(STORAGE_KEY, JSON.stringify(items));
   } catch {
-    // If we run out of quota, ignore – app still works, we just stop queuing more
+    // ignore quota errors – app still works, we just stop queuing more
   }
 }
 
@@ -106,7 +100,6 @@ function fileToDataUrl(file: File): Promise<string> {
 }
 
 async function dataUrlToFile(dataUrl: string, name: string): Promise<File> {
-  // Using fetch on data: URLs is widely supported and keeps code simple
   const res = await fetch(dataUrl);
   const blob = await res.blob();
   return new File([blob], name, { type: blob.type || "image/jpeg" });
@@ -121,7 +114,7 @@ export async function addPendingUpload(
   args: {
     jobId: string;
     inspectionType: InspectionType;
-    photoType: PhotoType | string;
+    photoType: string;
     label: string | null;
     jobNumber?: string | null;
     vehicleReg?: string | null;
@@ -163,6 +156,9 @@ export async function deletePendingUpload(id: string): Promise<void> {
 /**
  * Try to upload a single pending item.
  * Returns true on success, false on failure.
+ *
+ * NOTE: We assume storageService.uploadImage returns:
+ *   { url: string; backend: string; backendRef?: string | null }
  */
 export async function retryUpload(id: string): Promise<boolean> {
   const existing = updateOne(id, (u) => ({
@@ -176,30 +172,28 @@ export async function retryUpload(id: string): Promise<boolean> {
   try {
     const file = await dataUrlToFile(existing.fileDataUrl, `${existing.id}.jpg`);
 
-    // Upload to configured storage (Supabase bucket or Google Drive wrapper)
     const stored = await storageService.uploadImage(
       file,
       `jobs/${existing.jobId}/${existing.inspectionType}/${existing.photoType}/${existing.id}`
     );
 
-    // Insert row into photos table – inspections can link via job_id + type
+    // Insert row into photos table – inspection can link via job_id + type
     await insertPhoto({
       job_id: existing.jobId,
       inspection_id: null,
       type: existing.photoType,
       url: stored.url,
-      thumbnail_url: stored.thumbnailUrl ?? null,
+      thumbnail_url: null,
       backend: stored.backend,
       backend_ref: stored.backendRef ?? null,
       label: existing.label,
     });
 
+    // Mark as done, but keep it in history; PendingUploads screen can delete.
     updateOne(id, (u) => ({
       ...u,
-      status: "done",
+      status: "pending", // keep as pending until user hits Clear, so it's visible
       errorMessage: null,
-      backend: stored.backend,
-      backendRef: stored.backendRef ?? null,
     }));
 
     return true;
@@ -216,7 +210,6 @@ export async function retryUpload(id: string): Promise<boolean> {
 
 /**
  * Retry all items currently marked pending or failed.
- * Returns a small summary for the UI.
  */
 export async function retryAllPending(): Promise<{
   succeeded: number;
@@ -230,7 +223,6 @@ export async function retryAllPending(): Promise<{
   let succeeded = 0;
   let failed = 0;
 
-  // Do them sequentially to avoid hammering the network
   for (const u of targets) {
     // eslint-disable-next-line no-await-in-loop
     const ok = await retryUpload(u.id);
