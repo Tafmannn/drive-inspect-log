@@ -6,13 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+// Native select used instead of Radix Select to avoid BubbleSelect DOM crash
 import { useCreateJob, useUpdateJob, useJob } from "@/hooks/useJobs";
 import { toast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
@@ -273,15 +267,11 @@ export const JobForm = () => {
                 </div>
               ) : (
                 <>
-                  {/* controlled Select, plus hidden input so value goes into FormData */}
-                  <input
-                    type="hidden"
+                  <select
                     name="vehicle_make"
                     value={vehicleMake}
-                  />
-                  <Select
-                    value={vehicleMake}
-                    onValueChange={(v) => {
+                    onChange={(e) => {
+                      const v = e.target.value;
                       if (v === "__other__") {
                         setCustomMake(true);
                         setVehicleMake("");
@@ -292,21 +282,14 @@ export const JobForm = () => {
                         setCustomModel(false);
                       }
                     }}
+                    className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 mt-1"
                   >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Select make" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CAR_MAKES.map((m) => (
-                        <SelectItem key={m} value={m}>
-                          {m}
-                        </SelectItem>
-                      ))}
-                      <SelectItem value="__other__">
-                        Other…
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <option value="">Select make</option>
+                    {CAR_MAKES.map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                    <option value="__other__">Other…</option>
+                  </select>
                 </>
               )}
               <ErrorText field="vehicle_make" />
@@ -340,14 +323,11 @@ export const JobForm = () => {
                 </div>
               ) : (
                 <>
-                  <input
-                    type="hidden"
+                  <select
                     name="vehicle_model"
                     value={vehicleModel}
-                  />
-                  <Select
-                    value={vehicleModel}
-                    onValueChange={(v) => {
+                    onChange={(e) => {
+                      const v = e.target.value;
                       if (v === "__other__") {
                         setCustomModel(true);
                         setVehicleModel("");
@@ -356,27 +336,16 @@ export const JobForm = () => {
                       }
                     }}
                     disabled={!vehicleMake}
+                    className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mt-1"
                   >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue
-                        placeholder={
-                          vehicleMake
-                            ? "Select model"
-                            : "Select make first"
-                        }
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {models.map((m) => (
-                        <SelectItem key={m} value={m}>
-                          {m}
-                        </SelectItem>
-                      ))}
-                      <SelectItem value="__other__">
-                        Other…
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <option value="">
+                      {vehicleMake ? "Select model" : "Select make first"}
+                    </option>
+                    {models.map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                    <option value="__other__">Other…</option>
+                  </select>
                 </>
               )}
               <ErrorText field="vehicle_model" />
