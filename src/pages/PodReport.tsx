@@ -1,441 +1,412 @@
-// src/pages/PodReport.tsx
-
-import { useNavigate, useParams } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
-import { useJob } from "@/hooks/useJobs";
-import { Loader2, Printer, Mail } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { FUEL_PERCENT_TO_LABEL } from "@/lib/types";
+import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import { useJob } from "@/hooks/useJobs";
+import { useParams } from "react-router-dom";
+import { Loader2, Mail } from "lucide-react";
 import { openPodEmail } from "@/lib/podEmail";
-import type { Inspection, DamageItem } from "@/lib/types";
+import { FUEL_PERCENT_TO_LABEL } from "@/lib/types";
 
-function formatFuel(pct: number | null | undefined): string {
+const fuelLabel = (pct: number | null | undefined): string => {
   if (pct == null) return "N/A";
   return FUEL_PERCENT_TO_LABEL[pct] ?? `${pct}%`;
-}
+};
 
-function formatDateTime(value: string | null | undefined): string {
-  if (!value) return "—";
-  try {
-    return new Date(value).toLocaleString();
-  } catch {
-    return value;
-  }
-}
-
-function formatMileage(value: number | null | undefined): string {
-  if (value == null) return "—";
-  try {
-    return new Intl.NumberFormat("en-GB").format(value) + " mi";
-  } catch {
-    return `${value} mi`;
-  }
-}
-
-function formatDuration(start?: string | null, end?: string | null): string {
-  if (!start || !end) return "N/A";
-  const s = new Date(start).getTime();
-  const e = new Date(end).getTime();
-  if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) return "N/A";
-  const diffMs = e - s;
-  const totalMinutes = Math.round(diffMs / 60000);
-  const hours = Math.floor(totalMinutes / 60);
-  const mins = totalMinutes % 60;
-  if (hours === 0) return `${mins} min`;
-  if (mins === 0) return `${hours} hr`;
-  return `${hours} hr ${mins} min`;
-}
+const safeDate = (iso: string | null | undefined): string => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
 
 export const PodReport = () => {
-  const navigate = useNavigate();
   const { jobId } = useParams<{ jobId: string }>();
   const { data: job, isLoading } = useJob(jobId ?? "");
 
   if (isLoading || !job) {
     return (
-      <div className="min-h-screen bg-background">
-        <AppHeader title="POD Report" showBack onBack={() => navigate(-1)} />
-        <div className="flex justify-center py-12">
+      <div className="min-h-screen bg-background flex flex-col">
+        <AppHeader title="POD Report" showBack />
+        <div className="flex-1 flex items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       </div>
     );
   }
 
+  const ref = job.external_job_number || job.id.slice(0, 8).toUpperCase();
   const pickup = job.inspections.find((i) => i.type === "pickup");
   const delivery = job.inspections.find((i) => i.type === "delivery");
-
-  const pickupPhotos = job.photos.filter((p) =>
-    p.type.startsWith("pickup_"),
-  );
-  const deliveryPhotos = job.photos.filter((p) =>
-    p.type.startsWith("delivery_"),
-  );
-  const damagePhotos = job.photos.filter(
-    (p) => p.type === "damage_close_up",
-  );
   const pickupDamages = job.damage_items.filter(
-    (d) => pickup && d.inspection_id === pickup.id,
+    (d) => pickup && d.inspection_id === pickup.id
   );
   const deliveryDamages = job.damage_items.filter(
-    (d) => delivery && d.inspection_id === delivery.id,
+    (d) => delivery && d.inspection_id === delivery.id
   );
-  const additionalPhotos = job.photos.filter((p) => p.label);
+  const pickupPhotos = job.photos.filter((p) =>
+    p.type.startsWith("pickup_")
+  );
+  const deliveryPhotos = job.photos.filter((p) =>
+    p.type.startsWith("delivery_")
+  );
+  const damagePhotos = job.photos.filter(
+    (p) => p.type === "damage_close_up"
+  );
 
   const pickupOdo = pickup?.odometer ?? null;
   const deliveryOdo = delivery?.odometer ?? null;
-  const distance =
+  const journeyMiles =
     pickupOdo != null && deliveryOdo != null
       ? deliveryOdo - pickupOdo
       : null;
 
-  const jobRef = job.external_job_number || job.id.slice(0, 8);
-
-  const InspectionSection = ({
-    title,
-    inspection,
-    photoCount,
-    damages,
-  }: {
-    title: string;
-    inspection: Inspection | undefined;
-    photoCount: number;
-    damages: DamageItem[];
-  }) => {
-    if (!inspection) {
-      return (
-        <Card className="p-4 print:break-inside-avoid">
-          <p className="text-sm text-muted-foreground">
-            {title}: Not completed
-          </p>
-        </Card>
-      );
-    }
-
-    return (
-      <Card className="p-4 space-y-3 print:break-inside-avoid">
-        <h3 className="font-semibold text-base">{title}</h3>
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <div>
-            <span className="text-muted-foreground">Date / Time:</span>{" "}
-            {formatDateTime(inspection.inspected_at)}
-          </div>
-          <div>
-            <span className="text-muted-foreground">Driver:</span>{" "}
-            {inspection.inspected_by_name || "—"}
-          </div>
-          <div>
-            <span className="text-muted-foreground">Customer:</span>{" "}
-            {inspection.customer_name || "—"}
-          </div>
-          <div>
-            <span className="text-muted-foreground">Odometer:</span>{" "}
-            {formatMileage(inspection.odometer)}
-          </div>
-          <div>
-            <span className="text-muted-foreground">Fuel:</span>{" "}
-            {formatFuel(inspection.fuel_level_percent)}
-          </div>
-          {inspection.vehicle_condition && (
-            <div>
-              <span className="text-muted-foreground">Condition:</span>{" "}
-              {inspection.vehicle_condition}
-            </div>
-          )}
-          {inspection.light_condition && (
-            <div>
-              <span className="text-muted-foreground">Light:</span>{" "}
-              {inspection.light_condition}
-            </div>
-          )}
-        </div>
-
-        {damages.length > 0 && (
-          <div>
-            <p className="text-sm font-medium">
-              Recorded Damages ({damages.length})
-            </p>
-            <ul className="list-disc list-inside text-sm">
-              {damages.map((d) => (
-                <li key={d.id}>
-                  {d.area} — {d.item}
-                  {d.damage_types?.length
-                    ? `: ${d.damage_types.join(", ")}`
-                    : ""}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        <div className="text-sm text-muted-foreground">
-          Photos captured: <strong>{photoCount}</strong>
-        </div>
-
-        {/* Signatures */}
-        {(inspection.driver_signature_url ||
-          inspection.customer_signature_url) && (
-          <div className="grid grid-cols-2 gap-4 pt-2">
-            {inspection.driver_signature_url && (
-              <div>
-                <p className="text-sm font-medium">
-                  Driver: {inspection.inspected_by_name || "—"}
-                </p>
-                <img
-                  src={inspection.driver_signature_url}
-                  alt="Driver signature"
-                  className="h-16 border rounded bg-white"
-                />
-              </div>
-            )}
-            {inspection.customer_signature_url && (
-              <div>
-                <p className="text-sm font-medium">
-                  Customer: {inspection.customer_name || "—"}
-                </p>
-                <img
-                  src={inspection.customer_signature_url}
-                  alt="Customer signature"
-                  className="h-16 border rounded bg-white"
-                />
-              </div>
-            )}
-          </div>
-        )}
-      </Card>
-    );
-  };
+  const journeyText =
+    journeyMiles != null && journeyMiles >= 0
+      ? `${pickupOdo.toLocaleString("en-GB")} → ${deliveryOdo.toLocaleString(
+          "en-GB"
+        )} miles (approx. ${journeyMiles.toLocaleString(
+          "en-GB"
+        )} miles driven)`
+      : "Not available";
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-muted flex flex-col">
       <AppHeader
         title="POD Report"
         showBack
-        onBack={() => navigate(-1)}
-      >
-        <Button
-          size="sm"
-          variant="ghost"
-          className="text-app-header-foreground hover:bg-white/20 print:hidden"
-          onClick={() => window.print()}
-        >
-          <Printer className="h-5 w-5" />
-        </Button>
-      </AppHeader>
-
-      <div className="p-4 space-y-4 max-w-2xl mx-auto print:p-8">
-        {/* Brand header */}
-        <div className="text-center print:mb-4">
-          <h1 className="text-2xl font-extrabold tracking-wide">
-            AXENTRA VEHICLES
-          </h1>
-          <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground">
-            Driven Vehicle Logistics · United Kingdom
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Proof of Delivery (POD) Confirmation
-          </p>
-        </div>
-
-        {/* Job summary */}
-        <Card className="p-4 space-y-2 print:break-inside-avoid">
-          <div className="flex justify-between items-start gap-4">
-            <div>
-              <p className="text-sm font-semibold">
-                {job.vehicle_reg}
-              </p>
-              <p className="text-sm">
-                {job.vehicle_make} {job.vehicle_model} —{" "}
-                {job.vehicle_colour}
-              </p>
-              {job.vehicle_year && (
-                <p className="text-xs text-muted-foreground">
-                  Year: {job.vehicle_year}
-                </p>
-              )}
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-muted-foreground">
-                Job Reference
-              </p>
-              <p className="text-sm font-semibold">{jobRef}</p>
-              <p className="text-xs text-muted-foreground">
-                Generated: {new Date().toLocaleString()}
-              </p>
-            </div>
-          </div>
-          <p className="text-sm font-medium mt-2">
-            Route: {job.pickup_city} → {job.delivery_city}
-          </p>
-        </Card>
-
-        {/* Journey summary card */}
-        <Card className="p-4 space-y-2 print:break-inside-avoid">
-          <h3 className="font-semibold text-base">
-            Journey Summary
-          </h3>
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            <div>
-              <span className="text-muted-foreground">
-                Pickup mileage:
-              </span>{" "}
-              {formatMileage(pickupOdo)}
-            </div>
-            <div>
-              <span className="text-muted-foreground">
-                Delivery mileage:
-              </span>{" "}
-              {formatMileage(deliveryOdo)}
-            </div>
-            <div>
-              <span className="text-muted-foreground">
-                Distance driven:
-              </span>{" "}
-              {distance != null
-                ? `${new Intl.NumberFormat("en-GB").format(
-                    distance,
-                  )} mi`
-                : "N/A"}
-            </div>
-            <div>
-              <span className="text-muted-foreground">
-                Journey duration:
-              </span>{" "}
-              {formatDuration(
-                pickup?.inspected_at ?? null,
-                delivery?.inspected_at ?? null,
-              )}
-            </div>
-            <div>
-              <span className="text-muted-foreground">
-                Fuel at pickup:
-              </span>{" "}
-              {formatFuel(pickup?.fuel_level_percent)}
-            </div>
-            <div>
-              <span className="text-muted-foreground">
-                Fuel at delivery:
-              </span>{" "}
-              {formatFuel(delivery?.fuel_level_percent)}
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground mt-2">
-            Note: Distance is calculated from the recorded odometer
-            readings at pickup and delivery.
-          </p>
-        </Card>
-
-        {/* Pickup / Delivery addresses */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 print:grid-cols-2">
-          <Card className="p-4 space-y-1 print:break-inside-avoid">
-            <h3 className="font-semibold text-sm text-muted-foreground">
-              Pickup Location
-            </h3>
-            <p className="text-sm">
-              {job.pickup_contact_name} (
-              {job.pickup_contact_phone})
-            </p>
-            {job.pickup_company && (
-              <p className="text-sm">{job.pickup_company}</p>
-            )}
-            <p className="text-sm">
-              {[job.pickup_address_line1, job.pickup_city, job.pickup_postcode]
-                .filter(Boolean)
-                .join(", ")}
-            </p>
-          </Card>
-          <Card className="p-4 space-y-1 print:break-inside-avoid">
-            <h3 className="font-semibold text-sm text-muted-foreground">
-              Delivery Location
-            </h3>
-            <p className="text-sm">
-              {job.delivery_contact_name} (
-              {job.delivery_contact_phone})
-            </p>
-            {job.delivery_company && (
-              <p className="text-sm">{job.delivery_company}</p>
-            )}
-            <p className="text-sm">
-              {[job.delivery_address_line1, job.delivery_city, job.delivery_postcode]
-                .filter(Boolean)
-                .join(", ")}
-            </p>
-          </Card>
-        </div>
-
-        {/* Inspections */}
-        <InspectionSection
-          title="Pickup Inspection"
-          inspection={pickup}
-          photoCount={pickupPhotos.length}
-          damages={pickupDamages}
-        />
-        <InspectionSection
-          title="Delivery Inspection"
-          inspection={delivery}
-          photoCount={deliveryPhotos.length}
-          damages={deliveryDamages}
-        />
-
-        {/* Photo summary counts only - no heavy images */}
-        <Card className="p-4 print:break-inside-avoid">
-          <h3 className="font-semibold mb-2">Photo Summary</h3>
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            <div>
-              Pickup photos:{" "}
-              <strong>{pickupPhotos.length}</strong>
-            </div>
-            <div>
-              Delivery photos:{" "}
-              <strong>{deliveryPhotos.length}</strong>
-            </div>
-            <div>
-              Damage close-ups:{" "}
-              <strong>{damagePhotos.length}</strong>
-            </div>
-            <div>
-              Additional labelled:{" "}
-              <strong>{additionalPhotos.length}</strong>
-            </div>
-          </div>
-          {additionalPhotos.length > 0 && (
-            <div className="mt-2">
-              <p className="text-xs text-muted-foreground">
-                Additional photo labels:{" "}
-                {additionalPhotos
-                  .map((p) => p.label)
-                  .filter(Boolean)
-                  .join(", ")}
-              </p>
-            </div>
-          )}
-        </Card>
-
-        {/* UK-style small print */}
-        <p className="text-[10px] text-muted-foreground leading-snug print:mt-4">
-          By signing at collection and delivery, the customer confirms
-          that the vehicle condition, mileage and fuel level recorded
-          on this Proof of Delivery are an accurate reflection of the
-          vehicle at the relevant handover point. This document forms
-          part of Axentra Vehicles&apos; records for the purposes of
-          audit, insurance and dispute resolution.
-        </p>
-
-        {/* Actions (print / email) */}
-        <div className="flex gap-3 print:hidden">
-          <Button className="flex-1" onClick={() => window.print()}>
-            <Printer className="h-4 w-4 mr-2" /> Print Report
-          </Button>
+        rightSlot={
           <Button
-            variant="outline"
-            className="flex-1"
+            size="sm"
+            variant="ghost"
+            className="gap-1"
             onClick={() => openPodEmail(job)}
           >
-            <Mail className="h-4 w-4 mr-2" /> Email POD
+            <Mail className="h-4 w-4" />
+            Email POD
           </Button>
+        }
+      />
+
+      <main className="flex-1 overflow-y-auto">
+        <div className="max-w-4xl mx-auto py-6 px-3 sm:px-6 space-y-4">
+          {/* Top banner */}
+          <Card className="border border-slate-200 shadow-sm">
+            <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white rounded-t-lg">
+              <div className="flex flex-col">
+                <span className="text-xs tracking-[0.25em] uppercase text-slate-300">
+                  Axentra Vehicle Logistics
+                </span>
+                <span className="text-lg font-semibold tracking-wide">
+                  Proof of Delivery
+                </span>
+              </div>
+              <div className="text-right text-xs">
+                <div className="font-medium tracking-widest text-white">
+                  AXENTRA
+                </div>
+                <div className="text-slate-300">
+                  Ref: <span className="font-mono">{ref}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Vehicle summary */}
+              <div className="grid gap-4 md:grid-cols-[2fr,1fr]">
+                <div className="space-y-1">
+                  <div className="text-sm text-muted-foreground">
+                    Vehicle
+                  </div>
+                  <div className="text-lg font-semibold">
+                    {job.vehicle_reg} – {job.vehicle_make}{" "}
+                    {job.vehicle_model}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {job.vehicle_colour}
+                    {job.vehicle_year && ` • ${job.vehicle_year}`}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Job Reference: {ref}
+                  </div>
+                </div>
+                <div className="space-y-1 text-sm md:text-right">
+                  <div className="font-medium">Journey Overview</div>
+                  <div className="text-muted-foreground">
+                    {job.pickup_city || "Unknown"} →{" "}
+                    {job.delivery_city || "Unknown"}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Pickup: {job.pickup_postcode} • Delivery:{" "}
+                    {job.delivery_postcode}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Mileage: {journeyText}
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Pickup / Delivery addresses */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <Card className="bg-slate-50/60 border-slate-200">
+                  <div className="p-4 space-y-1">
+                    <div className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+                      Pickup
+                    </div>
+                    <div className="text-sm font-medium">
+                      {job.pickup_contact_name}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {job.pickup_contact_phone}
+                    </div>
+                    {job.pickup_company && (
+                      <div className="text-xs text-muted-foreground">
+                        {job.pickup_company}
+                      </div>
+                    )}
+                    <div className="text-xs text-muted-foreground">
+                      {job.pickup_address_line1}
+                      {job.pickup_city && `, ${job.pickup_city}`}
+                      {job.pickup_postcode && `, ${job.pickup_postcode}`}
+                    </div>
+                  </div>
+                </Card>
+
+                <Card className="bg-slate-50/60 border-slate-200">
+                  <div className="p-4 space-y-1">
+                    <div className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+                      Delivery
+                    </div>
+                    <div className="text-sm font-medium">
+                      {job.delivery_contact_name}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {job.delivery_contact_phone}
+                    </div>
+                    {job.delivery_company && (
+                      <div className="text-xs text-muted-foreground">
+                        {job.delivery_company}
+                      </div>
+                    )}
+                    <div className="text-xs text-muted-foreground">
+                      {job.delivery_address_line1}
+                      {job.delivery_city && `, ${job.delivery_city}`}
+                      {job.delivery_postcode &&
+                        `, ${job.delivery_postcode}`}
+                    </div>
+                  </div>
+                </Card>
+              </div>
+
+              {/* Inspection sections */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <Card>
+                  <div className="p-4 space-y-2">
+                    <div className="text-sm font-semibold">
+                      Pickup Inspection
+                    </div>
+                    <div className="text-xs space-y-1 text-muted-foreground">
+                      <div>
+                        <span className="font-medium text-foreground">
+                          Date:
+                        </span>{" "}
+                        {pickup ? safeDate(pickup.inspected_at) : "—"}
+                      </div>
+                      <div>
+                        <span className="font-medium text-foreground">
+                          Customer:
+                        </span>{" "}
+                        {pickup?.customer_name || "—"}
+                      </div>
+                      <div>
+                        <span className="font-medium text-foreground">
+                          Driver:
+                        </span>{" "}
+                        {pickup?.inspected_by_name || "—"}
+                      </div>
+                      <div>
+                        <span className="font-medium text-foreground">
+                          Odometer:
+                        </span>{" "}
+                        {pickup?.odometer != null
+                          ? pickup.odometer.toLocaleString("en-GB")
+                          : "—"}
+                      </div>
+                      <div>
+                        <span className="font-medium text-foreground">
+                          Fuel:
+                        </span>{" "}
+                        {fuelLabel(pickup?.fuel_level_percent ?? null)}
+                      </div>
+                      {pickup?.vehicle_condition && (
+                        <div>
+                          <span className="font-medium text-foreground">
+                            Condition:
+                          </span>{" "}
+                          {pickup.vehicle_condition}
+                        </div>
+                      )}
+                      {pickup?.light_condition && (
+                        <div>
+                          <span className="font-medium text-foreground">
+                            Light:
+                          </span>{" "}
+                          {pickup.light_condition}
+                        </div>
+                      )}
+                      <div>
+                        <span className="font-medium text-foreground">
+                          Photos:
+                        </span>{" "}
+                        {pickupPhotos.length}
+                      </div>
+                      <div>
+                        <span className="font-medium text-foreground">
+                          Damages:
+                        </span>{" "}
+                        {pickupDamages.length}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+
+                <Card>
+                  <div className="p-4 space-y-2">
+                    <div className="text-sm font-semibold">
+                      Delivery Inspection
+                    </div>
+                    <div className="text-xs space-y-1 text-muted-foreground">
+                      <div>
+                        <span className="font-medium text-foreground">
+                          Date:
+                        </span>{" "}
+                        {delivery ? safeDate(delivery.inspected_at) : "—"}
+                      </div>
+                      <div>
+                        <span className="font-medium text-foreground">
+                          Customer:
+                        </span>{" "}
+                        {delivery?.customer_name || "—"}
+                      </div>
+                      <div>
+                        <span className="font-medium text-foreground">
+                          Driver:
+                        </span>{" "}
+                        {delivery?.inspected_by_name || "—"}
+                      </div>
+                      <div>
+                        <span className="font-medium text-foreground">
+                          Odometer:
+                        </span>{" "}
+                        {delivery?.odometer != null
+                          ? delivery.odometer.toLocaleString("en-GB")
+                          : "—"}
+                      </div>
+                      <div>
+                        <span className="font-medium text-foreground">
+                          Fuel:
+                        </span>{" "}
+                        {fuelLabel(delivery?.fuel_level_percent ?? null)}
+                      </div>
+                      <div>
+                        <span className="font-medium text-foreground">
+                          Photos:
+                        </span>{" "}
+                        {deliveryPhotos.length}
+                      </div>
+                      <div>
+                        <span className="font-medium text-foreground">
+                          Damages:
+                        </span>{" "}
+                        {deliveryDamages.length}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+
+              {/* Photo summary */}
+              <Card className="bg-slate-50/80 border-slate-200">
+                <div className="p-4 space-y-2">
+                  <div className="text-sm font-semibold">
+                    Photo Summary
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs text-muted-foreground">
+                    <div>
+                      <div className="font-medium text-foreground">
+                        Pickup photos
+                      </div>
+                      <div>{pickupPhotos.length}</div>
+                    </div>
+                    <div>
+                      <div className="font-medium text-foreground">
+                        Delivery photos
+                      </div>
+                      <div>{deliveryPhotos.length}</div>
+                    </div>
+                    <div>
+                      <div className="font-medium text-foreground">
+                        Damage close-ups
+                      </div>
+                      <div>{damagePhotos.length}</div>
+                    </div>
+                    <div>
+                      <div className="font-medium text-foreground">
+                        Total images
+                      </div>
+                      <div>
+                        {pickupPhotos.length +
+                          deliveryPhotos.length +
+                          damagePhotos.length}
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground pt-1">
+                    Full-resolution images are stored securely within
+                    Axentra and can be supplied to clients, insurers or
+                    auditors on request.
+                  </p>
+                </div>
+              </Card>
+
+              {/* Declaration */}
+              <Card>
+                <div className="p-4 space-y-2 text-xs text-muted-foreground">
+                  <div className="text-sm font-semibold text-foreground">
+                    Customer Declaration
+                  </div>
+                  <p>
+                    The customer confirms that the vehicle described above
+                    has been received at the delivery address in the
+                    condition recorded on this report and any noted damage
+                    or exceptions have been agreed at the point of
+                    handover.
+                  </p>
+                </div>
+              </Card>
+
+              {/* Footer */}
+              <div className="flex items-center justify-between pt-2 text-[10px] text-muted-foreground">
+                <span>
+                  Generated by Axentra Vehicle Logistics – Proof of
+                  Delivery
+                </span>
+                <span>
+                  {new Date().toLocaleString("en-GB")} • Job {ref}
+                </span>
+              </div>
+            </div>
+          </Card>
         </div>
-      </div>
+      </main>
     </div>
   );
 };
