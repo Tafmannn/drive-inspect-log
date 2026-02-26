@@ -159,7 +159,11 @@ export async function addPendingUpload(
   },
 ): Promise<PendingUpload> {
   const fileDataUrl = await fileToDataUrl(file);
-  const id = "pu_" + (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
+  const id =
+    "pu_" +
+    (crypto.randomUUID
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2));
 
   const item: PendingUpload = {
     id,
@@ -183,7 +187,8 @@ export async function addPendingUpload(
   return item;
 }
 
-export function getAllPendingUploads(): PendingUpload[] {
+// 🔧 IMPORTANT: keep this async so .then(...) and await both work
+export async function getAllPendingUploads(): Promise<PendingUpload[]> {
   return loadAll();
 }
 
