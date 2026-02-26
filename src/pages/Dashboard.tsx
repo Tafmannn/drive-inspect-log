@@ -8,10 +8,12 @@ import { exportJobsCsv, exportInspectionsCsv } from "@/lib/export";
 import { exportExpensesCsv } from "@/lib/expenseApi";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/context/AuthContext";
 
 export const Dashboard = () => {
   const navigate = useNavigate();
   const { data: counts, isLoading } = useDashboardCounts();
+  const { isAdmin } = useAuth();
   const [exporting, setExporting] = useState(false);
 
   const handleExport = async (type: 'jobs' | 'inspections' | 'expenses') => {
@@ -73,12 +75,14 @@ export const Dashboard = () => {
           }}
         />
 
-        <DashboardCard
-          icon={<ShieldCheck className="h-6 w-6" />}
-          title="Admin Dashboard"
-          subtitle="Stats, timesheets & management"
-          onClick={() => navigate('/admin')}
-        />
+        {isAdmin && (
+          <DashboardCard
+            icon={<ShieldCheck className="h-6 w-6" />}
+            title="Admin Dashboard"
+            subtitle="Stats, timesheets & management"
+            onClick={() => navigate('/admin')}
+          />
+        )}
 
         <div className="pt-2 space-y-2">
           <h3 className="text-sm font-semibold text-muted-foreground">Exports</h3>

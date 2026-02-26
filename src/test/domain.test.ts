@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { FUEL_LEVEL_MAP, FUEL_PERCENT_TO_LABEL } from "@/lib/types";
 import { EXPENSE_CATEGORIES } from "@/lib/expenseApi";
+import { hasRoleCheck, isAdminDriverCheck, type AppUser, type AppRole } from "@/context/AuthContext";
+
+function makeUser(roles: AppRole[]): AppUser {
+  return { id: "test", name: "Test", email: "t@t.com", roles, status: "active" };
+}
 
 describe("Domain Model", () => {
   describe("Fuel level mapping", () => {
@@ -48,7 +53,6 @@ describe("Job Status Values", () => {
   ];
 
   it("should have all expected status values defined", () => {
-    // This validates the domain model is complete
     expect(VALID_STATUSES).toHaveLength(9);
   });
 
@@ -66,16 +70,41 @@ describe("Job Status Values", () => {
   });
 });
 
-describe("Role-based access", () => {
-  it("driver role should not allow gallery access", () => {
-    const role: string = "driver";
-    const canUseGallery = role === "admin";
-    expect(canUseGallery).toBe(false);
+describe("Multi-role system", () => {
+  it("DRIVER cannot access admin features", () => {
+    const user = makeUser(["DRIVER"]);
+    expect(hasRoleCheck(user, "ADMIN")).toBe(false);
+    expect(hasRoleCheck(user, "DRIVER")).toBe(true);
   });
 
-  it("admin role should allow gallery access", () => {
-    const role: string = "admin";
-    const canUseGallery = role === "admin";
-    expect(canUseGallery).toBe(true);
+  it("ADMIN has admin access", () => {
+    const user = makeUser(["ADMIN"]);
+    expect(hasRoleCheck(user, "ADMIN")).toBe(true);
+    expect(hasRoleCheck(user, "DRIVER")).toBe(false);
+  });
+
+  it("ADMIN+DRIVER hybrid has both roles", () => {
+    const user = makeUser(["ADMIN", "DRIVER"]);
+    expect(hasRoleCheck(user, "ADMIN")).toBe(true);
+    expect(hasRoleCheck(user, "DRIVER")).toBe(true);
+    expect(isAdminDriverCheck(user)).toBe(true);
+  });
+
+  it("SUPERADMIN has all roles implicitly", () => {
+    const user = makeUser(["SUPERADMIN"]);
+    expect(hasRoleCheck(user, "ADMIN")).toBe(true);
+    expect(hasRoleCheck(user, "DRIVER")).toBe(true);
+    expect(hasRoleCheck(user, "SUPERADMIN")).toBe(true);
+  });
+
+  it("gallery access only for admin/superadmin", () => {
+    expect(hasRoleCheck(makeUser(["DRIVER"]), "ADMIN")).toBe(false);
+    expect(hasRoleCheck(makeUser(["ADMIN"]), "ADMIN")).toBe(true);
+    expect(hasRoleCheck(makeUser(["SUPERADMIN"]), "ADMIN")).toBe(true);
+  });
+
+  it("isAdminDriver is false for single-role users", () => {
+    expect(isAdminDriverCheck(makeUser(["DRIVER"]))).toBe(false);
+    expect(isAdminDriverCheck(makeUser(["ADMIN"]))).toBe(false);
   });
 });
