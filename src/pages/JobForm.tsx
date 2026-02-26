@@ -1,5 +1,5 @@
-import { supabase } from "@/integrations/supabase/client";
-import { useState, useEffect } from "react";
+// src/pages/JobForm.tsx
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
@@ -18,158 +18,51 @@ import { toast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { CAR_MAKES, getModelsForMake } from "@/lib/carData";
 
+type ErrorMap = Record<string, string>;
+
 export const JobForm = () => {
   const navigate = useNavigate();
   const { jobId } = useParams();
   const isEdit = !!jobId;
+
   const { data: existingJob, isLoading: jobLoading } = useJob(jobId ?? "");
   const createMutation = useCreateJob();
   const updateMutation = useUpdateJob();
 
-  const [autoJobNumber, setAutoJobNumber] = useState<string | null>(null);
-  const [autoJobLoading, setAutoJobLoading] = useState(false);
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const [errors, setErrors] = useState<ErrorMap>({});
 
-  const [form, setForm] = useState({
-    external_job_number: "",
-    vehicle_reg: "",
-    vehicle_make: "",
-    vehicle_model: "",
-    vehicle_colour: "",
-    vehicle_year: "",
-    pickup_contact_name: "",
-    pickup_contact_phone: "",
-    pickup_company: "",
-    pickup_address_line1: "",
-    pickup_address_line2: "",
-    pickup_city: "",
-    pickup_postcode: "",
-    pickup_notes: "",
-    delivery_contact_name: "",
-    delivery_contact_phone: "",
-    delivery_company: "",
-    delivery_address_line1: "",
-    delivery_address_line2: "",
-    delivery_city: "",
-    delivery_postcode: "",
-    delivery_notes: "",
-    earliest_delivery_date: "",
-  });
-
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  // Vehicle make/model selection state (not per-keystroke typing)
+  const [vehicleMake, setVehicleMake] = useState<string>("");
+  const [vehicleModel, setVehicleModel] = useState<string>("");
   const [customMake, setCustomMake] = useState(false);
   const [customModel, setCustomModel] = useState(false);
 
-  // Populate form when editing
-  const [populated, setPopulated] = useState(false);
+  // Sync make/model when editing once job is loaded
   useEffect(() => {
-    if (isEdit && existingJob && !populated) {
+    if (isEdit && existingJob) {
       const makeKnown = CAR_MAKES.includes(existingJob.vehicle_make);
       const modelKnown =
         makeKnown &&
         getModelsForMake(existingJob.vehicle_make).includes(
           existingJob.vehicle_model,
         );
+
+      setVehicleMake(existingJob.vehicle_make);
+      setVehicleModel(existingJob.vehicle_model);
       setCustomMake(!makeKnown);
       setCustomModel(!modelKnown);
-      setForm({
-        external_job_number: existingJob.external_job_number ?? "",
-        vehicle_reg: existingJob.vehicle_reg,
-        vehicle_make: existingJob.vehicle_make,
-        vehicle_model: existingJob.vehicle_model,
-        vehicle_colour: existingJob.vehicle_colour,
-        vehicle_year: existingJob.vehicle_year ?? "",
-        pickup_contact_name: existingJob.pickup_contact_name,
-        pickup_contact_phone: existingJob.pickup_contact_phone,
-        pickup_company: existingJob.pickup_company ?? "",
-        pickup_address_line1: existingJob.pickup_address_line1,
-        pickup_address_line2: existingJob.pickup_address_line2 ?? "",
-        pickup_city: existingJob.pickup_city,
-        pickup_postcode: existingJob.pickup_postcode,
-        pickup_notes: existingJob.pickup_notes ?? "",
-        delivery_contact_name: existingJob.delivery_contact_name,
-        delivery_contact_phone: existingJob.delivery_contact_phone,
-        delivery_company: existingJob.delivery_company ?? "",
-        delivery_address_line1: existingJob.delivery_address_line1,
-        delivery_address_line2: existingJob.delivery_address_line2 ?? "",
-        delivery_city: existingJob.delivery_city,
-        delivery_postcode: existingJob.delivery_postcode,
-        delivery_notes: existingJob.delivery_notes ?? "",
-        earliest_delivery_date: existingJob.earliest_delivery_date ?? "",
-      });
-      setPopulated(true);
     }
-  }, [isEdit, existingJob, populated]);
+  }, [isEdit, existingJob]);
 
-  // Auto-generate job number for new jobs (AX0001, AX0002, ...)
-  useEffect(() => {
-    if (isEdit) return; // don't auto-generate when editing existing job
+  const models = getModelsForMake(vehicleMake || "");
 
-    const generateNextJobNumber = async () => {
-      setAutoJobLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from("jobs")
-          .select("external_job_number")
-          .ilike("external_job_number", "AX%")
-          .order("external_job_number", { ascending: false })
-          .limit(1);
+  // ─────────────────────────────────────────────
+  // Validation based on FormData (uncontrolled)
+  // ─────────────────────────────────────────────
 
-        if (error) {
-          console.error("Error generating job number", error);
-          return;
-        }
-
-        let next = "AX0001";
-        const last = data?.[0]?.external_job_number as
-          | string
-          | undefined;
-
-        if (last && /^AX\d{4}$/.test(last)) {
-          const n = parseInt(last.slice(2), 10) + 1;
-          next = `AX${n.toString().padStart(4, "0")}`;
-        }
-
-        setAutoJobNumber(next);
-
-        // If the user hasn't manually typed a job number yet, prefill it
-        setForm((prev) =>
-          prev.external_job_number
-            ? prev
-            : { ...prev, external_job_number: next },
-        );
-      } finally {
-        setAutoJobLoading(false);
-      }
-    };
-
-    void generateNextJobNumber();
-  }, [isEdit]);
-
-  const update = (field: string, value: string) => {
-    let v = value;
-
-    // Normalise vehicle registration: uppercase, no spaces
-    if (field === "vehicle_reg") {
-      v = value.toUpperCase().replace(/\s+/g, "");
-    }
-
-    // Normalise postcodes: uppercase, trimmed
-    if (field.endsWith("_postcode")) {
-      v = value.toUpperCase().trim();
-    }
-
-    setForm((prev) => ({ ...prev, [field]: v }));
-    setErrors((prev) => {
-      const next = { ...prev };
-      delete next[field];
-      return next;
-    });
-  };
-
-  const models = getModelsForMake(form.vehicle_make);
-
-  const validate = (): boolean => {
-    const e: Record<string, string> = {};
+  const validate = (data: FormData): boolean => {
+    const e: ErrorMap = {};
     const required: [string, string][] = [
       ["vehicle_reg", "Registration is required"],
       ["vehicle_make", "Make is required"],
@@ -186,10 +79,14 @@ export const JobForm = () => {
       ["delivery_city", "Delivery city is required"],
       ["delivery_postcode", "Delivery postcode is required"],
     ];
-    for (const [f, msg] of required) {
-      if (!(form as Record<string, string>)[f]?.trim()) e[f] = msg;
+
+    for (const [field, msg] of required) {
+      const val = (data.get(field) as string | null)?.trim() ?? "";
+      if (!val) e[field] = msg;
     }
+
     setErrors(e);
+
     if (Object.keys(e).length > 0) {
       toast({
         title: "Validation Error",
@@ -201,24 +98,56 @@ export const JobForm = () => {
     return true;
   };
 
+  // Helper to pull string safely
+  const getStr = (data: FormData, key: string): string => {
+    const v = data.get(key);
+    return (typeof v === "string" ? v : "").trim();
+  };
+
   const handleSubmit = async () => {
-    if (!validate()) return;
+    if (!formRef.current) return;
+    const data = new FormData(formRef.current);
+
+    // Make/model come from controlled Selects if not using "custom" inputs
+    if (!customMake) {
+      data.set("vehicle_make", vehicleMake);
+    }
+    if (!customModel) {
+      data.set("vehicle_model", vehicleModel);
+    }
+
+    if (!validate(data)) return;
+
+    const payload = {
+      external_job_number: getStr(data, "external_job_number") || null,
+      vehicle_reg: getStr(data, "vehicle_reg"),
+      vehicle_make: getStr(data, "vehicle_make"),
+      vehicle_model: getStr(data, "vehicle_model"),
+      vehicle_colour: getStr(data, "vehicle_colour"),
+      vehicle_year: getStr(data, "vehicle_year") || null,
+
+      pickup_contact_name: getStr(data, "pickup_contact_name"),
+      pickup_contact_phone: getStr(data, "pickup_contact_phone"),
+      pickup_company: getStr(data, "pickup_company") || null,
+      pickup_address_line1: getStr(data, "pickup_address_line1"),
+      pickup_address_line2: getStr(data, "pickup_address_line2") || null,
+      pickup_city: getStr(data, "pickup_city"),
+      pickup_postcode: getStr(data, "pickup_postcode"),
+      pickup_notes: getStr(data, "pickup_notes") || null,
+
+      delivery_contact_name: getStr(data, "delivery_contact_name"),
+      delivery_contact_phone: getStr(data, "delivery_contact_phone"),
+      delivery_company: getStr(data, "delivery_company") || null,
+      delivery_address_line1: getStr(data, "delivery_address_line1"),
+      delivery_address_line2: getStr(data, "delivery_address_line2") || null,
+      delivery_city: getStr(data, "delivery_city"),
+      delivery_postcode: getStr(data, "delivery_postcode"),
+      delivery_notes: getStr(data, "delivery_notes") || null,
+
+      earliest_delivery_date: getStr(data, "earliest_delivery_date") || null,
+    };
 
     try {
-      const payload = {
-        ...form,
-        vehicle_year: form.vehicle_year || null,
-        pickup_company: form.pickup_company || null,
-        pickup_address_line2: form.pickup_address_line2 || null,
-        pickup_notes: form.pickup_notes || null,
-        delivery_company: form.delivery_company || null,
-        delivery_address_line2: form.delivery_address_line2 || null,
-        delivery_notes: form.delivery_notes || null,
-        earliest_delivery_date: form.earliest_delivery_date || null,
-        external_job_number:
-          form.external_job_number || autoJobNumber || null,
-      };
-
       if (isEdit && jobId) {
         await updateMutation.mutateAsync({ jobId, input: payload });
         toast({ title: "Job Updated" });
@@ -227,20 +156,27 @@ export const JobForm = () => {
         const job = await createMutation.mutateAsync(payload);
         toast({
           title: "Job Created",
-          description: `${job.external_job_number ?? ""} – ${job.vehicle_reg}`,
+          description: `${job.external_job_number ?? ""} – ${
+            job.vehicle_reg
+          }`,
         });
         navigate(`/jobs/${job.id}`);
       }
     } catch (e: unknown) {
       toast({
         title: "Error",
-        description: e instanceof Error ? e.message : "Unknown error",
+        description:
+          e instanceof Error ? e.message : "Unknown error",
         variant: "destructive",
       });
     }
   };
 
-  if (isEdit && jobLoading) {
+  const isMutating =
+    createMutation.isPending || updateMutation.isPending;
+
+  // Show loader while fetching existing job
+  if (isEdit && jobLoading && !existingJob) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -248,40 +184,13 @@ export const JobForm = () => {
     );
   }
 
-  const isMutating = createMutation.isPending || updateMutation.isPending;
-
-  const Field = ({
-    label,
-    field,
-    required,
-    placeholder,
-    type,
-  }: {
-    label: string;
-    field: string;
-    required?: boolean;
-    placeholder?: string;
-    type?: string;
-  }) => (
-    <div>
-      <Label className="text-sm font-medium">
-        {label}
-        {required && " *"}
-      </Label>
-      <Input
-        type={type ?? "text"}
-        value={(form as Record<string, string>)[field] ?? ""}
-        onChange={(e) => update(field, e.target.value)}
-        placeholder={placeholder ?? label}
-        className="mt-1"
-      />
-      {errors[field] && (
-        <p className="text-xs text-destructive mt-1">
-          {errors[field]}
-        </p>
-      )}
-    </div>
-  );
+  // Small field helper just for error display; inputs themselves are uncontrolled
+  const ErrorText = ({ field }: { field: string }) =>
+    errors[field] ? (
+      <p className="text-xs text-destructive mt-1">
+        {errors[field]}
+      </p>
+    ) : null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -291,258 +200,456 @@ export const JobForm = () => {
         onBack={() => navigate(-1)}
       />
       <div className="p-4 space-y-6 max-w-lg mx-auto">
-        <div className="space-y-4">
-          <h3 className="font-semibold text-lg">Vehicle Details</h3>
+        <form
+          ref={formRef}
+          className="space-y-8"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void handleSubmit();
+          }}
+        >
+          {/* VEHICLE DETAILS */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-lg">
+              Vehicle Details
+            </h3>
 
-          {/* Job Number */}
-          <div className="space-y-1">
-            <Label className="text-sm font-medium">Job Number</Label>
-            <Input
-              type="text"
-              value={form.external_job_number}
-              onChange={(e) =>
-                update("external_job_number", e.target.value)
-              }
-              placeholder={
-                autoJobNumber
-                  ? `${autoJobNumber} (auto – leave blank to use)`
-                  : "Auto-generated if blank"
-              }
-              className="mt-1"
-            />
-            {autoJobLoading && (
-              <p className="text-xs text-muted-foreground">
-                Generating next AX number…
-              </p>
-            )}
-          </div>
+            {/* Job Number */}
+            <div>
+              <Label className="text-sm font-medium">
+                Job Number
+              </Label>
+              <Input
+                name="external_job_number"
+                placeholder="Auto-generated if left blank"
+                defaultValue={
+                  existingJob?.external_job_number ?? ""
+                }
+                className="mt-1"
+              />
+              <ErrorText field="external_job_number" />
+            </div>
 
-          <Field label="Registration" field="vehicle_reg" required />
+            {/* Registration */}
+            <div>
+              <Label className="text-sm font-medium">
+                Registration *
+              </Label>
+              <Input
+                name="vehicle_reg"
+                placeholder="Vehicle registration"
+                defaultValue={existingJob?.vehicle_reg ?? ""}
+                autoCapitalize="characters"
+                className="mt-1"
+              />
+              <ErrorText field="vehicle_reg" />
+            </div>
 
-          {/* Make dropdown */}
-          <div>
-            <Label className="text-sm font-medium">Make *</Label>
-            {customMake ? (
-              <div className="flex gap-2 mt-1">
-                <Input
-                  value={form.vehicle_make}
-                  onChange={(e) =>
-                    update("vehicle_make", e.target.value)
-                  }
-                  placeholder="Enter make"
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCustomMake(false)}
-                >
-                  List
-                </Button>
-              </div>
-            ) : (
-              <Select
-                value={form.vehicle_make}
-                onValueChange={(v) => {
-                  if (v === "__other__") {
-                    setCustomMake(true);
-                    update("vehicle_make", "");
-                    update("vehicle_model", "");
-                  } else {
-                    update("vehicle_make", v);
-                    update("vehicle_model", "");
-                    setCustomModel(false);
-                  }
-                }}
-              >
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select make" />
-                </SelectTrigger>
-                <SelectContent>
-                  {CAR_MAKES.map((m) => (
-                    <SelectItem key={m} value={m}>
-                      {m}
-                    </SelectItem>
-                  ))}
-                  <SelectItem value="__other__">Other…</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-            {errors.vehicle_make && (
-              <p className="text-xs text-destructive mt-1">
-                {errors.vehicle_make}
-              </p>
-            )}
-          </div>
-
-          {/* Model dropdown */}
-          <div>
-            <Label className="text-sm font-medium">Model *</Label>
-            {customModel || customMake ? (
-              <div className="flex gap-2 mt-1">
-                <Input
-                  value={form.vehicle_model}
-                  onChange={(e) =>
-                    update("vehicle_model", e.target.value)
-                  }
-                  placeholder="Enter model"
-                />
-                {!customMake && (
+            {/* Make */}
+            <div>
+              <Label className="text-sm font-medium">Make *</Label>
+              {customMake ? (
+                <div className="flex gap-2 mt-1">
+                  <Input
+                    name="vehicle_make"
+                    placeholder="Enter make"
+                    defaultValue={existingJob?.vehicle_make ?? ""}
+                    onBlur={(e) => {
+                      setVehicleMake(e.target.value);
+                    }}
+                  />
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setCustomModel(false)}
+                    type="button"
+                    onClick={() => {
+                      setCustomMake(false);
+                      setVehicleMake("");
+                      setVehicleModel("");
+                    }}
                   >
                     List
                   </Button>
-                )}
-              </div>
-            ) : (
-              <Select
-                value={form.vehicle_model}
-                onValueChange={(v) => {
-                  if (v === "__other__") {
-                    setCustomModel(true);
-                    update("vehicle_model", "");
-                  } else {
-                    update("vehicle_model", v);
-                  }
-                }}
-                disabled={!form.vehicle_make}
-              >
-                <SelectTrigger className="mt-1">
-                  <SelectValue
-                    placeholder={
-                      form.vehicle_make
-                        ? "Select model"
-                        : "Select make first"
-                    }
+                </div>
+              ) : (
+                <>
+                  {/* controlled Select, plus hidden input so value goes into FormData */}
+                  <input
+                    type="hidden"
+                    name="vehicle_make"
+                    value={vehicleMake}
                   />
-                </SelectTrigger>
-                <SelectContent>
-                  {models.map((m) => (
-                    <SelectItem key={m} value={m}>
-                      {m}
-                    </SelectItem>
-                  ))}
-                  <SelectItem value="__other__">Other…</SelectItem>
-                </SelectContent>
-              </Select>
+                  <Select
+                    value={vehicleMake}
+                    onValueChange={(v) => {
+                      if (v === "__other__") {
+                        setCustomMake(true);
+                        setVehicleMake("");
+                        setVehicleModel("");
+                      } else {
+                        setVehicleMake(v);
+                        setVehicleModel("");
+                        setCustomModel(false);
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select make" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CAR_MAKES.map((m) => (
+                        <SelectItem key={m} value={m}>
+                          {m}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="__other__">
+                        Other…
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </>
+              )}
+              <ErrorText field="vehicle_make" />
+            </div>
+
+            {/* Model */}
+            <div>
+              <Label className="text-sm font-medium">
+                Model *
+              </Label>
+              {customModel || customMake ? (
+                <div className="flex gap-2 mt-1">
+                  <Input
+                    name="vehicle_model"
+                    placeholder="Enter model"
+                    defaultValue={existingJob?.vehicle_model ?? ""}
+                    onBlur={(e) => {
+                      setVehicleModel(e.target.value);
+                    }}
+                  />
+                  {!customMake && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      type="button"
+                      onClick={() => setCustomModel(false)}
+                    >
+                      List
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <input
+                    type="hidden"
+                    name="vehicle_model"
+                    value={vehicleModel}
+                  />
+                  <Select
+                    value={vehicleModel}
+                    onValueChange={(v) => {
+                      if (v === "__other__") {
+                        setCustomModel(true);
+                        setVehicleModel("");
+                      } else {
+                        setVehicleModel(v);
+                      }
+                    }}
+                    disabled={!vehicleMake}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue
+                        placeholder={
+                          vehicleMake
+                            ? "Select model"
+                            : "Select make first"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {models.map((m) => (
+                        <SelectItem key={m} value={m}>
+                          {m}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="__other__">
+                        Other…
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </>
+              )}
+              <ErrorText field="vehicle_model" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-sm font-medium">
+                  Colour *
+                </Label>
+                <Input
+                  name="vehicle_colour"
+                  placeholder="e.g. Metallic Black"
+                  defaultValue={
+                    existingJob?.vehicle_colour ?? ""
+                  }
+                  className="mt-1"
+                />
+                <ErrorText field="vehicle_colour" />
+              </div>
+              <div>
+                <Label className="text-sm font-medium">
+                  Year
+                </Label>
+                <Input
+                  name="vehicle_year"
+                  type="number"
+                  inputMode="numeric"
+                  placeholder="e.g. 2020"
+                  defaultValue={existingJob?.vehicle_year ?? ""}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* PICKUP */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-lg">Pickup</h3>
+            <div>
+              <Label className="text-sm font-medium">
+                Contact Name *
+              </Label>
+              <Input
+                name="pickup_contact_name"
+                defaultValue={
+                  existingJob?.pickup_contact_name ?? ""
+                }
+                className="mt-1"
+              />
+              <ErrorText field="pickup_contact_name" />
+            </div>
+            <div>
+              <Label className="text-sm font-medium">
+                Phone *
+              </Label>
+              <Input
+                name="pickup_contact_phone"
+                defaultValue={
+                  existingJob?.pickup_contact_phone ?? ""
+                }
+                className="mt-1"
+              />
+              <ErrorText field="pickup_contact_phone" />
+            </div>
+            <div>
+              <Label className="text-sm font-medium">
+                Company
+              </Label>
+              <Input
+                name="pickup_company"
+                defaultValue={existingJob?.pickup_company ?? ""}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-sm font-medium">
+                Address Line 1 *
+              </Label>
+              <Input
+                name="pickup_address_line1"
+                defaultValue={
+                  existingJob?.pickup_address_line1 ?? ""
+                }
+                className="mt-1"
+              />
+              <ErrorText field="pickup_address_line1" />
+            </div>
+            <div>
+              <Label className="text-sm font-medium">
+                Address Line 2
+              </Label>
+              <Input
+                name="pickup_address_line2"
+                defaultValue={
+                  existingJob?.pickup_address_line2 ?? ""
+                }
+                className="mt-1"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-sm font-medium">
+                  City *
+                </Label>
+                <Input
+                  name="pickup_city"
+                  defaultValue={
+                    existingJob?.pickup_city ?? ""
+                  }
+                  className="mt-1"
+                />
+                <ErrorText field="pickup_city" />
+              </div>
+              <div>
+                <Label className="text-sm font-medium">
+                  Postcode *
+                </Label>
+                <Input
+                  name="pickup_postcode"
+                  defaultValue={
+                    existingJob?.pickup_postcode ?? ""
+                  }
+                  className="mt-1"
+                />
+                <ErrorText field="pickup_postcode" />
+              </div>
+            </div>
+            <div>
+              <Label className="text-sm font-medium">
+                Pickup Notes
+              </Label>
+              <Textarea
+                name="pickup_notes"
+                defaultValue={existingJob?.pickup_notes ?? ""}
+                className="mt-1"
+              />
+            </div>
+          </div>
+
+          {/* DELIVERY */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-lg">Delivery</h3>
+            <div>
+              <Label className="text-sm font-medium">
+                Contact Name *
+              </Label>
+              <Input
+                name="delivery_contact_name"
+                defaultValue={
+                  existingJob?.delivery_contact_name ?? ""
+                }
+                className="mt-1"
+              />
+              <ErrorText field="delivery_contact_name" />
+            </div>
+            <div>
+              <Label className="text-sm font-medium">
+                Phone *
+              </Label>
+              <Input
+                name="delivery_contact_phone"
+                defaultValue={
+                  existingJob?.delivery_contact_phone ?? ""
+                }
+                className="mt-1"
+              />
+              <ErrorText field="delivery_contact_phone" />
+            </div>
+            <div>
+              <Label className="text-sm font-medium">
+                Company
+              </Label>
+              <Input
+                name="delivery_company"
+                defaultValue={
+                  existingJob?.delivery_company ?? ""
+                }
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-sm font-medium">
+                Address Line 1 *
+              </Label>
+              <Input
+                name="delivery_address_line1"
+                defaultValue={
+                  existingJob?.delivery_address_line1 ?? ""
+                }
+                className="mt-1"
+              />
+              <ErrorText field="delivery_address_line1" />
+            </div>
+            <div>
+              <Label className="text-sm font-medium">
+                Address Line 2
+              </Label>
+              <Input
+                name="delivery_address_line2"
+                defaultValue={
+                  existingJob?.delivery_address_line2 ?? ""
+                }
+                className="mt-1"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-sm font-medium">
+                  City *
+                </Label>
+                <Input
+                  name="delivery_city"
+                  defaultValue={
+                    existingJob?.delivery_city ?? ""
+                  }
+                  className="mt-1"
+                />
+                <ErrorText field="delivery_city" />
+              </div>
+              <div>
+                <Label className="text-sm font-medium">
+                  Postcode *
+                </Label>
+                <Input
+                  name="delivery_postcode"
+                  defaultValue={
+                    existingJob?.delivery_postcode ?? ""
+                  }
+                  className="mt-1"
+                />
+                <ErrorText field="delivery_postcode" />
+              </div>
+            </div>
+            <div>
+              <Label className="text-sm font-medium">
+                Delivery Notes
+              </Label>
+              <Textarea
+                name="delivery_notes"
+                defaultValue={
+                  existingJob?.delivery_notes ?? ""
+                }
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-sm font-medium">
+                Earliest Delivery Date
+              </Label>
+              <Input
+                name="earliest_delivery_date"
+                type="date"
+                defaultValue={
+                  existingJob?.earliest_delivery_date ?? ""
+                }
+                className="mt-1"
+              />
+            </div>
+          </div>
+
+          <Button
+            className="w-full"
+            size="lg"
+            type="submit"
+            disabled={isMutating}
+          >
+            {isMutating && (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             )}
-            {errors.vehicle_model && (
-              <p className="text-xs text-destructive mt-1">
-                {errors.vehicle_model}
-              </p>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Colour" field="vehicle_colour" required />
-            <Field label="Year" field="vehicle_year" />
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <h3 className="font-semibold text-lg">Pickup</h3>
-          <Field
-            label="Contact Name"
-            field="pickup_contact_name"
-            required
-          />
-          <Field
-            label="Phone"
-            field="pickup_contact_phone"
-            required
-          />
-          <Field label="Company" field="pickup_company" />
-          <Field
-            label="Address Line 1"
-            field="pickup_address_line1"
-            required
-          />
-          <Field
-            label="Address Line 2"
-            field="pickup_address_line2"
-          />
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="City" field="pickup_city" required />
-            <Field
-              label="Postcode"
-              field="pickup_postcode"
-              required
-            />
-          </div>
-          <div>
-            <Label className="text-sm font-medium">Pickup Notes</Label>
-            <Textarea
-              value={form.pickup_notes}
-              onChange={(e) =>
-                update("pickup_notes", e.target.value)
-              }
-              className="mt-1"
-            />
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <h3 className="font-semibold text-lg">Delivery</h3>
-          <Field
-            label="Contact Name"
-            field="delivery_contact_name"
-            required
-          />
-          <Field
-            label="Phone"
-            field="delivery_contact_phone"
-            required
-          />
-          <Field label="Company" field="delivery_company" />
-          <Field
-            label="Address Line 1"
-            field="delivery_address_line1"
-            required
-          />
-          <Field
-            label="Address Line 2"
-            field="delivery_address_line2"
-          />
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="City" field="delivery_city" required />
-            <Field
-              label="Postcode"
-              field="delivery_postcode"
-              required
-            />
-          </div>
-          <div>
-            <Label className="text-sm font-medium">
-              Delivery Notes
-            </Label>
-            <Textarea
-              value={form.delivery_notes}
-              onChange={(e) =>
-                update("delivery_notes", e.target.value)
-              }
-              className="mt-1"
-            />
-          </div>
-          <Field
-            label="Earliest Delivery Date"
-            field="earliest_delivery_date"
-            type="date"
-          />
-        </div>
-
-        <Button
-          className="w-full"
-          size="lg"
-          onClick={handleSubmit}
-          disabled={isMutating}
-        >
-          {isMutating && (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          )}
-          {isEdit ? "Update Job" : "Create Job"}
-        </Button>
+            {isEdit ? "Update Job" : "Create Job"}
+          </Button>
+        </form>
       </div>
     </div>
   );
