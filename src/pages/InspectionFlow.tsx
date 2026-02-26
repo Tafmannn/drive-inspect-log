@@ -924,7 +924,7 @@ export const InspectionFlow = () => {
   });
 
   const pickupStepCount = 6;
-  const deliveryStepCount = 4;
+  const deliveryStepCount = 5;
   const totalSteps =
     type === "pickup" ? pickupStepCount : deliveryStepCount;
 
