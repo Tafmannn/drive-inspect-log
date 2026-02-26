@@ -411,7 +411,7 @@ export async function emailPodPdf(job: JobWithRelations): Promise<void> {
   const subject = `Axentra POD – ${ref} – ${job.vehicle_reg}`;
   const body = "Please find attached the Proof of Delivery for the completed job.\n\nKind regards,\nAxentra Vehicle Logistics";
 
-  // Primary: native share with file (works on iOS/Android to open email composer with attachment)
+  // Use native share API to open email composer with PDF attached
   if (navigator.share && navigator.canShare?.({ files: [file] })) {
     try {
       await navigator.share({
@@ -422,26 +422,15 @@ export async function emailPodPdf(job: JobWithRelations): Promise<void> {
       return;
     } catch (e: unknown) {
       if (e instanceof Error && e.name === "AbortError") return;
-      // Fall through to mailto
+      // Fall through to mailto (no attachment possible)
     }
   }
 
-  // Fallback: open mailto (no attachment possible via mailto, so also download the PDF)
-  const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body + "\n\n(The PDF has been downloaded separately – please attach it to this email.)")}`;
-  
+  // Fallback: open mailto without attachment, no download prompt
+  const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   try {
     window.location.href = mailto;
   } catch {
-    // If mailto fails, alert user
-    alert("No email app could be opened. Please check your device settings.");
-    return;
+    alert("No email app could be opened. Please use the 'Share PDF' button to send the POD as an attachment.");
   }
-
-  // Download the PDF as a fallback
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = fileName;
-  a.click();
-  URL.revokeObjectURL(url);
 }

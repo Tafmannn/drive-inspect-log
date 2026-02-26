@@ -362,27 +362,69 @@ export const InspectionFlow = () => {
     }
   }
 
-  // ───────────────── VALIDATION & SUBMIT ─────────────────
+  // ───────────────── PER-STEP VALIDATION ─────────────────
 
-  const validateBeforeSubmit = (): string[] => {
+  const validateStep = (step: number): string[] => {
     const missing: string[] = [];
-    if (!formState.odometer) missing.push("Odometer");
-    if (!formState.fuelLevel) missing.push("Fuel level");
-    if (!formState.driverName) missing.push("Driver name");
-    if (!driverSigned) missing.push("Driver signature");
-    if (!formState.customerName) missing.push("Customer name");
-    if (!customerSigned) missing.push("Customer signature");
 
-    if (type === "delivery") {
-      const hasStandard =
-        Object.values(formState.standardPhotos).filter(Boolean).length > 0;
-      const hasAdditional = formState.additionalPhotos.length > 0;
-      if (!hasStandard && !hasAdditional) {
-        missing.push("At least one delivery photo");
+    if (type === "pickup") {
+      switch (step) {
+        case 1:
+          if (!formState.odometer) missing.push("Odometer reading");
+          if (!formState.fuelLevel) missing.push("Fuel level");
+          break;
+        case 2:
+          if (!formState.vehicleCondition) missing.push("Vehicle condition");
+          if (!formState.lightCondition) missing.push("Light condition");
+          if (!formState.numberOfKeys) missing.push("Number of keys");
+          break;
+        case 3: // Damage – optional
+          break;
+        case 4: {
+          const hasPhotos = Object.values(formState.standardPhotos).filter(Boolean).length > 0;
+          if (!hasPhotos) missing.push("At least one pickup photo");
+          break;
+        }
+        case 5:
+          if (!formState.driverName) missing.push("Driver name");
+          if (!driverSigned) missing.push("Driver signature");
+          if (!formState.customerName) missing.push("Customer name");
+          if (!customerSigned) missing.push("Customer signature");
+          break;
+      }
+    } else {
+      switch (step) {
+        case 1:
+          if (!formState.odometer) missing.push("Odometer reading");
+          if (!formState.fuelLevel) missing.push("Fuel level");
+          break;
+        case 2: // Damage – optional
+          break;
+        case 3: {
+          const hasPhotos =
+            Object.values(formState.standardPhotos).filter(Boolean).length > 0 ||
+            formState.additionalPhotos.length > 0;
+          if (!hasPhotos) missing.push("At least one delivery photo");
+          break;
+        }
+        case 4:
+          if (!formState.driverName) missing.push("Driver name");
+          if (!driverSigned) missing.push("Driver signature");
+          if (!formState.customerName) missing.push("Customer name");
+          if (!customerSigned) missing.push("Customer signature");
+          break;
       }
     }
-
     return missing;
+  };
+
+  const validateBeforeSubmit = (): string[] => {
+    // Aggregate all steps
+    const allMissing: string[] = [];
+    for (let s = 1; s < totalSteps; s++) {
+      allMissing.push(...validateStep(s));
+    }
+    return allMissing;
   };
 
   const handleFinalSubmit = async () => {
@@ -596,7 +638,17 @@ export const InspectionFlow = () => {
   }
 
   const nextStep = () => {
-    if (currentStep < totalSteps) setCurrentStep((s) => s + 1);
+    if (currentStep >= totalSteps) return;
+    const missing = validateStep(currentStep);
+    if (missing.length > 0) {
+      toast({
+        title: "Please complete required fields",
+        description: missing.join(", "),
+        variant: "destructive",
+      });
+      return;
+    }
+    setCurrentStep((s) => s + 1);
   };
   const prevStep = () => {
     if (currentStep > 1) setCurrentStep((s) => s - 1);
@@ -1215,7 +1267,76 @@ export const InspectionFlow = () => {
             { field: "tyreInflationKit" as const, label: "Tyre Inflation Kit" },
             { field: "lockingWheelNut" as const, label: "Locking Wheel Nut" },
             { field: "satNavWorking" as const, label: "Sat Nav Working" },
-            { field: "numberOfKeys" as const, label: "Number of Keys" },
+          ].map(({ field, label }) => (
+            <div key={field}>
+              <Label className="text-sm font-medium">{label}</Label>
+              <RadioGroup
+                value={formState[field]}
+                onValueChange={(v) => updateField(field, v)}
+                className="mt-1 flex gap-4"
+              >
+                <div className="flex items-center space-x-1">
+                  <RadioGroupItem value="Yes" id={`${field}-yes`} />
+                  <Label htmlFor={`${field}-yes`} className="text-sm">Yes</Label>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <RadioGroupItem value="No" id={`${field}-no`} />
+                  <Label htmlFor={`${field}-no`} className="text-sm">No</Label>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <RadioGroupItem value="N/A" id={`${field}-na`} />
+                  <Label htmlFor={`${field}-na`} className="text-sm">N/A</Label>
+                </div>
+              </RadioGroup>
+            </div>
+          ))}
+
+          {/* Number of Keys – numeric stepper */}
+          <div>
+            <Label className="text-sm font-medium">Number of Keys *</Label>
+            <div className="flex items-center gap-3 mt-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-10 w-10 text-lg"
+                onClick={() => {
+                  const cur = parseInt(formState.numberOfKeys, 10) || 0;
+                  if (cur > 0) updateField("numberOfKeys", String(cur - 1));
+                }}
+                disabled={!formState.numberOfKeys || parseInt(formState.numberOfKeys, 10) <= 0}
+              >
+                −
+              </Button>
+              <Input
+                type="number"
+                inputMode="numeric"
+                min="0"
+                step="1"
+                value={formState.numberOfKeys}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/[^0-9]/g, "");
+                  updateField("numberOfKeys", v);
+                }}
+                className="w-20 text-center text-lg font-semibold"
+                placeholder="0"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-10 w-10 text-lg"
+                onClick={() => {
+                  const cur = parseInt(formState.numberOfKeys, 10) || 0;
+                  updateField("numberOfKeys", String(cur + 1));
+                }}
+              >
+                +
+              </Button>
+            </div>
+          </div>
+
+          {[
             { field: "evChargingCables" as const, label: "EV Charging Cables" },
             { field: "aerial" as const, label: "Aerial" },
             { field: "customerPaperwork" as const, label: "Customer Paperwork" },
