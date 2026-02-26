@@ -8,16 +8,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { useCreateExpense, useUploadReceipt } from "@/hooks/useExpenses";
-import { EXPENSE_CATEGORIES } from "@/lib/expenseApi";
+import { useCreateExpense, useUpdateExpense, useUploadReceipt } from "@/hooks/useExpenses";
+import { EXPENSE_CATEGORIES, getExpensesForJob } from "@/lib/expenseApi";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Camera, ImagePlus, X } from "lucide-react";
 import type { Job } from "@/lib/types";
 
 export const ExpenseForm = () => {
   const navigate = useNavigate();
+  const { expenseId } = useParams<{ expenseId: string }>();
   const [searchParams] = useSearchParams();
   const preselectedJobId = searchParams.get("jobId") || "";
+  const isEdit = !!expenseId;
 
   const [jobs, setJobs] = useState<Pick<Job, "id" | "vehicle_reg" | "external_job_number">[]>([]);
   const [jobId, setJobId] = useState(preselectedJobId);
@@ -28,11 +30,14 @@ export const ExpenseForm = () => {
   const [label, setLabel] = useState("");
   const [notes, setNotes] = useState("");
   const [receiptFiles, setReceiptFiles] = useState<{ file: File; preview: string }[]>([]);
+  const [existingReceipts, setExistingReceipts] = useState<{ id: string; url: string }[]>([]);
   const [saving, setSaving] = useState(false);
+  const [loadingExpense, setLoadingExpense] = useState(isEdit);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const createExpense = useCreateExpense();
+  const updateExpense = useUpdateExpense();
   const uploadReceipt = useUploadReceipt();
 
   useEffect(() => {
@@ -49,6 +54,39 @@ export const ExpenseForm = () => {
     };
     load();
   }, []);
+
+  // Load existing expense for editing
+  useEffect(() => {
+    if (!expenseId) return;
+    const loadExpense = async () => {
+      const { data, error } = await supabase
+        .from("expenses")
+        .select("*")
+        .eq("id", expenseId)
+        .single();
+      if (error || !data) {
+        toast({ title: "Expense not found", variant: "destructive" });
+        navigate(-1);
+        return;
+      }
+      setJobId(data.job_id);
+      setCategory(data.category);
+      setAmount(String(data.amount));
+      setDate(data.date);
+      setTime(data.time || "");
+      setLabel(data.label || "");
+      setNotes(data.notes || "");
+
+      // Load receipts
+      const { data: receipts } = await supabase
+        .from("expense_receipts")
+        .select("id, url")
+        .eq("expense_id", expenseId);
+      setExistingReceipts((receipts ?? []) as { id: string; url: string }[]);
+      setLoadingExpense(false);
+    };
+    loadExpense();
+  }, [expenseId]);
 
   const handleFileSelect = (files: FileList | null) => {
     if (!files) return;
@@ -78,22 +116,40 @@ export const ExpenseForm = () => {
 
     setSaving(true);
     try {
-      const expense = await createExpense.mutateAsync({
-        job_id: jobId,
-        date,
-        time: time || null,
-        amount: Number(amount),
-        category,
-        label: label || null,
-        notes: notes || null,
-      });
+      let targetId = expenseId;
 
-      // Upload receipts
-      for (const r of receiptFiles) {
-        await uploadReceipt.mutateAsync({ expenseId: expense.id, file: r.file });
+      if (isEdit && expenseId) {
+        await updateExpense.mutateAsync({
+          id: expenseId,
+          input: {
+            job_id: jobId,
+            date,
+            time: time || null,
+            amount: Number(amount),
+            category,
+            label: label || null,
+            notes: notes || null,
+          },
+        });
+      } else {
+        const expense = await createExpense.mutateAsync({
+          job_id: jobId,
+          date,
+          time: time || null,
+          amount: Number(amount),
+          category,
+          label: label || null,
+          notes: notes || null,
+        });
+        targetId = expense.id;
       }
 
-      toast({ title: "Expense saved" });
+      // Upload new receipts
+      for (const r of receiptFiles) {
+        await uploadReceipt.mutateAsync({ expenseId: targetId!, file: r.file });
+      }
+
+      toast({ title: isEdit ? "Expense updated" : "Expense saved" });
       navigate(-1);
     } catch (e: unknown) {
       toast({ title: "Save failed", description: e instanceof Error ? e.message : "Unknown error", variant: "destructive" });
@@ -104,8 +160,12 @@ export const ExpenseForm = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <AppHeader title="Add Expense" showBack onBack={() => navigate(-1)} />
+      <AppHeader title={isEdit ? "Edit Expense" : "Add Expense"} showBack onBack={() => navigate(-1)} />
       <div className="p-4 space-y-4 max-w-lg mx-auto">
+        {loadingExpense ? (
+          <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+        ) : (
+        <>
         {/* Job */}
         <div className="space-y-1.5">
           <Label>Job *</Label>
@@ -139,6 +199,7 @@ export const ExpenseForm = () => {
           <Label>Amount (£) *</Label>
           <Input
             type="number"
+            inputMode="decimal"
             step="0.01"
             min="0"
             placeholder="0.00"
@@ -185,6 +246,17 @@ export const ExpenseForm = () => {
           <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => handleFileSelect(e.target.files)} />
           <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={e => handleFileSelect(e.target.files)} />
 
+          {/* Existing receipts (edit mode) */}
+          {existingReceipts.length > 0 && (
+            <div className="grid grid-cols-3 gap-2">
+              {existingReceipts.map((r) => (
+                <div key={r.id} className="relative">
+                  <img src={r.url} alt="Receipt" className="w-full h-20 object-cover rounded border" />
+                </div>
+              ))}
+            </div>
+          )}
+
           {receiptFiles.length > 0 && (
             <div className="grid grid-cols-3 gap-2">
               {receiptFiles.map((r, i) => (
@@ -206,8 +278,10 @@ export const ExpenseForm = () => {
         {/* Submit */}
         <Button className="w-full" onClick={handleSubmit} disabled={saving}>
           {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          Save Expense
+          {isEdit ? "Update Expense" : "Save Expense"}
         </Button>
+        </>
+        )}
       </div>
     </div>
   );

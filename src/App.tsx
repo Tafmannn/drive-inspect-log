@@ -49,6 +49,7 @@ const App = () => (
             <Route path="/pending-uploads" element={<PendingUploads />} />
             <Route path="/expenses" element={<Expenses />} />
             <Route path="/expenses/new" element={<ExpenseForm />} />
+            <Route path="/expenses/:expenseId/edit" element={<ExpenseForm />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

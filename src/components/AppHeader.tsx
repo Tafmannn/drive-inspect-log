@@ -25,7 +25,7 @@ export const AppHeader = ({
 
     getAllPendingUploads()
       .then((items) => {
-        if (!cancelled) setPendingCount(items.length);
+        if (!cancelled) setPendingCount(items.filter(i => i.status === 'pending' || i.status === 'failed').length);
       })
       .catch(() => {
         // silently ignore – header shouldn't break the app
