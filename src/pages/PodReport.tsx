@@ -1,11 +1,13 @@
+import { useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { useJob } from "@/hooks/useJobs";
 import { useParams } from "react-router-dom";
-import { Loader2, Mail, Share2 } from "lucide-react";
+import { Loader2, Mail, Share2, FileDown } from "lucide-react";
 import { openPodEmail, generatePodEmailBody } from "@/lib/podEmail";
+import { sharePodPdf, emailPodPdf } from "@/lib/podPdf";
 import { FUEL_PERCENT_TO_LABEL } from "@/lib/types";
 import { toast } from "@/hooks/use-toast";
 import type { Inspection } from "@/lib/types";
@@ -61,6 +63,7 @@ const CHECKLIST_FIELDS: { key: keyof Inspection; label: string }[] = [
 export const PodReport = () => {
   const { jobId } = useParams<{ jobId: string }>();
   const { data: job, isLoading } = useJob(jobId ?? "");
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const handleShare = async () => {
     if (!job) return;
@@ -74,20 +77,45 @@ export const PodReport = () => {
           text: shareText,
         });
       } catch (e: unknown) {
-        // User cancelled or share failed
         if (e instanceof Error && e.name !== "AbortError") {
           toast({ title: "Share failed", description: e.message, variant: "destructive" });
         }
       }
     } else {
-      // Fallback: copy to clipboard
       try {
         await navigator.clipboard.writeText(shareText);
         toast({ title: "Copied to clipboard", description: "POD report text copied. Paste into any app to share." });
       } catch {
-        // Final fallback: open mailto
         openPodEmail(job);
       }
+    }
+  };
+
+  const handleSharePdf = async () => {
+    if (!job) return;
+    setPdfLoading(true);
+    try {
+      await sharePodPdf(job);
+    } catch (e: unknown) {
+      if (e instanceof Error && e.name !== "AbortError") {
+        toast({ title: "PDF share failed", description: e instanceof Error ? e.message : "Unknown error", variant: "destructive" });
+      }
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
+  const handleEmailPdf = async () => {
+    if (!job) return;
+    setPdfLoading(true);
+    try {
+      await emailPodPdf(job);
+    } catch (e: unknown) {
+      if (e instanceof Error && e.name !== "AbortError") {
+        toast({ title: "Email failed", description: e instanceof Error ? e.message : "Unknown error", variant: "destructive" });
+      }
+    } finally {
+      setPdfLoading(false);
     }
   };
 
@@ -156,19 +184,30 @@ export const PodReport = () => {
             size="sm"
             variant="ghost"
             className="gap-1"
-            onClick={handleShare}
+            onClick={handleSharePdf}
+            disabled={pdfLoading}
           >
-            <Share2 className="h-4 w-4" />
-            Share
+            {pdfLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+            PDF
           </Button>
           <Button
             size="sm"
             variant="ghost"
             className="gap-1"
-            onClick={() => openPodEmail(job)}
+            onClick={handleEmailPdf}
+            disabled={pdfLoading}
           >
             <Mail className="h-4 w-4" />
-            Email
+            Email POD
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="gap-1"
+            onClick={handleShare}
+          >
+            <Share2 className="h-4 w-4" />
+            Share
           </Button>
         </div>
       </AppHeader>
@@ -395,7 +434,39 @@ export const PodReport = () => {
                 </Card>
               )}
 
-              {/* Photo summary */}
+              {/* Delivery Checklist */}
+              {delivery && (() => {
+                const deliveryChecklistItems = CHECKLIST_FIELDS.filter((f) => {
+                  const val = delivery[f.key];
+                  return val != null && val !== "";
+                });
+                return deliveryChecklistItems.length > 0 ? (
+                  <Card>
+                    <div className="p-4 space-y-2">
+                      <div className="text-sm font-semibold">
+                        Delivery Checklist
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1 text-xs">
+                        {deliveryChecklistItems.map((item) => (
+                          <div key={item.key} className="flex justify-between py-0.5">
+                            <span className="text-muted-foreground">{item.label}:</span>
+                            <span className="font-medium text-foreground ml-2">
+                              {yesNo(delivery[item.key] as string | null)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      {delivery.notes && (
+                        <div className="text-xs mt-2">
+                          <span className="font-medium text-foreground">Notes:</span>{" "}
+                          <span className="text-muted-foreground">{delivery.notes}</span>
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                ) : null;
+              })()}
+
               <Card className="bg-muted/40 border-border">
                 <div className="p-4 space-y-2">
                   <div className="text-sm font-semibold">

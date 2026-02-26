@@ -864,20 +864,73 @@ export const InspectionFlow = () => {
     const additionalCount = formState.additionalPhotos.length;
     const jobRef = job?.external_job_number || jobId?.slice(0, 8);
 
+    // Determine "Collected" status – pickup inspection is complete if job already has one,
+    // or if we're currently submitting a pickup with all mandatory fields filled
+    const hasPickupComplete = job?.has_pickup_inspection === true;
+    const isCollected =
+      hasPickupComplete ||
+      (type === "pickup" &&
+        !!formState.odometer &&
+        !!formState.fuelLevel &&
+        !!formState.driverName &&
+        driverSigned &&
+        !!formState.customerName &&
+        customerSigned);
+
+    // Checklist items for the review – only shown for pickup type
+    const REVIEW_CHECKLIST = [
+      { field: "vehicleCondition" as const, label: "Vehicle Condition" },
+      { field: "lightCondition" as const, label: "Light Condition" },
+      { field: "oilLevel" as const, label: "Oil Level" },
+      { field: "waterLevel" as const, label: "Water Level" },
+      { field: "handbook" as const, label: "Handbook" },
+      { field: "serviceBook" as const, label: "Service Book" },
+      { field: "mot" as const, label: "MOT" },
+      { field: "v5" as const, label: "V5" },
+      { field: "parcelShelf" as const, label: "Parcel Shelf" },
+      { field: "spareWheel" as const, label: "Spare Wheel" },
+      { field: "toolKit" as const, label: "Tool Kit" },
+      { field: "tyreInflationKit" as const, label: "Tyre Inflation Kit" },
+      { field: "lockingWheelNut" as const, label: "Locking Wheel Nut" },
+      { field: "satNavWorking" as const, label: "Sat Nav Working" },
+      { field: "alloysOrTrims" as const, label: "Alloys / Trims" },
+      { field: "alloysDamaged" as const, label: "Alloys Damaged" },
+      { field: "wheelTrimsDamaged" as const, label: "Wheel Trims Damaged" },
+      { field: "numberOfKeys" as const, label: "Number of Keys" },
+      { field: "evChargingCables" as const, label: "EV Charging Cables" },
+      { field: "aerial" as const, label: "Aerial" },
+      { field: "customerPaperwork" as const, label: "Customer Paperwork" },
+    ];
+
+    // For delivery review, show the saved pickup checklist from the job data
+    const savedPickup = job?.inspections.find((i) => i.type === "pickup");
+
     return (
       <div className="space-y-6">
-        <h2 className="text-xl font-semibold text-center">
-          Review & Submit
-        </h2>
+        {/* Header with Collected pill */}
+        <div className="flex items-center justify-center gap-3">
+          <h2 className="text-xl font-semibold">Review & Submit</h2>
+          {isCollected ? (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
+              ✓ Collected
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+              Collection Incomplete
+            </span>
+          )}
+        </div>
+
+        {/* Job header pill */}
+        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+          <span className="font-mono font-medium text-foreground">{jobRef}</span>
+          <span>–</span>
+          <span className="font-medium text-foreground">{job?.vehicle_reg}</span>
+        </div>
+
         <Card className="p-6 space-y-3">
           <h3 className="font-medium">Inspection Summary</h3>
           <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Job:</span>
-              <span className="font-medium">
-                {jobRef} – {job?.vehicle_reg}
-              </span>
-            </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Type:</span>
               <span className="capitalize font-medium">{type}</span>
@@ -890,18 +943,6 @@ export const InspectionFlow = () => {
               <span className="text-muted-foreground">Fuel Level:</span>
               <span>{formState.fuelLevel || "—"}</span>
             </div>
-            {type === "pickup" && (
-              <>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Condition:</span>
-                  <span>{formState.vehicleCondition || "—"}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Light:</span>
-                  <span>{formState.lightCondition || "—"}</span>
-                </div>
-              </>
-            )}
             <div className="flex justify-between">
               <span className="text-muted-foreground">Damages:</span>
               <span>{formState.damages.length}</span>
@@ -910,7 +951,7 @@ export const InspectionFlow = () => {
               <ul className="list-disc list-inside text-xs text-muted-foreground pl-2">
                 {formState.damages.map((d) => (
                   <li key={d.tempId}>
-                    {d.area} – {d.item}
+                    {d.area} – {d.item}: {d.damageTypes.join(", ")}
                   </li>
                 ))}
               </ul>
@@ -923,13 +964,6 @@ export const InspectionFlow = () => {
               <span className="text-muted-foreground">Additional Photos:</span>
               <span>{additionalCount}</span>
             </div>
-            {formState.additionalPhotos.length > 0 && (
-              <ul className="list-disc list-inside text-xs text-muted-foreground pl-2">
-                {formState.additionalPhotos.map((p) => (
-                  <li key={p.tempId}>{p.label}</li>
-                ))}
-              </ul>
-            )}
             <div className="flex justify-between">
               <span className="text-muted-foreground">Driver:</span>
               <span>
@@ -946,6 +980,79 @@ export const InspectionFlow = () => {
             </div>
           </div>
         </Card>
+
+        {/* Current inspection checklist (pickup) */}
+        {type === "pickup" && (
+          <Card className="p-6 space-y-3">
+            <h3 className="font-medium">Pickup Checklist</h3>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+              {REVIEW_CHECKLIST.map(({ field, label }) => {
+                const val = formState[field];
+                if (!val) return null;
+                return (
+                  <div key={field} className="flex justify-between py-0.5">
+                    <span className="text-muted-foreground text-xs">{label}:</span>
+                    <span className="font-medium text-xs">{val}</span>
+                  </div>
+                );
+              })}
+            </div>
+            {formState.notes && (
+              <div className="text-xs">
+                <span className="font-medium">Notes:</span>{" "}
+                <span className="text-muted-foreground">{formState.notes}</span>
+              </div>
+            )}
+          </Card>
+        )}
+
+        {/* Saved pickup checklist (shown on delivery review) */}
+        {type === "delivery" && savedPickup && (
+          <Card className="p-6 space-y-3">
+            <h3 className="font-medium">Pickup Checklist (from collection)</h3>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+              {[
+                { key: "vehicle_condition" as const, label: "Vehicle Condition" },
+                { key: "light_condition" as const, label: "Light Condition" },
+                { key: "oil_level_status" as const, label: "Oil Level" },
+                { key: "water_level_status" as const, label: "Water Level" },
+                { key: "handbook" as const, label: "Handbook" },
+                { key: "service_book" as const, label: "Service Book" },
+                { key: "mot" as const, label: "MOT" },
+                { key: "v5" as const, label: "V5" },
+                { key: "parcel_shelf" as const, label: "Parcel Shelf" },
+                { key: "spare_wheel_status" as const, label: "Spare Wheel" },
+                { key: "tool_kit" as const, label: "Tool Kit" },
+                { key: "tyre_inflation_kit" as const, label: "Tyre Inflation Kit" },
+                { key: "locking_wheel_nut" as const, label: "Locking Wheel Nut" },
+                { key: "sat_nav_working" as const, label: "Sat Nav Working" },
+                { key: "alloys_or_trims" as const, label: "Alloys / Trims" },
+                { key: "alloys_damaged" as const, label: "Alloys Damaged" },
+                { key: "wheel_trims_damaged" as const, label: "Wheel Trims Damaged" },
+                { key: "number_of_keys" as const, label: "Number of Keys" },
+                { key: "ev_charging_cables" as const, label: "EV Charging Cables" },
+                { key: "aerial" as const, label: "Aerial" },
+                { key: "customer_paperwork" as const, label: "Customer Paperwork" },
+              ].map(({ key, label }) => {
+                const val = savedPickup[key];
+                if (!val || val === "") return null;
+                return (
+                  <div key={key} className="flex justify-between py-0.5">
+                    <span className="text-muted-foreground text-xs">{label}:</span>
+                    <span className="font-medium text-xs">{String(val)}</span>
+                  </div>
+                );
+              })}
+            </div>
+            {savedPickup.notes && (
+              <div className="text-xs">
+                <span className="font-medium">Notes:</span>{" "}
+                <span className="text-muted-foreground">{savedPickup.notes}</span>
+              </div>
+            )}
+          </Card>
+        )}
+
         <div className="bg-warning/10 border border-warning/30 rounded-lg p-4">
           <p className="text-sm text-foreground">
             Please ensure all information is correct. You will not be
