@@ -147,10 +147,6 @@ export const PodReport = () => {
 
   const pickupOdo = pickup?.odometer ?? null;
   const deliveryOdo = delivery?.odometer ?? null;
-  const journeyMiles = pickupOdo != null && deliveryOdo != null ? deliveryOdo - pickupOdo : null;
-  const journeyText = journeyMiles != null && journeyMiles >= 0
-    ? `${pickupOdo.toLocaleString("en-GB")} → ${deliveryOdo.toLocaleString("en-GB")} miles (approx. ${journeyMiles.toLocaleString("en-GB")} miles driven)`
-    : "Not available";
 
   const pickupChecklistItems = getChecklistItems(pickup);
   const deliveryChecklistItems = getChecklistItems(delivery);
@@ -204,7 +200,6 @@ export const PodReport = () => {
                 {job.vehicle_year && <DetailRow label="Year" value={job.vehicle_year} />}
                 <DetailRow label="Job Reference" value={ref} />
                 <DetailRow label="Route" value={`${job.pickup_city || "—"} → ${job.delivery_city || "—"}`} />
-                <DetailRow label="Mileage" value={journeyText} />
                 <DetailRow label="Collection Status" value={pickup ? "✓ Collected" : "Not collected"} />
                 <DetailRow label="Delivery Status" value={delivery ? "✓ Delivered" : "Not delivered"} />
               </Card>

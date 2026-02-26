@@ -18,7 +18,8 @@ export const PendingUploads = () => {
   const refresh = async () => {
     setLoading(true);
     const items = await getAllPendingUploads();
-    setUploads(items);
+    // Only show actionable items (pending/failed), not completed ones
+    setUploads(items.filter(i => i.status === 'pending' || i.status === 'failed'));
     setLoading(false);
   };
 
