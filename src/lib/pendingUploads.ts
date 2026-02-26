@@ -1,241 +1,276 @@
-// src/lib/pendingUploads.ts
-// Local-first photo upload queue for Axentra inspections.
-// Stores images in localStorage while offline / low signal, then
-// replays them to Supabase (and Google Drive if configured).
+// src/pages/PendingUploads.tsx
+import { useState, useEffect, useMemo } from "react";
+import { AppHeader } from "@/components/AppHeader";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { useNavigate } from "react-router-dom";
+import {
+  getAllPendingUploads,
+  retryUpload,
+  retryAllPending,
+  deletePendingUpload,
+  type PendingUpload,
+} from "@/lib/pendingUploads";
+import {
+  Loader2,
+  RefreshCw,
+  CheckCircle,
+  XCircle,
+  Clock,
+  Trash2,
+  Info,
+} from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
-import { storageService } from "./storage";
-import { insertPhoto } from "./api";
-import type {
-  InspectionType,
-  PhotoType,
-  StorageBackend,
-} from "./types";
-
-const STORAGE_KEY = "axentra.pendingUploads.v1";
-
-export type PendingUploadStatus = "pending" | "uploading" | "failed" | "done";
-
-export interface PendingUpload {
-  id: string;
-  jobId: string;
-  inspectionType: InspectionType;
-  photoType: PhotoType | string;
-  label: string | null;
-  createdAt: string;
-  status: PendingUploadStatus;
-  errorMessage?: string | null;
-
-  // Local-only data for reconstructing the file
-  fileDataUrl: string;
-
-  // Optional metadata that can be attached later
-  backend?: StorageBackend;
-  backendRef?: string | null;
+type PendingUploadWithJob = PendingUpload & {
   jobNumber?: string | null;
   vehicleReg?: string | null;
-}
+};
 
-// ─────────────────────────────────────────────────────────────
-// internal storage helpers
-// ─────────────────────────────────────────────────────────────
+export const PendingUploads = () => {
+  const navigate = useNavigate();
+  const [uploads, setUploads] = useState<PendingUploadWithJob[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [retrying, setRetrying] = useState<string | null>(null);
+  const [retryingAll, setRetryingAll] = useState(false);
+  const [clearing, setClearing] = useState<string | null>(null);
 
-function safeGetStorage(): Storage | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
-}
-
-function loadAll(): PendingUpload[] {
-  const storage = safeGetStorage();
-  if (!storage) return [];
-  try {
-    const raw = storage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed as PendingUpload[];
-  } catch {
-    return [];
-  }
-}
-
-function saveAll(items: PendingUpload[]): void {
-  const storage = safeGetStorage();
-  if (!storage) return;
-  try {
-    storage.setItem(STORAGE_KEY, JSON.stringify(items));
-  } catch {
-    // If we run out of quota, we silently ignore – app should still work
-  }
-}
-
-function updateOne(
-  id: string,
-  updater: (item: PendingUpload) => PendingUpload
-): PendingUpload | null {
-  const all = loadAll();
-  const idx = all.findIndex((u) => u.id === id);
-  if (idx === -1) return null;
-  const updated = updater(all[idx]);
-  all[idx] = updated;
-  saveAll(all);
-  return updated;
-}
-
-function removeOne(id: string): void {
-  const all = loadAll();
-  const next = all.filter((u) => u.id !== id);
-  saveAll(next);
-}
-
-// ─────────────────────────────────────────────────────────────
-// file <-> data URL helpers
-// ─────────────────────────────────────────────────────────────
-
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(reader.error ?? new Error("File read error"));
-    reader.onload = () => resolve(reader.result as string);
-    reader.readAsDataURL(file);
-  });
-}
-
-async function dataUrlToFile(dataUrl: string, name: string): Promise<File> {
-  // Using fetch on data: URLs is widely supported and keeps code simple
-  const res = await fetch(dataUrl);
-  const blob = await res.blob();
-  return new File([blob], name, { type: blob.type || "image/jpeg" });
-}
-
-// ─────────────────────────────────────────────────────────────
-// public API
-// ─────────────────────────────────────────────────────────────
-
-export async function addPendingUpload(
-  file: File,
-  args: {
-    jobId: string;
-    inspectionType: InspectionType;
-    photoType: PhotoType | string;
-    label: string | null;
-    jobNumber?: string | null;
-    vehicleReg?: string | null;
-  }
-): Promise<PendingUpload> {
-  const fileDataUrl = await fileToDataUrl(file);
-  const id =
-    "pu_" + Date.now().toString() + "_" + Math.random().toString(36).slice(2);
-
-  const item: PendingUpload = {
-    id,
-    jobId: args.jobId,
-    inspectionType: args.inspectionType,
-    photoType: args.photoType,
-    label: args.label ?? null,
-    createdAt: new Date().toISOString(),
-    status: "pending",
-    errorMessage: null,
-    fileDataUrl,
-    jobNumber: args.jobNumber,
-    vehicleReg: args.vehicleReg,
+  const refresh = async () => {
+    setLoading(true);
+    const items = await getAllPendingUploads();
+    setUploads(items as PendingUploadWithJob[]);
+    setLoading(false);
   };
 
-  const all = loadAll();
-  all.push(item);
-  saveAll(all);
+  useEffect(() => {
+    void refresh();
+  }, []);
 
-  return item;
-}
+  const handleRetry = async (id: string) => {
+    setRetrying(id);
+    const ok = await retryUpload(id);
+    if (ok) {
+      toast({ title: "Upload succeeded" });
+    } else {
+      toast({ title: "Upload failed", variant: "destructive" });
+    }
+    await refresh();
+    setRetrying(null);
+  };
 
-export async function getAllPendingUploads(): Promise<PendingUpload[]> {
-  return loadAll();
-}
-
-export async function deletePendingUpload(id: string): Promise<void> {
-  removeOne(id);
-}
-
-/**
- * Try to upload a single pending item.
- * Returns true on success, false on failure.
- */
-export async function retryUpload(id: string): Promise<boolean> {
-  const existing = updateOne(id, (u) => ({
-    ...u,
-    status: "uploading",
-    errorMessage: null,
-  }));
-
-  if (!existing) return false;
-
-  try {
-    const file = await dataUrlToFile(existing.fileDataUrl, `${existing.id}.jpg`);
-
-    // Upload to configured storage (Supabase bucket or Google Drive wrapper)
-    const stored = await storageService.uploadImage(
-      file,
-      `jobs/${existing.jobId}/${existing.inspectionType}/${existing.photoType}/${existing.id}`
-    );
-
-    // Insert row into photos table – inspections link via job_id + type
-    await insertPhoto({
-      job_id: existing.jobId,
-      inspection_id: null, // can be associated later server-side if needed
-      type: existing.photoType,
-      url: stored.url,
-      thumbnail_url: stored.thumbnailUrl ?? null,
-      backend: stored.backend,
-      backend_ref: stored.backendRef ?? null,
-      label: existing.label,
+  const handleRetryAll = async () => {
+    setRetryingAll(true);
+    const { succeeded, failed } = await retryAllPending();
+    toast({
+      title: "Retry complete",
+      description: `${succeeded} succeeded, ${failed} failed.`,
     });
+    await refresh();
+    setRetryingAll(false);
+  };
 
-    updateOne(id, (u) => ({
-      ...u,
-      status: "done",
-      errorMessage: null,
-      backend: stored.backend,
-      backendRef: stored.backendRef ?? null,
-    }));
+  const handleClear = async (u: PendingUploadWithJob) => {
+    setClearing(u.id);
+    await deletePendingUpload(u.id);
+    toast({ title: "Removed from queue" });
+    await refresh();
+    setClearing(null);
+  };
 
-    return true;
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "Upload failed";
-    updateOne(id, (u) => ({
-      ...u,
-      status: "failed",
-      errorMessage: msg,
-    }));
-    return false;
-  }
-}
+  const statusIcon = (status: string) => {
+    switch (status) {
+      case "pending":
+        return <Clock className="h-4 w-4 text-warning" />;
+      case "uploading":
+        return <Loader2 className="h-4 w-4 animate-spin text-primary" />;
+      case "failed":
+        return <XCircle className="h-4 w-4 text-destructive" />;
+      case "done":
+        return <CheckCircle className="h-4 w-4 text-success" />;
+      default:
+        return null;
+    }
+  };
 
-/**
- * Retry all items currently marked pending or failed.
- * Returns a small summary for the UI.
- */
-export async function retryAllPending(): Promise<{
-  succeeded: number;
-  failed: number;
-}> {
-  const all = loadAll();
-  const targets = all.filter(
-    (u) => u.status === "pending" || u.status === "failed"
+  // Group uploads by job for clearer context
+  const grouped = useMemo(() => {
+    const byJob: Record<
+      string,
+      {
+        key: string;
+        jobNumber?: string | null;
+        vehicleReg?: string | null;
+        items: PendingUploadWithJob[];
+      }
+    > = {};
+
+    for (const u of uploads) {
+      const key =
+        (u.jobNumber || u.vehicleReg || u.jobId || "unknown") as string;
+      if (!byJob[key]) {
+        byJob[key] = {
+          key,
+          jobNumber: u.jobNumber,
+          vehicleReg: u.vehicleReg,
+          items: [],
+        };
+      }
+      byJob[key].items.push(u);
+    }
+
+    return Object.values(byJob);
+  }, [uploads]);
+
+  const totalPending = uploads.length;
+
+  return (
+    <div className="min-h-screen bg-background">
+      <AppHeader
+        title="Pending Uploads"
+        showBack
+        onBack={() => navigate(-1)}
+      />
+      <div className="p-4 space-y-4 max-w-lg mx-auto">
+        {/* Info banner */}
+        <Card className="p-3 flex items-start gap-2">
+          <Info className="h-4 w-4 mt-0.5 text-muted-foreground" />
+          <div className="text-xs text-muted-foreground space-y-1">
+            <p>
+              When signal is weak, Axentra stores inspection photos locally and
+              retries them when you&apos;re back online.
+            </p>
+            <p>
+              Use <strong>Retry</strong> on individual items or{" "}
+              <strong>Retry All</strong> to push everything again.
+            </p>
+          </div>
+        </Card>
+
+        {totalPending > 0 && (
+          <Button
+            onClick={handleRetryAll}
+            disabled={retryingAll}
+            className="w-full"
+          >
+            {retryingAll ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="mr-2 h-4 w-4" />
+            )}
+            Retry All ({totalPending})
+          </Button>
+        )}
+
+        {loading && (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        )}
+
+        {!loading && totalPending === 0 && (
+          <p className="text-center py-12 text-muted-foreground">
+            No pending uploads. All photos are synced.
+          </p>
+        )}
+
+        {/* Grouped by job */}
+        {!loading &&
+          grouped.map((group) => {
+            const first = group.items[0];
+            const jobLabel =
+              group.jobNumber && group.vehicleReg
+                ? `${group.jobNumber} – ${group.vehicleReg}`
+                : group.jobNumber || group.vehicleReg || "Unknown job";
+
+            const pickupCount = group.items.filter(
+              (u) => u.inspectionType === "pickup"
+            ).length;
+            const deliveryCount = group.items.filter(
+              (u) => u.inspectionType === "delivery"
+            ).length;
+
+            return (
+              <div key={group.key} className="space-y-2">
+                <div className="flex items-center justify-between px-1">
+                  <div className="flex flex-col">
+                    <p className="text-sm font-semibold">{jobLabel}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Pickup: {pickupCount} · Delivery: {deliveryCount}
+                    </p>
+                  </div>
+                  {first.jobId && (
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      onClick={() => navigate(`/jobs/${first.jobId}`)}
+                    >
+                      View job
+                    </Button>
+                  )}
+                </div>
+
+                {group.items.map((u) => (
+                  <Card
+                    key={u.id}
+                    className="p-4 flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      {statusIcon(u.status)}
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {u.photoType}
+                          {u.label ? ` – ${u.label}` : ""}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {u.inspectionType} ·{" "}
+                          {new Date(u.createdAt).toLocaleString()}
+                        </p>
+                        {u.errorMessage && (
+                          <p className="text-xs text-destructive">
+                            {u.errorMessage}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant={
+                          u.status === "failed" ? "destructive" : "secondary"
+                        }
+                        className="capitalize"
+                      >
+                        {u.status}
+                      </Badge>
+                      {(u.status === "pending" || u.status === "failed") && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleRetry(u.id)}
+                          disabled={retrying === u.id}
+                        >
+                          {retrying === u.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-3 w-3" />
+                          )}
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleClear(u)}
+                        disabled={clearing === u.id}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            );
+          })}
+      </div>
+    </div>
   );
-
-  let succeeded = 0;
-  let failed = 0;
-
-  // Do them sequentially to avoid hammering the network
-  for (const u of targets) {
-    // eslint-disable-next-line no-await-in-loop
-    const ok = await retryUpload(u.id);
-    if (ok) succeeded++;
-    else failed++;
-  }
-
-  return { succeeded, failed };
-}
+};
