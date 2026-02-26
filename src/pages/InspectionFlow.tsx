@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -108,10 +108,16 @@ export const InspectionFlow = () => {
     useState<{ x: number; y: number } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // Signature refs and state
   const driverCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const customerCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const driverCanvasInitialized = useRef(false);
+  const customerCanvasInitialized = useRef(false);
   const [driverSigned, setDriverSigned] = useState(false);
   const [customerSigned, setCustomerSigned] = useState(false);
+
+  // Additional photos label (lifted out of PhotosStep to avoid remount)
+  const [newPhotoLabel, setNewPhotoLabel] = useState("");
 
   const [formState, setFormState] = useState<InspectionFormState>({
     odometer: "",
@@ -146,7 +152,6 @@ export const InspectionFlow = () => {
     customerName: "",
   });
 
-  // step counts – delivery now includes a dedicated Photos step
   const pickupStepCount = 6;
   const deliveryStepCount = 5;
   const totalSteps = type === "pickup" ? pickupStepCount : deliveryStepCount;
@@ -229,10 +234,19 @@ export const InspectionFlow = () => {
   };
 
   // ───────────────── SIGNATURE DRAWING ─────────────────
+  // Setup canvas ONCE via a ref callback that checks an initialized flag.
+  // This prevents re-attaching listeners and clearing the canvas on re-render.
 
-  const setupCanvas = useCallback(
+  const initCanvas = useCallback(
     (canvas: HTMLCanvasElement | null, isDriver: boolean) => {
       if (!canvas) return;
+      const flag = isDriver ? driverCanvasInitialized : customerCanvasInitialized;
+      if (flag.current) return;
+      flag.current = true;
+
+      if (isDriver) driverCanvasRef.current = canvas;
+      else customerCanvasRef.current = canvas;
+
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
@@ -282,6 +296,24 @@ export const InspectionFlow = () => {
     },
     []
   );
+
+  const clearDriverSignature = useCallback(() => {
+    const canvas = driverCanvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext("2d");
+      ctx?.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    setDriverSigned(false);
+  }, []);
+
+  const clearCustomerSignature = useCallback(() => {
+    const canvas = customerCanvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext("2d");
+      ctx?.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    setCustomerSigned(false);
+  }, []);
 
   const canvasToFile = async (
     canvas: HTMLCanvasElement,
@@ -335,7 +367,6 @@ export const InspectionFlow = () => {
     if (!formState.customerName) missing.push("Customer name");
     if (!customerSigned) missing.push("Customer signature");
 
-    // For delivery, require at least one photo – keeps POD strong
     if (type === "delivery") {
       const hasStandard =
         Object.values(formState.standardPhotos).filter(Boolean).length > 0;
@@ -565,19 +596,19 @@ export const InspectionFlow = () => {
     if (currentStep > 1) setCurrentStep((s) => s - 1);
   };
 
-  // ───────────────── SHARED STEP COMPONENTS ─────────────────
+  // ───────────────── STEP CONTENT (inline JSX, NOT components) ─────────────────
+  // These are plain functions that return JSX, called as renderX(), never <X />.
+  // This prevents React from unmounting/remounting them on parent re-render,
+  // which would destroy input focus (keyboard bug) and clear canvas (signature bug).
 
-  const OdometerFuel = () => (
+  const renderOdometerFuel = () => (
     <div className="space-y-6">
       <h2 className="text-xl font-semibold text-center">
         Odometer & Fuel Level
       </h2>
       <div className="space-y-4">
         <div>
-          <Label
-            htmlFor="odometer"
-            className="text-base font-medium"
-          >
+          <Label htmlFor="odometer" className="text-base font-medium">
             Odometer *
           </Label>
           <Input
@@ -609,7 +640,7 @@ export const InspectionFlow = () => {
     </div>
   );
 
-  const DamageStep = () => (
+  const renderDamageStep = () => (
     <div className="space-y-4">
       <h2 className="text-xl font-semibold text-center">
         {type === "pickup" ? "Pickup" : "Delivery"} Damage
@@ -652,9 +683,8 @@ export const InspectionFlow = () => {
     </div>
   );
 
-  const PhotosStep = () => {
+  const renderPhotosStep = () => {
     const photoTypes = PHOTO_TYPES_BY_INSPECTION[type];
-    const [newLabel, setNewLabel] = useState("");
 
     return (
       <div className="space-y-6">
@@ -690,21 +720,11 @@ export const InspectionFlow = () => {
                   if (f) handlePhotoCapture(pt.key, f);
                 }}
               />
-              <Label
-                htmlFor={`photo-${pt.key}`}
-                className="cursor-pointer"
-              >
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full gap-1"
-                  asChild
-                >
+              <Label htmlFor={`photo-${pt.key}`} className="cursor-pointer">
+                <Button variant="outline" size="sm" className="w-full gap-1" asChild>
                   <span>
                     <Camera className="h-3 w-3" />
-                    {formState.standardPhotoUrls[pt.key]
-                      ? "Retake"
-                      : "Capture"}
+                    {formState.standardPhotoUrls[pt.key] ? "Retake" : "Capture"}
                   </span>
                 </Button>
               </Label>
@@ -740,8 +760,8 @@ export const InspectionFlow = () => {
           <div className="flex gap-2">
             <Input
               placeholder="Label (e.g. Boot interior)"
-              value={newLabel}
-              onChange={(e) => setNewLabel(e.target.value)}
+              value={newPhotoLabel}
+              onChange={(e) => setNewPhotoLabel(e.target.value)}
               className="flex-1"
             />
             <input
@@ -753,16 +773,13 @@ export const InspectionFlow = () => {
               onChange={(e) => {
                 const f = e.target.files?.[0];
                 if (f) {
-                  addAdditionalPhoto(f, newLabel || "Unlabelled");
-                  setNewLabel("");
+                  addAdditionalPhoto(f, newPhotoLabel || "Unlabelled");
+                  setNewPhotoLabel("");
                 }
                 e.target.value = "";
               }}
             />
-            <Label
-              htmlFor="additional-photo-input"
-              className="cursor-pointer"
-            >
+            <Label htmlFor="additional-photo-input" className="cursor-pointer">
               <Button variant="outline" size="sm" asChild>
                 <span>
                   <Plus className="h-4 w-4" />
@@ -775,7 +792,7 @@ export const InspectionFlow = () => {
     );
   };
 
-  const SignaturesStep = () => (
+  const renderSignaturesStep = () => (
     <div className="space-y-6">
       <h2 className="text-xl font-semibold text-center">Signatures</h2>
       <Card className="p-4 space-y-3">
@@ -790,19 +807,23 @@ export const InspectionFlow = () => {
           />
         </div>
         <canvas
-          ref={(el) => {
-            driverCanvasRef.current = el;
-            if (el) setupCanvas(el, true);
-          }}
+          ref={(el) => initCanvas(el, true)}
           width={320}
           height={120}
           className="w-full border-2 border-dashed border-muted-foreground/25 rounded-lg bg-white touch-none"
         />
-        {driverSigned && <p className="text-xs text-emerald-600">Signed ✓</p>}
+        <div className="flex items-center justify-between">
+          {driverSigned && <p className="text-xs text-success">Signed ✓</p>}
+          {driverSigned && (
+            <Button variant="ghost" size="sm" onClick={clearDriverSignature}>
+              Clear
+            </Button>
+          )}
+        </div>
       </Card>
 
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-        <p className="text-sm text-amber-800 font-medium">
+      <div className="bg-warning/10 border border-warning/30 rounded-lg p-4">
+        <p className="text-sm text-warning-foreground font-medium">
           Please pass the device to the customer for their signature.
         </p>
       </div>
@@ -819,22 +840,24 @@ export const InspectionFlow = () => {
           />
         </div>
         <canvas
-          ref={(el) => {
-            customerCanvasRef.current = el;
-            if (el) setupCanvas(el, false);
-          }}
+          ref={(el) => initCanvas(el, false)}
           width={320}
           height={120}
           className="w-full border-2 border-dashed border-muted-foreground/25 rounded-lg bg-white touch-none"
         />
-        {customerSigned && (
-          <p className="text-xs text-emerald-600">Signed ✓</p>
-        )}
+        <div className="flex items-center justify-between">
+          {customerSigned && <p className="text-xs text-success">Signed ✓</p>}
+          {customerSigned && (
+            <Button variant="ghost" size="sm" onClick={clearCustomerSignature}>
+              Clear
+            </Button>
+          )}
+        </div>
       </Card>
     </div>
   );
 
-  const ReviewStep = () => {
+  const renderReviewStep = () => {
     const photoCount = Object.values(formState.standardPhotos).filter(
       Boolean
     ).length;
@@ -897,9 +920,7 @@ export const InspectionFlow = () => {
               <span>{photoCount}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">
-                Additional Photos:
-              </span>
+              <span className="text-muted-foreground">Additional Photos:</span>
               <span>{additionalCount}</span>
             </div>
             {formState.additionalPhotos.length > 0 && (
@@ -925,8 +946,8 @@ export const InspectionFlow = () => {
             </div>
           </div>
         </Card>
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-          <p className="text-sm text-amber-800">
+        <div className="bg-warning/10 border border-warning/30 rounded-lg p-4">
+          <p className="text-sm text-foreground">
             Please ensure all information is correct. You will not be
             able to make changes after submission.
           </p>
@@ -950,17 +971,14 @@ export const InspectionFlow = () => {
     );
   };
 
-  // Pickup-only checklist step
-  const CollectionChecklist = () => (
+  const renderCollectionChecklist = () => (
     <div className="space-y-6">
       <h2 className="text-xl font-semibold text-center">
         Collection Checklist
       </h2>
       <div className="space-y-6">
         <div>
-          <Label className="text-base font-medium">
-            Vehicle Condition
-          </Label>
+          <Label className="text-base font-medium">Vehicle Condition</Label>
           <RadioGroup
             value={formState.vehicleCondition}
             onValueChange={(v) => updateField("vehicleCondition", v)}
@@ -1045,8 +1063,106 @@ export const InspectionFlow = () => {
           />
         </div>
 
-        {/* Equipment checklist (unchanged logic) */}
-        {/* … keep your existing items here, omitted for brevity if you already have them … */}
+        {/* Equipment checklist items */}
+        <div className="space-y-4">
+          <h3 className="font-medium">Equipment</h3>
+          {[
+            { field: "handbook" as const, label: "Handbook" },
+            { field: "serviceBook" as const, label: "Service Book" },
+            { field: "mot" as const, label: "MOT" },
+            { field: "v5" as const, label: "V5" },
+            { field: "parcelShelf" as const, label: "Parcel Shelf" },
+            { field: "spareWheel" as const, label: "Spare Wheel" },
+            { field: "toolKit" as const, label: "Tool Kit" },
+            { field: "tyreInflationKit" as const, label: "Tyre Inflation Kit" },
+            { field: "lockingWheelNut" as const, label: "Locking Wheel Nut" },
+            { field: "satNavWorking" as const, label: "Sat Nav Working" },
+            { field: "numberOfKeys" as const, label: "Number of Keys" },
+            { field: "evChargingCables" as const, label: "EV Charging Cables" },
+            { field: "aerial" as const, label: "Aerial" },
+            { field: "customerPaperwork" as const, label: "Customer Paperwork" },
+          ].map(({ field, label }) => (
+            <div key={field}>
+              <Label className="text-sm font-medium">{label}</Label>
+              <RadioGroup
+                value={formState[field]}
+                onValueChange={(v) => updateField(field, v)}
+                className="mt-1 flex gap-4"
+              >
+                <div className="flex items-center space-x-1">
+                  <RadioGroupItem value="Yes" id={`${field}-yes`} />
+                  <Label htmlFor={`${field}-yes`} className="text-sm">Yes</Label>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <RadioGroupItem value="No" id={`${field}-no`} />
+                  <Label htmlFor={`${field}-no`} className="text-sm">No</Label>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <RadioGroupItem value="N/A" id={`${field}-na`} />
+                  <Label htmlFor={`${field}-na`} className="text-sm">N/A</Label>
+                </div>
+              </RadioGroup>
+            </div>
+          ))}
+
+          <div>
+            <Label className="text-sm font-medium">Alloys or Trims</Label>
+            <RadioGroup
+              value={formState.alloysOrTrims}
+              onValueChange={(v) => updateField("alloysOrTrims", v)}
+              className="mt-1 flex gap-4"
+            >
+              <div className="flex items-center space-x-1">
+                <RadioGroupItem value="Alloys" id="aot-alloys" />
+                <Label htmlFor="aot-alloys" className="text-sm">Alloys</Label>
+              </div>
+              <div className="flex items-center space-x-1">
+                <RadioGroupItem value="Trims" id="aot-trims" />
+                <Label htmlFor="aot-trims" className="text-sm">Trims</Label>
+              </div>
+            </RadioGroup>
+          </div>
+
+          {formState.alloysOrTrims === "Alloys" && (
+            <div>
+              <Label className="text-sm font-medium">Alloys Damaged?</Label>
+              <RadioGroup
+                value={formState.alloysDamaged}
+                onValueChange={(v) => updateField("alloysDamaged", v)}
+                className="mt-1 flex gap-4"
+              >
+                <div className="flex items-center space-x-1">
+                  <RadioGroupItem value="Yes" id="ad-yes" />
+                  <Label htmlFor="ad-yes" className="text-sm">Yes</Label>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <RadioGroupItem value="No" id="ad-no" />
+                  <Label htmlFor="ad-no" className="text-sm">No</Label>
+                </div>
+              </RadioGroup>
+            </div>
+          )}
+
+          {formState.alloysOrTrims === "Trims" && (
+            <div>
+              <Label className="text-sm font-medium">Wheel Trims Damaged?</Label>
+              <RadioGroup
+                value={formState.wheelTrimsDamaged}
+                onValueChange={(v) => updateField("wheelTrimsDamaged", v)}
+                className="mt-1 flex gap-4"
+              >
+                <div className="flex items-center space-x-1">
+                  <RadioGroupItem value="Yes" id="wtd-yes" />
+                  <Label htmlFor="wtd-yes" className="text-sm">Yes</Label>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <RadioGroupItem value="No" id="wtd-no" />
+                  <Label htmlFor="wtd-no" className="text-sm">No</Label>
+                </div>
+              </RadioGroup>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -1055,37 +1171,24 @@ export const InspectionFlow = () => {
 
   const renderPickupStep = (step: number) => {
     switch (step) {
-      case 1:
-        return <OdometerFuel />;
-      case 2:
-        return <CollectionChecklist />;
-      case 3:
-        return <DamageStep />;
-      case 4:
-        return <PhotosStep />;
-      case 5:
-        return <SignaturesStep />;
-      case 6:
-        return <ReviewStep />;
-      default:
-        return null;
+      case 1: return renderOdometerFuel();
+      case 2: return renderCollectionChecklist();
+      case 3: return renderDamageStep();
+      case 4: return renderPhotosStep();
+      case 5: return renderSignaturesStep();
+      case 6: return renderReviewStep();
+      default: return null;
     }
   };
 
   const renderDeliveryStep = (step: number) => {
     switch (step) {
-      case 1:
-        return <OdometerFuel />;
-      case 2:
-        return <DamageStep />;
-      case 3:
-        return <PhotosStep />;
-      case 4:
-        return <SignaturesStep />;
-      case 5:
-        return <ReviewStep />;
-      default:
-        return null;
+      case 1: return renderOdometerFuel();
+      case 2: return renderDamageStep();
+      case 3: return renderPhotosStep();
+      case 4: return renderSignaturesStep();
+      case 5: return renderReviewStep();
+      default: return null;
     }
   };
 

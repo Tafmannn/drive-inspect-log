@@ -10,7 +10,7 @@ export const PendingJobs = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <AppHeader title="Pending" showBack onBack={() => navigate('/')} />
+      <AppHeader title="Pending Jobs" showBack onBack={() => navigate('/')} />
       <div className="p-4">
         {isLoading && <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}
         {!isLoading && (!jobs || jobs.length === 0) && <p className="text-center py-12 text-muted-foreground">No pending jobs.</p>}

@@ -1,6 +1,6 @@
 import { AppHeader } from "@/components/AppHeader";
 import { DashboardCard } from "@/components/DashboardCard";
-import { Truck, Clock, AlertTriangle, Download, FileDown, Loader2 } from "lucide-react";
+import { Truck, Clock, AlertTriangle, Download, FileDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useDashboardCounts } from "@/hooks/useJobs";
 import { toast } from "@/hooks/use-toast";
@@ -35,7 +35,7 @@ export const Dashboard = () => {
           icon={<Truck className="h-6 w-6" />}
           title="My Jobs"
           subtitle="View your current jobs"
-          count={isLoading ? undefined : counts?.totalJobs ?? 0}
+          count={isLoading ? undefined : counts?.myJobs ?? 0}
           onClick={() => navigate('/jobs')}
         />
         
@@ -43,16 +43,16 @@ export const Dashboard = () => {
           icon={<Clock className="h-6 w-6" />}
           title="Last 14 days"
           subtitle="Completed jobs within the last 2 weeks"
-          count={isLoading ? undefined : counts?.fullyCompleted ?? 0}
+          count={isLoading ? undefined : counts?.completedLast14Days ?? 0}
           onClick={() => navigate('/jobs/completed')}
         />
         
         <DashboardCard
           icon={<AlertTriangle className="h-6 w-6" />}
-          title="Pending"
-          subtitle="View all pending items"
-          count={isLoading ? undefined : counts?.pendingPickup ?? 0}
-          onClick={() => navigate('/jobs/pending')}
+          title="Pending Uploads"
+          subtitle="Photos awaiting upload"
+          count={isLoading ? undefined : counts?.pendingUploads ?? 0}
+          onClick={() => navigate('/pending-uploads')}
         />
         
         <DashboardCard
