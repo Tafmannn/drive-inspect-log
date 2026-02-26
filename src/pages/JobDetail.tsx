@@ -2,10 +2,13 @@ import { useNavigate, useParams } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { useJob } from "@/hooks/useJobs";
 import { useJobExpenses } from "@/hooks/useExpenses";
-import { Loader2, Phone, MapPin, Building, Edit, ClipboardCheck, Truck, FileText, Receipt } from "lucide-react";
+import { Loader2, Phone, MapPin, Building, Edit, ClipboardCheck, Truck, FileText, Receipt, QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "@/hooks/use-toast";
+import { useState, useEffect } from "react";
+import { createQrConfirmation, getQrConfirmationsForJob, buildQrUrl, type QrConfirmation } from "@/lib/qrApi";
 
 const STATUS_LABELS: Record<string, string> = {
   ready_for_pickup: 'Ready for Pickup',
@@ -25,6 +28,30 @@ export const JobDetail = () => {
   const { data: job, isLoading } = useJob(jobId ?? '');
   const { data: jobExpenses } = useJobExpenses(jobId ?? '');
   const expenseTotal = jobExpenses?.reduce((sum, e) => sum + Number(e.amount), 0) ?? 0;
+
+  const [qrConfirmations, setQrConfirmations] = useState<QrConfirmation[]>([]);
+  const [generatingQr, setGeneratingQr] = useState(false);
+
+  useEffect(() => {
+    if (!jobId) return;
+    getQrConfirmationsForJob(jobId).then(setQrConfirmations).catch(() => {});
+  }, [jobId]);
+
+  const handleGenerateQr = async (eventType: "collection" | "delivery") => {
+    if (!jobId) return;
+    setGeneratingQr(true);
+    try {
+      const qr = await createQrConfirmation(jobId, eventType);
+      setQrConfirmations(prev => [qr, ...prev]);
+      const url = buildQrUrl(qr.token);
+      await navigator.clipboard.writeText(url);
+      toast({ title: "QR link copied", description: "Share this link with the customer to confirm handover." });
+    } catch (e: unknown) {
+      toast({ title: "Failed", description: e instanceof Error ? e.message : "Error", variant: "destructive" });
+    } finally {
+      setGeneratingQr(false);
+    }
+  };
 
   if (isLoading || !job) {
     return (
@@ -92,6 +119,37 @@ export const JobDetail = () => {
               </Button>
             )}
           </div>
+        </Card>
+
+        {/* QR Handover Confirmations */}
+        <Card className="p-4 space-y-3">
+          <h3 className="font-semibold text-sm flex items-center gap-2">
+            <QrCode className="h-4 w-4 text-muted-foreground" /> QR Handover
+          </h3>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => handleGenerateQr("collection")} disabled={generatingQr}>
+              Collection QR
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => handleGenerateQr("delivery")} disabled={generatingQr}>
+              Delivery QR
+            </Button>
+          </div>
+          {qrConfirmations.length > 0 && (
+            <div className="space-y-1">
+              {qrConfirmations.map(qr => (
+                <div key={qr.id} className="flex justify-between text-xs py-1">
+                  <span className="text-muted-foreground capitalize">{qr.event_type}</span>
+                  {qr.confirmed_at ? (
+                    <Badge className="bg-success text-success-foreground text-[10px]">
+                      ✓ {qr.customer_name} – {new Date(qr.confirmed_at).toLocaleString("en-GB")}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-[10px]">Pending</Badge>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </Card>
 
         {/* Expenses */}

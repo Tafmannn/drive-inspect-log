@@ -117,7 +117,44 @@
 - [ ] Tap → full-screen viewer with swipe + zoom
 - [ ] Close button returns to previous view
 
-## 6. CSV Exports
+## 6. Role-Based Gallery Restriction
+
+- [ ] Default role = driver: photo file inputs force camera only
+- [ ] Admin role: file inputs allow gallery selection
+- [ ] Verify on iOS and Android
+
+## 7. QR Handover Confirmation
+
+- [ ] Job detail: Collection QR and Delivery QR buttons generate tokens
+- [ ] QR link is copied to clipboard
+- [ ] Opening /confirm?token=... shows handover confirmation page
+- [ ] Customer enters name → confirms → status shows confirmed on job detail
+- [ ] Expired tokens show expired message
+- [ ] Already confirmed tokens show done message
+
+## 8. Admin Dashboard
+
+- [ ] Navigate from main dashboard → Admin Dashboard tile
+- [ ] Widgets: Jobs In Progress, Completed Today/Week, Pending Uploads, Week Expenses
+- [ ] Quick actions navigate correctly (All Jobs, All Expenses, Timesheets, Pending Uploads)
+- [ ] Exports work from admin dashboard
+
+## 9. Timesheets
+
+- [ ] Navigate from Admin Dashboard → Timesheets
+- [ ] 7/14/30 day range filters update data
+- [ ] Summary row shows total jobs, miles, expenses
+- [ ] Per-day rows show first/last activity, job count, mileage, expenses
+- [ ] CSV export downloads correctly
+
+## 10. Authentication (Disabled State)
+
+- [ ] No login screen appears
+- [ ] App functions normally as driver role
+- [ ] AuthContext provides correct defaults
+- [ ] Admin Dashboard accessible without login
+
+## 11. CSV Exports
 
 - [ ] Jobs CSV: all fields present, downloads correctly
 - [ ] Inspections CSV: linked to correct jobs

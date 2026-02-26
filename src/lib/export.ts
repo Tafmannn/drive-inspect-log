@@ -59,7 +59,7 @@ export async function exportInspectionsCsv(): Promise<void> {
 
   const rows: string[] = [];
   for (const insp of (inspections ?? []) as Inspection[]) {
-    const job = (jobs ?? []).find((j: Job) => j.id === insp.job_id);
+    const job = (jobs ?? []).find((j: any) => j.id === insp.job_id);
     rows.push(toCsvRow([
       job?.external_job_number ?? '', job?.vehicle_reg ?? '', insp.type,
       insp.odometer != null ? String(insp.odometer) : '',
