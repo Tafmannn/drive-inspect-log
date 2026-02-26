@@ -4,9 +4,11 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { useJob } from "@/hooks/useJobs";
 import { useParams } from "react-router-dom";
-import { Loader2, Mail } from "lucide-react";
-import { openPodEmail } from "@/lib/podEmail";
+import { Loader2, Mail, Share2 } from "lucide-react";
+import { openPodEmail, generatePodEmailBody } from "@/lib/podEmail";
 import { FUEL_PERCENT_TO_LABEL } from "@/lib/types";
+import { toast } from "@/hooks/use-toast";
+import type { Inspection } from "@/lib/types";
 
 const fuelLabel = (pct: number | null | undefined): string => {
   if (pct == null) return "N/A";
@@ -26,9 +28,68 @@ const safeDate = (iso: string | null | undefined): string => {
   });
 };
 
+const yesNo = (val: string | null | undefined): string => {
+  if (!val) return "—";
+  return val;
+};
+
+// Checklist fields to display from the pickup inspection
+const CHECKLIST_FIELDS: { key: keyof Inspection; label: string }[] = [
+  { key: "vehicle_condition", label: "Vehicle Condition" },
+  { key: "light_condition", label: "Light Condition" },
+  { key: "oil_level_status", label: "Oil Level" },
+  { key: "water_level_status", label: "Water Level" },
+  { key: "handbook", label: "Handbook" },
+  { key: "service_book", label: "Service Book" },
+  { key: "mot", label: "MOT" },
+  { key: "v5", label: "V5" },
+  { key: "parcel_shelf", label: "Parcel Shelf" },
+  { key: "spare_wheel_status", label: "Spare Wheel" },
+  { key: "tool_kit", label: "Tool Kit" },
+  { key: "tyre_inflation_kit", label: "Tyre Inflation Kit" },
+  { key: "locking_wheel_nut", label: "Locking Wheel Nut" },
+  { key: "sat_nav_working", label: "Sat Nav Working" },
+  { key: "alloys_or_trims", label: "Alloys / Trims" },
+  { key: "alloys_damaged", label: "Alloys Damaged" },
+  { key: "wheel_trims_damaged", label: "Wheel Trims Damaged" },
+  { key: "number_of_keys", label: "Number of Keys" },
+  { key: "ev_charging_cables", label: "EV Charging Cables" },
+  { key: "aerial", label: "Aerial" },
+  { key: "customer_paperwork", label: "Customer Paperwork" },
+];
+
 export const PodReport = () => {
   const { jobId } = useParams<{ jobId: string }>();
   const { data: job, isLoading } = useJob(jobId ?? "");
+
+  const handleShare = async () => {
+    if (!job) return;
+    const { subject, body } = generatePodEmailBody(job);
+    const shareText = `${subject}\n\n${body}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: subject,
+          text: shareText,
+        });
+      } catch (e: unknown) {
+        // User cancelled or share failed
+        if (e instanceof Error && e.name !== "AbortError") {
+          toast({ title: "Share failed", description: e.message, variant: "destructive" });
+        }
+      }
+    } else {
+      // Fallback: copy to clipboard
+      try {
+        await navigator.clipboard.writeText(shareText);
+        toast({ title: "Copied to clipboard", description: "POD report text copied. Paste into any app to share." });
+      } catch {
+        // Final fallback: open mailto
+        openPodEmail(job);
+      }
+    }
+  };
 
   if (isLoading || !job) {
     return (
@@ -76,30 +137,49 @@ export const PodReport = () => {
         )} miles driven)`
       : "Not available";
 
+  // Filter checklist fields that have values
+  const checklistItems = pickup
+    ? CHECKLIST_FIELDS.filter((f) => {
+        const val = pickup[f.key];
+        return val != null && val !== "";
+      })
+    : [];
+
   return (
     <div className="min-h-screen bg-muted flex flex-col">
       <AppHeader
         title="POD Report"
         showBack
       >
-        <Button
-          size="sm"
-          variant="ghost"
-          className="gap-1"
-          onClick={() => openPodEmail(job)}
-        >
-          <Mail className="h-4 w-4" />
-          Email POD
-        </Button>
+        <div className="flex gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="gap-1"
+            onClick={handleShare}
+          >
+            <Share2 className="h-4 w-4" />
+            Share
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="gap-1"
+            onClick={() => openPodEmail(job)}
+          >
+            <Mail className="h-4 w-4" />
+            Email
+          </Button>
+        </div>
       </AppHeader>
 
       <main className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto py-6 px-3 sm:px-6 space-y-4">
           {/* Top banner */}
-          <Card className="border border-slate-200 shadow-sm">
-            <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white rounded-t-lg">
+          <Card className="border border-border shadow-sm">
+            <div className="flex items-center justify-between px-6 py-4 bg-foreground text-background rounded-t-lg">
               <div className="flex flex-col">
-                <span className="text-xs tracking-[0.25em] uppercase text-slate-300">
+                <span className="text-xs tracking-[0.25em] uppercase opacity-70">
                   Axentra Vehicle Logistics
                 </span>
                 <span className="text-lg font-semibold tracking-wide">
@@ -107,10 +187,10 @@ export const PodReport = () => {
                 </span>
               </div>
               <div className="text-right text-xs">
-                <div className="font-medium tracking-widest text-white">
+                <div className="font-medium tracking-widest">
                   AXENTRA
                 </div>
-                <div className="text-slate-300">
+                <div className="opacity-70">
                   Ref: <span className="font-mono">{ref}</span>
                 </div>
               </div>
@@ -155,9 +235,9 @@ export const PodReport = () => {
 
               {/* Pickup / Delivery addresses */}
               <div className="grid gap-4 md:grid-cols-2">
-                <Card className="bg-slate-50/60 border-slate-200">
+                <Card className="bg-muted/40 border-border">
                   <div className="p-4 space-y-1">
-                    <div className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+                    <div className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                       Pickup
                     </div>
                     <div className="text-sm font-medium">
@@ -179,9 +259,9 @@ export const PodReport = () => {
                   </div>
                 </Card>
 
-                <Card className="bg-slate-50/60 border-slate-200">
+                <Card className="bg-muted/40 border-border">
                   <div className="p-4 space-y-1">
-                    <div className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+                    <div className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                       Delivery
                     </div>
                     <div className="text-sm font-medium">
@@ -214,63 +294,33 @@ export const PodReport = () => {
                     </div>
                     <div className="text-xs space-y-1 text-muted-foreground">
                       <div>
-                        <span className="font-medium text-foreground">
-                          Date:
-                        </span>{" "}
+                        <span className="font-medium text-foreground">Date:</span>{" "}
                         {pickup ? safeDate(pickup.inspected_at) : "—"}
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">
-                          Customer:
-                        </span>{" "}
+                        <span className="font-medium text-foreground">Customer:</span>{" "}
                         {pickup?.customer_name || "—"}
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">
-                          Driver:
-                        </span>{" "}
+                        <span className="font-medium text-foreground">Driver:</span>{" "}
                         {pickup?.inspected_by_name || "—"}
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">
-                          Odometer:
-                        </span>{" "}
+                        <span className="font-medium text-foreground">Odometer:</span>{" "}
                         {pickup?.odometer != null
                           ? pickup.odometer.toLocaleString("en-GB")
                           : "—"}
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">
-                          Fuel:
-                        </span>{" "}
+                        <span className="font-medium text-foreground">Fuel:</span>{" "}
                         {fuelLabel(pickup?.fuel_level_percent ?? null)}
                       </div>
-                      {pickup?.vehicle_condition && (
-                        <div>
-                          <span className="font-medium text-foreground">
-                            Condition:
-                          </span>{" "}
-                          {pickup.vehicle_condition}
-                        </div>
-                      )}
-                      {pickup?.light_condition && (
-                        <div>
-                          <span className="font-medium text-foreground">
-                            Light:
-                          </span>{" "}
-                          {pickup.light_condition}
-                        </div>
-                      )}
                       <div>
-                        <span className="font-medium text-foreground">
-                          Photos:
-                        </span>{" "}
+                        <span className="font-medium text-foreground">Photos:</span>{" "}
                         {pickupPhotos.length}
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">
-                          Damages:
-                        </span>{" "}
+                        <span className="font-medium text-foreground">Damages:</span>{" "}
                         {pickupDamages.length}
                       </div>
                     </div>
@@ -284,47 +334,33 @@ export const PodReport = () => {
                     </div>
                     <div className="text-xs space-y-1 text-muted-foreground">
                       <div>
-                        <span className="font-medium text-foreground">
-                          Date:
-                        </span>{" "}
+                        <span className="font-medium text-foreground">Date:</span>{" "}
                         {delivery ? safeDate(delivery.inspected_at) : "—"}
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">
-                          Customer:
-                        </span>{" "}
+                        <span className="font-medium text-foreground">Customer:</span>{" "}
                         {delivery?.customer_name || "—"}
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">
-                          Driver:
-                        </span>{" "}
+                        <span className="font-medium text-foreground">Driver:</span>{" "}
                         {delivery?.inspected_by_name || "—"}
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">
-                          Odometer:
-                        </span>{" "}
+                        <span className="font-medium text-foreground">Odometer:</span>{" "}
                         {delivery?.odometer != null
                           ? delivery.odometer.toLocaleString("en-GB")
                           : "—"}
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">
-                          Fuel:
-                        </span>{" "}
+                        <span className="font-medium text-foreground">Fuel:</span>{" "}
                         {fuelLabel(delivery?.fuel_level_percent ?? null)}
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">
-                          Photos:
-                        </span>{" "}
+                        <span className="font-medium text-foreground">Photos:</span>{" "}
                         {deliveryPhotos.length}
                       </div>
                       <div>
-                        <span className="font-medium text-foreground">
-                          Damages:
-                        </span>{" "}
+                        <span className="font-medium text-foreground">Damages:</span>{" "}
                         {deliveryDamages.length}
                       </div>
                     </div>
@@ -332,8 +368,35 @@ export const PodReport = () => {
                 </Card>
               </div>
 
+              {/* Pickup Checklist */}
+              {pickup && checklistItems.length > 0 && (
+                <Card>
+                  <div className="p-4 space-y-2">
+                    <div className="text-sm font-semibold">
+                      Pickup Checklist
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1 text-xs">
+                      {checklistItems.map((item) => (
+                        <div key={item.key} className="flex justify-between py-0.5">
+                          <span className="text-muted-foreground">{item.label}:</span>
+                          <span className="font-medium text-foreground ml-2">
+                            {yesNo(pickup[item.key] as string | null)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    {pickup.notes && (
+                      <div className="text-xs mt-2">
+                        <span className="font-medium text-foreground">Notes:</span>{" "}
+                        <span className="text-muted-foreground">{pickup.notes}</span>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )}
+
               {/* Photo summary */}
-              <Card className="bg-slate-50/80 border-slate-200">
+              <Card className="bg-muted/40 border-border">
                 <div className="p-4 space-y-2">
                   <div className="text-sm font-semibold">
                     Photo Summary
@@ -373,6 +436,42 @@ export const PodReport = () => {
                     Axentra and can be supplied to clients, insurers or
                     auditors on request.
                   </p>
+                </div>
+              </Card>
+
+              {/* Signatures */}
+              <Card>
+                <div className="p-4 space-y-2">
+                  <div className="text-sm font-semibold">Signatures</div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {pickup?.driver_signature_url && (
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Pickup – Driver ({pickup.inspected_by_name || "—"})</div>
+                        <img src={pickup.driver_signature_url} alt="Driver signature" className="h-16 border rounded bg-white p-1" />
+                      </div>
+                    )}
+                    {pickup?.customer_signature_url && (
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Pickup – Customer ({pickup.customer_name || "—"})</div>
+                        <img src={pickup.customer_signature_url} alt="Customer signature" className="h-16 border rounded bg-white p-1" />
+                      </div>
+                    )}
+                    {delivery?.driver_signature_url && (
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Delivery – Driver ({delivery.inspected_by_name || "—"})</div>
+                        <img src={delivery.driver_signature_url} alt="Driver signature" className="h-16 border rounded bg-white p-1" />
+                      </div>
+                    )}
+                    {delivery?.customer_signature_url && (
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Delivery – Customer ({delivery.customer_name || "—"})</div>
+                        <img src={delivery.customer_signature_url} alt="Customer signature" className="h-16 border rounded bg-white p-1" />
+                      </div>
+                    )}
+                  </div>
+                  {!pickup?.driver_signature_url && !delivery?.driver_signature_url && (
+                    <p className="text-xs text-muted-foreground">No signatures recorded.</p>
+                  )}
                 </div>
               </Card>
 

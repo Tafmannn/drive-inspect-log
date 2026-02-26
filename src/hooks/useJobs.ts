@@ -6,29 +6,33 @@ import type { Job, JobWithRelations, InspectionType, Inspection, DamageItem } fr
 // ─── Dashboard ───────────────────────────────────────────────────────
 
 export interface DashboardCounts {
-  totalJobs: number;
-  fullyCompleted: number;
-  pendingPickup: number;
+  /** Count of jobs shown in the "My Jobs" list */
+  myJobs: number;
+  /** Completed jobs within the last 14 days */
+  completedLast14Days: number;
+  /** Jobs completed but with pending/failed uploads */
   pendingUploads: number;
 }
 
+/**
+ * Dashboard counts – each counter is derived from the exact same query
+ * used by the corresponding list page, ensuring counters always match.
+ */
 export function useDashboardCounts() {
   return useQuery({
     queryKey: ["dashboard-counts"],
     queryFn: async () => {
-      const [active, completed, pending, allPending] = await Promise.all([
-        api.listJobs(),
+      const [active, completed, allPending] = await Promise.all([
+        api.listActiveJobs(),
         api.listCompletedJobs(),
-        api.listPendingJobs(),
         getAllPendingUploads(),
       ]);
       const pendingUploads = allPending.filter(
         (u) => u.status === "pending" || u.status === "failed"
       ).length;
       return {
-        totalJobs: active.length,
-        fullyCompleted: completed.length,
-        pendingPickup: pending.length,
+        myJobs: active.length,
+        completedLast14Days: completed.length,
         pendingUploads,
       } satisfies DashboardCounts;
     },
