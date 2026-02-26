@@ -1,4 +1,9 @@
-import { useState, useRef, useCallback } from "react";
+import {
+  useState,
+  useRef,
+  useCallback,
+  type RefObject,
+} from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -118,10 +123,7 @@ const OdometerFuel = ({
     </h2>
     <div className="space-y-4">
       <div>
-        <Label
-          htmlFor="odometer"
-          className="text-base font-medium"
-        >
+        <Label htmlFor="odometer" className="text-base font-medium">
           Odometer *
         </Label>
         <Input
@@ -142,10 +144,7 @@ const OdometerFuel = ({
           className="mt-2"
         >
           {["Empty", "1/4", "1/2", "3/4", "Full"].map((level) => (
-            <div
-              key={level}
-              className="flex items-center space-x-2"
-            >
+            <div key={level} className="flex items-center space-x-2">
               <RadioGroupItem value={level} id={`fuel-${level}`} />
               <Label htmlFor={`fuel-${level}`}>{level}</Label>
             </div>
@@ -263,10 +262,7 @@ const PhotosStep = ({
                 if (f) onCaptureStandard(pt.key, f);
               }}
             />
-            <Label
-              htmlFor={`photo-${pt.key}`}
-              className="cursor-pointer"
-            >
+            <Label htmlFor={`photo-${pt.key}`} className="cursor-pointer">
               <Button
                 variant="outline"
                 size="sm"
@@ -350,8 +346,8 @@ interface SignaturesStepProps {
   driverName: string;
   customerName: string;
   onChangeName: (field: "driverName" | "customerName", value: string) => void;
-  driverCanvasRef: React.RefObject<HTMLCanvasElement>;
-  customerCanvasRef: React.RefObject<HTMLCanvasElement>;
+  driverCanvasRef: RefObject<HTMLCanvasElement>;
+  customerCanvasRef: RefObject<HTMLCanvasElement>;
   setupCanvas: (canvas: HTMLCanvasElement, who: "driver" | "customer") => void;
   driverSigned: boolean;
   customerSigned: boolean;
@@ -595,10 +591,7 @@ const CollectionChecklist = ({
         >
           {["Clean", "Dirty", "Wet", "Snow Covered", "Iced Over"].map(
             (c) => (
-              <div
-                key={c}
-                className="flex items-center space-x-2"
-              >
+              <div key={c} className="flex items-center space-x-2">
                 <RadioGroupItem value={c} id={`vc-${c}`} />
                 <Label htmlFor={`vc-${c}`}>{c}</Label>
               </div>
@@ -615,10 +608,7 @@ const CollectionChecklist = ({
         >
           {["Good", "Poor", "Dark", "Artificial", "Raining"].map(
             (l) => (
-              <div
-                key={l}
-                className="flex items-center space-x-2"
-              >
+              <div key={l} className="flex items-center space-x-2">
                 <RadioGroupItem value={l} id={`lc-${l}`} />
                 <Label htmlFor={`lc-${l}`}>{l}</Label>
               </div>
@@ -663,10 +653,7 @@ const CollectionChecklist = ({
         </div>
       </div>
       <div>
-        <Label
-          htmlFor="notes"
-          className="text-base font-medium"
-        >
+        <Label htmlFor="notes" className="text-base font-medium">
           Notes
         </Label>
         <Textarea
@@ -751,14 +738,8 @@ const CollectionChecklist = ({
             className="mt-1 flex flex-wrap gap-4"
           >
             {["Ok", "Deflated", "Damaged", "Missing"].map((c) => (
-              <div
-                key={c}
-                className="flex items-center space-x-2"
-              >
-                <RadioGroupItem
-                  value={c}
-                  id={`spare-${c}`}
-                />
+              <div key={c} className="flex items-center space-x-2">
+                <RadioGroupItem value={c} id={`spare-${c}`} />
                 <Label htmlFor={`spare-${c}`}>{c}</Label>
               </div>
             ))}
@@ -774,10 +755,7 @@ const CollectionChecklist = ({
             className="mt-1 flex gap-6"
           >
             {["Yes", "No", "N/A"].map((v) => (
-              <div
-                key={v}
-                className="flex items-center space-x-2"
-              >
+              <div key={v} className="flex items-center space-x-2">
                 <RadioGroupItem value={v} id={`sn-${v}`} />
                 <Label htmlFor={`sn-${v}`}>{v}</Label>
               </div>
@@ -1595,4 +1573,3 @@ export const InspectionFlow = () => {
     </div>
   );
 };
-
