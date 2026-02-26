@@ -1,11 +1,11 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { useJob } from "@/hooks/useJobs";
-import { Loader2, Phone, MapPin, Building, Edit, ClipboardCheck, Truck, FileText } from "lucide-react";
+import { useJobExpenses } from "@/hooks/useExpenses";
+import { Loader2, Phone, MapPin, Building, Edit, ClipboardCheck, Truck, FileText, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import type { Job } from "@/lib/types";
 
 const STATUS_LABELS: Record<string, string> = {
   ready_for_pickup: 'Ready for Pickup',
@@ -23,6 +23,8 @@ export const JobDetail = () => {
   const navigate = useNavigate();
   const { jobId } = useParams<{ jobId: string }>();
   const { data: job, isLoading } = useJob(jobId ?? '');
+  const { data: jobExpenses } = useJobExpenses(jobId ?? '');
+  const expenseTotal = jobExpenses?.reduce((sum, e) => sum + Number(e.amount), 0) ?? 0;
 
   if (isLoading || !job) {
     return (
@@ -89,6 +91,20 @@ export const JobDetail = () => {
                 <Truck className="h-4 w-4 mr-1" /> Start
               </Button>
             )}
+          </div>
+        </Card>
+
+        {/* Expenses */}
+        <Card className="p-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-sm flex items-center gap-2">
+              <Receipt className="h-4 w-4 text-muted-foreground" /> Expenses
+            </h3>
+            <Badge variant="outline">{jobExpenses?.length ?? 0} – £{expenseTotal.toFixed(2)}</Badge>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => navigate(`/expenses?jobId=${job.id}`)}>View Expenses</Button>
+            <Button size="sm" onClick={() => navigate(`/expenses/new?jobId=${job.id}`)}>Add Expense</Button>
           </div>
         </Card>
 

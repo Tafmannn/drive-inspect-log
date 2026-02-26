@@ -1,0 +1,86 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import * as expApi from '@/lib/expenseApi';
+
+export function useExpenses(filters?: {
+  jobId?: string;
+  category?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}) {
+  return useQuery({
+    queryKey: ['expenses', filters],
+    queryFn: () => expApi.listExpenses(filters),
+  });
+}
+
+export function useJobExpenses(jobId: string) {
+  return useQuery({
+    queryKey: ['expenses', 'job', jobId],
+    queryFn: () => expApi.getExpensesForJob(jobId),
+    enabled: !!jobId,
+  });
+}
+
+export function useExpenseTotals() {
+  return useQuery({
+    queryKey: ['expense-totals'],
+    queryFn: () => expApi.getExpenseTotals(),
+    staleTime: 60_000,
+  });
+}
+
+export function useCreateExpense() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: expApi.createExpense,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['expenses'] });
+      qc.invalidateQueries({ queryKey: ['expense-totals'] });
+      qc.invalidateQueries({ queryKey: ['dashboard-counts'] });
+    },
+  });
+}
+
+export function useUpdateExpense() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: Partial<expApi.Expense> }) =>
+      expApi.updateExpense(id, input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['expenses'] });
+      qc.invalidateQueries({ queryKey: ['expense-totals'] });
+    },
+  });
+}
+
+export function useDeleteExpense() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: expApi.deleteExpense,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['expenses'] });
+      qc.invalidateQueries({ queryKey: ['expense-totals'] });
+    },
+  });
+}
+
+export function useUploadReceipt() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ expenseId, file }: { expenseId: string; file: File }) =>
+      expApi.uploadReceipt(expenseId, file),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['expenses'] });
+    },
+  });
+}
+
+export function useDeleteReceipt() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: expApi.deleteReceipt,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['expenses'] });
+    },
+  });
+}

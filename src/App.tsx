@@ -12,6 +12,8 @@ import { PendingJobs } from "./pages/PendingJobs";
 import { InspectionFlow } from "./pages/InspectionFlow";
 import { PodReport } from "./pages/PodReport";
 import { PendingUploads } from "./pages/PendingUploads";
+import { Expenses } from "./pages/Expenses";
+import { ExpenseForm } from "./pages/ExpenseForm";
 import NotFound from "./pages/NotFound";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 
@@ -45,6 +47,8 @@ const App = () => (
               element={<InspectionFlow />}
             />
             <Route path="/pending-uploads" element={<PendingUploads />} />
+            <Route path="/expenses" element={<Expenses />} />
+            <Route path="/expenses/new" element={<ExpenseForm />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
