@@ -31,8 +31,12 @@ import {
 } from "lucide-react";
 import { useJob, useSubmitInspection } from "@/hooks/useJobs";
 import { storageService } from "@/lib/storage";
-import { insertPhoto } from "@/lib/api";
-import { addPendingUpload } from "@/lib/pendingUploads";
+import {
+  addPendingUpload,
+  getAllPendingUploads,
+  retryUpload,
+  type PendingUpload,
+} from "@/lib/pendingUploads";
 import { toast } from "@/hooks/use-toast";
 import { FUEL_LEVEL_MAP } from "@/lib/types";
 import type {
@@ -956,6 +960,17 @@ export const InspectionFlow = () => {
       notes: damage.notes,
       photo: damage.photo,
     };
+
+    // Local-first: store damage photo immediately
+    if (jobId && damage.photo) {
+      void addPendingUpload(damage.photo, {
+        jobId,
+        inspectionType: type,
+        photoType: "damage_close_up",
+        label: null,
+      });
+    }
+
     setFormState((prev) => ({
       ...prev,
       damages: [...prev.damages, draft],
@@ -972,6 +987,17 @@ export const InspectionFlow = () => {
 
   const handlePhotoCapture = (photoKey: string, file: File) => {
     const url = URL.createObjectURL(file);
+
+    // Local-first: store photo immediately in pending queue
+    if (jobId) {
+      void addPendingUpload(file, {
+        jobId,
+        inspectionType: type,
+        photoType: photoKey,
+        label: null,
+      });
+    }
+
     setFormState((prev) => ({
       ...prev,
       standardPhotos: { ...prev.standardPhotos, [photoKey]: file },
@@ -989,6 +1015,18 @@ export const InspectionFlow = () => {
       label,
       previewUrl: URL.createObjectURL(file),
     };
+
+    // Local-first: store additional photo immediately
+    if (jobId) {
+      const photoType = type === "pickup" ? "pickup_other" : "delivery_other";
+      void addPendingUpload(file, {
+        jobId,
+        inspectionType: type,
+        photoType,
+        label,
+      });
+    }
+
     setFormState((prev) => ({
       ...prev,
       additionalPhotos: [...prev.additionalPhotos, draft],
@@ -1069,40 +1107,6 @@ export const InspectionFlow = () => {
     });
   };
 
-  async function tryUploadPhoto(
-    file: File,
-    pathHint: string,
-    photoType: string,
-    label: string | null,
-  ): Promise<{
-    url: string;
-    backend: string;
-    backendRef: string | null;
-  } | null> {
-    try {
-      const result = await storageService.uploadImage(
-        file,
-        pathHint,
-      );
-      return {
-        url: result.url,
-        backend: result.backend,
-        backendRef: result.backendRef ?? null,
-      };
-    } catch {
-      await addPendingUpload(file, {
-        id:
-          Date.now().toString() +
-          Math.random().toString(36).slice(2),
-        jobId: jobId!,
-        inspectionType: type,
-        photoType,
-        label,
-      });
-      return null;
-    }
-  }
-
   const validateBeforeSubmit = (): string[] => {
     const missing: string[] = [];
     if (!formState.odometer) missing.push("Odometer");
@@ -1112,6 +1116,25 @@ export const InspectionFlow = () => {
     if (!formState.customerName) missing.push("Customer name");
     if (!customerSigned) missing.push("Customer signature");
     return missing;
+  };
+
+  const syncPhotosForThisInspection = async (
+    jobId: string,
+    inspectionType: InspectionType,
+  ): Promise<{ succeeded: number; failed: number }> => {
+    const all = await getAllPendingUploads();
+    const relevant: PendingUpload[] = all.filter(
+      (u) => u.jobId === jobId && u.inspectionType === inspectionType,
+    );
+
+    let succeeded = 0;
+    let failed = 0;
+    for (const u of relevant) {
+      const ok = await retryUpload(u.id);
+      if (ok) succeeded++;
+      else failed++;
+    }
+    return { succeeded, failed };
   };
 
   const handleFinalSubmit = async () => {
@@ -1127,98 +1150,26 @@ export const InspectionFlow = () => {
     }
 
     setSubmitting(true);
-    let pendingCount = 0;
     try {
-      const photoTypes = PHOTO_TYPES_BY_INSPECTION[type];
-      for (const pt of photoTypes) {
-        const file = formState.standardPhotos[pt.key];
-        if (file) {
-          const result = await tryUploadPhoto(
-            file,
-            `jobs/${jobId}/${type}/${pt.key}/${Date.now()}`,
-            pt.key,
-            null,
-          );
-          if (result) {
-            await insertPhoto({
-              job_id: jobId,
-              inspection_id: null,
-              type: pt.key,
-              url: result.url,
-              thumbnail_url: null,
-              backend: result.backend,
-              backend_ref: result.backendRef,
-              label: null,
-            });
-          } else {
-            pendingCount++;
-          }
-        }
-      }
+      // 1. Sync all photos for this job + inspection type from local storage
+      const { succeeded, failed } = await syncPhotosForThisInspection(
+        jobId,
+        type,
+      );
 
-      for (const ap of formState.additionalPhotos) {
-        const photoKey =
-          type === "pickup" ? "pickup_other" : "delivery_other";
-        const result = await tryUploadPhoto(
-          ap.file,
-          `jobs/${jobId}/${type}/additional/${ap.tempId}`,
-          photoKey,
-          ap.label,
-        );
-        if (result) {
-          await insertPhoto({
-            job_id: jobId,
-            inspection_id: null,
-            type: photoKey,
-            url: result.url,
-            thumbnail_url: null,
-            backend: result.backend,
-            backend_ref: result.backendRef,
-            label: ap.label,
-          });
-        } else {
-          pendingCount++;
-        }
-      }
+      // 2. Build damage payload (no photo URLs here – photos are in photo table)
+      const damageItemsPayload = formState.damages.map((d) => ({
+        x: d.x,
+        y: d.y,
+        area: d.area,
+        location: d.location,
+        item: d.item,
+        damage_types: d.damageTypes,
+        notes: d.notes,
+        photo_url: null as string | null,
+      }));
 
-      const damageItemsPayload = [];
-      for (const d of formState.damages) {
-        let photoUrl: string | null = null;
-        if (d.photo) {
-          const result = await tryUploadPhoto(
-            d.photo,
-            `jobs/${jobId}/${type}/damage/${d.tempId}`,
-            "damage_close_up",
-            null,
-          );
-          if (result) {
-            await insertPhoto({
-              job_id: jobId,
-              inspection_id: null,
-              type: "damage_close_up",
-              url: result.url,
-              thumbnail_url: null,
-              backend: result.backend,
-              backend_ref: result.backendRef,
-              label: null,
-            });
-            photoUrl = result.url;
-          } else {
-            pendingCount++;
-          }
-        }
-        damageItemsPayload.push({
-          x: d.x,
-          y: d.y,
-          area: d.area,
-          location: d.location,
-          item: d.item,
-          damage_types: d.damageTypes,
-          notes: d.notes,
-          photo_url: photoUrl,
-        });
-      }
-
+      // 3. Upload signatures (direct to storage – usually done with device in hand)
       let driverSigUrl: string | null = null;
       let customerSigUrl: string | null = null;
       if (driverCanvasRef.current && driverSigned) {
@@ -1244,6 +1195,7 @@ export const InspectionFlow = () => {
         customerSigUrl = result.url;
       }
 
+      // 4. Submit inspection data
       const inspPayload: Record<string, unknown> = {
         odometer: formState.odometer
           ? parseInt(formState.odometer)
@@ -1293,11 +1245,14 @@ export const InspectionFlow = () => {
       const jobRef =
         job?.external_job_number || jobId.slice(0, 8);
       const reg = job?.vehicle_reg || "";
+
       let desc = `${
         type === "pickup" ? "Pickup" : "Delivery"
       } inspection submitted for ${jobRef} (${reg}).`;
-      if (pendingCount > 0)
-        desc += ` ${pendingCount} photo(s) pending upload.`;
+      if (succeeded || failed) {
+        desc += ` Photos synced: ${succeeded} uploaded, ${failed} still pending.`;
+      }
+
       toast({ title: "Success", description: desc });
       navigate(`/jobs/${jobId}`);
     } catch (e: unknown) {
