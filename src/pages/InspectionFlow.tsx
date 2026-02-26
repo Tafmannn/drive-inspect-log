@@ -30,6 +30,7 @@ import type {
   DamageItemDraft,
   AdditionalPhotoDraft,
 } from "@/lib/types";
+import { PhotoViewer } from "@/components/PhotoViewer";
 
 interface InspectionFormState {
   odometer: string;
@@ -686,6 +687,14 @@ export const InspectionFlow = () => {
   const renderPhotosStep = () => {
     const photoTypes = PHOTO_TYPES_BY_INSPECTION[type];
 
+    // Build list of captured photos for viewer
+    const capturedPhotos = [
+      ...photoTypes
+        .filter(pt => formState.standardPhotoUrls[pt.key])
+        .map(pt => ({ url: formState.standardPhotoUrls[pt.key], label: pt.label })),
+      ...formState.additionalPhotos.map(ap => ({ url: ap.previewUrl, label: ap.label })),
+    ];
+
     return (
       <div className="space-y-6">
         <h2 className="text-xl font-semibold text-center">Photos</h2>
@@ -788,6 +797,16 @@ export const InspectionFlow = () => {
             </Label>
           </div>
         </div>
+
+        {/* Photo Gallery Viewer for captured photos */}
+        {capturedPhotos.length > 0 && (
+          <div className="pt-4 border-t">
+            <PhotoViewer
+              title={`${type === "pickup" ? "Collection" : "Delivery"} Photos`}
+              photos={capturedPhotos}
+            />
+          </div>
+        )}
       </div>
     );
   };
@@ -911,7 +930,7 @@ export const InspectionFlow = () => {
         <div className="flex items-center justify-center gap-3">
           <h2 className="text-xl font-semibold">Review & Submit</h2>
           {isCollected ? (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-success/20 text-success-foreground">
               ✓ Collected
             </span>
           ) : (
