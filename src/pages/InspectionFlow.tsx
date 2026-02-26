@@ -926,18 +926,25 @@ export const InspectionFlow = () => {
 
     return (
       <div className="space-y-6">
-        {/* Header with Collected pill */}
-        <div className="flex items-center justify-center gap-3">
+        {/* Header with status pills */}
+        <div className="flex flex-col items-center gap-2">
           <h2 className="text-xl font-semibold">Review & Submit</h2>
-          {isCollected ? (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-success/20 text-success-foreground">
-              ✓ Collected
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
-              Collection Incomplete
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {isCollected ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-success/20 text-success-foreground">
+                ✓ Collected
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+                Collection Incomplete
+              </span>
+            )}
+            {type === "delivery" && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/20 text-primary">
+                ✓ Delivering
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Job header pill */}

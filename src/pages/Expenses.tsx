@@ -108,7 +108,7 @@ export const Expenses = () => {
         )}
 
         {expenses?.map(e => (
-          <Card key={e.id} className="p-4 space-y-1 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/expenses/${e.id}`)}>
+          <Card key={e.id} className="p-4 space-y-1 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/expenses/${e.id}/edit`)}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="text-xs font-mono">
