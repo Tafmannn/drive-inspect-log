@@ -1,270 +1,205 @@
-// src/lib/podEmail.ts
-// Branded Axentra POD email generator (text-only but formatted)
-// Used for "Email POD" flows via mailto: links.
-
 import type { JobWithRelations } from "./types";
 import { FUEL_PERCENT_TO_LABEL } from "./types";
 
-function fuelLabel(pct: number | null): string {
+function fuelLabel(pct: number | null | undefined): string {
   if (pct == null) return "N/A";
   return FUEL_PERCENT_TO_LABEL[pct] ?? `${pct}%`;
 }
 
-function formatDateTime(value: string | null | undefined): string {
-  if (!value) return "N/A";
-  try {
-    return new Date(value).toLocaleString();
-  } catch {
-    return value;
-  }
-}
-
-function formatMileage(value: number | null | undefined): string {
-  if (value == null) return "N/A";
-  try {
-    return new Intl.NumberFormat("en-GB").format(value) + " mi";
-  } catch {
-    return `${value} mi`;
-  }
+function safeDate(iso: string | null | undefined): string {
+  if (!iso) return "N/A";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "N/A";
+  return d.toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export function generatePodEmailBody(
-  job: JobWithRelations,
+  job: JobWithRelations
 ): { subject: string; body: string } {
-  const ref = job.external_job_number || job.id.slice(0, 8);
-  const subject = `Axentra Vehicles | POD – ${ref} – ${job.vehicle_reg}`;
+  const ref = job.external_job_number || job.id.slice(0, 8).toUpperCase();
+  const subject = `POD Confirmation – AXENTRA – ${job.vehicle_reg} – ${ref}`;
 
   const pickup = job.inspections.find((i) => i.type === "pickup");
   const delivery = job.inspections.find((i) => i.type === "delivery");
 
   const pickupDamages = job.damage_items.filter(
-    (d) => pickup && d.inspection_id === pickup.id,
+    (d) => pickup && d.inspection_id === pickup.id
   );
   const deliveryDamages = job.damage_items.filter(
-    (d) => delivery && d.inspection_id === delivery.id,
+    (d) => delivery && d.inspection_id === delivery.id
   );
 
   const pickupPhotos = job.photos.filter((p) =>
-    p.type.startsWith("pickup_"),
+    p.type.startsWith("pickup_")
   );
   const deliveryPhotos = job.photos.filter((p) =>
-    p.type.startsWith("delivery_"),
+    p.type.startsWith("delivery_")
+  );
+  const damagePhotos = job.photos.filter(
+    (p) => p.type === "damage_close_up"
   );
 
   const pickupOdo = pickup?.odometer ?? null;
   const deliveryOdo = delivery?.odometer ?? null;
-  const mileageDelta =
+  const journeyMiles =
     pickupOdo != null && deliveryOdo != null
       ? deliveryOdo - pickupOdo
       : null;
 
+  const journeyLine =
+    journeyMiles != null && journeyMiles >= 0
+      ? `${pickupOdo?.toLocaleString("en-GB")} → ${deliveryOdo?.toLocaleString(
+          "en-GB"
+        )} miles (approx. ${journeyMiles.toLocaleString(
+          "en-GB"
+        )} miles driven)`
+      : "N/A";
+
   const lines: string[] = [];
 
-  // ─────────────────────────────────────────
-  // BRAND HEADER
-  // ─────────────────────────────────────────
-  lines.push(
-    "AXENTRA VEHICLES",
-    "Professional Driven Vehicle Logistics",
-    "www.axentravehicles.co.uk",
-    "",
-    "PROOF OF DELIVERY (POD)",
-    "────────────────────────────────────────",
-    "",
-  );
+  lines.push("AXENTRA VEHICLE LOGISTICS");
+  lines.push("Proof of Delivery (POD)");
+  lines.push("".padEnd(40, "═"));
+  lines.push("");
 
-  // ─────────────────────────────────────────
-  // JOB SUMMARY
-  // ─────────────────────────────────────────
-  lines.push("JOB SUMMARY");
-  lines.push("────────────────");
-  lines.push(`Job Ref.............: ${ref}`);
-  if (job.external_job_number) {
-    lines.push(
-      `Client Ref..........: ${job.external_job_number}`,
-    );
-  }
+  // Vehicle
+  lines.push("VEHICLE");
   lines.push(
-    `Vehicle.............: ${job.vehicle_reg} – ${job.vehicle_make} ${job.vehicle_model} (${job.vehicle_colour})`,
+    `Registration: ${job.vehicle_reg} – ${job.vehicle_make} ${job.vehicle_model} (${job.vehicle_colour})`
   );
   if (job.vehicle_year) {
-    lines.push(`Year................: ${job.vehicle_year}`);
+    lines.push(`Year: ${job.vehicle_year}`);
   }
+  lines.push(`Job Reference: ${ref}`);
   lines.push("");
 
-  // ─────────────────────────────────────────
-  // PICKUP BLOCK
-  // ─────────────────────────────────────────
+  // Journey overview
+  lines.push("JOURNEY OVERVIEW");
+  lines.push(
+    `Route: ${job.pickup_city || "Unknown"} → ${
+      job.delivery_city || "Unknown"
+    }`
+  );
+  lines.push(`Pickup postcode: ${job.pickup_postcode}`);
+  lines.push(`Delivery postcode: ${job.delivery_postcode}`);
+  lines.push(`Mileage: ${journeyLine}`);
+  lines.push("");
+
+  // Pickup block
   lines.push("PICKUP DETAILS");
-  lines.push("────────────────");
   lines.push(
-    `Contact.............: ${job.pickup_contact_name} (${job.pickup_contact_phone})`,
+    `Contact: ${job.pickup_contact_name} (${job.pickup_contact_phone})`
   );
   lines.push(
-    `Address.............: ${[
-      job.pickup_address_line1,
-      job.pickup_city,
-      job.pickup_postcode,
-    ]
-      .filter(Boolean)
-      .join(", ")}`,
+    `Location: ${job.pickup_address_line1}, ${job.pickup_city}, ${job.pickup_postcode}`
   );
-
-  if (pickup) {
-    lines.push(
-      `Date/Time...........: ${formatDateTime(pickup.inspected_at)}`,
-      `Mileage at Pickup...: ${formatMileage(pickup.odometer)}`,
-      `Fuel at Pickup......: ${fuelLabel(pickup.fuel_level_percent)}`,
-      `Recorded Damages....: ${pickupDamages.length}`,
-      `Pickup Photos.......: ${pickupPhotos.length}`,
-    );
-    if (pickup.notes) {
-      lines.push(
-        `Pickup Notes........: ${pickup.notes.trim()}`,
-      );
-    }
-    if (pickup.customer_name || pickup.inspected_by_name) {
-      lines.push(
-        `Signed (Customer)...: ${
-          pickup.customer_name || "N/A"
-        }`,
-        `Signed (Driver).....: ${
-          pickup.inspected_by_name || "N/A"
-        }`,
-      );
-    }
-  } else {
-    lines.push("Status..............: Pickup inspection not completed");
+  if (job.pickup_company) {
+    lines.push(`Company: ${job.pickup_company}`);
   }
-  lines.push("");
-
-  // ─────────────────────────────────────────
-  // DELIVERY BLOCK
-  // ─────────────────────────────────────────
-  lines.push("DELIVERY DETAILS");
-  lines.push("────────────────");
   lines.push(
-    `Contact.............: ${job.delivery_contact_name} (${job.delivery_contact_phone})`,
+    pickup
+      ? `Date/Time: ${safeDate(pickup.inspected_at)}`
+      : "Date/Time: Not completed"
   );
   lines.push(
-    `Address.............: ${[
-      job.delivery_address_line1,
-      job.delivery_city,
-      job.delivery_postcode,
-    ]
-      .filter(Boolean)
-      .join(", ")}`,
-  );
-
-  if (delivery) {
-    lines.push(
-      `Date/Time...........: ${formatDateTime(delivery.inspected_at)}`,
-      `Mileage at Delivery.: ${formatMileage(delivery.odometer)}`,
-      `Fuel at Delivery....: ${fuelLabel(
-        delivery.fuel_level_percent,
-      )}`,
-      `Recorded Damages....: ${deliveryDamages.length}`,
-      `Delivery Photos.....: ${deliveryPhotos.length}`,
-    );
-    if (delivery.notes) {
-      lines.push(
-        `Delivery Notes......: ${delivery.notes.trim()}`,
-      );
-    }
-    if (delivery.customer_name || delivery.inspected_by_name) {
-      lines.push(
-        `Signed (Customer)...: ${
-          delivery.customer_name || "N/A"
-        }`,
-        `Signed (Driver).....: ${
-          delivery.inspected_by_name || "N/A"
-        }`,
-      );
-    }
-  } else {
-    lines.push(
-      "Status..............: Delivery inspection not completed",
-    );
-  }
-  lines.push("");
-
-  // ─────────────────────────────────────────
-  // MILEAGE & FUEL SUMMARY
-  // ─────────────────────────────────────────
-  lines.push("MILEAGE & FUEL SUMMARY");
-  lines.push("──────────────────────");
-  lines.push(
-    `Pickup Mileage......: ${
-      pickupOdo != null ? formatMileage(pickupOdo) : "N/A"
-    }`,
-  );
-  lines.push(
-    `Delivery Mileage....: ${
-      deliveryOdo != null ? formatMileage(deliveryOdo) : "N/A"
-    }`,
-  );
-  lines.push(
-    `Total Distance......: ${
-      mileageDelta != null
-        ? new Intl.NumberFormat("en-GB").format(mileageDelta) +
-          " mi"
+    `Odometer: ${
+      pickup?.odometer != null
+        ? pickup.odometer.toLocaleString("en-GB")
         : "N/A"
-    }`,
+    }`
+  );
+  lines.push(`Fuel: ${fuelLabel(pickup?.fuel_level_percent ?? null)}`);
+  if (pickup?.vehicle_condition) {
+    lines.push(`Vehicle condition: ${pickup.vehicle_condition}`);
+  }
+  if (pickup?.light_condition) {
+    lines.push(`Light conditions: ${pickup.light_condition}`);
+  }
+  lines.push(`Recorded damages: ${pickupDamages.length}`);
+  lines.push("");
+
+  // Delivery block
+  lines.push("DELIVERY DETAILS");
+  lines.push(
+    `Contact: ${job.delivery_contact_name} (${job.delivery_contact_phone})`
   );
   lines.push(
-    `Pickup Fuel.........: ${fuelLabel(
-      pickup?.fuel_level_percent ?? null,
-    )}`,
+    `Location: ${job.delivery_address_line1}, ${job.delivery_city}, ${job.delivery_postcode}`
+  );
+  if (job.delivery_company) {
+    lines.push(`Company: ${job.delivery_company}`);
+  }
+  lines.push(
+    delivery
+      ? `Date/Time: ${safeDate(delivery.inspected_at)}`
+      : "Date/Time: Not completed"
   );
   lines.push(
-    `Delivery Fuel.......: ${fuelLabel(
-      delivery?.fuel_level_percent ?? null,
-    )}`,
+    `Odometer: ${
+      delivery?.odometer != null
+        ? delivery.odometer.toLocaleString("en-GB")
+        : "N/A"
+    }`
+  );
+  lines.push(`Fuel: ${fuelLabel(delivery?.fuel_level_percent ?? null)}`);
+  lines.push(`Recorded damages on delivery: ${deliveryDamages.length}`);
+  lines.push("");
+
+  // Photo summary
+  lines.push("PHOTO SUMMARY");
+  lines.push(`Pickup photos: ${pickupPhotos.length}`);
+  lines.push(`Delivery photos: ${deliveryPhotos.length}`);
+  lines.push(`Damage close-ups: ${damagePhotos.length}`);
+  lines.push(
+    "Note: Full-resolution images are held within the Axentra system and can be provided on request."
   );
   lines.push("");
 
-  // ─────────────────────────────────────────
-  // DAMAGE / PHOTO SUMMARY
-  // ─────────────────────────────────────────
-  const totalDamages =
-    pickupDamages.length + deliveryDamages.length;
-  const totalPhotos = pickupPhotos.length + deliveryPhotos.length;
+  // Signatures (if captured)
+  const pickupCustomerName = pickup?.customer_name || job.delivery_contact_name;
+  const pickupDriver = pickup?.inspected_by_name || "Driver";
+  const deliveryCustomerName =
+    delivery?.customer_name || job.delivery_contact_name;
+  const deliveryDriver = delivery?.inspected_by_name || pickupDriver;
 
-  lines.push("DAMAGE & MEDIA SUMMARY");
-  lines.push("──────────────────────");
+  lines.push("SIGNATURES");
   lines.push(
-    `Total Recorded Damages: ${totalDamages} (Pickup: ${pickupDamages.length}, Delivery: ${deliveryDamages.length})`,
+    `Pickup – Driver: ${pickupDriver} | Customer: ${pickupCustomerName || "N/A"}`
   );
   lines.push(
-    `Total Photos........: ${totalPhotos} (Pickup: ${pickupPhotos.length}, Delivery: ${deliveryPhotos.length})`,
+    `Delivery – Driver: ${deliveryDriver} | Customer: ${
+      deliveryCustomerName || "N/A"
+    }`
   );
-  lines.push(
-    "",
-    "All supporting photos are stored in the Axentra system",
-    "and will be provided as attachments or via secure link.",
-    "",
-  );
+  lines.push("");
 
-  // ─────────────────────────────────────────
-  // BRAND FOOTER
-  // ─────────────────────────────────────────
+  // Declaration
+  lines.push("DECLARATION");
   lines.push(
-    "────────────────────────────────────────",
-    "Axentra Vehicles",
-    "Driven Vehicle Logistics · Trade Plate Specialists",
-    "www.axentravehicles.co.uk",
+    "The customer confirms that the above vehicle has been inspected at the point of delivery and any noted damage or exceptions have been recorded on this POD and accompanying imagery."
   );
+  lines.push("");
 
-  return {
-    subject,
-    body: lines.join("\n"),
-  };
+  // Footer
+  lines.push("—");
+  lines.push("Axentra Vehicle Logistics");
+  lines.push("This email serves as formal POD confirmation.");
+
+  const body = lines.join("\n");
+
+  return { subject, body };
 }
 
 export function openPodEmail(job: JobWithRelations): void {
   const { subject, body } = generatePodEmailBody(job);
   const mailto = `mailto:?subject=${encodeURIComponent(
-    subject,
+    subject
   )}&body=${encodeURIComponent(body)}`;
   window.open(mailto, "_blank");
 }
