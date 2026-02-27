@@ -45,7 +45,7 @@ function directionBadge(dir: string) {
 export function GoogleSheetsPanel() {
   const qc = useQueryClient();
   const [spreadsheetId, setSpreadsheetId] = useState("");
-  const [sheetName, setSheetName] = useState("Jobs");
+  const [sheetName, setSheetName] = useState("Job Master");
 
   const { data: config, isLoading: configLoading } = useQuery({
     queryKey: ["sheet-sync-config"],
@@ -148,7 +148,7 @@ export function GoogleSheetsPanel() {
           <div className="space-y-1">
             <Label className="text-xs">Sheet (tab) name</Label>
             <Input
-              placeholder="Jobs"
+              placeholder="Job Master"
               value={sheetName || config?.sheet_name || ""}
               onChange={(e) => setSheetName(e.target.value)}
             />

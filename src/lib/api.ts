@@ -95,7 +95,7 @@ async function generateJobNumber(): Promise<string> {
   return `AX${String(next).padStart(4, '0')}`;
 }
 
-export async function createJob(input: Omit<Job, 'id' | 'status' | 'has_pickup_inspection' | 'has_delivery_inspection' | 'completed_at' | 'created_at' | 'updated_at'>): Promise<Job> {
+export async function createJob(input: Partial<Omit<Job, 'id' | 'status' | 'has_pickup_inspection' | 'has_delivery_inspection' | 'completed_at' | 'created_at' | 'updated_at'>> & Pick<Job, 'vehicle_reg' | 'vehicle_make' | 'vehicle_model' | 'vehicle_colour' | 'pickup_contact_name' | 'pickup_contact_phone' | 'pickup_address_line1' | 'pickup_city' | 'pickup_postcode' | 'delivery_contact_name' | 'delivery_contact_phone' | 'delivery_address_line1' | 'delivery_city' | 'delivery_postcode'>): Promise<Job> {
   const payload = { ...input };
   if (!payload.external_job_number) {
     (payload as Record<string, unknown>).external_job_number = await generateJobNumber();
