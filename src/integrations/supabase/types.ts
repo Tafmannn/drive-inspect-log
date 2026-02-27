@@ -348,8 +348,11 @@ export type Database = {
           cancellation_reason: string | null
           caz_ulez_cost: number | null
           caz_ulez_flag: string | null
+          client_company: string | null
+          client_email: string | null
           client_name: string | null
           client_notes: string | null
+          client_phone: string | null
           completed_at: string | null
           created_at: string
           delivery_access_notes: string | null
@@ -417,8 +420,11 @@ export type Database = {
           cancellation_reason?: string | null
           caz_ulez_cost?: number | null
           caz_ulez_flag?: string | null
+          client_company?: string | null
+          client_email?: string | null
           client_name?: string | null
           client_notes?: string | null
+          client_phone?: string | null
           completed_at?: string | null
           created_at?: string
           delivery_access_notes?: string | null
@@ -486,8 +492,11 @@ export type Database = {
           cancellation_reason?: string | null
           caz_ulez_cost?: number | null
           caz_ulez_flag?: string | null
+          client_company?: string | null
+          client_email?: string | null
           client_name?: string | null
           client_notes?: string | null
+          client_phone?: string | null
           completed_at?: string | null
           created_at?: string
           delivery_access_notes?: string | null
