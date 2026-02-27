@@ -1,16 +1,19 @@
 // src/pages/JobForm.tsx
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 // Native select used instead of Radix Select to avoid BubbleSelect DOM crash
 import { useCreateJob, useUpdateJob, useJob } from "@/hooks/useJobs";
 import { toast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, MapPin, Navigation } from "lucide-react";
 import { CAR_MAKES, getModelsForMake } from "@/lib/carData";
+import { isValidUkPostcode, calculateRoute, type RouteResult } from "@/lib/mapsApi";
+import { isFeatureEnabled } from "@/lib/featureFlags";
 
 type ErrorMap = Record<string, string>;
 
@@ -26,11 +29,42 @@ export const JobForm = () => {
   const formRef = useRef<HTMLFormElement | null>(null);
   const [errors, setErrors] = useState<ErrorMap>({});
 
-  // Vehicle make/model selection state (not per-keystroke typing)
+  // Vehicle make/model selection state
   const [vehicleMake, setVehicleMake] = useState<string>("");
   const [vehicleModel, setVehicleModel] = useState<string>("");
   const [customMake, setCustomMake] = useState(false);
   const [customModel, setCustomModel] = useState(false);
+
+  // Route calculation state
+  const [routeResult, setRouteResult] = useState<RouteResult | null>(null);
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [mapsEnabled, setMapsEnabled] = useState(false);
+  const routeDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    isFeatureEnabled("MAPS_ENABLED").then(setMapsEnabled);
+  }, []);
+
+  // Debounced route calculation
+  const triggerRouteCalc = useCallback((pickupPC: string, deliveryPC: string) => {
+    if (!mapsEnabled) return;
+    if (routeDebounce.current) clearTimeout(routeDebounce.current);
+    if (!isValidUkPostcode(pickupPC) || !isValidUkPostcode(deliveryPC)) {
+      setRouteResult(null);
+      return;
+    }
+    setRouteLoading(true);
+    routeDebounce.current = setTimeout(async () => {
+      try {
+        const result = await calculateRoute(pickupPC, deliveryPC);
+        setRouteResult(result);
+      } catch {
+        setRouteResult(null);
+      } finally {
+        setRouteLoading(false);
+      }
+    }, 750);
+  }, [mapsEnabled]);
 
   // Sync make/model when editing once job is loaded
   useEffect(() => {
@@ -139,6 +173,12 @@ export const JobForm = () => {
       delivery_notes: getStr(data, "delivery_notes") || null,
 
       earliest_delivery_date: getStr(data, "earliest_delivery_date") || null,
+      // Include route data if calculated
+      ...(routeResult?.valid ? {
+        route_distance_miles: routeResult.distanceMiles,
+        route_eta_minutes: routeResult.etaMinutes,
+        maps_validated: true,
+      } : {}),
     };
 
     try {
@@ -470,6 +510,10 @@ export const JobForm = () => {
                     existingJob?.pickup_postcode ?? ""
                   }
                   className="mt-1"
+                  onBlur={(e) => {
+                    const deliveryPC = formRef.current ? new FormData(formRef.current).get("delivery_postcode") as string : "";
+                    if (deliveryPC) triggerRouteCalc(e.target.value, deliveryPC);
+                  }}
                 />
                 <ErrorText field="pickup_postcode" />
               </div>
@@ -576,6 +620,10 @@ export const JobForm = () => {
                     existingJob?.delivery_postcode ?? ""
                   }
                   className="mt-1"
+                  onBlur={(e) => {
+                    const pickupPC = formRef.current ? new FormData(formRef.current).get("pickup_postcode") as string : "";
+                    if (pickupPC) triggerRouteCalc(pickupPC, e.target.value);
+                  }}
                 />
                 <ErrorText field="delivery_postcode" />
               </div>
@@ -605,7 +653,32 @@ export const JobForm = () => {
                 className="mt-1"
               />
             </div>
-          </div>
+            </div>
+
+          {/* Route estimate (Maps) */}
+          {mapsEnabled && (routeLoading || routeResult) && (
+            <div className="rounded-lg border border-border p-4 space-y-2">
+              <h3 className="font-semibold text-sm flex items-center gap-2">
+                <Navigation className="h-4 w-4 text-primary" /> Route Estimate
+              </h3>
+              {routeLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Calculating route…
+                </div>
+              ) : routeResult?.valid ? (
+                <div className="flex gap-4">
+                  <Badge variant="outline" className="text-sm">
+                    <MapPin className="h-3 w-3 mr-1" /> {routeResult.distanceText ?? `${routeResult.distanceMiles} mi`}
+                  </Badge>
+                  <Badge variant="outline" className="text-sm">
+                    🕐 {routeResult.durationText ?? `${routeResult.etaMinutes} min`}
+                  </Badge>
+                </div>
+              ) : (
+                <p className="text-xs text-destructive">{routeResult?.error || "No route found"}</p>
+              )}
+            </div>
+          )}
 
           <Button
             className="w-full"

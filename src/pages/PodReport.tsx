@@ -321,26 +321,32 @@ export const PodReport = () => {
                 </div>
               </Card>
 
-              {/* ── Expenses ── */}
-              <Card className="p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold">Expenses for this Job</h3>
-                  <span className="text-xs font-medium text-foreground">{jobExpenses?.length ?? 0} expenses – £{expenseTotal.toFixed(2)}</span>
-                </div>
-                {jobExpenses && jobExpenses.length > 0 ? (
-                  <div className="space-y-1">
-                    {jobExpenses.map(e => (
-                      <div key={e.id} className="flex justify-between text-xs py-0.5">
-                        <span className="text-muted-foreground">{e.category}{e.label ? ` – ${e.label}` : ''}</span>
-                        <span className="font-medium">£{Number(e.amount).toFixed(2)}</span>
+              {/* ── Expenses (billable only on POD) ── */}
+              {(() => {
+                const billableExpenses = (jobExpenses ?? []).filter((e: any) => e.billable_on_pod !== false);
+                const billableTotal = billableExpenses.reduce((sum: number, e: any) => sum + Number(e.amount), 0);
+                return (
+                  <Card className="p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold">Billable Expenses</h3>
+                      <span className="text-xs font-medium text-foreground">{billableExpenses.length} expenses – £{billableTotal.toFixed(2)}</span>
+                    </div>
+                    {billableExpenses.length > 0 ? (
+                      <div className="space-y-1">
+                        {billableExpenses.map((e: any) => (
+                          <div key={e.id} className="flex justify-between text-xs py-0.5">
+                            <span className="text-muted-foreground">{e.category}{e.label ? ` – ${e.label}` : ''}</span>
+                            <span className="font-medium">£{Number(e.amount).toFixed(2)}</span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground">No expenses recorded</p>
-                )}
-                <Button size="sm" variant="outline" onClick={() => navigate(`/expenses/new?jobId=${jobId}`)}>Add Expense</Button>
-              </Card>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">No billable expenses recorded</p>
+                    )}
+                    <Button size="sm" variant="outline" onClick={() => navigate(`/expenses/new?jobId=${jobId}`)}>Add Expense</Button>
+                  </Card>
+                );
+              })()}
 
               <Card className="p-4 space-y-2 text-xs text-muted-foreground">
                 <h3 className="text-sm font-semibold text-foreground">Customer Declaration</h3>

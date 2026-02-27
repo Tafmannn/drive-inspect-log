@@ -22,7 +22,6 @@ import {
 } from "lucide-react";
 import { useJob, useSubmitInspection } from "@/hooks/useJobs";
 import { storageService } from "@/lib/storage";
-import { insertPhoto } from "@/lib/api";
 import { addPendingUpload } from "@/lib/pendingUploads";
 import { toast } from "@/hooks/use-toast";
 import { FUEL_LEVEL_MAP } from "@/lib/types";
@@ -383,35 +382,7 @@ export const InspectionFlow = () => {
     });
   };
 
-  async function tryUploadPhoto(
-    file: File,
-    pathHint: string,
-    photoType: string,
-    label: string | null
-  ): Promise<{
-    url: string;
-    backend: string;
-    backendRef: string | null;
-  } | null> {
-    try {
-      const result = await storageService.uploadImage(file, pathHint);
-      return {
-        url: result.url,
-        backend: result.backend,
-        backendRef: result.backendRef ?? null,
-      };
-    } catch {
-      if (jobId) {
-        await addPendingUpload(file, {
-          jobId,
-          inspectionType: type,
-          photoType,
-          label,
-        });
-      }
-      return null;
-    }
-  }
+  // tryUploadPhoto removed — all photos now go through background queue
 
   // ───────────────── PER-STEP VALIDATION ─────────────────
 
@@ -491,102 +462,9 @@ export const InspectionFlow = () => {
     }
 
     setSubmitting(true);
-    let pendingCount = 0;
 
     try {
-      // 1) upload standard photos
-      const photoTypes = PHOTO_TYPES_BY_INSPECTION[type];
-      for (const pt of photoTypes) {
-        const file = formState.standardPhotos[pt.key];
-        if (file) {
-          const result = await tryUploadPhoto(
-            file,
-            `jobs/${jobId}/${type}/${pt.key}/${Date.now()}`,
-            pt.key,
-            null
-          );
-          if (result) {
-            await insertPhoto({
-              job_id: jobId,
-              inspection_id: null,
-              type: pt.key,
-              url: result.url,
-              thumbnail_url: null,
-              backend: result.backend,
-              backend_ref: result.backendRef,
-              label: null,
-            });
-          } else {
-            pendingCount++;
-          }
-        }
-      }
-
-      // 2) upload additional photos
-      for (const ap of formState.additionalPhotos) {
-        const photoKey = type === "pickup" ? "pickup_other" : "delivery_other";
-        const result = await tryUploadPhoto(
-          ap.file,
-          `jobs/${jobId}/${type}/additional/${ap.tempId}`,
-          photoKey,
-          ap.label
-        );
-        if (result) {
-          await insertPhoto({
-            job_id: jobId,
-            inspection_id: null,
-            type: photoKey,
-            url: result.url,
-            thumbnail_url: null,
-            backend: result.backend,
-            backend_ref: result.backendRef,
-            label: ap.label,
-          });
-        } else {
-          pendingCount++;
-        }
-      }
-
-      // 3) upload damage photos
-      const damageItemsPayload: any[] = [];
-      for (const d of formState.damages) {
-        let photoUrl: string | null = null;
-        if (d.photo) {
-          const result = await tryUploadPhoto(
-            d.photo,
-            `jobs/${jobId}/${type}/damage/${d.tempId}`,
-            "damage_close_up",
-            null
-          );
-          if (result) {
-            await insertPhoto({
-              job_id: jobId,
-              inspection_id: null,
-              type: "damage_close_up",
-              url: result.url,
-              thumbnail_url: null,
-              backend: result.backend,
-              backend_ref: result.backendRef,
-              label: null,
-            });
-            photoUrl = result.url;
-          } else {
-            pendingCount++;
-          }
-        }
-        damageItemsPayload.push({
-          x: d.x,
-          y: d.y,
-          area: d.area,
-          location: d.location,
-          item: d.item,
-          damage_types: d.damageTypes,
-          notes: d.notes,
-          photo_url: photoUrl,
-        });
-      }
-
-      // 4) upload signatures
+      // ── 1) Upload signatures (critical for POD — do these synchronously) ──
       let driverSigUrl: string | null = null;
       let customerSigUrl: string | null = null;
 
@@ -611,7 +489,31 @@ export const InspectionFlow = () => {
         customerSigUrl = result.url;
       }
 
-      // 5) submit inspection
+      // ── 2) Build damage items payload (photos queued, not blocking) ──
+      const damageItemsPayload: any[] = [];
+      for (const d of formState.damages) {
+        // Queue damage photo to background — don't block submission
+        if (d.photo) {
+          addPendingUpload(d.photo, {
+            jobId,
+            inspectionType: type,
+            photoType: "damage_close_up",
+            label: null,
+          }).catch(() => {});
+        }
+        damageItemsPayload.push({
+          x: d.x,
+          y: d.y,
+          area: d.area,
+          location: d.location,
+          item: d.item,
+          damage_types: d.damageTypes,
+          notes: d.notes,
+          photo_url: null, // Will be populated when upload completes
+        });
+      }
+
+      // ── 3) Submit inspection metadata IMMEDIATELY (non-blocking) ──
       const inspPayload: Record<string, unknown> = {
         odometer: formState.odometer
           ? parseInt(formState.odometer, 10)
@@ -657,17 +559,47 @@ export const InspectionFlow = () => {
         damageItems: damageItemsPayload,
       });
 
+      // ── 4) Queue ALL photos to background upload (fire-and-forget) ──
+      let pendingCount = 0;
+      const photoTypes = PHOTO_TYPES_BY_INSPECTION[type];
+      for (const pt of photoTypes) {
+        const file = formState.standardPhotos[pt.key];
+        if (file) {
+          pendingCount++;
+          addPendingUpload(file, {
+            jobId,
+            inspectionType: type,
+            photoType: pt.key,
+            label: null,
+          }).catch(() => {});
+        }
+      }
+
+      for (const ap of formState.additionalPhotos) {
+        const photoKey = type === "pickup" ? "pickup_other" : "delivery_other";
+        pendingCount++;
+        addPendingUpload(ap.file, {
+          jobId,
+          inspectionType: type,
+          photoType: photoKey,
+          label: ap.label,
+        }).catch(() => {});
+      }
+
+      // ── 5) Immediately trigger background retry (best-effort) ──
+      import("@/lib/pendingUploads").then(m => m.retryAllPending()).catch(() => {});
+
       const jobRef = job?.external_job_number || jobId.slice(0, 8);
       const reg = job?.vehicle_reg || "";
       let desc = `${
         type === "pickup" ? "Pickup" : "Delivery"
       } inspection submitted for ${jobRef} (${reg}).`;
       if (pendingCount > 0) {
-        desc += ` ${pendingCount} photo(s) pending upload.`;
+        desc += ` ${pendingCount} photo(s) uploading in background.`;
       }
 
       toast({ title: "Success", description: desc });
-      if (dk) clearDraft(dk); // Clear autosave draft after successful submission
+      if (dk) clearDraft(dk);
       navigate(`/jobs/${jobId}`);
     } catch (e: unknown) {
       toast({
