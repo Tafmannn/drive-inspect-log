@@ -219,7 +219,8 @@ Deno.serve(async (req) => {
     const serviceAccount = JSON.parse(SA_JSON_STR);
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const { action } = await req.json();
+    const body = await req.json();
+    const { action } = body;
 
     // Get sync config
     const { data: config, error: cfgErr } = await supabase
@@ -285,6 +286,9 @@ Deno.serve(async (req) => {
       return respond({ success: true, headers, message: "All headers validated successfully." });
     } else if (action === "pull") {
       return await handlePull(supabase, token, spreadsheet_id, sheetName, REQUIRED_FIELDS);
+    } else if (action === "push") {
+      const { jobIds } = body;
+      return await handlePush(supabase, token, spreadsheet_id, sheetName, jobIds);
     } else {
       return respond({ error: `Unknown action: ${action}` }, 400);
     }
@@ -529,6 +533,170 @@ async function handlePull(
     log.errors.push({ error: msg });
     await supabase.from("sheet_sync_logs").insert({
       direction: "pull",
+      status: "error",
+      ...log,
+    });
+    return respond({ success: false, error: msg, ...log }, 500);
+  }
+}
+
+// ─── PUSH: App → Sheet (Write jobs to Job Master) ───────────────────
+
+const REVERSE_STATUS_MAP: Record<string, string> = {
+  ready_for_pickup: "Booked",
+  in_transit: "En Route",
+  delivery_complete: "Completed",
+  cancelled: "Cancelled",
+};
+
+async function handlePush(
+  supabase: any,
+  token: string,
+  spreadsheetId: string,
+  sheetName: string,
+  jobIds?: string[]
+) {
+  const log = { rows_processed: 0, rows_created: 0, rows_updated: 0, rows_skipped: 0, errors: [] as any[] };
+
+  try {
+    // 1. Fetch jobs from Supabase
+    let query = supabase.from("jobs").select("*").eq("is_hidden", false);
+    if (jobIds && jobIds.length > 0) {
+      query = query.in("id", jobIds);
+    }
+    const { data: jobs, error: jobsErr } = await query;
+    if (jobsErr) throw jobsErr;
+    if (!jobs || jobs.length === 0) {
+      return respond({ success: true, message: "No jobs to push.", ...log });
+    }
+
+    // 2. Fetch expenses aggregated per job
+    const jobIdList = jobs.map((j: any) => j.id);
+    const { data: expenses } = await supabase
+      .from("expenses")
+      .select("job_id, amount")
+      .in("job_id", jobIdList)
+      .eq("is_hidden", false);
+    const expensesByJob: Record<string, number> = {};
+    for (const e of expenses ?? []) {
+      expensesByJob[e.job_id] = (expensesByJob[e.job_id] || 0) + Number(e.amount || 0);
+    }
+
+    // 3. Read existing sheet to find App Job ID column for de-duplication
+    const rows = await readSheet(token, spreadsheetId, `'${sheetName}'!A:AZ`);
+    const headers = (rows[0] ?? []).map((h: string) => h.trim());
+    const hIdx: Record<string, number> = {};
+    for (let i = 0; i < headers.length; i++) hIdx[headers[i]] = i;
+
+    const appJobIdColIdx = hIdx["App Job ID"];
+    // Build map of existing App Job IDs → row number (1-indexed)
+    const existingAppIds: Record<string, number> = {};
+    if (appJobIdColIdx !== undefined) {
+      for (let r = 1; r < rows.length; r++) {
+        const val = (rows[r]?.[appJobIdColIdx] ?? "").trim();
+        if (val) existingAppIds[val] = r + 1; // sheet row is 1-indexed + header
+      }
+    }
+
+    let nextRow = rows.length + 1; // next available row for appending
+
+    // 4. Push each job
+    for (const job of jobs) {
+      log.rows_processed++;
+      const totalExpenses = expensesByJob[job.id] || 0;
+      const sheetStatus = REVERSE_STATUS_MAP[job.status] || job.status || "";
+
+      const rowValues = JOB_MASTER_HEADERS.map((header: string) => {
+        switch (header) {
+          case "Job ID": return job.external_job_number || "";
+          case "Job Date": return job.job_date || "";
+          case "Job Status": return sheetStatus;
+          case "Job Priority": return job.priority || "Normal";
+          case "Job Type": return job.job_type || "Single";
+          case "Job Source": return job.job_source || "";
+          case "Created At": return job.created_at || "";
+          case "Updated At": return job.updated_at || "";
+          case "Client Name": return job.client_name || "";
+          case "Client Notes": return job.client_notes || "";
+          case "Pickup Contact Name": return job.pickup_contact_name || "";
+          case "Pickup Contact Phone": return job.pickup_contact_phone || "";
+          case "Pickup Address Line 1": return job.pickup_address_line1 || "";
+          case "Pickup Town / City": return job.pickup_city || "";
+          case "Pickup Postcode": return job.pickup_postcode || "";
+          case "Pickup Time From": return job.pickup_time_from || "";
+          case "Pickup Time To": return job.pickup_time_to || "";
+          case "Pickup Access Notes": return job.pickup_access_notes || "";
+          case "Delivery Contact Name": return job.delivery_contact_name || "";
+          case "Delivery Contact Phone": return job.delivery_contact_phone || "";
+          case "Delivery Address Line 1": return job.delivery_address_line1 || "";
+          case "Delivery Town / City": return job.delivery_city || "";
+          case "Delivery Postcode": return job.delivery_postcode || "";
+          case "Delivery Time From": return job.delivery_time_from || "";
+          case "Delivery Time To": return job.delivery_time_to || "";
+          case "Delivery Access Notes": return job.delivery_access_notes || "";
+          case "Promise By Time": return job.promise_by_time || "";
+          case "Vehicle Reg": return job.vehicle_reg || "";
+          case "Vehicle Make": return job.vehicle_make || "";
+          case "Vehicle Model": return job.vehicle_model || "";
+          case "Vehicle Colour": return job.vehicle_colour || "";
+          case "Vehicle Type": return job.vehicle_type || "";
+          case "Vehicle Fuel Type": return job.vehicle_fuel_type || "";
+          case "Distance (Miles)": return job.distance_miles != null ? String(job.distance_miles) : "";
+          case "Rate (£ per mile)": return job.rate_per_mile != null ? String(job.rate_per_mile) : "";
+          case "Total Price (£)": return job.total_price != null ? String(job.total_price) : "";
+          case "CAZ/ULEZ?": return job.caz_ulez_flag || "";
+          case "CAZ/ULEZ Cost (£)": return job.caz_ulez_cost != null ? String(job.caz_ulez_cost) : "";
+          case "Other Expenses (£)": return totalExpenses > 0 ? String(totalExpenses) : (job.other_expenses != null ? String(job.other_expenses) : "");
+          case "Driver Name": return job.driver_name || "";
+          case "Driver ID": return job.driver_external_id || "";
+          case "Job Notes": return job.job_notes || "";
+          case "Cancellation Reason": return job.cancellation_reason || "";
+          case "Sync to App?": return "YES";
+          case "App Job ID": return job.id;
+          case "Sync to Map?": return job.sync_to_map ? "YES" : "NO";
+          case "Map Job ID": return "";
+          default: return "";
+        }
+      });
+
+      const existingRow = existingAppIds[job.id] || (job.sheet_row_index ? job.sheet_row_index : null);
+      const lastCol = getColumnLetter(JOB_MASTER_HEADERS.length - 1);
+
+      if (existingRow) {
+        // Update existing row
+        await appendRow(token, spreadsheetId, `'${sheetName}'!A${existingRow}:${lastCol}${existingRow}`, rowValues);
+        await supabase.from("jobs").update({ sheet_row_index: existingRow }).eq("id", job.id);
+        log.rows_updated++;
+      } else {
+        // Append new row
+        const targetRow = nextRow;
+        await appendRow(token, spreadsheetId, `'${sheetName}'!A${targetRow}:${lastCol}${targetRow}`, rowValues);
+        await supabase.from("jobs").update({ sheet_row_index: targetRow }).eq("id", job.id);
+        existingAppIds[job.id] = targetRow;
+        nextRow++;
+        log.rows_created++;
+      }
+    }
+
+    // 5. Update last_push_at
+    const { data: cfgId } = await supabase.from("sheet_sync_config").select("id").single();
+    if (cfgId) {
+      await supabase.from("sheet_sync_config").update({ last_push_at: new Date().toISOString() }).eq("id", cfgId.id);
+    }
+
+    // 6. Log sync
+    await supabase.from("sheet_sync_logs").insert({
+      direction: "push",
+      status: log.errors.length ? "partial" : "success",
+      ...log,
+    });
+
+    return respond({ success: true, ...log });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    log.errors.push({ error: msg });
+    await supabase.from("sheet_sync_logs").insert({
+      direction: "push",
       status: "error",
       ...log,
     });
