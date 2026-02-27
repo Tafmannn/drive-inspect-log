@@ -5,3 +5,9 @@ verify_jwt = false
 
 [functions.maps-directions]
 verify_jwt = false
+
+[functions.gcs-upload]
+verify_jwt = false
+
+[functions.vision-ocr]
+verify_jwt = false

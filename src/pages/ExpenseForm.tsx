@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
@@ -11,9 +11,15 @@ import { toast } from "@/hooks/use-toast";
 import { useCreateExpense, useUpdateExpense, useUploadReceipt } from "@/hooks/useExpenses";
 import { EXPENSE_CATEGORIES, getExpensesForJob } from "@/lib/expenseApi";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Camera, ImagePlus, X } from "lucide-react";
+import { Loader2, Camera, ImagePlus, X, ScanLine } from "lucide-react";
 import type { Job } from "@/lib/types";
 import { useAuth } from "@/context/AuthContext";
+import { saveDraft, loadDraft, clearDraft, draftKey } from "@/lib/autosave";
+import { ocrReceipt } from "@/lib/visionApi";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 
 export const ExpenseForm = () => {
   const navigate = useNavigate();
@@ -22,6 +28,7 @@ export const ExpenseForm = () => {
   const [searchParams] = useSearchParams();
   const preselectedJobId = searchParams.get("jobId") || "";
   const isEdit = !!expenseId;
+  const DRAFT_KEY = draftKey("expense", expenseId || "new");
 
   const [jobs, setJobs] = useState<Pick<Job, "id" | "vehicle_reg" | "external_job_number">[]>([]);
   const [jobId, setJobId] = useState(preselectedJobId);
@@ -35,12 +42,56 @@ export const ExpenseForm = () => {
   const [existingReceipts, setExistingReceipts] = useState<{ id: string; url: string }[]>([]);
   const [saving, setSaving] = useState(false);
   const [loadingExpense, setLoadingExpense] = useState(isEdit);
+  const [showDraftDialog, setShowDraftDialog] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const createExpense = useCreateExpense();
   const updateExpense = useUpdateExpense();
   const uploadReceipt = useUploadReceipt();
+
+  // ─── Autosave ──────────────────────────────────────────────
+  interface DraftData { jobId: string; category: string; amount: string; date: string; time: string; label: string; notes: string }
+
+  const saveDraftNow = useCallback(() => {
+    if (isEdit) return; // don't autosave edits
+    const draft: DraftData = { jobId, category, amount, date, time, label, notes };
+    saveDraft(DRAFT_KEY, draft);
+  }, [jobId, category, amount, date, time, label, notes, isEdit, DRAFT_KEY]);
+
+  // Autosave on field changes (debounced)
+  useEffect(() => {
+    if (isEdit) return;
+    const t = setTimeout(saveDraftNow, 1500);
+    return () => clearTimeout(t);
+  }, [saveDraftNow, isEdit]);
+
+  // Check for existing draft on mount
+  useEffect(() => {
+    if (isEdit) return;
+    const draft = loadDraft<DraftData>(DRAFT_KEY);
+    if (draft) setShowDraftDialog(true);
+  }, []);
+
+  const restoreDraft = () => {
+    const draft = loadDraft<DraftData>(DRAFT_KEY);
+    if (draft) {
+      setJobId(draft.data.jobId || preselectedJobId);
+      setCategory(draft.data.category);
+      setAmount(draft.data.amount);
+      setDate(draft.data.date);
+      setTime(draft.data.time);
+      setLabel(draft.data.label);
+      setNotes(draft.data.notes);
+    }
+    setShowDraftDialog(false);
+  };
+
+  const discardDraft = () => {
+    clearDraft(DRAFT_KEY);
+    setShowDraftDialog(false);
+  };
 
   useEffect(() => {
     // Load jobs for dropdown (active + completed in last 14 days)
@@ -97,6 +148,28 @@ export const ExpenseForm = () => {
       preview: URL.createObjectURL(f),
     }));
     setReceiptFiles(prev => [...prev, ...newFiles]);
+
+    // Auto-scan first receipt for OCR if Vision AI is enabled
+    if (newFiles.length > 0 && !amount) {
+      handleOcrScan(newFiles[0].file);
+    }
+  };
+
+  const handleOcrScan = async (file: File) => {
+    setScanning(true);
+    try {
+      const result = await ocrReceipt(file);
+      if (result) {
+        if (result.amount && !amount) setAmount(String(result.amount));
+        if (result.date && date === new Date().toISOString().slice(0, 10)) setDate(result.date);
+        if (result.vendor && !label) setLabel(result.vendor);
+        toast({ title: "Receipt scanned", description: "Fields pre-filled from receipt. Please verify." });
+      }
+    } catch {
+      // OCR failed silently — user can fill manually
+    } finally {
+      setScanning(false);
+    }
   };
 
   const removeReceipt = (idx: number) => {
@@ -152,6 +225,7 @@ export const ExpenseForm = () => {
       }
 
       toast({ title: isEdit ? "Expense updated" : "Expense saved" });
+      clearDraft(DRAFT_KEY);
       navigate(-1);
     } catch (e: unknown) {
       toast({ title: "Save failed", description: e instanceof Error ? e.message : "Unknown error", variant: "destructive" });
@@ -162,6 +236,20 @@ export const ExpenseForm = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Draft restore dialog */}
+      <Dialog open={showDraftDialog} onOpenChange={setShowDraftDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Resume saved progress?</DialogTitle>
+            <DialogDescription>You have an unsaved expense draft. Would you like to restore it?</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={discardDraft}>Discard</Button>
+            <Button onClick={restoreDraft}>Restore</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <AppHeader title={isEdit ? "Edit Expense" : "Add Expense"} showBack onBack={() => navigate(-1)} />
       <div className="p-4 space-y-4 max-w-lg mx-auto">
         {loadingExpense ? (
@@ -237,13 +325,18 @@ export const ExpenseForm = () => {
         {/* Receipts */}
         <Card className="p-4 space-y-3">
           <Label>Receipt Photos</Label>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button type="button" variant="outline" size="sm" onClick={() => cameraInputRef.current?.click()}>
               <Camera className="h-4 w-4 mr-1" /> Camera
             </Button>
             {canUseGallery && (
               <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
                 <ImagePlus className="h-4 w-4 mr-1" /> Gallery
+              </Button>
+            )}
+            {receiptFiles.length > 0 && (
+              <Button type="button" variant="outline" size="sm" onClick={() => handleOcrScan(receiptFiles[0].file)} disabled={scanning}>
+                {scanning ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <ScanLine className="h-4 w-4 mr-1" />} Scan Receipt
               </Button>
             )}
           </div>
