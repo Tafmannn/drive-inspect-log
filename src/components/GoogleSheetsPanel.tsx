@@ -117,6 +117,15 @@ export function GoogleSheetsPanel() {
 
   const isSyncing = pushSync.isPending || pullSync.isPending;
 
+  const setupTab = useMutation({
+    mutationFn: syncApi.setupJobMasterTab,
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ["sheet-sync-config"] });
+      toast({ title: "Job Master tab created", description: data.message });
+    },
+    onError: (e: Error) => toast({ title: "Setup failed", description: e.message, variant: "destructive" }),
+  });
+
   if (configLoading) {
     return <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
   }
@@ -163,6 +172,10 @@ export function GoogleSheetsPanel() {
           <Button size="sm" variant="outline" onClick={() => testConn.mutate()} disabled={testConn.isPending || !config}>
             {testConn.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <RefreshCw className="h-4 w-4 mr-1" />}
             Test Connection
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => setupTab.mutate()} disabled={setupTab.isPending || !config}>
+            {setupTab.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Sheet className="h-4 w-4 mr-1" />}
+            Create Job Master Tab
           </Button>
         </div>
 

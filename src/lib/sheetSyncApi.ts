@@ -36,6 +36,10 @@ export async function testSheetConnection() {
   return callSync({ action: "test" });
 }
 
+export async function setupJobMasterTab() {
+  return callSync({ action: "setup_job_master" });
+}
+
 // ─── Config CRUD ─────────────────────────────────────────────────────
 
 export interface SheetSyncConfig {
