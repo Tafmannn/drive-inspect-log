@@ -247,7 +247,12 @@ Deno.serve(async (req) => {
       // Create "Job Master" tab with all 47 headers
       const sheetNames = await getSheetNames(token, spreadsheet_id);
       if (sheetNames.includes("Job Master")) {
-        return respond({ success: false, error: "Tab 'Job Master' already exists." }, 400);
+        // Tab already exists — treat as success, update config to use it
+        const { data: cfgId } = await supabase.from("sheet_sync_config").select("id").single();
+        if (cfgId) {
+          await supabase.from("sheet_sync_config").update({ sheet_name: "Job Master" }).eq("id", cfgId.id);
+        }
+        return respond({ success: true, message: "Tab 'Job Master' already exists. Config updated.", headers: JOB_MASTER_HEADERS });
       }
       await addSheet(token, spreadsheet_id, "Job Master");
       // Write header row
