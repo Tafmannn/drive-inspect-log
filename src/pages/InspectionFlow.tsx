@@ -26,10 +26,12 @@ import { addPendingUpload } from "@/lib/pendingUploads";
 import { toast } from "@/hooks/use-toast";
 import { FUEL_LEVEL_MAP } from "@/lib/types";
 import type {
+  Job,
   InspectionType,
   DamageItemDraft,
   AdditionalPhotoDraft,
 } from "@/lib/types";
+import * as api from "@/lib/api";
 import { PhotoViewer } from "@/components/PhotoViewer";
 import { useAuth } from "@/context/AuthContext";
 import { saveDraft, loadDraft, clearDraft, draftKey } from "@/lib/autosave";
@@ -115,6 +117,9 @@ export const InspectionFlow = () => {
     useState<{ x: number; y: number } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [showDraftPrompt, setShowDraftPrompt] = useState(false);
+  // Tracks that we're in an active editing session — prevents draft modal
+  // from re-appearing after camera/photo capture causes a remount.
+  const sessionActive = useRef(false);
 
   // Photo label modal state
   const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
@@ -173,50 +178,89 @@ export const InspectionFlow = () => {
   const dk = jobId ? draftKey(type, jobId) : "";
 
   useEffect(() => {
-    if (!dk) return;
+    if (!dk || !sessionActive.current) return;
     // Only save serializable fields (exclude File objects)
     const { standardPhotos, additionalPhotos, ...serializable } = formState;
-    const timer = setTimeout(() => saveDraft(dk, serializable), 500);
+    const draftPayload = { ...serializable, _currentStep: currentStep };
+    const timer = setTimeout(() => saveDraft(dk, draftPayload), 500);
     return () => clearTimeout(timer);
-  }, [formState, dk]);
+  }, [formState, currentStep, dk]);
 
-  // ─── DRAFT RESTORE: check on mount ───
+  // ─── DRAFT RESTORE: check on mount (once) ───
   useEffect(() => {
-    if (!dk) return;
-    const draft = loadDraft<Partial<typeof formState>>(dk);
-    if (draft) setShowDraftPrompt(true);
+    if (!dk || sessionActive.current) return;
+    const draft = loadDraft<Record<string, unknown>>(dk);
+    if (draft?.data) {
+      // Only show prompt if draft has meaningful data (not just empty strings)
+      const d = draft.data;
+      const hasMeaningful = d.odometer || d.fuelLevel || d.notes || d.customerName || d.driverName ||
+        d.vehicleCondition || d.lightCondition || d.numberOfKeys;
+      if (hasMeaningful) {
+        setShowDraftPrompt(true);
+        return;
+      }
+    }
+    // No meaningful draft — start fresh and mark session active
+    sessionActive.current = true;
   }, [dk]);
 
   const handleRestoreDraft = () => {
     if (!dk) return;
-    const draft = loadDraft<Partial<typeof formState>>(dk);
+    const draft = loadDraft<Record<string, unknown>>(dk);
     if (draft?.data) {
-      setFormState(prev => ({ ...prev, ...draft.data }));
+      const { _currentStep, ...fields } = draft.data;
+      setFormState(prev => ({ ...prev, ...fields }));
+      if (typeof _currentStep === "number" && _currentStep >= 1 && _currentStep <= totalSteps) {
+        setCurrentStep(_currentStep);
+      }
       toast({ title: "Draft restored", description: "Your previous progress has been loaded." });
     }
+    sessionActive.current = true;
     setShowDraftPrompt(false);
   };
 
   const handleDiscardDraft = () => {
     if (dk) clearDraft(dk);
+    sessionActive.current = true;
     setShowDraftPrompt(false);
   };
 
   // ─── AUTO-POPULATE: prefill driver/customer names ───
   useEffect(() => {
     if (!job) return;
+    // Use the correct contact based on inspection type
+    const contactName = type === "pickup"
+      ? job.pickup_contact_name
+      : job.delivery_contact_name;
     setFormState(prev => ({
       ...prev,
-      customerName: prev.customerName || job.delivery_contact_name || "",
-      driverName: prev.driverName || "Driver", // Will use actual user name when auth enabled
+      customerName: prev.customerName || contactName || "",
+      driverName: prev.driverName || "Driver",
     }));
-  }, [job]);
+  }, [job, type]);
+
+  // ─── PHASE 3: Set job status to in_progress on first data entry ───
+  const statusMarked = useRef(false);
+  const markInProgress = useCallback(async () => {
+    if (statusMarked.current || !jobId || !job) return;
+    const targetStatus = type === "pickup" ? "pickup_in_progress" : "delivery_in_progress";
+    // Only transition if the job is in an earlier state
+    const earlyStatuses = ["ready_for_pickup", "pickup_complete", "in_transit"];
+    if (type === "pickup" && earlyStatuses.includes(job.status)) {
+      statusMarked.current = true;
+      api.updateJob(jobId, { status: targetStatus } as Partial<Job>).catch(() => {});
+    } else if (type === "delivery" && ["pickup_complete", "in_transit"].includes(job.status)) {
+      statusMarked.current = true;
+      api.updateJob(jobId, { status: targetStatus } as Partial<Job>).catch(() => {});
+    }
+  }, [jobId, job, type]);
 
   const updateField = useCallback(
     (field: keyof InspectionFormState, value: string) => {
       setFormState((prev) => ({ ...prev, [field]: value }));
+      markInProgress();
     },
-    []
+    [markInProgress]
   );
 
   const addDamage = (position: { x: number; y: number }) => {
