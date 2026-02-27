@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
-import { getAllPendingUploads, retryUpload, retryAllPending, type PendingUpload } from "@/lib/pendingUploads";
+import { getAllPendingUploads, retryUpload, retryAllPending, pruneDone, type PendingUpload } from "@/lib/pendingUploads";
 import { Loader2, RefreshCw, CheckCircle, XCircle, Clock } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -17,6 +17,7 @@ export const PendingUploads = () => {
 
   const refresh = async () => {
     setLoading(true);
+    pruneDone(); // Clean up completed items from localStorage
     const items = await getAllPendingUploads();
     // Only show actionable items (pending/failed), not completed ones
     setUploads(items.filter(i => i.status === 'pending' || i.status === 'failed'));

@@ -8,6 +8,12 @@ import { supabase } from '@/integrations/supabase/client';
  */
 class GcsStorageService implements StorageService {
   async uploadImage(file: File, pathHint: string): Promise<StoredFileInfo> {
+    // Reject files over 10MB to avoid edge function memory issues
+    const MAX_SIZE = 10 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      throw new Error('Upload failed: File too large (max 10 MB)');
+    }
+
     const ext = file.name.split('.').pop() || 'jpg';
     const fileName = `${pathHint}.${ext}`;
 
@@ -22,8 +28,12 @@ class GcsStorageService implements StorageService {
       },
     });
 
-    if (error) throw new Error(`GCS upload failed: ${error.message}`);
-    if (data?.error) throw new Error(`GCS upload failed: ${data.error}`);
+    if (error) {
+      throw new Error(classifyUploadError(error.message));
+    }
+    if (data?.error) {
+      throw new Error(classifyUploadError(data.error));
+    }
 
     return {
       url: data.url,
@@ -45,6 +55,27 @@ class GcsStorageService implements StorageService {
       reader.readAsDataURL(file);
     });
   }
+}
+
+/** Map raw error messages to user-friendly descriptions */
+function classifyUploadError(raw: string): string {
+  const lower = raw.toLowerCase();
+  if (lower.includes('permission') || lower.includes('403') || lower.includes('forbidden')) {
+    return 'Upload failed: Server did not accept the file (permission denied)';
+  }
+  if (lower.includes('not found') || lower.includes('404')) {
+    return 'Upload failed: Storage bucket not found';
+  }
+  if (lower.includes('too large') || lower.includes('413') || lower.includes('payload')) {
+    return 'Upload failed: File too large';
+  }
+  if (lower.includes('network') || lower.includes('fetch') || lower.includes('timeout')) {
+    return 'Upload failed: Network unavailable';
+  }
+  if (lower.includes('token') || lower.includes('auth') || lower.includes('401') || lower.includes('jwt')) {
+    return 'Upload failed: Authentication expired';
+  }
+  return `Upload failed: ${raw}`;
 }
 
 export const gcsStorageService = new GcsStorageService();
