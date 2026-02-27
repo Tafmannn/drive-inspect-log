@@ -16,18 +16,18 @@ import { toast } from "@/hooks/use-toast";
 import * as syncApi from "@/lib/sheetSyncApi";
 
 const COLUMN_MAP = [
-  { col: "A", header: "Job ID", direction: "anchor" },
-  { col: "B", header: "Job Date", direction: "app_to_sheet" },
-  { col: "C", header: "Job Status", direction: "bidirectional" },
-  { col: "D", header: "Job Priority", direction: "app_to_sheet" },
-  { col: "E", header: "Job Type", direction: "app_to_sheet" },
-  { col: "F", header: "Client Name", direction: "app_to_sheet" },
-  { col: "G-R", header: "Pickup / Delivery Fields", direction: "app_to_sheet" },
-  { col: "AB-AG", header: "Vehicle Fields", direction: "app_to_sheet" },
-  { col: "AH-AK", header: "Distance / Rate / Price", direction: "sheet_to_app" },
-  { col: "AN", header: "Driver Name", direction: "app_to_sheet" },
-  { col: "AR", header: "Sync to App?", direction: "sheet_to_app" },
-  { col: "AS", header: "App Job ID", direction: "app_to_sheet" },
+  { col: "A-B", header: "Created At / Updated At", direction: "app_to_sheet" },
+  { col: "C", header: "App Job ID", direction: "anchor" },
+  { col: "D", header: "Status", direction: "bidirectional" },
+  { col: "E-I", header: "Client Fields (Name, Notes, Phone, Email, Company)", direction: "app_to_sheet" },
+  { col: "J-Q", header: "Pickup Fields", direction: "app_to_sheet" },
+  { col: "R-Z", header: "Delivery Fields + Promise By Time", direction: "app_to_sheet" },
+  { col: "AA-AF", header: "Vehicle Fields", direction: "app_to_sheet" },
+  { col: "AG-AL", header: "Distance / Rate / Price / CAZ / Expenses", direction: "sheet_to_app" },
+  { col: "AM-AN", header: "Driver Name / Driver ID", direction: "app_to_sheet" },
+  { col: "AO-AP", header: "Job Notes / Cancellation Reason", direction: "app_to_sheet" },
+  { col: "AQ", header: "Sync to App?", direction: "sheet_to_app" },
+  { col: "AR-AS", header: "Sync to Map? / Map Job ID", direction: "app_to_sheet" },
 ];
 
 function directionBadge(dir: string) {

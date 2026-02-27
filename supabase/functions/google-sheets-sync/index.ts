@@ -187,18 +187,19 @@ async function appendRow(
   }
 }
 
-// ─── Full 47-column Job Master headers ───────────────────────────────
+// ─── Full 45-column Job Master headers (canonical order) ────────────
 
 const JOB_MASTER_HEADERS = [
-  "Job ID", "Job Date", "Job Status", "Job Priority", "Job Type", "Job Source", "Created At", "Updated At",
-  "Client Name", "Client Notes",
+  "Created At", "Updated At", "App Job ID", "Status",
+  "Client Name", "Client Notes", "Client Phone", "Client Email", "Client Company",
   "Pickup Contact Name", "Pickup Contact Phone", "Pickup Address Line 1", "Pickup Town / City", "Pickup Postcode",
   "Pickup Time From", "Pickup Time To", "Pickup Access Notes",
-  "Delivery Contact Name", "Delivery Contact Phone", "Delivery Address Line 1", "Delivery Town / City",
-  "Delivery Postcode", "Delivery Time From", "Delivery Time To", "Delivery Access Notes", "Promise By Time",
+  "Delivery Contact Name", "Delivery Contact Pho", "Delivery Address Line 1", "Delivery Town / City", "Delivery Postcode",
+  "Delivery Time Fr", "Delivery Time To", "Delivery Access Notes", "Promise By Time",
   "Vehicle Reg", "Vehicle Make", "Vehicle Model", "Vehicle Colour", "Vehicle Type", "Vehicle Fuel Type",
   "Distance (Miles)", "Rate (£ per mile)", "Total Price (£)", "CAZ/ULEZ?", "CAZ/ULEZ Cost (£)", "Other Expenses (£)",
-  "Driver Name", "Driver ID", "Job Notes", "Cancellation Reason", "Sync to App?", "App Job ID", "Sync to Map?", "Map Job ID"
+  "Driver Name", "Driver ID", "Job Notes", "Cancellation Reason",
+  "Sync to App?", "Sync to Map?", "Map Job ID",
 ];
 
 // ─── Job Entry column → app field mapping ────────────────────────────
@@ -223,6 +224,9 @@ const JOB_ENTRY_HEADER_MAP: Record<string, string> = {
   "Client": "client_name",
   "Customer": "client_name",
   "Client Notes": "client_notes",
+  "Client Phone": "client_phone",
+  "Client Email": "client_email",
+  "Client Company": "client_company",
   "Pickup Contact Name": "pickup_contact_name",
   "Pickup Name": "pickup_contact_name",
   "Pickup Contact Phone": "pickup_contact_phone",
@@ -241,6 +245,7 @@ const JOB_ENTRY_HEADER_MAP: Record<string, string> = {
   "Delivery Contact Name": "delivery_contact_name",
   "Delivery Name": "delivery_contact_name",
   "Delivery Contact Phone": "delivery_contact_phone",
+  "Delivery Contact Pho": "delivery_contact_phone",
   "Delivery Phone": "delivery_contact_phone",
   "Delivery Company": "delivery_company",
   "Delivery Address Line 1": "delivery_address_line1",
@@ -250,6 +255,7 @@ const JOB_ENTRY_HEADER_MAP: Record<string, string> = {
   "Delivery Postcode": "delivery_postcode",
   "End PC": "delivery_postcode",
   "Delivery Time From": "delivery_time_from",
+  "Delivery Time Fr": "delivery_time_from",
   "Delivery Time To": "delivery_time_to",
   "Delivery Access Notes": "delivery_access_notes",
   "Promise By Time": "promise_by_time",
@@ -281,6 +287,7 @@ const JOB_ENTRY_HEADER_MAP: Record<string, string> = {
   "Driver ID": "driver_external_id",
   "Job Notes": "job_notes",
   "Notes": "job_notes",
+  "Cancellation Reason": "cancellation_reason",
   // These are write-back columns on Job Entry
   "App Job ID": "_app_job_id",
   "Imported At": "_imported_at",
@@ -608,6 +615,9 @@ async function handlePull(
       if (fieldValues["job_source"]) jobPayload.job_source = fieldValues["job_source"];
       if (fieldValues["client_name"]) jobPayload.client_name = fieldValues["client_name"];
       if (fieldValues["client_notes"]) jobPayload.client_notes = fieldValues["client_notes"];
+      if (fieldValues["client_phone"]) jobPayload.client_phone = fieldValues["client_phone"];
+      if (fieldValues["client_email"]) jobPayload.client_email = fieldValues["client_email"];
+      if (fieldValues["client_company"]) jobPayload.client_company = fieldValues["client_company"];
       if (fieldValues["pickup_company"]) jobPayload.pickup_company = fieldValues["pickup_company"];
       if (fieldValues["pickup_time_from"]) jobPayload.pickup_time_from = fieldValues["pickup_time_from"];
       if (fieldValues["pickup_time_to"]) jobPayload.pickup_time_to = fieldValues["pickup_time_to"];
@@ -629,6 +639,7 @@ async function handlePull(
       if (fieldValues["driver_name"]) jobPayload.driver_name = fieldValues["driver_name"];
       if (fieldValues["driver_external_id"]) jobPayload.driver_external_id = fieldValues["driver_external_id"];
       if (fieldValues["job_notes"]) jobPayload.job_notes = fieldValues["job_notes"];
+      if (fieldValues["cancellation_reason"]) jobPayload.cancellation_reason = fieldValues["cancellation_reason"];
       if (fieldValues["vehicle_year"]) jobPayload.vehicle_year = fieldValues["vehicle_year"];
 
       // Validate minimum required fields
@@ -777,16 +788,15 @@ async function upsertJobMasterRow(
   
   const rowValues = JOB_MASTER_HEADERS.map((header: string) => {
     switch (header) {
-      case "Job ID": return jobPayload.external_job_number || "";
-      case "Job Date": return jobPayload.job_date || "";
-      case "Job Status": return sheetStatus;
-      case "Job Priority": return jobPayload.priority || "Normal";
-      case "Job Type": return jobPayload.job_type || "Single";
-      case "Job Source": return jobPayload.job_source || "";
       case "Created At": return newJob.created_at || "";
       case "Updated At": return new Date().toISOString();
+      case "App Job ID": return newJob.id;
+      case "Status": return sheetStatus;
       case "Client Name": return jobPayload.client_name || "";
       case "Client Notes": return jobPayload.client_notes || "";
+      case "Client Phone": return jobPayload.client_phone || "";
+      case "Client Email": return jobPayload.client_email || "";
+      case "Client Company": return jobPayload.client_company || "";
       case "Pickup Contact Name": return jobPayload.pickup_contact_name || "";
       case "Pickup Contact Phone": return jobPayload.pickup_contact_phone || "";
       case "Pickup Address Line 1": return jobPayload.pickup_address_line1 || "";
@@ -796,11 +806,11 @@ async function upsertJobMasterRow(
       case "Pickup Time To": return jobPayload.pickup_time_to || "";
       case "Pickup Access Notes": return jobPayload.pickup_access_notes || "";
       case "Delivery Contact Name": return jobPayload.delivery_contact_name || "";
-      case "Delivery Contact Phone": return jobPayload.delivery_contact_phone || "";
+      case "Delivery Contact Pho": return jobPayload.delivery_contact_phone || "";
       case "Delivery Address Line 1": return jobPayload.delivery_address_line1 || "";
       case "Delivery Town / City": return jobPayload.delivery_city || "";
       case "Delivery Postcode": return jobPayload.delivery_postcode || "";
-      case "Delivery Time From": return jobPayload.delivery_time_from || "";
+      case "Delivery Time Fr": return jobPayload.delivery_time_from || "";
       case "Delivery Time To": return jobPayload.delivery_time_to || "";
       case "Delivery Access Notes": return jobPayload.delivery_access_notes || "";
       case "Promise By Time": return jobPayload.promise_by_time || "";
@@ -819,9 +829,8 @@ async function upsertJobMasterRow(
       case "Driver Name": return jobPayload.driver_name || "";
       case "Driver ID": return jobPayload.driver_external_id || "";
       case "Job Notes": return jobPayload.job_notes || "";
-      case "Cancellation Reason": return "";
+      case "Cancellation Reason": return jobPayload.cancellation_reason || "";
       case "Sync to App?": return "YES";
-      case "App Job ID": return newJob.id;
       case "Sync to Map?": return "NO";
       case "Map Job ID": return "";
       default: return "";
@@ -911,16 +920,15 @@ async function handlePush(
 
       const rowValues = JOB_MASTER_HEADERS.map((header: string) => {
         switch (header) {
-          case "Job ID": return job.external_job_number || "";
-          case "Job Date": return job.job_date || "";
-          case "Job Status": return sheetStatus;
-          case "Job Priority": return job.priority || "Normal";
-          case "Job Type": return job.job_type || "Single";
-          case "Job Source": return job.job_source || "";
           case "Created At": return job.created_at || "";
           case "Updated At": return job.updated_at || "";
+          case "App Job ID": return job.id;
+          case "Status": return sheetStatus;
           case "Client Name": return job.client_name || "";
           case "Client Notes": return job.client_notes || "";
+          case "Client Phone": return job.client_phone || "";
+          case "Client Email": return job.client_email || "";
+          case "Client Company": return job.client_company || "";
           case "Pickup Contact Name": return job.pickup_contact_name || "";
           case "Pickup Contact Phone": return job.pickup_contact_phone || "";
           case "Pickup Address Line 1": return job.pickup_address_line1 || "";
@@ -930,11 +938,11 @@ async function handlePush(
           case "Pickup Time To": return job.pickup_time_to || "";
           case "Pickup Access Notes": return job.pickup_access_notes || "";
           case "Delivery Contact Name": return job.delivery_contact_name || "";
-          case "Delivery Contact Phone": return job.delivery_contact_phone || "";
+          case "Delivery Contact Pho": return job.delivery_contact_phone || "";
           case "Delivery Address Line 1": return job.delivery_address_line1 || "";
           case "Delivery Town / City": return job.delivery_city || "";
           case "Delivery Postcode": return job.delivery_postcode || "";
-          case "Delivery Time From": return job.delivery_time_from || "";
+          case "Delivery Time Fr": return job.delivery_time_from || "";
           case "Delivery Time To": return job.delivery_time_to || "";
           case "Delivery Access Notes": return job.delivery_access_notes || "";
           case "Promise By Time": return job.promise_by_time || "";
@@ -955,7 +963,6 @@ async function handlePush(
           case "Job Notes": return job.job_notes || "";
           case "Cancellation Reason": return job.cancellation_reason || "";
           case "Sync to App?": return "YES";
-          case "App Job ID": return job.id;
           case "Sync to Map?": return job.sync_to_map ? "YES" : "NO";
           case "Map Job ID": return "";
           default: return "";
