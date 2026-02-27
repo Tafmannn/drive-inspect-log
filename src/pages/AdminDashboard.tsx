@@ -10,8 +10,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Loader2, Truck, CheckCircle, AlertTriangle, Receipt, Clock, FileDown,
-  Eye, Edit, Archive, RotateCcw, Settings, Users, BarChart3, Sheet
+  Eye, Edit, Archive, RotateCcw, Settings, Users, BarChart3, Sheet, Search
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { GoogleSheetsPanel } from "@/components/GoogleSheetsPanel";
 import { exportJobsCsv, exportInspectionsCsv } from "@/lib/export";
 import { exportExpensesCsv } from "@/lib/expenseApi";
@@ -333,6 +334,24 @@ export const AdminDashboard = () => {
     <div className="min-h-screen bg-background">
       <AppHeader title="Admin Dashboard" showBack onBack={() => navigate("/")} />
       <div className="p-4 max-w-4xl mx-auto">
+        {/* Global search */}
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search jobs by reg, ref, client, postcode…"
+            className="pl-9"
+            onChange={(e) => {
+              const q = e.target.value.toLowerCase().trim();
+              // Store search query as URL param for filtering within tabs
+              const url = new URL(window.location.href);
+              if (q) url.searchParams.set("q", q);
+              else url.searchParams.delete("q");
+              window.history.replaceState({}, "", url.toString());
+              // Force re-render of job tabs
+              document.dispatchEvent(new CustomEvent("admin-search", { detail: q }));
+            }}
+          />
+        </div>
         <Tabs defaultValue="overview">
           <TabsList className="w-full grid grid-cols-4 lg:grid-cols-8 mb-4">
             <TabsTrigger value="overview"><BarChart3 className="h-4 w-4 mr-1 hidden sm:inline" />Overview</TabsTrigger>

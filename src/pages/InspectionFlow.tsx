@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { VehicleDiagram } from "@/components/VehicleDiagram";
 import { VehicleDamageModal } from "@/components/VehicleDamageModal";
+import { PhotoLabelModal } from "@/components/PhotoLabelModal";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft,
@@ -32,6 +33,7 @@ import type {
 } from "@/lib/types";
 import { PhotoViewer } from "@/components/PhotoViewer";
 import { useAuth } from "@/context/AuthContext";
+import { saveDraft, loadDraft, clearDraft, draftKey } from "@/lib/autosave";
 
 interface InspectionFormState {
   odometer: string;
@@ -113,6 +115,12 @@ export const InspectionFlow = () => {
   const [pendingDamagePosition, setPendingDamagePosition] =
     useState<{ x: number; y: number } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showDraftPrompt, setShowDraftPrompt] = useState(false);
+
+  // Photo label modal state
+  const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
+  const [pendingPhotoPreview, setPendingPhotoPreview] = useState<string | null>(null);
+  const [showPhotoLabelModal, setShowPhotoLabelModal] = useState(false);
 
   // Signature refs and state
   const driverCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -161,6 +169,49 @@ export const InspectionFlow = () => {
   const pickupStepCount = 6;
   const deliveryStepCount = 5;
   const totalSteps = type === "pickup" ? pickupStepCount : deliveryStepCount;
+
+  // ─── AUTOSAVE: save draft on every form change ───
+  const dk = jobId ? draftKey(type, jobId) : "";
+
+  useEffect(() => {
+    if (!dk) return;
+    // Only save serializable fields (exclude File objects)
+    const { standardPhotos, additionalPhotos, ...serializable } = formState;
+    const timer = setTimeout(() => saveDraft(dk, serializable), 500);
+    return () => clearTimeout(timer);
+  }, [formState, dk]);
+
+  // ─── DRAFT RESTORE: check on mount ───
+  useEffect(() => {
+    if (!dk) return;
+    const draft = loadDraft<Partial<typeof formState>>(dk);
+    if (draft) setShowDraftPrompt(true);
+  }, [dk]);
+
+  const handleRestoreDraft = () => {
+    if (!dk) return;
+    const draft = loadDraft<Partial<typeof formState>>(dk);
+    if (draft?.data) {
+      setFormState(prev => ({ ...prev, ...draft.data }));
+      toast({ title: "Draft restored", description: "Your previous progress has been loaded." });
+    }
+    setShowDraftPrompt(false);
+  };
+
+  const handleDiscardDraft = () => {
+    if (dk) clearDraft(dk);
+    setShowDraftPrompt(false);
+  };
+
+  // ─── AUTO-POPULATE: prefill driver/customer names ───
+  useEffect(() => {
+    if (!job) return;
+    setFormState(prev => ({
+      ...prev,
+      customerName: prev.customerName || job.delivery_contact_name || "",
+      driverName: prev.driverName || "Driver", // Will use actual user name when auth enabled
+    }));
+  }, [job]);
 
   const updateField = useCallback(
     (field: keyof InspectionFormState, value: string) => {
@@ -616,6 +667,7 @@ export const InspectionFlow = () => {
       }
 
       toast({ title: "Success", description: desc });
+      if (dk) clearDraft(dk); // Clear autosave draft after successful submission
       navigate(`/jobs/${jobId}`);
     } catch (e: unknown) {
       toast({
@@ -824,12 +876,6 @@ export const InspectionFlow = () => {
             </div>
           ))}
           <div className="flex gap-2">
-            <Input
-              placeholder="Label (e.g. Boot interior)"
-              value={newPhotoLabel}
-              onChange={(e) => setNewPhotoLabel(e.target.value)}
-              className="flex-1"
-            />
             <input
               type="file"
               accept="image/*"
@@ -839,16 +885,18 @@ export const InspectionFlow = () => {
               onChange={(e) => {
                 const f = e.target.files?.[0];
                 if (f) {
-                  addAdditionalPhoto(f, newPhotoLabel || "Unlabelled");
-                  setNewPhotoLabel("");
+                  // Show label modal after capture
+                  setPendingPhotoFile(f);
+                  setPendingPhotoPreview(URL.createObjectURL(f));
+                  setShowPhotoLabelModal(true);
                 }
                 e.target.value = "";
               }}
             />
-            <Label htmlFor="additional-photo-input" className="cursor-pointer">
-              <Button variant="outline" size="sm" asChild>
+            <Label htmlFor="additional-photo-input" className="cursor-pointer w-full">
+              <Button variant="outline" size="sm" className="w-full gap-1" asChild>
                 <span>
-                  <Plus className="h-4 w-4" />
+                  <Plus className="h-4 w-4" /> Add Photo
                 </span>
               </Button>
             </Label>
@@ -898,9 +946,9 @@ export const InspectionFlow = () => {
         </div>
       </Card>
 
-      <div className="bg-warning/10 border border-warning/30 rounded-lg p-4">
-        <p className="text-sm text-warning-foreground font-medium">
-          Please pass the device to the customer for their signature.
+      <div className="bg-warning border-2 border-warning rounded-lg p-4">
+        <p className="text-sm text-foreground font-bold">
+          ⚠ PLEASE PASS THE DEVICE TO THE CUSTOMER FOR THEIR SIGNATURE
         </p>
       </div>
 
@@ -1558,6 +1606,46 @@ export const InspectionFlow = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Draft restore prompt */}
+      <Dialog open={showDraftPrompt} onOpenChange={setShowDraftPrompt}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Resume from draft?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            You have an unsaved draft for this inspection. Would you like to continue where you left off?
+          </p>
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" className="flex-1" onClick={handleDiscardDraft}>Start Fresh</Button>
+            <Button className="flex-1" onClick={handleRestoreDraft}>Resume</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Photo label modal */}
+      <PhotoLabelModal
+        isOpen={showPhotoLabelModal}
+        previewUrl={pendingPhotoPreview}
+        onSave={(label) => {
+          if (pendingPhotoFile) {
+            addAdditionalPhoto(pendingPhotoFile, label);
+          }
+          if (pendingPhotoPreview) URL.revokeObjectURL(pendingPhotoPreview);
+          setPendingPhotoFile(null);
+          setPendingPhotoPreview(null);
+          setShowPhotoLabelModal(false);
+        }}
+        onSkip={() => {
+          if (pendingPhotoFile) {
+            addAdditionalPhoto(pendingPhotoFile, "Unlabelled");
+          }
+          if (pendingPhotoPreview) URL.revokeObjectURL(pendingPhotoPreview);
+          setPendingPhotoFile(null);
+          setPendingPhotoPreview(null);
+          setShowPhotoLabelModal(false);
+        }}
+      />
     </div>
   );
 };
