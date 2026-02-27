@@ -1,0 +1,1 @@
+UPDATE public.sheet_sync_config SET sheet_name = 'Jobs' WHERE sheet_name = 'Job Master';
