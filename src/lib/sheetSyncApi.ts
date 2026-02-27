@@ -19,6 +19,9 @@ async function callSync(body: Record<string, unknown>) {
 }
 
 export async function pushToSheet(jobIds?: string[]) {
+  // Skip if no sheet is configured to avoid noisy 400 errors
+  const config = await getSheetSyncConfig();
+  if (!config || !config.is_enabled || !config.spreadsheet_id) return null;
   return callSync({ action: "push", jobIds });
 }
 
