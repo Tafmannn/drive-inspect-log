@@ -361,6 +361,7 @@ export type Database = {
           has_pickup_inspection: boolean
           id: string
           is_hidden: boolean
+          maps_validated: boolean
           notify_customer_on_arrival: boolean
           notify_customer_on_complete: boolean
           notify_customer_on_start: boolean
@@ -373,6 +374,8 @@ export type Database = {
           pickup_notes: string | null
           pickup_postcode: string
           pod_pdf_url: string | null
+          route_distance_miles: number | null
+          route_eta_minutes: number | null
           status: string
           updated_at: string
           vehicle_colour: string
@@ -399,6 +402,7 @@ export type Database = {
           has_pickup_inspection?: boolean
           id?: string
           is_hidden?: boolean
+          maps_validated?: boolean
           notify_customer_on_arrival?: boolean
           notify_customer_on_complete?: boolean
           notify_customer_on_start?: boolean
@@ -411,6 +415,8 @@ export type Database = {
           pickup_notes?: string | null
           pickup_postcode: string
           pod_pdf_url?: string | null
+          route_distance_miles?: number | null
+          route_eta_minutes?: number | null
           status?: string
           updated_at?: string
           vehicle_colour: string
@@ -437,6 +443,7 @@ export type Database = {
           has_pickup_inspection?: boolean
           id?: string
           is_hidden?: boolean
+          maps_validated?: boolean
           notify_customer_on_arrival?: boolean
           notify_customer_on_complete?: boolean
           notify_customer_on_start?: boolean
@@ -449,6 +456,8 @@ export type Database = {
           pickup_notes?: string | null
           pickup_postcode?: string
           pod_pdf_url?: string | null
+          route_distance_miles?: number | null
+          route_eta_minutes?: number | null
           status?: string
           updated_at?: string
           vehicle_colour?: string
