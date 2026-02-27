@@ -68,6 +68,17 @@ async function getAccessToken(serviceAccount: any): Promise<string> {
 
 const SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets";
 
+async function getSheetNames(token: string, spreadsheetId: string): Promise<string[]> {
+  const url = `${SHEETS_API}/${spreadsheetId}?fields=sheets.properties.title`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Failed to get sheet metadata [${res.status}]: ${err}`);
+  }
+  const data = await res.json();
+  return (data.sheets ?? []).map((s: any) => s.properties?.title).filter(Boolean);
+}
+
 function extractSpreadsheetId(input: string): string {
   const match = input.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
   return match ? match[1] : input;
@@ -78,7 +89,9 @@ async function readSheet(
   spreadsheetId: string,
   range: string
 ): Promise<string[][]> {
-  const url = `${SHEETS_API}/${spreadsheetId}/values/${encodeURIComponent(range)}`;
+  // Use encodeURI (not encodeURIComponent) to preserve !, :, and ' characters
+  const url = `${SHEETS_API}/${spreadsheetId}/values/${encodeURI(range)}`;
+  console.log("Reading sheet range:", range);
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -96,7 +109,7 @@ async function updateCell(
   range: string,
   value: string
 ): Promise<void> {
-  const url = `${SHEETS_API}/${spreadsheetId}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
+  const url = `${SHEETS_API}/${spreadsheetId}/values/${encodeURI(range)}?valueInputOption=USER_ENTERED`;
   const res = await fetch(url, {
     method: "PUT",
     headers: {
@@ -174,7 +187,19 @@ Deno.serve(async (req) => {
     const sheetName = config.sheet_name || "Job Master";
 
     if (action === "test") {
-      const rows = await readSheet(token, spreadsheet_id, `'${sheetName}'!A1:AU1`);
+      // First get available sheet names
+      const sheetNames = await getSheetNames(token, spreadsheet_id);
+      console.log("Available sheets:", sheetNames);
+      
+      if (!sheetNames.includes(sheetName)) {
+        return respond({ 
+          success: false, 
+          error: `Tab "${sheetName}" not found. Available tabs: ${sheetNames.join(", ")}`,
+          available_sheets: sheetNames 
+        }, 400);
+      }
+      
+      const rows = await readSheet(token, spreadsheet_id, `'${sheetName}'!A1:AZ1`);
       const headers = rows[0] ?? [];
       // Validate headers
       const missing = EXPECTED_HEADERS.filter(h => !headers.includes(h));
@@ -206,7 +231,7 @@ async function handlePull(
 
   try {
     // Read all data dynamically
-    const rows = await readSheet(token, spreadsheetId, `'${sheetName}'!A:AU`);
+    const rows = await readSheet(token, spreadsheetId, `'${sheetName}'!A:AZ`);
     if (rows.length < 2) {
       return respond({ success: true, message: "Sheet is empty.", ...log });
     }
