@@ -91,7 +91,15 @@ async function loadLogo(): Promise<string | null> {
   }
 }
 
-export async function generatePodPdf(job: JobWithRelations): Promise<Blob> {
+export interface PodExpense {
+  id: string;
+  category: string;
+  label: string | null;
+  amount: number;
+  billable_on_pod: boolean;
+}
+
+export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpense[]): Promise<Blob> {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const contentWidth = pageWidth - MARGIN * 2;
@@ -156,9 +164,29 @@ export async function generatePodPdf(job: JobWithRelations): Promise<Blob> {
   });
   y = (doc as any).lastAutoTable.finalY + 8;
 
-  // ── Expenses Summary ──
-  // Expenses are passed via the job object if available – for now we note this section
-  // so the PDF structure is complete. The caller can extend JobWithRelations to include expenses.
+  // ── Billable Expenses ──
+  const billableExpenses = (expenses ?? []).filter(e => e.billable_on_pod !== false);
+  if (billableExpenses.length > 0) {
+    const billableTotal = billableExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+    y = addSectionTitle(doc, `Billable Expenses (£${billableTotal.toFixed(2)})`, y);
+    y = ensureSpace(doc, y, 20);
+    autoTable(doc, {
+      startY: y,
+      margin: { left: MARGIN, right: MARGIN },
+      theme: "striped",
+      styles: { fontSize: 8, cellPadding: { top: 1.5, bottom: 1.5, left: 3, right: 3 } },
+      headStyles: { fillColor: [33, 37, 41], textColor: [255, 255, 255] },
+      head: [["Category", "Label", "Amount"]],
+      body: billableExpenses.map(e => [
+        e.category,
+        e.label || "—",
+        `£${Number(e.amount).toFixed(2)}`,
+      ]),
+      foot: [["", "Total", `£${billableTotal.toFixed(2)}`]],
+      footStyles: { fontStyle: "bold" },
+    });
+    y = (doc as any).lastAutoTable.finalY + 8;
+  }
 
   // ── Pickup Details ──
   y = addSectionTitle(doc, "Pickup Details", y);
@@ -380,13 +408,14 @@ export async function generatePodPdf(job: JobWithRelations): Promise<Blob> {
   return doc.output("blob");
 }
 
-export async function sharePodPdf(job: JobWithRelations): Promise<void> {
-  const blob = await generatePodPdf(job);
+export async function sharePodPdf(job: JobWithRelations, expenses?: PodExpense[]): Promise<void> {
+  const blob = await generatePodPdf(job, expenses);
   const ref = job.external_job_number || job.id.slice(0, 8).toUpperCase();
+  const sanitizedReg = job.vehicle_reg.replace(/\s+/g, "");
   const dateStr = job.completed_at
     ? new Date(job.completed_at).toISOString().slice(0, 10)
     : new Date().toISOString().slice(0, 10);
-  const fileName = `AXENTRA_POD_${ref}_${job.vehicle_reg}_${dateStr}.pdf`;
+  const fileName = `AXENTRA_POD_${ref}_${sanitizedReg}_${dateStr}.pdf`;
   const file = new File([blob], fileName, { type: "application/pdf" });
 
   if (navigator.share && navigator.canShare?.({ files: [file] })) {
@@ -405,13 +434,14 @@ export async function sharePodPdf(job: JobWithRelations): Promise<void> {
   }
 }
 
-export async function emailPodPdf(job: JobWithRelations): Promise<void> {
-  const blob = await generatePodPdf(job);
+export async function emailPodPdf(job: JobWithRelations, expenses?: PodExpense[]): Promise<void> {
+  const blob = await generatePodPdf(job, expenses);
   const ref = job.external_job_number || job.id.slice(0, 8).toUpperCase();
+  const sanitizedReg = job.vehicle_reg.replace(/\s+/g, "");
   const dateStr = job.completed_at
     ? new Date(job.completed_at).toISOString().slice(0, 10)
     : new Date().toISOString().slice(0, 10);
-  const fileName = `AXENTRA_POD_${ref}_${job.vehicle_reg}_${dateStr}.pdf`;
+  const fileName = `AXENTRA_POD_${ref}_${sanitizedReg}_${dateStr}.pdf`;
   const file = new File([blob], fileName, { type: "application/pdf" });
 
   const subject = `Axentra POD – ${ref} – ${job.vehicle_reg}`;
