@@ -44,6 +44,9 @@ export interface Job {
   job_source: string | null;
   client_name: string | null;
   client_notes: string | null;
+  client_phone: string | null;
+  client_email: string | null;
+  client_company: string | null;
   vehicle_reg: string;
   vehicle_make: string;
   vehicle_model: string;

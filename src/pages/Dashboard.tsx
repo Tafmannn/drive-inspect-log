@@ -1,20 +1,24 @@
 import { AppHeader } from "@/components/AppHeader";
 import { DashboardCard } from "@/components/DashboardCard";
-import { Truck, Clock, AlertTriangle, Download, FileDown, Receipt, ShieldCheck } from "lucide-react";
+import { Truck, Clock, AlertTriangle, Download, FileDown, Receipt, ShieldCheck, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useDashboardCounts } from "@/hooks/useJobs";
 import { toast } from "@/hooks/use-toast";
 import { exportJobsCsv, exportInspectionsCsv } from "@/lib/export";
 import { exportExpensesCsv } from "@/lib/expenseApi";
+import { pullFromSheet } from "@/lib/sheetSyncApi";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
+import { useQueryClient } from "@tanstack/react-query";
 
 export const Dashboard = () => {
   const navigate = useNavigate();
   const { data: counts, isLoading } = useDashboardCounts();
   const { isAdmin } = useAuth();
   const [exporting, setExporting] = useState(false);
+  const [pulling, setPulling] = useState(false);
+  const qc = useQueryClient();
 
   const handleExport = async (type: 'jobs' | 'inspections' | 'expenses') => {
     setExporting(true);
@@ -30,11 +34,28 @@ export const Dashboard = () => {
     }
   };
 
+  const handleDownloadJobs = async () => {
+    setPulling(true);
+    try {
+      const result = await pullFromSheet();
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
+      toast({
+        title: 'Jobs Downloaded',
+        description: `${result.rows_created} new, ${result.rows_skipped} skipped, ${result.errors?.length ?? 0} errors.`,
+      });
+    } catch (e: unknown) {
+      toast({ title: 'Download failed', description: e instanceof Error ? e.message : 'Unknown error', variant: 'destructive' });
+    } finally {
+      setPulling(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <AppHeader title="AXENTRA" />
       
-      <div className="p-4 space-y-4">
+      <div className="p-4 space-y-4 max-w-lg mx-auto">
         <DashboardCard
           icon={<Truck className="h-6 w-6" />}
           title="My Jobs"
@@ -67,12 +88,10 @@ export const Dashboard = () => {
         />
         
         <DashboardCard
-          icon={<Download className="h-6 w-6" />}
+          icon={pulling ? <Loader2 className="h-6 w-6 animate-spin" /> : <Download className="h-6 w-6" />}
           title="Download Jobs"
-          subtitle="Get your latest jobs"
-          onClick={() => {
-            toast({ title: "Sync", description: "Job sync is a stub — connect external source to enable." });
-          }}
+          subtitle={pulling ? "Pulling from Job Entry…" : "Import new jobs from Google Sheet"}
+          onClick={pulling ? undefined : handleDownloadJobs}
         />
 
         {isAdmin && (

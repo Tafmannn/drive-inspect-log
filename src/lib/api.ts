@@ -13,7 +13,7 @@ import type {
 // ─── Jobs ────────────────────────────────────────────────────────────
 
 export async function listJobs(filter?: { statuses?: string[] }): Promise<Job[]> {
-  let query = supabase.from('jobs').select('*').eq('is_hidden', false).order('created_at', { ascending: false });
+  let query = supabase.from('jobs').select('*').eq('is_hidden', false).order('job_date', { ascending: true, nullsFirst: false }).order('created_at', { ascending: false });
   if (filter?.statuses?.length) {
     query = query.in('status', filter.statuses);
   }
