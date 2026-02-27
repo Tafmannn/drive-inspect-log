@@ -16,26 +16,25 @@ import { toast } from "@/hooks/use-toast";
 import * as syncApi from "@/lib/sheetSyncApi";
 
 const COLUMN_MAP = [
-  { col: "A", header: "Date", direction: "app_to_sheet" },
-  { col: "B", header: "Client", direction: "app_to_sheet" },
-  { col: "C", header: "Reg", direction: "app_to_sheet" },
-  { col: "D", header: "Start PC", direction: "app_to_sheet" },
-  { col: "E", header: "End PC", direction: "app_to_sheet" },
-  { col: "F", header: "Miles", direction: "app_to_sheet" },
-  { col: "G", header: "Rate", direction: "sheet_to_app" },
-  { col: "H", header: "Expenses", direction: "app_to_sheet" },
-  { col: "I", header: "Total", direction: "sheet_only" },
-  { col: "J", header: "Status", direction: "sheet_to_app" },
-  { col: "K", header: "Invoice Link", direction: "app_to_sheet" },
-  { col: "L", header: "Job ID", direction: "anchor" },
-  { col: "M", header: "Alerts", direction: "sheet_only" },
-  { col: "N", header: "Bid Phrase", direction: "sheet_only" },
+  { col: "A", header: "Job ID", direction: "anchor" },
+  { col: "B", header: "Job Date", direction: "app_to_sheet" },
+  { col: "C", header: "Job Status", direction: "bidirectional" },
+  { col: "D", header: "Job Priority", direction: "app_to_sheet" },
+  { col: "E", header: "Job Type", direction: "app_to_sheet" },
+  { col: "F", header: "Client Name", direction: "app_to_sheet" },
+  { col: "G-R", header: "Pickup / Delivery Fields", direction: "app_to_sheet" },
+  { col: "AB-AG", header: "Vehicle Fields", direction: "app_to_sheet" },
+  { col: "AH-AK", header: "Distance / Rate / Price", direction: "sheet_to_app" },
+  { col: "AN", header: "Driver Name", direction: "app_to_sheet" },
+  { col: "AR", header: "Sync to App?", direction: "sheet_to_app" },
+  { col: "AS", header: "App Job ID", direction: "app_to_sheet" },
 ];
 
 function directionBadge(dir: string) {
   switch (dir) {
     case "app_to_sheet": return <Badge variant="outline" className="text-xs bg-primary/10">App → Sheet</Badge>;
     case "sheet_to_app": return <Badge variant="outline" className="text-xs bg-warning/10 text-warning">Sheet → App</Badge>;
+    case "bidirectional": return <Badge variant="outline" className="text-xs bg-success/10 text-success">↔ Both</Badge>;
     case "sheet_only": return <Badge variant="outline" className="text-xs bg-muted">Sheet Only</Badge>;
     case "anchor": return <Badge variant="secondary" className="text-xs">Anchor</Badge>;
     default: return <Badge variant="outline" className="text-xs">{dir}</Badge>;

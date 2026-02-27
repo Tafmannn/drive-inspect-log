@@ -544,8 +544,13 @@ async function handlePull(
 
 const REVERSE_STATUS_MAP: Record<string, string> = {
   ready_for_pickup: "Booked",
+  pickup_in_progress: "En Route",
+  pickup_complete: "En Route",
   in_transit: "En Route",
+  delivery_in_progress: "En Route",
   delivery_complete: "Completed",
+  pod_ready: "Completed",
+  completed: "Completed",
   cancelled: "Cancelled",
 };
 
