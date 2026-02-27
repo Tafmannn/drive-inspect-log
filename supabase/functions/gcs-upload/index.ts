@@ -39,7 +39,7 @@ serve(async (req) => {
       );
     }
 
-    const bucket = sa.project_id ? `${sa.project_id}-axentra` : "axentra-storage";
+    const bucket = "axentra_db";
     const fileBytes = Uint8Array.from(atob(fileBase64), (c) => c.charCodeAt(0));
 
     // Upload to GCS using JSON API
