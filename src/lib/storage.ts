@@ -1,4 +1,4 @@
-import type { StorageBackend, StorageService } from './types';
+import type { StorageService, StoredFileInfo } from './types';
 import { internalStorageService } from './internalStorageService';
 import { gcsStorageService } from './gcsStorageService';
 import { isFeatureEnabled } from './featureFlags';
@@ -20,11 +20,24 @@ async function resolveStorage(): Promise<StorageService> {
 
 /**
  * Proxy storage service that resolves at runtime based on the
- * CLOUD_STORAGE_ENABLED feature flag. Falls back to Supabase internal storage.
+ * CLOUD_STORAGE_ENABLED feature flag. Falls back to Supabase internal storage
+ * if GCS upload fails (e.g. permission errors, network issues).
  */
 export const storageService: StorageService = {
   async uploadImage(file, pathHint) {
     const svc = await resolveStorage();
+
+    // If primary is GCS, try it first but fall back to internal on failure
+    if (svc === gcsStorageService) {
+      try {
+        return await svc.uploadImage(file, pathHint);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[Storage] GCS upload failed, falling back to internal storage: ${msg}`);
+        return await internalStorageService.uploadImage(file, pathHint);
+      }
+    }
+
     return svc.uploadImage(file, pathHint);
   },
 };
