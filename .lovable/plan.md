@@ -1,52 +1,106 @@
 
 
-## Analysis
+## Full A-Z Analysis & Improvement Plan for Axentra Vehicles
 
-The user's actual Google Sheet headers differ from the current code in three ways:
+### Current State Summary
 
-1. **New fields not in DB**: `client_phone`, `client_email`, `client_company` — need migration to add these columns to the `jobs` table
-2. **Truncated headers in sheet**: `"Delivery Contact Pho"` (not "Phone"), `"Delivery Time Fr"` (not "From") — the code must use these exact strings
-3. **Header ordering**: The user provided the canonical header order which differs from the current `JOB_MASTER_HEADERS`
+**Working well:**
+- Push (App → Job Master) syncs all 45 columns correctly
+- Pull (Job Entry → App → Job Master) creates jobs and writes back App Job ID
+- Inspection flow (pickup/delivery) with photos, damage, signatures
+- Expense tracking per job
+- Admin dashboard with overview stats, job management, sheets panel
+- Autosave drafts, QR handover, CSV exports
 
-## Changes Required
+**Issues Found:**
 
-### 1. Database migration — add 3 columns to `jobs`
-```sql
-ALTER TABLE jobs ADD COLUMN IF NOT EXISTS client_phone text;
-ALTER TABLE jobs ADD COLUMN IF NOT EXISTS client_email text;
-ALTER TABLE jobs ADD COLUMN IF NOT EXISTS client_company text;
+1. **JobCard shows pickup contact name as primary identifier** — should show Client Name
+2. **No status badge on job cards** — driver can't see job status at a glance
+3. **No distance/price summary on cards** — key operational info missing
+4. **Phone numbers not tappable** — no `tel:` links on job cards or detail page
+5. **No map deep-links** — addresses not linkable to Google Maps
+6. **Dashboard "Download Jobs" card is a stub** — should trigger Pull from Job Entry
+7. **Job cards missing client_name, job_date** — imported jobs have this data but cards don't show it
+8. **No job_date sorting** — active jobs sorted by created_at, should prioritise by job_date
+9. **Job types not exported to types.ts** — `client_phone`, `client_email`, `client_company` missing from Job type
+10. **Edge function: imported jobs don't get external_job_number auto-generated** — pulled jobs show raw UUID as ref
+
+---
+
+### Implementation Steps
+
+#### 1. Update Job type to include new client fields
+Add `client_phone`, `client_email`, `client_company` to the `Job` interface in `src/lib/types.ts`.
+
+#### 2. Redesign JobCard for driver-first UX
+Restructure `src/components/JobCard.tsx`:
+- **Top-left**: Client name (with avatar initial), not pickup contact
+- **Top-right**: Vehicle reg badge (keep)
+- **Subtitle line**: `job_date • distance_miles mi • £total_price • STATUS`
+- **Status badge**: Coloured chip (green=Ready, blue=In Progress, etc.)
+- Add new props: `clientName`, `status`, `jobDate`, `distanceMiles`, `totalPrice`
+- Make phone numbers tappable (`<a href="tel:...">`)
+- Make addresses tappable (deep-link to Google Maps)
+
+#### 3. Update JobList to pass new card data
+In `src/pages/JobList.tsx`:
+- Pass `clientName`, `status`, `jobDate`, `distanceMiles`, `totalPrice` to JobCard
+- Sort jobs by `job_date` ascending (soonest first), then `created_at`
+- Add status badge mapping
+
+#### 4. Update CompletedJobs to pass new card data
+Same changes as JobList for consistency.
+
+#### 5. Wire "Download Jobs" dashboard card to Pull
+In `src/pages/Dashboard.tsx`:
+- Change the "Download Jobs" stub to actually call `pullFromSheet()` and show results
+- Invalidate job queries after pull
+
+#### 6. Add tap-to-call and map links on JobDetail
+In `src/pages/JobDetail.tsx`:
+- Wrap phone numbers in `<a href="tel:...">` links
+- Wrap addresses in `<a href="https://maps.google.com/...">` links
+- Show client name block if present
+- Show pricing block (distance, rate, total, CAZ/ULEZ)
+
+#### 7. Auto-generate external_job_number for pulled jobs
+In edge function `handlePull`: after inserting the job, if `external_job_number` is null, generate one (AX#### sequence) and update both the DB and the Job Master row. This ensures imported jobs get proper refs like app-created jobs.
+
+#### 8. Sort active jobs by job_date
+In `src/lib/api.ts` `listActiveJobs`: add `.order('job_date', { ascending: true, nullsFirst: false })` as primary sort.
+
+#### 9. Add status colour mapping
+Create a shared `STATUS_CONFIG` map used by both JobCard and JobDetail:
+```
+ready_for_pickup → "Ready" (green)
+pickup_in_progress / pickup_complete / in_transit / delivery_in_progress → "In Progress" (blue)
+delivery_complete / pod_ready → "Completed" (gray)
+cancelled → "Cancelled" (red)
 ```
 
-### 2. Update `supabase/functions/google-sheets-sync/index.ts`
+#### 10. Minor UX polish
+- Disable CTA button while mutations are pending (JobCard)
+- Add loading spinner on Pull/Push buttons (already done in GoogleSheetsPanel)
+- Ensure no horizontal overflow on iPhone (check card layout max-width)
 
-**A. Replace `JOB_MASTER_HEADERS`** with the user's exact 45-header list:
-```
-Created At, Updated At, App Job ID, Status,
-Client Name, Client Notes, Client Phone, Client Email, Client Company,
-Pickup Contact Name, Pickup Contact Phone, Pickup Address Line 1, Pickup Town / City, Pickup Postcode,
-Pickup Time From, Pickup Time To, Pickup Access Notes,
-Delivery Contact Name, Delivery Contact Pho, Delivery Address Line 1, Delivery Town / City, Delivery Postcode,
-Delivery Time Fr, Delivery Time To, Delivery Access Notes, Promise By Time,
-Vehicle Reg, Vehicle Make, Vehicle Model, Vehicle Colour, Vehicle Type, Vehicle Fuel Type,
-Distance (Miles), Rate (£ per mile), Total Price (£), CAZ/ULEZ?, CAZ/ULEZ Cost (£), Other Expenses (£),
-Driver Name, Driver ID, Job Notes, Cancellation Reason,
-Sync to App?, Sync to Map?, Map Job ID
-```
+---
 
-**B. Update `JOB_ENTRY_HEADER_MAP`** — add mappings for:
-- `"Client Phone"` → `client_phone`
-- `"Client Email"` → `client_email`  
-- `"Client Company"` → `client_company`
-- `"Delivery Contact Pho"` → `delivery_contact_phone`
-- `"Delivery Time Fr"` → `delivery_time_from`
+### Files to modify:
+1. `src/lib/types.ts` — add 3 client fields to Job interface
+2. `src/components/JobCard.tsx` — redesign layout with client name, status, summary line, tap-to-call, map links
+3. `src/pages/JobList.tsx` — pass new props, sort by job_date
+4. `src/pages/CompletedJobs.tsx` — pass new props
+5. `src/pages/Dashboard.tsx` — wire Download Jobs to pull
+6. `src/pages/JobDetail.tsx` — add tap-to-call, map links, client block, pricing block
+7. `src/lib/api.ts` — sort active jobs by job_date
+8. `supabase/functions/google-sheets-sync/index.ts` — auto-generate job numbers for pulled jobs
 
-**C. Update `upsertJobMasterRow` switch cases** — change `"Delivery Contact Phone"` → `"Delivery Contact Pho"`, `"Delivery Time From"` → `"Delivery Time Fr"`, add `"Client Phone"`, `"Client Email"`, `"Client Company"` cases
-
-**D. Update `handlePush` switch cases** — same header renames as above
-
-### 3. Update `src/components/GoogleSheetsPanel.tsx`
-Update the `COLUMN_MAP` display table to reflect the new canonical headers.
-
-### 4. Update `src/integrations/supabase/types.ts`
-Add the 3 new nullable columns to the Jobs type (auto-handled by migration).
+### Not changing (already working):
+- Push flow
+- Pull flow (Job Entry → App → Job Master)
+- Column mapping (45-header canonical structure)
+- Admin dashboard tabs
+- Inspection flow
+- Expense tracking
+- Autosave system
 
