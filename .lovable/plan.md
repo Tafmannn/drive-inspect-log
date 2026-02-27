@@ -1,31 +1,52 @@
-## Google Sheets ↔ App Sync Architecture (Updated)
 
-### Current Implementation (Working)
 
-**Push (App → Sheet):** Writes all app jobs to the Job Master tab. Unchanged.
+## Analysis
 
-**Pull (Sheet → App):** Reads from the **Job Entry** tab (auto-detected), creates new jobs in the app, writes back `App Job ID` + `Imported At` to Job Entry, then upserts the job to Job Master with all system-generated fields.
+The user's actual Google Sheet headers differ from the current code in three ways:
 
-### Pull Workflow
+1. **New fields not in DB**: `client_phone`, `client_email`, `client_company` — need migration to add these columns to the `jobs` table
+2. **Truncated headers in sheet**: `"Delivery Contact Pho"` (not "Phone"), `"Delivery Time Fr"` (not "From") — the code must use these exact strings
+3. **Header ordering**: The user provided the canonical header order which differs from the current `JOB_MASTER_HEADERS`
 
-1. Auto-detect "Job Entry" and "Job Master" tabs (case-insensitive, partial match)
-2. Auto-add "App Job ID" and "Imported At" columns to Job Entry if missing
-3. For each row in Job Entry:
-   - Skip if `App Job ID` already set (already imported)
-   - Skip if `Sync to App?` / `Import?` is not YES (when column exists)
-   - Map headers dynamically via `JOB_ENTRY_HEADER_MAP`
-   - Validate required fields (pickup address, delivery address, vehicle reg)
-   - Check for duplicates by `external_job_number`
-   - Insert job with status `ready_for_pickup`
-   - Write back `App Job ID` + `Imported At` to Job Entry row
-   - Upsert corresponding row in Job Master tab
+## Changes Required
 
-### Duplicate Protection
+### 1. Database migration — add 3 columns to `jobs`
+```sql
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS client_phone text;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS client_email text;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS client_company text;
+```
 
-- Primary: `App Job ID` column in Job Entry (written after import)
-- Secondary: `external_job_number` dedup check in database
+### 2. Update `supabase/functions/google-sheets-sync/index.ts`
 
-### Files Modified
+**A. Replace `JOB_MASTER_HEADERS`** with the user's exact 45-header list:
+```
+Created At, Updated At, App Job ID, Status,
+Client Name, Client Notes, Client Phone, Client Email, Client Company,
+Pickup Contact Name, Pickup Contact Phone, Pickup Address Line 1, Pickup Town / City, Pickup Postcode,
+Pickup Time From, Pickup Time To, Pickup Access Notes,
+Delivery Contact Name, Delivery Contact Pho, Delivery Address Line 1, Delivery Town / City, Delivery Postcode,
+Delivery Time Fr, Delivery Time To, Delivery Access Notes, Promise By Time,
+Vehicle Reg, Vehicle Make, Vehicle Model, Vehicle Colour, Vehicle Type, Vehicle Fuel Type,
+Distance (Miles), Rate (£ per mile), Total Price (£), CAZ/ULEZ?, CAZ/ULEZ Cost (£), Other Expenses (£),
+Driver Name, Driver ID, Job Notes, Cancellation Reason,
+Sync to App?, Sync to Map?, Map Job ID
+```
 
-- `supabase/functions/google-sheets-sync/index.ts` — Complete pull redesign
-- `src/components/GoogleSheetsPanel.tsx` — Improved pull notifications + query invalidation
+**B. Update `JOB_ENTRY_HEADER_MAP`** — add mappings for:
+- `"Client Phone"` → `client_phone`
+- `"Client Email"` → `client_email`  
+- `"Client Company"` → `client_company`
+- `"Delivery Contact Pho"` → `delivery_contact_phone`
+- `"Delivery Time Fr"` → `delivery_time_from`
+
+**C. Update `upsertJobMasterRow` switch cases** — change `"Delivery Contact Phone"` → `"Delivery Contact Pho"`, `"Delivery Time From"` → `"Delivery Time Fr"`, add `"Client Phone"`, `"Client Email"`, `"Client Company"` cases
+
+**D. Update `handlePush` switch cases** — same header renames as above
+
+### 3. Update `src/components/GoogleSheetsPanel.tsx`
+Update the `COLUMN_MAP` display table to reflect the new canonical headers.
+
+### 4. Update `src/integrations/supabase/types.ts`
+Add the 3 new nullable columns to the Jobs type (auto-handled by migration).
+
