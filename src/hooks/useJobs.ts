@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as api from "@/lib/api";
 import { getAllPendingUploads } from "@/lib/pendingUploads";
+import { pushToSheet } from "@/lib/sheetSyncApi";
 import type { Job, JobWithRelations, InspectionType, Inspection, DamageItem } from "@/lib/types";
 
 // ─── Dashboard ───────────────────────────────────────────────────────
@@ -79,9 +80,11 @@ export function useCreateJob() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: Parameters<typeof api.createJob>[0]) => api.createJob(input),
-    onSuccess: () => {
+    onSuccess: (_data) => {
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
+      // Auto-push new job to Google Sheet (fire-and-forget)
+      if (_data?.id) pushToSheet([_data.id]).catch(() => {});
     },
   });
 }
@@ -95,6 +98,7 @@ export function useUpdateJob() {
       qc.invalidateQueries({ queryKey: ["job", vars.jobId] });
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
+      pushToSheet([vars.jobId]).catch(() => {});
     },
   });
 }
@@ -117,6 +121,7 @@ export function useSubmitInspection() {
       qc.invalidateQueries({ queryKey: ["job", vars.jobId] });
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
+      pushToSheet([vars.jobId]).catch(() => {});
     },
   });
 }

@@ -10,8 +10,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Loader2, Truck, CheckCircle, AlertTriangle, Receipt, Clock, FileDown,
-  Eye, Edit, Archive, RotateCcw, Settings, Users, BarChart3
+  Eye, Edit, Archive, RotateCcw, Settings, Users, BarChart3, Sheet
 } from "lucide-react";
+import { GoogleSheetsPanel } from "@/components/GoogleSheetsPanel";
 import { exportJobsCsv, exportInspectionsCsv } from "@/lib/export";
 import { exportExpensesCsv } from "@/lib/expenseApi";
 import { toast } from "@/hooks/use-toast";
@@ -333,12 +334,13 @@ export const AdminDashboard = () => {
       <AppHeader title="Admin Dashboard" showBack onBack={() => navigate("/")} />
       <div className="p-4 max-w-4xl mx-auto">
         <Tabs defaultValue="overview">
-          <TabsList className="w-full grid grid-cols-4 lg:grid-cols-7 mb-4">
+          <TabsList className="w-full grid grid-cols-4 lg:grid-cols-8 mb-4">
             <TabsTrigger value="overview"><BarChart3 className="h-4 w-4 mr-1 hidden sm:inline" />Overview</TabsTrigger>
             <TabsTrigger value="jobs">Jobs</TabsTrigger>
             <TabsTrigger value="archived-jobs">Archived</TabsTrigger>
             <TabsTrigger value="expenses">Expenses</TabsTrigger>
             <TabsTrigger value="archived-expenses" className="hidden lg:flex">Exp. Archive</TabsTrigger>
+            <TabsTrigger value="sheets"><Sheet className="h-4 w-4 mr-1 hidden sm:inline" />Sheets</TabsTrigger>
             <TabsTrigger value="timesheets" onClick={() => navigate("/admin/timesheets")}>Timesheets</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="settings"><Settings className="h-4 w-4" /></TabsTrigger>
@@ -349,6 +351,7 @@ export const AdminDashboard = () => {
           <TabsContent value="archived-jobs"><JobsTab archived /></TabsContent>
           <TabsContent value="expenses"><ExpensesTab /></TabsContent>
           <TabsContent value="archived-expenses"><ExpensesTab archived /></TabsContent>
+          <TabsContent value="sheets"><GoogleSheetsPanel /></TabsContent>
           <TabsContent value="users"><UsersTab /></TabsContent>
           <TabsContent value="settings"><SettingsTab /></TabsContent>
         </Tabs>
