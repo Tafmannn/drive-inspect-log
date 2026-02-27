@@ -341,6 +341,7 @@ export type Database = {
       }
       jobs: {
         Row: {
+          admin_rate: number | null
           completed_at: string | null
           created_at: string
           delivery_address_line1: string
@@ -368,6 +369,7 @@ export type Database = {
           pickup_contact_phone: string
           pickup_notes: string | null
           pickup_postcode: string
+          pod_pdf_url: string | null
           status: string
           updated_at: string
           vehicle_colour: string
@@ -377,6 +379,7 @@ export type Database = {
           vehicle_year: string | null
         }
         Insert: {
+          admin_rate?: number | null
           completed_at?: string | null
           created_at?: string
           delivery_address_line1: string
@@ -404,6 +407,7 @@ export type Database = {
           pickup_contact_phone: string
           pickup_notes?: string | null
           pickup_postcode: string
+          pod_pdf_url?: string | null
           status?: string
           updated_at?: string
           vehicle_colour: string
@@ -413,6 +417,7 @@ export type Database = {
           vehicle_year?: string | null
         }
         Update: {
+          admin_rate?: number | null
           completed_at?: string | null
           created_at?: string
           delivery_address_line1?: string
@@ -440,6 +445,7 @@ export type Database = {
           pickup_contact_phone?: string
           pickup_notes?: string | null
           pickup_postcode?: string
+          pod_pdf_url?: string | null
           status?: string
           updated_at?: string
           vehicle_colour?: string
@@ -547,6 +553,81 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sheet_sync_config: {
+        Row: {
+          column_mapping: Json
+          created_at: string
+          id: string
+          is_enabled: boolean
+          last_pull_at: string | null
+          last_push_at: string | null
+          sheet_name: string
+          spreadsheet_id: string
+          updated_at: string
+        }
+        Insert: {
+          column_mapping?: Json
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          last_pull_at?: string | null
+          last_push_at?: string | null
+          sheet_name?: string
+          spreadsheet_id: string
+          updated_at?: string
+        }
+        Update: {
+          column_mapping?: Json
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          last_pull_at?: string | null
+          last_push_at?: string | null
+          sheet_name?: string
+          spreadsheet_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      sheet_sync_logs: {
+        Row: {
+          created_at: string
+          details: Json | null
+          direction: string
+          errors: Json | null
+          id: string
+          rows_created: number
+          rows_processed: number
+          rows_skipped: number
+          rows_updated: number
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          details?: Json | null
+          direction: string
+          errors?: Json | null
+          id?: string
+          rows_created?: number
+          rows_processed?: number
+          rows_skipped?: number
+          rows_updated?: number
+          status: string
+        }
+        Update: {
+          created_at?: string
+          details?: Json | null
+          direction?: string
+          errors?: Json | null
+          id?: string
+          rows_created?: number
+          rows_processed?: number
+          rows_skipped?: number
+          rows_updated?: number
+          status?: string
+        }
+        Relationships: []
       }
     }
     Views: {
