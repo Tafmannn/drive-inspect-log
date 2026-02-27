@@ -83,6 +83,11 @@ export const JobDetail = () => {
           <p className="text-sm text-muted-foreground">{job.vehicle_make} {job.vehicle_model} — {job.vehicle_colour}</p>
           {job.external_job_number && <p className="text-xs text-muted-foreground mt-1">Ref: {job.external_job_number}</p>}
           <p className="text-sm font-medium mt-2">{job.pickup_city} → {job.delivery_city}</p>
+          {(job as any).route_distance_miles != null && (
+            <p className="text-xs text-muted-foreground mt-1">
+              📏 {(job as any).route_distance_miles} mi • 🕐 {(job as any).route_eta_minutes} min
+            </p>
+          )}
         </Card>
 
         {/* Pickup */}

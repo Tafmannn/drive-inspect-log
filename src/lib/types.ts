@@ -66,6 +66,11 @@ export interface Job {
   created_at: string;
   updated_at: string;
   is_hidden?: boolean;
+  admin_rate?: number | null;
+  pod_pdf_url?: string | null;
+  route_distance_miles?: number | null;
+  route_eta_minutes?: number | null;
+  maps_validated?: boolean;
 }
 
 export interface Inspection {
