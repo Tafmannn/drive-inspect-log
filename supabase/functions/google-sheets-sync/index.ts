@@ -124,26 +124,16 @@ async function updateCell(
   }
 }
 
-// ─── Expected headers for Job Master ─────────────────────────────────
+// ─── Expected headers for Jobs tab ───────────────────────────────────
 
 const EXPECTED_HEADERS = [
-  "Job ID", "Job Date", "Job Status", "Job Priority", "Job Type", "Job Source", "Created At", "Updated At",
-  "Client Name", "Client Notes",
-  "Pickup Contact Name", "Pickup Contact Phone", "Pickup Address Line 1", "Pickup Town / City", "Pickup Postcode",
-  "Pickup Time From", "Pickup Time To", "Pickup Access Notes",
-  "Delivery Contact Name", "Delivery Contact Phone", "Delivery Address Line 1", "Delivery Town / City",
-  "Delivery Postcode", "Delivery Time From", "Delivery Time To", "Delivery Access Notes", "Promise By Time",
-  "Vehicle Reg", "Vehicle Make", "Vehicle Model", "Vehicle Colour", "Vehicle Type", "Vehicle Fuel Type",
-  "Distance (Miles)", "Rate (£ per mile)", "Total Price (£)", "CAZ/ULEZ?", "CAZ/ULEZ Cost (£)", "Other Expenses (£)",
-  "Driver Name", "Driver ID", "Job Notes", "Cancellation Reason", "Sync to App?", "App Job ID", "Sync to Map?", "Map Job ID"
+  "Date", "Client", "Reg", "Start PC", "End PC", "Miles", "Rate",
+  "Expenses", "Total", "Status", "Invoice Link", "Job ID", "Alerts", "Bid Phrase"
 ];
 
 // Required fields for job creation (header names)
 const REQUIRED_FIELDS = [
-  "Job Date", "Job Status", "Job Type", "Client Name",
-  "Pickup Contact Name", "Pickup Contact Phone", "Pickup Address Line 1", "Pickup Town / City", "Pickup Postcode",
-  "Delivery Contact Name", "Delivery Contact Phone", "Delivery Address Line 1", "Delivery Town / City", "Delivery Postcode",
-  "Vehicle Reg", "Distance (Miles)", "Rate (£ per mile)", "Total Price (£)"
+  "Reg", "Start PC", "End PC", "Job ID"
 ];
 
 // ─── Main handler ────────────────────────────────────────────────────
@@ -200,8 +190,8 @@ Deno.serve(async (req) => {
       }
       
       const rows = await readSheet(token, spreadsheet_id, `'${sheetName}'!A1:AZ1`);
-      const headers = rows[0] ?? [];
-      // Validate headers
+      const headers = (rows[0] ?? []).map((h: string) => h.trim());
+      // Validate headers (trim both sides for comparison)
       const missing = EXPECTED_HEADERS.filter(h => !headers.includes(h));
       if (missing.length > 0) {
         return respond({ success: false, error: `Missing headers: ${missing.join(", ")}`, headers }, 400);
@@ -236,7 +226,7 @@ async function handlePull(
       return respond({ success: true, message: "Sheet is empty.", ...log });
     }
 
-    const headers = rows[0];
+    const headers = rows[0].map((h: string) => h.trim());
     // Validate headers
     const missing = EXPECTED_HEADERS.filter(h => !headers.includes(h));
     if (missing.length > 0) {
@@ -267,18 +257,22 @@ async function handlePull(
       log.rows_processed++;
       const sheetRowIndex = i + 1; // 1-indexed for sheet
 
-      const syncToApp = norm(cell(row, "Sync to App?"));
-      const appJobId = cell(row, "App Job ID");
       const sheetJobId = cell(row, "Job ID");
 
-      // Skip rows not marked for sync
-      if (syncToApp !== "YES") {
+      // Skip rows without a Job ID (anchor column)
+      if (!sheetJobId) {
         log.rows_skipped++;
         continue;
       }
 
-      // Skip rows already synced (idempotency)
-      if (appJobId) {
+      // Check if job already exists in DB by sheet_job_id or external_job_number
+      const { data: existing } = await supabase
+        .from("jobs")
+        .select("id")
+        .or(`sheet_job_id.eq.${sheetJobId},external_job_number.eq.${sheetJobId}`)
+        .maybeSingle();
+
+      if (existing) {
         log.rows_skipped++;
         continue;
       }
@@ -292,7 +286,6 @@ async function handlePull(
       }
 
       if (missingFields.length > 0) {
-        // Log validation error
         await supabase.from("sync_errors").insert({
           sheet_row_index: sheetRowIndex,
           sheet_job_id: sheetJobId || null,
@@ -302,22 +295,6 @@ async function handlePull(
         log.errors.push({ row: sheetRowIndex, sheetJobId, missing: missingFields });
         log.rows_skipped++;
         continue;
-      }
-
-      // Also check for duplicate sheet_job_id in DB
-      if (sheetJobId) {
-        const { data: existing } = await supabase
-          .from("jobs")
-          .select("id")
-          .eq("sheet_job_id", sheetJobId)
-          .maybeSingle();
-        if (existing) {
-          // Already exists — write back app ID and skip
-          const appIdColLetter = getColumnLetter(hIdx["App Job ID"]);
-          await updateCell(token, spreadsheetId, `'${sheetName}'!${appIdColLetter}${sheetRowIndex}`, existing.id);
-          log.rows_skipped++;
-          continue;
-        }
       }
 
       // Parse numeric values
@@ -335,55 +312,36 @@ async function handlePull(
         "en route": "in_transit",
         "completed": "delivery_complete",
         "cancelled": "cancelled",
+        "pending": "ready_for_pickup",
       };
-      const rawStatus = cell(row, "Job Status").toLowerCase();
+      const rawStatus = (cell(row, "Status") || "").toLowerCase();
       const appStatus = statusMap[rawStatus] || "ready_for_pickup";
 
-      // Build job insert payload
+      // Build job insert payload mapped from 14-column "Jobs" tab
       const jobPayload: Record<string, any> = {
-        sheet_job_id: sheetJobId || null,
-        external_job_number: sheetJobId || null,
-        job_date: cell(row, "Job Date") || null,
+        sheet_job_id: sheetJobId,
+        external_job_number: sheetJobId,
         status: appStatus,
-        priority: cell(row, "Job Priority") || "Normal",
-        job_type: cell(row, "Job Type") || "Single",
-        job_source: cell(row, "Job Source") || null,
-        client_name: cell(row, "Client Name") || null,
-        client_notes: cell(row, "Client Notes") || null,
-        pickup_contact_name: cell(row, "Pickup Contact Name"),
-        pickup_contact_phone: cell(row, "Pickup Contact Phone"),
-        pickup_address_line1: cell(row, "Pickup Address Line 1"),
-        pickup_city: cell(row, "Pickup Town / City"),
-        pickup_postcode: cell(row, "Pickup Postcode"),
-        pickup_time_from: cell(row, "Pickup Time From") || null,
-        pickup_time_to: cell(row, "Pickup Time To") || null,
-        pickup_access_notes: cell(row, "Pickup Access Notes") || null,
-        delivery_contact_name: cell(row, "Delivery Contact Name"),
-        delivery_contact_phone: cell(row, "Delivery Contact Phone"),
-        delivery_address_line1: cell(row, "Delivery Address Line 1"),
-        delivery_city: cell(row, "Delivery Town / City"),
-        delivery_postcode: cell(row, "Delivery Postcode"),
-        delivery_time_from: cell(row, "Delivery Time From") || null,
-        delivery_time_to: cell(row, "Delivery Time To") || null,
-        delivery_access_notes: cell(row, "Delivery Access Notes") || null,
-        promise_by_time: cell(row, "Promise By Time") || null,
-        vehicle_reg: cell(row, "Vehicle Reg"),
-        vehicle_make: cell(row, "Vehicle Make") || "",
-        vehicle_model: cell(row, "Vehicle Model") || "",
-        vehicle_colour: cell(row, "Vehicle Colour") || "",
-        vehicle_type: cell(row, "Vehicle Type") || null,
-        vehicle_fuel_type: cell(row, "Vehicle Fuel Type") || null,
-        distance_miles: parseNum(cell(row, "Distance (Miles)")),
-        rate_per_mile: parseNum(cell(row, "Rate (£ per mile)")),
-        total_price: parseNum(cell(row, "Total Price (£)")),
-        caz_ulez_flag: cell(row, "CAZ/ULEZ?") || null,
-        caz_ulez_cost: parseNum(cell(row, "CAZ/ULEZ Cost (£)")),
-        other_expenses: parseNum(cell(row, "Other Expenses (£)")),
-        driver_name: cell(row, "Driver Name") || null,
-        driver_external_id: cell(row, "Driver ID") || null,
-        job_notes: cell(row, "Job Notes") || null,
-        cancellation_reason: cell(row, "Cancellation Reason") || null,
-        sync_to_map: norm(cell(row, "Sync to Map?")) === "YES",
+        vehicle_reg: cell(row, "Reg") || "UNKNOWN",
+        vehicle_make: "",
+        vehicle_model: "",
+        vehicle_colour: "",
+        pickup_contact_name: cell(row, "Client") || "Unknown",
+        pickup_contact_phone: "",
+        pickup_address_line1: cell(row, "Start PC") || "",
+        pickup_city: "",
+        pickup_postcode: cell(row, "Start PC") || "",
+        delivery_contact_name: cell(row, "Client") || "Unknown",
+        delivery_contact_phone: "",
+        delivery_address_line1: cell(row, "End PC") || "",
+        delivery_city: "",
+        delivery_postcode: cell(row, "End PC") || "",
+        client_name: cell(row, "Client") || null,
+        distance_miles: parseNum(cell(row, "Miles")),
+        rate_per_mile: parseNum(cell(row, "Rate")),
+        other_expenses: parseNum(cell(row, "Expenses")),
+        total_price: parseNum(cell(row, "Total")),
+        job_date: cell(row, "Date") || null,
         sheet_row_index: sheetRowIndex,
       };
 
@@ -398,10 +356,6 @@ async function handlePull(
         log.errors.push({ row: sheetRowIndex, sheetJobId, error: insertErr.message });
         continue;
       }
-
-      // Write back App Job ID to sheet
-      const appIdColLetter = getColumnLetter(hIdx["App Job ID"]);
-      await updateCell(token, spreadsheetId, `'${sheetName}'!${appIdColLetter}${sheetRowIndex}`, newJob.id);
 
       log.rows_created++;
     }
