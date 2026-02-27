@@ -100,6 +100,17 @@ async function getAccessToken(serviceAccount: any): Promise<string> {
 
 const SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets";
 
+/** Extract the spreadsheet ID from a full Google Sheets URL or return as-is if already an ID */
+function extractSpreadsheetId(input: string): string {
+  const match = input.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+  return match ? match[1] : input;
+}
+
+/** Quote sheet name for ranges (needed when name contains spaces) */
+function q(sheetName: string): string {
+  return sheetName;
+}
+
 async function readSheet(
   token: string,
   spreadsheetId: string,
@@ -272,7 +283,8 @@ Deno.serve(async (req) => {
     }
 
     const token = await getAccessToken(serviceAccount);
-    const { spreadsheet_id, sheet_name } = config;
+    const spreadsheet_id = extractSpreadsheetId(config.spreadsheet_id);
+    const { sheet_name } = config;
 
     if (action === "push") {
       return await handlePush(supabase, token, spreadsheet_id, sheet_name, jobIds);
@@ -280,7 +292,7 @@ Deno.serve(async (req) => {
       return await handlePull(supabase, token, spreadsheet_id, sheet_name);
     } else if (action === "test") {
       // Quick connectivity test
-      const rows = await readSheet(token, spreadsheet_id, `${sheet_name}!A1:N1`);
+      const rows = await readSheet(token, spreadsheet_id, `${q(sheet_name)}!A1:N1`);
       return new Response(
         JSON.stringify({ success: true, headers: rows[0] ?? [] }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -349,7 +361,7 @@ async function handlePush(
     }
 
     // Read existing sheet data to find existing job IDs
-    const existingRows = await readSheet(token, spreadsheetId, `${sheetName}!A:N`);
+    const existingRows = await readSheet(token, spreadsheetId, `${q(sheetName)}!A:N`);
     const headerRow = existingRows[0] ?? [];
     const jobIdColIdx = 11; // L column (0-indexed)
 
@@ -400,7 +412,7 @@ async function handlePush(
         // Also push status (J=9) on push
         mergedRow[9] = String(row[9] ?? existingRowData[9] ?? "");
 
-        await updateSheet(token, spreadsheetId, `${sheetName}!A${sheetRow}:N${sheetRow}`, [mergedRow]);
+        await updateSheet(token, spreadsheetId, `${q(sheetName)}!A${sheetRow}:N${sheetRow}`, [mergedRow]);
         log.rows_updated++;
       } else {
         // Append new row
@@ -411,7 +423,7 @@ async function handlePush(
         });
         // Set status for new rows
         newRow[9] = STATUS_APP_TO_SHEET[job.status] || job.status;
-        await appendSheet(token, spreadsheetId, `${sheetName}!A:N`, [newRow]);
+        await appendSheet(token, spreadsheetId, `${q(sheetName)}!A:N`, [newRow]);
         log.rows_created++;
       }
     }
@@ -453,7 +465,7 @@ async function handlePull(
   const log = { rows_processed: 0, rows_created: 0, rows_updated: 0, rows_skipped: 0, errors: [] as any[] };
 
   try {
-    const rows = await readSheet(token, spreadsheetId, `${sheetName}!A:N`);
+    const rows = await readSheet(token, spreadsheetId, `${q(sheetName)}!A:N`);
     if (rows.length < 2) {
       return respond({ success: true, message: "Sheet is empty.", ...log });
     }
