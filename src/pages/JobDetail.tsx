@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { createQrConfirmation, getQrConfirmationsForJob, buildQrUrl, type QrConfirmation } from "@/lib/qrApi";
+import { QrDisplayModal } from "@/components/QrDisplayModal";
+import { useAuth } from "@/context/AuthContext";
 
 const STATUS_LABELS: Record<string, string> = {
   ready_for_pickup: 'Ready for Pickup',
@@ -27,10 +29,12 @@ export const JobDetail = () => {
   const { jobId } = useParams<{ jobId: string }>();
   const { data: job, isLoading } = useJob(jobId ?? '');
   const { data: jobExpenses } = useJobExpenses(jobId ?? '');
+  const { isAdmin } = useAuth();
   const expenseTotal = jobExpenses?.reduce((sum, e) => sum + Number(e.amount), 0) ?? 0;
 
   const [qrConfirmations, setQrConfirmations] = useState<QrConfirmation[]>([]);
   const [generatingQr, setGeneratingQr] = useState(false);
+  const [qrModal, setQrModal] = useState<{ open: boolean; url: string; eventType: string }>({ open: false, url: '', eventType: '' });
 
   useEffect(() => {
     if (!jobId) return;
@@ -44,8 +48,8 @@ export const JobDetail = () => {
       const qr = await createQrConfirmation(jobId, eventType);
       setQrConfirmations(prev => [qr, ...prev]);
       const url = buildQrUrl(qr.token);
-      await navigator.clipboard.writeText(url);
-      toast({ title: "QR link copied", description: "Share this link with the customer to confirm handover." });
+      // Always show QR modal — never rely on clipboard alone
+      setQrModal({ open: true, url, eventType });
     } catch (e: unknown) {
       toast({ title: "Failed", description: e instanceof Error ? e.message : "Error", variant: "destructive" });
     } finally {
@@ -64,6 +68,7 @@ export const JobDetail = () => {
 
   const pickupInspection = job.inspections.find((i) => i.type === 'pickup');
   const deliveryInspection = job.inspections.find((i) => i.type === 'delivery');
+  const jobRef = job.external_job_number || job.id.slice(0, 8);
 
   return (
     <div className="min-h-screen bg-background">
@@ -180,9 +185,11 @@ export const JobDetail = () => {
 
         {/* Actions */}
         <div className="space-y-2">
-          <Button variant="outline" className="w-full" onClick={() => navigate(`/jobs/${job.id}/edit`)}>
-            <Edit className="h-4 w-4 mr-2" /> Edit Job
-          </Button>
+          {isAdmin && (
+            <Button variant="outline" className="w-full" onClick={() => navigate(`/jobs/${job.id}/edit`)}>
+              <Edit className="h-4 w-4 mr-2" /> Edit Job
+            </Button>
+          )}
           {(job.has_pickup_inspection || job.has_delivery_inspection) && (
             <Button className="w-full" onClick={() => navigate(`/jobs/${job.id}/pod`)}>
               <FileText className="h-4 w-4 mr-2" /> View POD Report
@@ -190,6 +197,15 @@ export const JobDetail = () => {
           )}
         </div>
       </div>
+
+      {/* QR Display Modal */}
+      <QrDisplayModal
+        isOpen={qrModal.open}
+        onClose={() => setQrModal(prev => ({ ...prev, open: false }))}
+        url={qrModal.url}
+        eventType={qrModal.eventType}
+        jobRef={jobRef}
+      />
     </div>
   );
 };

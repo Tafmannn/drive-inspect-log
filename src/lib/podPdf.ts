@@ -383,7 +383,10 @@ export async function generatePodPdf(job: JobWithRelations): Promise<Blob> {
 export async function sharePodPdf(job: JobWithRelations): Promise<void> {
   const blob = await generatePodPdf(job);
   const ref = job.external_job_number || job.id.slice(0, 8).toUpperCase();
-  const fileName = `AXENTRA_POD_${ref}_${job.vehicle_reg}.pdf`;
+  const dateStr = job.completed_at
+    ? new Date(job.completed_at).toISOString().slice(0, 10)
+    : new Date().toISOString().slice(0, 10);
+  const fileName = `AXENTRA_POD_${ref}_${job.vehicle_reg}_${dateStr}.pdf`;
   const file = new File([blob], fileName, { type: "application/pdf" });
 
   if (navigator.share && navigator.canShare?.({ files: [file] })) {
@@ -405,13 +408,16 @@ export async function sharePodPdf(job: JobWithRelations): Promise<void> {
 export async function emailPodPdf(job: JobWithRelations): Promise<void> {
   const blob = await generatePodPdf(job);
   const ref = job.external_job_number || job.id.slice(0, 8).toUpperCase();
-  const fileName = `AXENTRA_POD_${ref}_${job.vehicle_reg}.pdf`;
+  const dateStr = job.completed_at
+    ? new Date(job.completed_at).toISOString().slice(0, 10)
+    : new Date().toISOString().slice(0, 10);
+  const fileName = `AXENTRA_POD_${ref}_${job.vehicle_reg}_${dateStr}.pdf`;
   const file = new File([blob], fileName, { type: "application/pdf" });
 
   const subject = `Axentra POD – ${ref} – ${job.vehicle_reg}`;
-  const body = "Please find attached the Proof of Delivery for the completed job.\n\nKind regards,\nAxentra Vehicle Logistics";
+  const body = `Dear Customer,\n\nPlease find attached the Proof of Delivery for job ${ref} (${job.vehicle_reg}).\n\nRoute: ${job.pickup_city || "—"} → ${job.delivery_city || "—"}\nDate: ${dateStr}\n\nIf you have any queries, please do not hesitate to contact us.\n\nKind regards,\nAxentra Vehicle Logistics`;
 
-  // Use native share API to open email composer with PDF attached
+  // Try native share with file attachment first (works on mobile)
   if (navigator.share && navigator.canShare?.({ files: [file] })) {
     try {
       await navigator.share({
@@ -422,15 +428,11 @@ export async function emailPodPdf(job: JobWithRelations): Promise<void> {
       return;
     } catch (e: unknown) {
       if (e instanceof Error && e.name === "AbortError") return;
-      // Fall through to mailto (no attachment possible)
+      // Fall through to mailto
     }
   }
 
-  // Fallback: open mailto without attachment, no download prompt
+  // Fallback: open email client via mailto (no attachment but opens email app)
   const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  try {
-    window.location.href = mailto;
-  } catch {
-    alert("No email app could be opened. Please use the 'Share PDF' button to send the POD as an attachment.");
-  }
+  window.location.href = mailto;
 }

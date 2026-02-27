@@ -123,6 +123,7 @@ export type Database = {
       expenses: {
         Row: {
           amount: number
+          billable_on_pod: boolean
           category: string
           created_at: string
           currency: string
@@ -139,6 +140,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          billable_on_pod?: boolean
           category: string
           created_at?: string
           currency?: string
@@ -155,6 +157,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          billable_on_pod?: boolean
           category?: string
           created_at?: string
           currency?: string

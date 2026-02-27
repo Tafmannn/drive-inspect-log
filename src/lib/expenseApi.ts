@@ -15,6 +15,18 @@ export const EXPENSE_CATEGORIES = [
 
 export type ExpenseCategory = typeof EXPENSE_CATEGORIES[number];
 
+/** Categories that appear on the POD as billable client expenses */
+export const BILLABLE_CATEGORIES: ExpenseCategory[] = [
+  'Fuel',
+  'Tolls',
+  'Congestion/ULEZ/CAZ',
+  'Car Wash / Valet',
+];
+
+export function isBillableCategory(category: string): boolean {
+  return BILLABLE_CATEGORIES.includes(category as ExpenseCategory);
+}
+
 export interface Expense {
   id: string;
   job_id: string;
@@ -157,7 +169,8 @@ export async function createExpense(input: {
       notes: input.notes ?? null,
       driver_id: input.driver_id ?? null,
       upload_status: 'synced',
-    })
+      billable_on_pod: isBillableCategory(input.category),
+    } as any)
     .select()
     .single();
   if (error) throw error;
