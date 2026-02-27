@@ -1,27 +1,27 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Phone, Building, ChevronRight } from "lucide-react";
+import { MapPin, Phone, Building, ChevronRight, Calendar, Route } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { getStatusConfig, getStatusBadgeClasses } from "@/lib/statusConfig";
+
+interface ContactInfo {
+  name: string;
+  phone?: string;
+  company?: string;
+  address: string;
+}
 
 interface JobCardProps {
   jobId: string;
   plateNumber: string;
-  collectFrom: {
-    name: string;
-    contact?: string;
-    email?: string;
-    phone?: string;
-    company?: string;
-    address: string;
-  };
-  deliverTo: {
-    name: string;
-    contact?: string;
-    email?: string;
-    phone?: string;
-    company?: string;
-    address: string;
-  };
+  clientName?: string;
+  status?: string;
+  jobDate?: string;
+  distanceMiles?: number | null;
+  totalPrice?: number | null;
+  collectFrom: ContactInfo;
+  deliverTo: ContactInfo;
   instructions?: string;
   deadline?: string;
   ctaLabel?: string;
@@ -29,68 +29,143 @@ interface JobCardProps {
   onCardClick?: () => void;
 }
 
-export const JobCard = ({ 
-  jobId, 
-  plateNumber, 
-  collectFrom, 
-  deliverTo, 
+function mapsUrl(address: string): string {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+}
+
+function formatDate(dateStr: string): string {
+  try {
+    const d = new Date(dateStr + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diff = d.getTime() - today.getTime();
+    const days = Math.round(diff / 86400000);
+    if (days === 0) return 'Today';
+    if (days === 1) return 'Tomorrow';
+    if (days === -1) return 'Yesterday';
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  } catch { return dateStr; }
+}
+
+export const JobCard = ({
+  jobId,
+  plateNumber,
+  clientName,
+  status,
+  jobDate,
+  distanceMiles,
+  totalPrice,
+  collectFrom,
+  deliverTo,
   instructions,
   deadline,
   ctaLabel = "Start Inspection",
   onStartInspection,
   onCardClick,
 }: JobCardProps) => {
+  const displayName = clientName || collectFrom.name || jobId;
+  const initial = displayName.charAt(0).toUpperCase();
+  const statusCfg = status ? getStatusConfig(status) : null;
+  const statusClasses = status ? getStatusBadgeClasses(status) : '';
+
+  const summaryParts: string[] = [];
+  if (jobDate) summaryParts.push(formatDate(jobDate));
+  if (distanceMiles != null) summaryParts.push(`${distanceMiles} mi`);
+  if (totalPrice != null) summaryParts.push(`£${totalPrice}`);
+
   return (
-    <Card className="p-4 mb-4 border-2 border-primary/20 cursor-pointer" onClick={onCardClick}>
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-bold text-sm">
-            {jobId.slice(-1)}
+    <Card className="p-4 mb-3 border border-border cursor-pointer active:bg-muted/50 transition-colors" onClick={onCardClick}>
+      {/* Header: Client name + Vehicle reg */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <Avatar className="h-8 w-8 shrink-0">
+            <AvatarFallback className="bg-primary text-primary-foreground text-sm font-bold">
+              {initial}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <h3 className="font-semibold text-sm leading-tight truncate">{displayName}</h3>
+            <p className="text-xs text-muted-foreground truncate">{jobId}</p>
           </div>
-          <h3 className="font-semibold text-lg">{jobId}</h3>
         </div>
-        <Badge variant="secondary" className="bg-warning text-warning-foreground font-bold px-3 py-1">
+        <Badge variant="secondary" className="bg-warning text-warning-foreground font-bold px-2 py-0.5 text-xs shrink-0 ml-2">
           {plateNumber}
         </Badge>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        <div className="space-y-2">
-          <h4 className="font-semibold text-sm text-muted-foreground">Collect From</h4>
-          <div className="space-y-1">
-            <div className="flex items-center gap-2"><Building className="h-4 w-4 text-muted-foreground" /><span className="text-sm">{collectFrom.name}</span></div>
-            {collectFrom.phone && <div className="flex items-center gap-2"><Phone className="h-4 w-4 text-muted-foreground" /><span className="text-sm">{collectFrom.phone}</span></div>}
-            {collectFrom.company && <div className="text-sm text-muted-foreground">{collectFrom.company}</div>}
-            <div className="flex items-start gap-2"><MapPin className="h-4 w-4 text-muted-foreground mt-0.5" /><span className="text-sm">{collectFrom.address}</span></div>
-          </div>
-        </div>
-        <div className="space-y-2">
-          <h4 className="font-semibold text-sm text-muted-foreground">Deliver To</h4>
-          <div className="space-y-1">
-            <div className="flex items-center gap-2"><Building className="h-4 w-4 text-muted-foreground" /><span className="text-sm">{deliverTo.name}</span></div>
-            {deliverTo.phone && <div className="flex items-center gap-2"><Phone className="h-4 w-4 text-muted-foreground" /><span className="text-sm">{deliverTo.phone}</span></div>}
-            {deliverTo.company && <div className="text-sm text-muted-foreground">{deliverTo.company}</div>}
-            <div className="flex items-start gap-2"><MapPin className="h-4 w-4 text-muted-foreground mt-0.5" /><span className="text-sm">{deliverTo.address}</span></div>
-          </div>
-        </div>
-      </div>
-
-      {instructions && (
-        <div className="mb-4 p-3 bg-warning/10 border border-warning/20 rounded-lg">
-          <div className="text-sm"><span className="font-semibold text-warning">IMPORTANT:</span> {instructions}</div>
+      {/* Summary line: date • miles • price • status */}
+      {(summaryParts.length > 0 || statusCfg) && (
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
+          {summaryParts.length > 0 && (
+            <span className="text-xs text-muted-foreground">{summaryParts.join(' • ')}</span>
+          )}
+          {statusCfg && (
+            <Badge className={`${statusClasses} text-[10px] px-1.5 py-0`}>{statusCfg.label}</Badge>
+          )}
         </div>
       )}
 
-      {deadline && <div className="mb-4 text-sm text-destructive"><strong>Do not deliver before {deadline}</strong></div>}
+      {/* Pickup & Delivery */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+        <ContactBlock label="Collect From" contact={collectFrom} />
+        <ContactBlock label="Deliver To" contact={deliverTo} />
+      </div>
 
-      <Button 
+      {instructions && (
+        <div className="mb-3 p-2.5 bg-warning/10 border border-warning/20 rounded-lg">
+          <div className="text-xs"><span className="font-semibold text-warning">NOTE:</span> {instructions}</div>
+        </div>
+      )}
+
+      {deadline && <div className="mb-3 text-xs text-destructive"><strong>Do not deliver before {deadline}</strong></div>}
+
+      <Button
         onClick={(e) => { e.stopPropagation(); onStartInspection?.(); }}
         className="w-full"
-        size="lg"
+        size="default"
       >
         {ctaLabel}
-        <ChevronRight className="ml-2 h-4 w-4" />
+        <ChevronRight className="ml-1 h-4 w-4" />
       </Button>
     </Card>
   );
 };
+
+function ContactBlock({ label, contact }: { label: string; contact: ContactInfo }) {
+  return (
+    <div className="space-y-1">
+      <h4 className="font-semibold text-xs text-muted-foreground">{label}</h4>
+      <div className="space-y-0.5">
+        <div className="flex items-center gap-1.5">
+          <Building className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          <span className="text-sm truncate">{contact.name}</span>
+        </div>
+        {contact.phone && (
+          <div className="flex items-center gap-1.5">
+            <Phone className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <a
+              href={`tel:${contact.phone}`}
+              onClick={(e) => e.stopPropagation()}
+              className="text-sm text-primary underline-offset-2 hover:underline truncate"
+            >
+              {contact.phone}
+            </a>
+          </div>
+        )}
+        {contact.company && <div className="text-xs text-muted-foreground pl-5">{contact.company}</div>}
+        <div className="flex items-start gap-1.5">
+          <MapPin className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
+          <a
+            href={mapsUrl(contact.address)}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="text-sm text-primary underline-offset-2 hover:underline"
+          >
+            {contact.address}
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}

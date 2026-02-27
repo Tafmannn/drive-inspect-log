@@ -709,6 +709,26 @@ async function handlePull(
 
       console.log(`Job created: ${newJob.id} from row ${sheetRowIndex}`);
 
+      // 5b. Auto-generate external_job_number if missing
+      if (!newJob.external_job_number) {
+        const { data: maxRow } = await supabase
+          .from("jobs")
+          .select("external_job_number")
+          .like("external_job_number", "AX%")
+          .order("external_job_number", { ascending: false })
+          .limit(1);
+        let nextNum = 1;
+        if (maxRow && maxRow.length > 0 && maxRow[0].external_job_number) {
+          const m = maxRow[0].external_job_number.match(/^AX(\d+)$/);
+          if (m) nextNum = parseInt(m[1], 10) + 1;
+        }
+        const genNumber = `AX${String(nextNum).padStart(4, "0")}`;
+        await supabase.from("jobs").update({ external_job_number: genNumber }).eq("id", newJob.id);
+        newJob.external_job_number = genNumber;
+        jobPayload.external_job_number = genNumber;
+        console.log(`Auto-generated job number: ${genNumber} for ${newJob.id}`);
+      }
+
       // 6. Write back to Job Entry: App Job ID + Imported At
       const now = new Date().toISOString();
       if (appJobIdHeader && hIdx[appJobIdHeader] !== undefined) {
