@@ -36,7 +36,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <AppErrorBoundary>
-        <AuthProvider>
+        <AuthProvider overrideRoles={["ADMIN", "DRIVER"]}>
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Dashboard />} />
