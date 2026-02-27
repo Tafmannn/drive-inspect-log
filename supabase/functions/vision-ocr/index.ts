@@ -1,0 +1,212 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
+
+interface OcrRequest {
+  imageBase64: string;
+  type: "receipt" | "odometer";
+}
+
+interface ReceiptResult {
+  amount: number | null;
+  date: string | null;
+  vendor: string | null;
+  rawText: string;
+}
+
+interface OdometerResult {
+  reading: number | null;
+  rawText: string;
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const serviceAccountJson = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_JSON");
+    if (!serviceAccountJson) {
+      return new Response(
+        JSON.stringify({ error: "GOOGLE_SERVICE_ACCOUNT_JSON not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const sa = JSON.parse(serviceAccountJson);
+    const accessToken = await getAccessToken(sa);
+
+    const body: OcrRequest = await req.json();
+    const { imageBase64, type } = body;
+
+    if (!imageBase64 || !type) {
+      return new Response(
+        JSON.stringify({ error: "imageBase64 and type are required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Call Google Vision API
+    const visionUrl = "https://vision.googleapis.com/v1/images:annotate";
+    const visionRes = await fetch(visionUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        requests: [
+          {
+            image: { content: imageBase64 },
+            features: [{ type: "TEXT_DETECTION", maxResults: 1 }],
+          },
+        ],
+      }),
+    });
+
+    if (!visionRes.ok) {
+      const errText = await visionRes.text();
+      console.error("Vision API error:", errText);
+      return new Response(
+        JSON.stringify({ error: "Vision API failed", details: errText }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const visionData = await visionRes.json();
+    const fullText = visionData.responses?.[0]?.fullTextAnnotation?.text || "";
+
+    let result: ReceiptResult | OdometerResult;
+
+    if (type === "receipt") {
+      result = parseReceipt(fullText);
+    } else {
+      result = parseOdometer(fullText);
+    }
+
+    return new Response(JSON.stringify(result), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (e) {
+    console.error("vision-ocr error:", e);
+    return new Response(
+      JSON.stringify({ error: e.message }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+});
+
+// ─── Receipt parsing ─────────────────────────────────────────────────
+
+function parseReceipt(text: string): ReceiptResult {
+  const result: ReceiptResult = { amount: null, date: null, vendor: null, rawText: text };
+
+  // Extract amount: look for £ or GBP followed by numbers, or TOTAL line
+  const amountPatterns = [
+    /(?:total|amount|balance|due)[:\s]*[£$]?\s*(\d+[.,]\d{2})/i,
+    /[£]\s*(\d+[.,]\d{2})/,
+    /(\d+[.,]\d{2})\s*(?:GBP|gbp)/,
+  ];
+  for (const pat of amountPatterns) {
+    const m = text.match(pat);
+    if (m) {
+      result.amount = parseFloat(m[1].replace(",", "."));
+      break;
+    }
+  }
+
+  // Extract date: DD/MM/YYYY or DD-MM-YYYY or YYYY-MM-DD
+  const datePatterns = [
+    /(\d{2})[\/\-](\d{2})[\/\-](\d{4})/,
+    /(\d{4})[\/\-](\d{2})[\/\-](\d{2})/,
+  ];
+  for (const pat of datePatterns) {
+    const m = text.match(pat);
+    if (m) {
+      if (m[1].length === 4) {
+        result.date = `${m[1]}-${m[2]}-${m[3]}`;
+      } else {
+        result.date = `${m[3]}-${m[2]}-${m[1]}`;
+      }
+      break;
+    }
+  }
+
+  // Vendor: first non-empty line, typically the store name
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  if (lines.length > 0) {
+    result.vendor = lines[0].slice(0, 60);
+  }
+
+  return result;
+}
+
+// ─── Odometer parsing ────────────────────────────────────────────────
+
+function parseOdometer(text: string): OdometerResult {
+  const result: OdometerResult = { reading: null, rawText: text };
+
+  // Look for large numbers (4-7 digits) that could be odometer readings
+  const numbers = text.match(/\b(\d{4,7})\b/g);
+  if (numbers && numbers.length > 0) {
+    // Take the largest number as the likely odometer reading
+    const parsed = numbers.map(Number).sort((a, b) => b - a);
+    result.reading = parsed[0];
+  }
+
+  return result;
+}
+
+// ─── Google Auth ─────────────────────────────────────────────────────
+
+async function getAccessToken(sa: { client_email: string; private_key: string }): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  const header = { alg: "RS256", typ: "JWT" };
+  const payload = {
+    iss: sa.client_email,
+    scope: "https://www.googleapis.com/auth/cloud-vision",
+    aud: "https://oauth2.googleapis.com/token",
+    iat: now,
+    exp: now + 3600,
+  };
+
+  const enc = (obj: unknown) =>
+    btoa(JSON.stringify(obj)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+
+  const unsigned = `${enc(header)}.${enc(payload)}`;
+  const key = await importPrivateKey(sa.private_key);
+  const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(unsigned));
+  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig)))
+    .replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+
+  const jwt = `${unsigned}.${sigB64}`;
+
+  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
+  });
+
+  const tokenData = await tokenRes.json();
+  if (!tokenData.access_token) throw new Error("Failed to get access token: " + JSON.stringify(tokenData));
+  return tokenData.access_token;
+}
+
+async function importPrivateKey(pem: string): Promise<CryptoKey> {
+  const pemContents = pem
+    .replace(/-----BEGIN PRIVATE KEY-----/g, "")
+    .replace(/-----END PRIVATE KEY-----/g, "")
+    .replace(/\s/g, "");
+  const binaryDer = Uint8Array.from(atob(pemContents), (c) => c.charCodeAt(0));
+  return crypto.subtle.importKey(
+    "pkcs8",
+    binaryDer,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+}
