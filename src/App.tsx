@@ -6,6 +6,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/context/AuthContext";
 import { Dashboard } from "./pages/Dashboard";
 import { JobList } from "./pages/JobList";
+import { JobMasterList } from "./pages/JobMasterList";
+import { SyncErrors } from "./pages/SyncErrors";
 import { JobForm } from "./pages/JobForm";
 import { JobDetail } from "./pages/JobDetail";
 import { CompletedJobs } from "./pages/CompletedJobs";
@@ -41,6 +43,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/jobs" element={<JobList />} />
+              <Route path="/jobs/master" element={<JobMasterList />} />
               <Route path="/jobs/new" element={<JobForm />} />
               <Route path="/jobs/completed" element={<CompletedJobs />} />
               <Route path="/jobs/pending" element={<PendingJobs />} />
@@ -54,6 +57,7 @@ const App = () => (
               <Route path="/expenses/:expenseId/edit" element={<ExpenseForm />} />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/admin/timesheets" element={<Timesheets />} />
+              <Route path="/admin/sync-errors" element={<SyncErrors />} />
               <Route path="/confirm" element={<QrConfirm />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

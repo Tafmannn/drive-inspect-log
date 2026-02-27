@@ -345,8 +345,14 @@ export type Database = {
       jobs: {
         Row: {
           admin_rate: number | null
+          cancellation_reason: string | null
+          caz_ulez_cost: number | null
+          caz_ulez_flag: string | null
+          client_name: string | null
+          client_notes: string | null
           completed_at: string | null
           created_at: string
+          delivery_access_notes: string | null
           delivery_address_line1: string
           delivery_address_line2: string | null
           delivery_city: string
@@ -355,16 +361,27 @@ export type Database = {
           delivery_contact_phone: string
           delivery_notes: string | null
           delivery_postcode: string
+          delivery_time_from: string | null
+          delivery_time_to: string | null
+          distance_miles: number | null
+          driver_external_id: string | null
+          driver_name: string | null
           earliest_delivery_date: string | null
           external_job_number: string | null
           has_delivery_inspection: boolean
           has_pickup_inspection: boolean
           id: string
           is_hidden: boolean
+          job_date: string | null
+          job_notes: string | null
+          job_source: string | null
+          job_type: string | null
           maps_validated: boolean
           notify_customer_on_arrival: boolean
           notify_customer_on_complete: boolean
           notify_customer_on_start: boolean
+          other_expenses: number | null
+          pickup_access_notes: string | null
           pickup_address_line1: string
           pickup_address_line2: string | null
           pickup_city: string
@@ -373,21 +390,38 @@ export type Database = {
           pickup_contact_phone: string
           pickup_notes: string | null
           pickup_postcode: string
+          pickup_time_from: string | null
+          pickup_time_to: string | null
           pod_pdf_url: string | null
+          priority: string | null
+          promise_by_time: string | null
+          rate_per_mile: number | null
           route_distance_miles: number | null
           route_eta_minutes: number | null
+          sheet_job_id: string | null
+          sheet_row_index: number | null
           status: string
+          sync_to_map: boolean | null
+          total_price: number | null
           updated_at: string
           vehicle_colour: string
+          vehicle_fuel_type: string | null
           vehicle_make: string
           vehicle_model: string
           vehicle_reg: string
+          vehicle_type: string | null
           vehicle_year: string | null
         }
         Insert: {
           admin_rate?: number | null
+          cancellation_reason?: string | null
+          caz_ulez_cost?: number | null
+          caz_ulez_flag?: string | null
+          client_name?: string | null
+          client_notes?: string | null
           completed_at?: string | null
           created_at?: string
+          delivery_access_notes?: string | null
           delivery_address_line1: string
           delivery_address_line2?: string | null
           delivery_city: string
@@ -396,16 +430,27 @@ export type Database = {
           delivery_contact_phone: string
           delivery_notes?: string | null
           delivery_postcode: string
+          delivery_time_from?: string | null
+          delivery_time_to?: string | null
+          distance_miles?: number | null
+          driver_external_id?: string | null
+          driver_name?: string | null
           earliest_delivery_date?: string | null
           external_job_number?: string | null
           has_delivery_inspection?: boolean
           has_pickup_inspection?: boolean
           id?: string
           is_hidden?: boolean
+          job_date?: string | null
+          job_notes?: string | null
+          job_source?: string | null
+          job_type?: string | null
           maps_validated?: boolean
           notify_customer_on_arrival?: boolean
           notify_customer_on_complete?: boolean
           notify_customer_on_start?: boolean
+          other_expenses?: number | null
+          pickup_access_notes?: string | null
           pickup_address_line1: string
           pickup_address_line2?: string | null
           pickup_city: string
@@ -414,21 +459,38 @@ export type Database = {
           pickup_contact_phone: string
           pickup_notes?: string | null
           pickup_postcode: string
+          pickup_time_from?: string | null
+          pickup_time_to?: string | null
           pod_pdf_url?: string | null
+          priority?: string | null
+          promise_by_time?: string | null
+          rate_per_mile?: number | null
           route_distance_miles?: number | null
           route_eta_minutes?: number | null
+          sheet_job_id?: string | null
+          sheet_row_index?: number | null
           status?: string
+          sync_to_map?: boolean | null
+          total_price?: number | null
           updated_at?: string
           vehicle_colour: string
+          vehicle_fuel_type?: string | null
           vehicle_make: string
           vehicle_model: string
           vehicle_reg: string
+          vehicle_type?: string | null
           vehicle_year?: string | null
         }
         Update: {
           admin_rate?: number | null
+          cancellation_reason?: string | null
+          caz_ulez_cost?: number | null
+          caz_ulez_flag?: string | null
+          client_name?: string | null
+          client_notes?: string | null
           completed_at?: string | null
           created_at?: string
+          delivery_access_notes?: string | null
           delivery_address_line1?: string
           delivery_address_line2?: string | null
           delivery_city?: string
@@ -437,16 +499,27 @@ export type Database = {
           delivery_contact_phone?: string
           delivery_notes?: string | null
           delivery_postcode?: string
+          delivery_time_from?: string | null
+          delivery_time_to?: string | null
+          distance_miles?: number | null
+          driver_external_id?: string | null
+          driver_name?: string | null
           earliest_delivery_date?: string | null
           external_job_number?: string | null
           has_delivery_inspection?: boolean
           has_pickup_inspection?: boolean
           id?: string
           is_hidden?: boolean
+          job_date?: string | null
+          job_notes?: string | null
+          job_source?: string | null
+          job_type?: string | null
           maps_validated?: boolean
           notify_customer_on_arrival?: boolean
           notify_customer_on_complete?: boolean
           notify_customer_on_start?: boolean
+          other_expenses?: number | null
+          pickup_access_notes?: string | null
           pickup_address_line1?: string
           pickup_address_line2?: string | null
           pickup_city?: string
@@ -455,15 +528,26 @@ export type Database = {
           pickup_contact_phone?: string
           pickup_notes?: string | null
           pickup_postcode?: string
+          pickup_time_from?: string | null
+          pickup_time_to?: string | null
           pod_pdf_url?: string | null
+          priority?: string | null
+          promise_by_time?: string | null
+          rate_per_mile?: number | null
           route_distance_miles?: number | null
           route_eta_minutes?: number | null
+          sheet_job_id?: string | null
+          sheet_row_index?: number | null
           status?: string
+          sync_to_map?: boolean | null
+          total_price?: number | null
           updated_at?: string
           vehicle_colour?: string
+          vehicle_fuel_type?: string | null
           vehicle_make?: string
           vehicle_model?: string
           vehicle_reg?: string
+          vehicle_type?: string | null
           vehicle_year?: string | null
         }
         Relationships: []
@@ -638,6 +722,36 @@ export type Database = {
           rows_skipped?: number
           rows_updated?: number
           status?: string
+        }
+        Relationships: []
+      }
+      sync_errors: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          missing_fields: string[]
+          resolved: boolean
+          sheet_job_id: string | null
+          sheet_row_index: number
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          missing_fields?: string[]
+          resolved?: boolean
+          sheet_job_id?: string | null
+          sheet_row_index: number
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          missing_fields?: string[]
+          resolved?: boolean
+          sheet_job_id?: string | null
+          sheet_row_index?: number
         }
         Relationships: []
       }
