@@ -101,7 +101,14 @@ export const PodReport = () => {
     if (!job) return;
     setPdfLoading(true);
     try {
-      await sharePodPdf(job);
+      const billable = (jobExpenses ?? []).map(e => ({
+        id: e.id,
+        category: e.category,
+        label: e.label ?? null,
+        amount: Number(e.amount),
+        billable_on_pod: e.billable_on_pod,
+      }));
+      await sharePodPdf(job, billable);
     } catch (e: unknown) {
       if (e instanceof Error && e.name !== "AbortError") {
         toast({ title: "PDF share failed", description: e instanceof Error ? e.message : "Unknown error", variant: "destructive" });
@@ -115,7 +122,14 @@ export const PodReport = () => {
     if (!job) return;
     setPdfLoading(true);
     try {
-      await emailPodPdf(job);
+      const billable = (jobExpenses ?? []).map(e => ({
+        id: e.id,
+        category: e.category,
+        label: e.label ?? null,
+        amount: Number(e.amount),
+        billable_on_pod: e.billable_on_pod,
+      }));
+      await emailPodPdf(job, billable);
     } catch (e: unknown) {
       if (e instanceof Error && e.name !== "AbortError") {
         toast({ title: "Email failed", description: e instanceof Error ? e.message : "Unknown error", variant: "destructive" });

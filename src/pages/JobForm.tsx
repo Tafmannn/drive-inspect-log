@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 // Native select used instead of Radix Select to avoid BubbleSelect DOM crash
 import { useCreateJob, useUpdateJob, useJob } from "@/hooks/useJobs";
 import { toast } from "@/hooks/use-toast";
@@ -14,8 +15,16 @@ import { Loader2, MapPin, Navigation } from "lucide-react";
 import { CAR_MAKES, getModelsForMake } from "@/lib/carData";
 import { isValidUkPostcode, calculateRoute, type RouteResult } from "@/lib/mapsApi";
 import { isFeatureEnabled } from "@/lib/featureFlags";
+import { saveDraft, loadDraft, clearDraft, draftKey } from "@/lib/autosave";
 
 type ErrorMap = Record<string, string>;
+
+interface JobFormDraft {
+  vehicleMake: string;
+  vehicleModel: string;
+  customMake: boolean;
+  customModel: boolean;
+}
 
 export const JobForm = () => {
   const navigate = useNavigate();
@@ -35,15 +44,72 @@ export const JobForm = () => {
   const [customMake, setCustomMake] = useState(false);
   const [customModel, setCustomModel] = useState(false);
 
+  // Autosave draft state
+  const [showDraftPrompt, setShowDraftPrompt] = useState(false);
+  const dk = isEdit ? "" : draftKey("newJob", "create");
+
   // Route calculation state
   const [routeResult, setRouteResult] = useState<RouteResult | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [mapsEnabled, setMapsEnabled] = useState(false);
   const routeDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     isFeatureEnabled("MAPS_ENABLED").then(setMapsEnabled);
   }, []);
+
+  // ─── AUTOSAVE: check for draft on mount (new job only) ───
+  useEffect(() => {
+    if (!dk || isEdit) return;
+    const draft = loadDraft<JobFormDraft>(dk);
+    if (draft) setShowDraftPrompt(true);
+  }, [dk, isEdit]);
+
+  // ─── AUTOSAVE: save draft on form input (new job only) ───
+  const saveDraftFromForm = useCallback(() => {
+    if (!dk || isEdit || !formRef.current) return;
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    autosaveTimer.current = setTimeout(() => {
+      if (!formRef.current) return;
+      const data = new FormData(formRef.current);
+      const draft: Record<string, string> = {};
+      data.forEach((val, key) => {
+        if (typeof val === "string") draft[key] = val;
+      });
+      saveDraft(dk, { ...draft, vehicleMake, vehicleModel, customMake, customModel });
+    }, 800);
+  }, [dk, isEdit, vehicleMake, vehicleModel, customMake, customModel]);
+
+  const handleRestoreDraft = () => {
+    if (!dk) return;
+    const draft = loadDraft<Record<string, string> & JobFormDraft>(dk);
+    if (draft?.data && formRef.current) {
+      const d = draft.data;
+      // Restore controlled state
+      if (d.vehicleMake) setVehicleMake(d.vehicleMake);
+      if (d.vehicleModel) setVehicleModel(d.vehicleModel);
+      if (d.customMake != null) setCustomMake(!!d.customMake);
+      if (d.customModel != null) setCustomModel(!!d.customModel);
+      // Restore uncontrolled form fields
+      requestAnimationFrame(() => {
+        if (!formRef.current) return;
+        const fields = formRef.current.elements;
+        for (const [key, val] of Object.entries(d)) {
+          if (["vehicleMake", "vehicleModel", "customMake", "customModel"].includes(key)) continue;
+          const el = fields.namedItem(key);
+          if (el && "value" in el && !(el instanceof RadioNodeList)) (el as HTMLInputElement).value = val as string;
+        }
+      });
+      toast({ title: "Draft restored", description: "Your previous job form has been loaded." });
+    }
+    setShowDraftPrompt(false);
+  };
+
+  const handleDiscardDraft = () => {
+    if (dk) clearDraft(dk);
+    setShowDraftPrompt(false);
+  };
 
   // Debounced route calculation
   const triggerRouteCalc = useCallback((pickupPC: string, deliveryPC: string) => {
@@ -187,6 +253,7 @@ export const JobForm = () => {
         toast({ title: "Job Updated" });
         navigate(`/jobs/${jobId}`);
       } else {
+        if (dk) clearDraft(dk);
         const job = await createMutation.mutateAsync(payload);
         toast({
           title: "Job Created",
@@ -228,6 +295,20 @@ export const JobForm = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Draft restore prompt */}
+      <Dialog open={showDraftPrompt} onOpenChange={setShowDraftPrompt}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Resume draft?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">You have an unsaved job form from a previous session. Would you like to restore it?</p>
+          <div className="flex gap-2 justify-end pt-2">
+            <Button variant="outline" onClick={handleDiscardDraft}>Discard</Button>
+            <Button onClick={handleRestoreDraft}>Restore Draft</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <AppHeader
         title={isEdit ? "Edit Job" : "New Job"}
         showBack
@@ -237,6 +318,7 @@ export const JobForm = () => {
         <form
           ref={formRef}
           className="space-y-8"
+          onChange={saveDraftFromForm}
           onSubmit={(e) => {
             e.preventDefault();
             void handleSubmit();

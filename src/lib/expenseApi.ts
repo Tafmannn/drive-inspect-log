@@ -38,6 +38,8 @@ export interface Expense {
   category: string;
   label: string | null;
   notes: string | null;
+  billable_on_pod: boolean;
+  is_hidden: boolean;
   upload_status: string;
   created_at: string;
   updated_at: string;
