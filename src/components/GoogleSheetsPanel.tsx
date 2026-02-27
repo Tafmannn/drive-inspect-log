@@ -105,10 +105,21 @@ export function GoogleSheetsPanel() {
   const pullSync = useMutation({
     mutationFn: syncApi.pullFromSheet,
     onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ["sheet-sync-logs", "sheet-sync-config", "jobs", "admin-jobs"] });
+      qc.invalidateQueries({ queryKey: ["sheet-sync-logs"] });
+      qc.invalidateQueries({ queryKey: ["sheet-sync-config"] });
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
+      qc.invalidateQueries({ queryKey: ["admin-jobs"] });
+      const parts: string[] = [];
+      if (data.rows_created > 0) parts.push(`${data.rows_created} new jobs imported`);
+      if (data.rows_updated > 0) parts.push(`${data.rows_updated} updated`);
+      if (data.rows_skipped > 0) parts.push(`${data.rows_skipped} skipped`);
+      if (data.errors?.length > 0) parts.push(`${data.errors.length} errors`);
+      const desc = parts.length > 0 ? parts.join(", ") : (data.message || "No eligible rows found");
       toast({
-        title: "Pull complete",
-        description: `${data.rows_updated} updated, ${data.rows_skipped} skipped`,
+        title: data.rows_created > 0 ? `${data.rows_created} new jobs imported from Job Entry` : "Pull complete",
+        description: desc,
+        variant: data.errors?.length > 0 ? "destructive" : "default",
       });
     },
     onError: (e: Error) => toast({ title: "Pull failed", description: e.message, variant: "destructive" }),
@@ -201,7 +212,7 @@ export function GoogleSheetsPanel() {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Push sends all job data to the sheet. Pull imports Rate (G) and Status (J) from the sheet.
+            Push sends all app jobs to Job Master. Pull imports new jobs from the Job Entry tab and syncs them to Job Master.
           </p>
         </Card>
       )}

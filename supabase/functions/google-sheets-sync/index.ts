@@ -89,7 +89,6 @@ async function readSheet(
   spreadsheetId: string,
   range: string
 ): Promise<string[][]> {
-  // Use encodeURI (not encodeURIComponent) to preserve !, :, and ' characters
   const url = `${SHEETS_API}/${spreadsheetId}/values/${encodeURI(range)}`;
   console.log("Reading sheet range:", range);
   const res = await fetch(url, {
@@ -121,6 +120,27 @@ async function updateCell(
   if (!res.ok) {
     const err = await res.text();
     throw new Error(`Sheets update failed [${res.status}]: ${err}`);
+  }
+}
+
+async function updateRow(
+  token: string,
+  spreadsheetId: string,
+  range: string,
+  values: string[]
+): Promise<void> {
+  const url = `${SHEETS_API}/${spreadsheetId}/values/${encodeURI(range)}?valueInputOption=USER_ENTERED`;
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ values: [values] }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Row update failed [${res.status}]: ${err}`);
   }
 }
 
@@ -181,23 +201,98 @@ const JOB_MASTER_HEADERS = [
   "Driver Name", "Driver ID", "Job Notes", "Cancellation Reason", "Sync to App?", "App Job ID", "Sync to Map?", "Map Job ID"
 ];
 
-// ─── Expected headers (auto-detected based on sheet_name) ────────────
+// ─── Job Entry column → app field mapping ────────────────────────────
+// This is the configurable mapping from Job Entry tab headers to app job fields.
+// Adjust this if the Job Entry tab headers differ.
 
-const JOBS_TAB_HEADERS = [
-  "Date", "Client", "Reg", "Start PC", "End PC", "Miles", "Rate",
-  "Expenses", "Total", "Status", "Invoice Link", "Job ID", "Alerts", "Bid Phrase"
-];
+const JOB_ENTRY_HEADER_MAP: Record<string, string> = {
+  // Flexible: maps common Job Entry header names → app job field names
+  "Job ID": "external_job_number",
+  "Job Number": "external_job_number",
+  "Job Date": "job_date",
+  "Date": "job_date",
+  "Job Status": "_status_raw",
+  "Status": "_status_raw",
+  "Job Priority": "priority",
+  "Priority": "priority",
+  "Job Type": "job_type",
+  "Type": "job_type",
+  "Job Source": "job_source",
+  "Source": "job_source",
+  "Client Name": "client_name",
+  "Client": "client_name",
+  "Customer": "client_name",
+  "Client Notes": "client_notes",
+  "Pickup Contact Name": "pickup_contact_name",
+  "Pickup Name": "pickup_contact_name",
+  "Pickup Contact Phone": "pickup_contact_phone",
+  "Pickup Phone": "pickup_contact_phone",
+  "Pickup Company": "pickup_company",
+  "Pickup Address Line 1": "pickup_address_line1",
+  "Pickup Address": "pickup_address_line1",
+  "Pickup Town / City": "pickup_city",
+  "Pickup City": "pickup_city",
+  "Pickup Postcode": "pickup_postcode",
+  "Start PC": "pickup_postcode",
+  "Pickup Time From": "pickup_time_from",
+  "Pickup Time To": "pickup_time_to",
+  "Pickup Access Notes": "pickup_access_notes",
+  "Pickup Notes": "pickup_notes",
+  "Delivery Contact Name": "delivery_contact_name",
+  "Delivery Name": "delivery_contact_name",
+  "Delivery Contact Phone": "delivery_contact_phone",
+  "Delivery Phone": "delivery_contact_phone",
+  "Delivery Company": "delivery_company",
+  "Delivery Address Line 1": "delivery_address_line1",
+  "Delivery Address": "delivery_address_line1",
+  "Delivery Town / City": "delivery_city",
+  "Delivery City": "delivery_city",
+  "Delivery Postcode": "delivery_postcode",
+  "End PC": "delivery_postcode",
+  "Delivery Time From": "delivery_time_from",
+  "Delivery Time To": "delivery_time_to",
+  "Delivery Access Notes": "delivery_access_notes",
+  "Promise By Time": "promise_by_time",
+  "Vehicle Reg": "vehicle_reg",
+  "Reg": "vehicle_reg",
+  "Registration": "vehicle_reg",
+  "Vehicle Make": "vehicle_make",
+  "Make": "vehicle_make",
+  "Vehicle Model": "vehicle_model",
+  "Model": "vehicle_model",
+  "Vehicle Colour": "vehicle_colour",
+  "Colour": "vehicle_colour",
+  "Color": "vehicle_colour",
+  "Vehicle Type": "vehicle_type",
+  "Vehicle Fuel Type": "vehicle_fuel_type",
+  "Fuel Type": "vehicle_fuel_type",
+  "Distance (Miles)": "distance_miles",
+  "Miles": "distance_miles",
+  "Rate (£ per mile)": "rate_per_mile",
+  "Rate": "rate_per_mile",
+  "Total Price (£)": "total_price",
+  "Total": "total_price",
+  "CAZ/ULEZ?": "caz_ulez_flag",
+  "CAZ/ULEZ Cost (£)": "caz_ulez_cost",
+  "Other Expenses (£)": "other_expenses",
+  "Expenses": "other_expenses",
+  "Driver Name": "driver_name",
+  "Driver": "driver_name",
+  "Driver ID": "driver_external_id",
+  "Job Notes": "job_notes",
+  "Notes": "job_notes",
+  // These are write-back columns on Job Entry
+  "App Job ID": "_app_job_id",
+  "Imported At": "_imported_at",
+  "Import?": "_import_flag",
+  "Sync to App?": "_import_flag",
+};
 
-// Required fields for job creation — varies by tab
-const JOBS_TAB_REQUIRED = [
-  "Reg", "Start PC", "End PC", "Job ID"
-];
-
-const JOB_MASTER_REQUIRED = [
-  "Job Date", "Job Status", "Job Type", "Client Name",
-  "Pickup Contact Name", "Pickup Contact Phone", "Pickup Address Line 1", "Pickup Town / City", "Pickup Postcode",
-  "Delivery Contact Name", "Delivery Contact Phone", "Delivery Address Line 1", "Delivery Town / City", "Delivery Postcode",
-  "Vehicle Reg", "Distance (Miles)", "Rate (£ per mile)", "Total Price (£)"
+// Minimum required fields to create a job
+const JOB_ENTRY_REQUIRED_FIELDS = [
+  "pickup_address_line1",
+  "delivery_address_line1",
+  "vehicle_reg",
 ];
 
 // ─── Main handler ────────────────────────────────────────────────────
@@ -240,15 +335,10 @@ Deno.serve(async (req) => {
     const token = await getAccessToken(serviceAccount);
     const spreadsheet_id = extractSpreadsheetId(config.spreadsheet_id);
     const sheetName = config.sheet_name || "Job Master";
-    const isJobMaster = sheetName === "Job Master";
-    const EXPECTED_HEADERS = isJobMaster ? JOB_MASTER_HEADERS : JOBS_TAB_HEADERS;
-    const REQUIRED_FIELDS = isJobMaster ? JOB_MASTER_REQUIRED : JOBS_TAB_REQUIRED;
 
     if (action === "setup_job_master") {
-      // Create "Job Master" tab with all 47 headers
       const sheetNames = await getSheetNames(token, spreadsheet_id);
       if (sheetNames.includes("Job Master")) {
-        // Tab already exists — treat as success, update config to use it
         const { data: cfgId } = await supabase.from("sheet_sync_config").select("id").single();
         if (cfgId) {
           await supabase.from("sheet_sync_config").update({ sheet_name: "Job Master" }).eq("id", cfgId.id);
@@ -256,10 +346,8 @@ Deno.serve(async (req) => {
         return respond({ success: true, message: "Tab 'Job Master' already exists. Config updated.", headers: JOB_MASTER_HEADERS });
       }
       await addSheet(token, spreadsheet_id, "Job Master");
-      // Write header row
       const colLetter = getColumnLetter(JOB_MASTER_HEADERS.length - 1);
       await appendRow(token, spreadsheet_id, `'Job Master'!A1:${colLetter}1`, JOB_MASTER_HEADERS);
-      // Update config to use Job Master
       const { data: cfgId } = await supabase.from("sheet_sync_config").select("id").single();
       if (cfgId) {
         await supabase.from("sheet_sync_config").update({ sheet_name: "Job Master" }).eq("id", cfgId.id);
@@ -269,6 +357,11 @@ Deno.serve(async (req) => {
       const sheetNames = await getSheetNames(token, spreadsheet_id);
       console.log("Available sheets:", sheetNames);
       
+      // Find Job Entry tab
+      const jobEntryTab = findTabName(sheetNames, "Job Entry");
+      const jobMasterTab = findTabName(sheetNames, "Job Master");
+      
+      // Test configured sheet
       if (!sheetNames.includes(sheetName)) {
         return respond({ 
           success: false, 
@@ -279,13 +372,25 @@ Deno.serve(async (req) => {
       
       const rows = await readSheet(token, spreadsheet_id, `'${sheetName}'!A1:AZ1`);
       const headers = (rows[0] ?? []).map((h: string) => h.trim());
-      const missing = EXPECTED_HEADERS.filter(h => !headers.includes(h));
-      if (missing.length > 0) {
-        return respond({ success: false, error: `Missing headers: ${missing.join(", ")}`, headers }, 400);
+      
+      // Only validate Job Master headers if testing Job Master
+      if (sheetName === "Job Master" || sheetName === jobMasterTab) {
+        const missing = JOB_MASTER_HEADERS.filter(h => !headers.includes(h));
+        if (missing.length > 0) {
+          return respond({ success: false, error: `Missing headers: ${missing.join(", ")}`, headers }, 400);
+        }
       }
-      return respond({ success: true, headers, message: "All headers validated successfully." });
+      
+      return respond({ 
+        success: true, 
+        headers, 
+        message: "All headers validated successfully.",
+        available_sheets: sheetNames,
+        job_entry_tab: jobEntryTab,
+        job_master_tab: jobMasterTab,
+      });
     } else if (action === "pull") {
-      return await handlePull(supabase, token, spreadsheet_id, sheetName, REQUIRED_FIELDS);
+      return await handlePull(supabase, token, spreadsheet_id);
     } else if (action === "push") {
       const { jobIds } = body;
       return await handlePush(supabase, token, spreadsheet_id, sheetName, jobIds);
@@ -299,34 +404,74 @@ Deno.serve(async (req) => {
   }
 });
 
-// ─── PULL: Job Master → App (Create new jobs) ───────────────────────
+// ─── Find closest matching tab name ──────────────────────────────────
+
+function findTabName(sheetNames: string[], target: string): string | null {
+  // Exact match first
+  if (sheetNames.includes(target)) return target;
+  // Case-insensitive match
+  const lower = target.toLowerCase();
+  const found = sheetNames.find(s => s.toLowerCase() === lower);
+  if (found) return found;
+  // Partial match (contains)
+  const partial = sheetNames.find(s => s.toLowerCase().includes(lower) || lower.includes(s.toLowerCase()));
+  return partial || null;
+}
+
+// ─── PULL: Job Entry → App → Job Master ─────────────────────────────
 
 async function handlePull(
   supabase: any,
   token: string,
   spreadsheetId: string,
-  sheetName: string,
-  requiredFields: string[]
 ) {
-  const isJobMaster = sheetName === "Job Master";
-  const expectedHeaders = isJobMaster ? JOB_MASTER_HEADERS : JOBS_TAB_HEADERS;
   const log = { rows_processed: 0, rows_created: 0, rows_updated: 0, rows_skipped: 0, errors: [] as any[] };
 
   try {
-    const rows = await readSheet(token, spreadsheetId, `'${sheetName}'!A:AZ`);
+    // 1. Detect tabs
+    const sheetNames = await getSheetNames(token, spreadsheetId);
+    console.log("Available sheets for pull:", sheetNames);
+    
+    const jobEntryTab = findTabName(sheetNames, "Job Entry");
+    const jobMasterTab = findTabName(sheetNames, "Job Master");
+    
+    if (!jobEntryTab) {
+      return respond({ success: false, error: `No "Job Entry" tab found. Available tabs: ${sheetNames.join(", ")}. Please create a "Job Entry" tab.`, ...log }, 400);
+    }
+    
+    console.log(`Pull: reading from "${jobEntryTab}", will sync to "${jobMasterTab || 'Job Master'}"`);
+
+    // 2. Read Job Entry tab
+    const rows = await readSheet(token, spreadsheetId, `'${jobEntryTab}'!A:AZ`);
     if (rows.length < 2) {
-      return respond({ success: true, message: "Sheet is empty.", ...log });
+      return respond({ success: true, message: "Job Entry tab is empty (no data rows).", ...log });
     }
 
     const headers = rows[0].map((h: string) => h.trim());
-    const missing = expectedHeaders.filter(h => !headers.includes(h));
-    if (missing.length > 0) {
-      return respond({ success: false, error: `Missing headers: ${missing.join(", ")}`, ...log }, 400);
-    }
-
+    console.log("Job Entry headers:", headers);
+    
     const hIdx: Record<string, number> = {};
     for (let i = 0; i < headers.length; i++) {
       hIdx[headers[i]] = i;
+    }
+
+    // Auto-add "App Job ID" and "Imported At" columns if missing
+    let nextColIdx = headers.length;
+    if (!headers.includes("App Job ID")) {
+      const col = getColumnLetter(nextColIdx);
+      await updateCell(token, spreadsheetId, `'${jobEntryTab}'!${col}1`, "App Job ID");
+      headers.push("App Job ID");
+      hIdx["App Job ID"] = nextColIdx;
+      nextColIdx++;
+      console.log("Added 'App Job ID' column to Job Entry");
+    }
+    if (!headers.includes("Imported At")) {
+      const col = getColumnLetter(nextColIdx);
+      await updateCell(token, spreadsheetId, `'${jobEntryTab}'!${col}1`, "Imported At");
+      headers.push("Imported At");
+      hIdx["Imported At"] = nextColIdx;
+      nextColIdx++;
+      console.log("Added 'Imported At' column to Job Entry");
     }
 
     const cell = (row: string[], header: string): string => {
@@ -335,10 +480,67 @@ async function handlePull(
       return (row[idx] ?? "").trim();
     };
 
-    const norm = (val: string): string => val.toUpperCase().trim();
+    // Build mapping: for each header in the sheet, find the app field
+    const headerToField: Record<string, string> = {};
+    for (const header of headers) {
+      const mapped = JOB_ENTRY_HEADER_MAP[header];
+      if (mapped) headerToField[header] = mapped;
+    }
+    console.log("Mapped headers:", JSON.stringify(headerToField));
 
+    // Find the App Job ID column (to check if already imported)
+    const appJobIdHeader = "App Job ID"; // guaranteed to exist now
+    const importedAtHeader = "Imported At"; // guaranteed to exist now
+    const importFlagHeader = headers.find(h => 
+      h === "Import?" || h === "Sync to App?" || h === "Import"
+    );
+
+    // Clear unresolved sync errors before processing
     await supabase.from("sync_errors").delete().eq("resolved", false);
 
+    // 3. Read Job Master to find existing rows for upsert
+    let masterRows: string[][] = [];
+    let masterHeaders: string[] = [];
+    let masterHIdx: Record<string, number> = {};
+    let masterAppJobIds: Record<string, number> = {}; // appJobId → row number
+    let masterNextRow = 2;
+    
+    const actualMasterTab = jobMasterTab || "Job Master";
+    if (sheetNames.includes(actualMasterTab)) {
+      masterRows = await readSheet(token, spreadsheetId, `'${actualMasterTab}'!A:AZ`);
+      if (masterRows.length > 0) {
+        masterHeaders = masterRows[0].map((h: string) => h.trim());
+        for (let i = 0; i < masterHeaders.length; i++) masterHIdx[masterHeaders[i]] = i;
+        
+        const masterAppIdCol = masterHIdx["App Job ID"];
+        if (masterAppIdCol !== undefined) {
+          for (let r = 1; r < masterRows.length; r++) {
+            const val = (masterRows[r]?.[masterAppIdCol] ?? "").trim();
+            if (val) masterAppJobIds[val] = r + 1;
+          }
+        }
+        masterNextRow = masterRows.length + 1;
+      }
+    }
+
+    const statusMap: Record<string, string> = {
+      "draft": "ready_for_pickup",
+      "booked": "ready_for_pickup",
+      "new": "ready_for_pickup",
+      "enroute": "in_transit",
+      "en route": "in_transit",
+      "completed": "delivery_complete",
+      "cancelled": "cancelled",
+      "pending": "ready_for_pickup",
+    };
+
+    const parseNum = (val: string): number | null => {
+      if (!val) return null;
+      const n = parseFloat(val.replace(/[£,]/g, ""));
+      return isNaN(n) ? null : n;
+    };
+
+    // 4. Process each row
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
       if (!row || row.every(c => !c || c.trim() === "")) continue;
@@ -346,47 +548,112 @@ async function handlePull(
       log.rows_processed++;
       const sheetRowIndex = i + 1;
 
-      // Determine Job ID column name based on tab
-      const jobIdHeader = isJobMaster ? "Job ID" : "Job ID";
-      const sheetJobId = cell(row, jobIdHeader);
-
-      // For Job Master: check Sync to App? flag
-      if (isJobMaster) {
-        const syncToApp = norm(cell(row, "Sync to App?"));
-        const appJobId = cell(row, "App Job ID");
-        if (syncToApp !== "YES") { log.rows_skipped++; continue; }
-        if (appJobId) { log.rows_skipped++; continue; }
-      }
-
-      if (!sheetJobId) { log.rows_skipped++; continue; }
-
-      // Check for existing job
-      const { data: existing } = await supabase
-        .from("jobs")
-        .select("id")
-        .or(`sheet_job_id.eq.${sheetJobId},external_job_number.eq.${sheetJobId}`)
-        .maybeSingle();
-
-      if (existing) {
-        // For Job Master, write back app ID if missing
-        if (isJobMaster) {
-          const appIdColLetter = getColumnLetter(hIdx["App Job ID"]);
-          await updateCell(token, spreadsheetId, `'${sheetName}'!${appIdColLetter}${sheetRowIndex}`, existing.id);
+      // Skip if already imported (has App Job ID)
+      if (appJobIdHeader) {
+        const existingAppId = cell(row, appJobIdHeader);
+        if (existingAppId) {
+          log.rows_skipped++;
+          continue;
         }
-        log.rows_skipped++;
-        continue;
       }
 
-      // Validate required fields
+      // Check import flag if it exists (optional)
+      if (importFlagHeader) {
+        const flag = cell(row, importFlagHeader).toUpperCase();
+        // If there's an import flag column but it's not YES, skip
+        if (flag && flag !== "YES" && flag !== "Y" && flag !== "TRUE") {
+          log.rows_skipped++;
+          continue;
+        }
+      }
+
+      // Build job payload from mapped headers
+      const fieldValues: Record<string, string> = {};
+      for (const [header, field] of Object.entries(headerToField)) {
+        fieldValues[field] = cell(row, header);
+      }
+
+      // Determine status
+      const rawStatus = (fieldValues["_status_raw"] || "").toLowerCase();
+      const appStatus = statusMap[rawStatus] || "ready_for_pickup";
+
+      // Build the job insert payload
+      const jobPayload: Record<string, any> = {
+        status: appStatus,
+        // Required fields with defaults
+        vehicle_reg: fieldValues["vehicle_reg"] || "UNKNOWN",
+        vehicle_make: fieldValues["vehicle_make"] || "",
+        vehicle_model: fieldValues["vehicle_model"] || "",
+        vehicle_colour: fieldValues["vehicle_colour"] || "",
+        pickup_contact_name: fieldValues["pickup_contact_name"] || fieldValues["client_name"] || "Unknown",
+        pickup_contact_phone: fieldValues["pickup_contact_phone"] || "",
+        pickup_address_line1: fieldValues["pickup_address_line1"] || fieldValues["pickup_postcode"] || "",
+        pickup_city: fieldValues["pickup_city"] || "",
+        pickup_postcode: fieldValues["pickup_postcode"] || "",
+        delivery_contact_name: fieldValues["delivery_contact_name"] || fieldValues["client_name"] || "Unknown",
+        delivery_contact_phone: fieldValues["delivery_contact_phone"] || "",
+        delivery_address_line1: fieldValues["delivery_address_line1"] || fieldValues["delivery_postcode"] || "",
+        delivery_city: fieldValues["delivery_city"] || "",
+        delivery_postcode: fieldValues["delivery_postcode"] || "",
+      };
+
+      // Optional fields
+      if (fieldValues["external_job_number"]) {
+        jobPayload.external_job_number = fieldValues["external_job_number"];
+        jobPayload.sheet_job_id = fieldValues["external_job_number"];
+      }
+      if (fieldValues["job_date"]) jobPayload.job_date = fieldValues["job_date"];
+      if (fieldValues["priority"]) jobPayload.priority = fieldValues["priority"];
+      if (fieldValues["job_type"]) jobPayload.job_type = fieldValues["job_type"];
+      if (fieldValues["job_source"]) jobPayload.job_source = fieldValues["job_source"];
+      if (fieldValues["client_name"]) jobPayload.client_name = fieldValues["client_name"];
+      if (fieldValues["client_notes"]) jobPayload.client_notes = fieldValues["client_notes"];
+      if (fieldValues["pickup_company"]) jobPayload.pickup_company = fieldValues["pickup_company"];
+      if (fieldValues["pickup_time_from"]) jobPayload.pickup_time_from = fieldValues["pickup_time_from"];
+      if (fieldValues["pickup_time_to"]) jobPayload.pickup_time_to = fieldValues["pickup_time_to"];
+      if (fieldValues["pickup_access_notes"]) jobPayload.pickup_access_notes = fieldValues["pickup_access_notes"];
+      if (fieldValues["pickup_notes"]) jobPayload.pickup_notes = fieldValues["pickup_notes"];
+      if (fieldValues["delivery_company"]) jobPayload.delivery_company = fieldValues["delivery_company"];
+      if (fieldValues["delivery_time_from"]) jobPayload.delivery_time_from = fieldValues["delivery_time_from"];
+      if (fieldValues["delivery_time_to"]) jobPayload.delivery_time_to = fieldValues["delivery_time_to"];
+      if (fieldValues["delivery_access_notes"]) jobPayload.delivery_access_notes = fieldValues["delivery_access_notes"];
+      if (fieldValues["promise_by_time"]) jobPayload.promise_by_time = fieldValues["promise_by_time"];
+      if (fieldValues["vehicle_type"]) jobPayload.vehicle_type = fieldValues["vehicle_type"];
+      if (fieldValues["vehicle_fuel_type"]) jobPayload.vehicle_fuel_type = fieldValues["vehicle_fuel_type"];
+      if (fieldValues["distance_miles"]) jobPayload.distance_miles = parseNum(fieldValues["distance_miles"]);
+      if (fieldValues["rate_per_mile"]) jobPayload.rate_per_mile = parseNum(fieldValues["rate_per_mile"]);
+      if (fieldValues["total_price"]) jobPayload.total_price = parseNum(fieldValues["total_price"]);
+      if (fieldValues["caz_ulez_flag"]) jobPayload.caz_ulez_flag = fieldValues["caz_ulez_flag"];
+      if (fieldValues["caz_ulez_cost"]) jobPayload.caz_ulez_cost = parseNum(fieldValues["caz_ulez_cost"]);
+      if (fieldValues["other_expenses"]) jobPayload.other_expenses = parseNum(fieldValues["other_expenses"]);
+      if (fieldValues["driver_name"]) jobPayload.driver_name = fieldValues["driver_name"];
+      if (fieldValues["driver_external_id"]) jobPayload.driver_external_id = fieldValues["driver_external_id"];
+      if (fieldValues["job_notes"]) jobPayload.job_notes = fieldValues["job_notes"];
+      if (fieldValues["vehicle_year"]) jobPayload.vehicle_year = fieldValues["vehicle_year"];
+
+      // Validate minimum required fields
       const missingFields: string[] = [];
-      for (const reqField of requiredFields) {
-        if (!cell(row, reqField)) missingFields.push(reqField);
+      for (const reqField of JOB_ENTRY_REQUIRED_FIELDS) {
+        if (!jobPayload[reqField] || jobPayload[reqField] === "" || jobPayload[reqField] === "UNKNOWN") {
+          // Find the header name for this field for the error message
+          const headerName = Object.entries(headerToField).find(([_, f]) => f === reqField)?.[0] || reqField;
+          missingFields.push(headerName);
+        }
+      }
+
+      // Also check that we have at least pickup and delivery addresses
+      if (!jobPayload.pickup_address_line1 && !jobPayload.pickup_postcode) {
+        missingFields.push("Pickup Address / Postcode");
+      }
+      if (!jobPayload.delivery_address_line1 && !jobPayload.delivery_postcode) {
+        missingFields.push("Delivery Address / Postcode");
       }
 
       if (missingFields.length > 0) {
+        const sheetJobId = fieldValues["external_job_number"] || `Row ${sheetRowIndex}`;
         await supabase.from("sync_errors").insert({
           sheet_row_index: sheetRowIndex,
-          sheet_job_id: sheetJobId || null,
+          sheet_job_id: sheetJobId,
           missing_fields: missingFields,
           error_message: `Missing required fields: ${missingFields.join(", ")}`,
         });
@@ -395,132 +662,84 @@ async function handlePull(
         continue;
       }
 
-      const parseNum = (val: string): number | null => {
-        if (!val) return null;
-        const n = parseFloat(val.replace(/[£,]/g, ""));
-        return isNaN(n) ? null : n;
-      };
-
-      const statusMap: Record<string, string> = {
-        "draft": "ready_for_pickup",
-        "booked": "ready_for_pickup",
-        "enroute": "in_transit",
-        "en route": "in_transit",
-        "completed": "delivery_complete",
-        "cancelled": "cancelled",
-        "pending": "ready_for_pickup",
-      };
-
-      let jobPayload: Record<string, any>;
-
-      if (isJobMaster) {
-        const rawStatus = cell(row, "Job Status").toLowerCase();
-        const appStatus = statusMap[rawStatus] || "ready_for_pickup";
-        jobPayload = {
-          sheet_job_id: sheetJobId,
-          external_job_number: sheetJobId,
-          job_date: cell(row, "Job Date") || null,
-          status: appStatus,
-          priority: cell(row, "Job Priority") || "Normal",
-          job_type: cell(row, "Job Type") || "Single",
-          job_source: cell(row, "Job Source") || null,
-          client_name: cell(row, "Client Name") || null,
-          client_notes: cell(row, "Client Notes") || null,
-          pickup_contact_name: cell(row, "Pickup Contact Name"),
-          pickup_contact_phone: cell(row, "Pickup Contact Phone"),
-          pickup_address_line1: cell(row, "Pickup Address Line 1"),
-          pickup_city: cell(row, "Pickup Town / City"),
-          pickup_postcode: cell(row, "Pickup Postcode"),
-          pickup_time_from: cell(row, "Pickup Time From") || null,
-          pickup_time_to: cell(row, "Pickup Time To") || null,
-          pickup_access_notes: cell(row, "Pickup Access Notes") || null,
-          delivery_contact_name: cell(row, "Delivery Contact Name"),
-          delivery_contact_phone: cell(row, "Delivery Contact Phone"),
-          delivery_address_line1: cell(row, "Delivery Address Line 1"),
-          delivery_city: cell(row, "Delivery Town / City"),
-          delivery_postcode: cell(row, "Delivery Postcode"),
-          delivery_time_from: cell(row, "Delivery Time From") || null,
-          delivery_time_to: cell(row, "Delivery Time To") || null,
-          delivery_access_notes: cell(row, "Delivery Access Notes") || null,
-          promise_by_time: cell(row, "Promise By Time") || null,
-          vehicle_reg: cell(row, "Vehicle Reg"),
-          vehicle_make: cell(row, "Vehicle Make") || "",
-          vehicle_model: cell(row, "Vehicle Model") || "",
-          vehicle_colour: cell(row, "Vehicle Colour") || "",
-          vehicle_type: cell(row, "Vehicle Type") || null,
-          vehicle_fuel_type: cell(row, "Vehicle Fuel Type") || null,
-          distance_miles: parseNum(cell(row, "Distance (Miles)")),
-          rate_per_mile: parseNum(cell(row, "Rate (£ per mile)")),
-          total_price: parseNum(cell(row, "Total Price (£)")),
-          caz_ulez_flag: cell(row, "CAZ/ULEZ?") || null,
-          caz_ulez_cost: parseNum(cell(row, "CAZ/ULEZ Cost (£)")),
-          other_expenses: parseNum(cell(row, "Other Expenses (£)")),
-          driver_name: cell(row, "Driver Name") || null,
-          driver_external_id: cell(row, "Driver ID") || null,
-          job_notes: cell(row, "Job Notes") || null,
-          cancellation_reason: cell(row, "Cancellation Reason") || null,
-          sync_to_map: norm(cell(row, "Sync to Map?")) === "YES",
-          sheet_row_index: sheetRowIndex,
-        };
-      } else {
-        // Jobs tab (14-column)
-        const rawStatus = (cell(row, "Status") || "").toLowerCase();
-        const appStatus = statusMap[rawStatus] || "ready_for_pickup";
-        jobPayload = {
-          sheet_job_id: sheetJobId,
-          external_job_number: sheetJobId,
-          status: appStatus,
-          vehicle_reg: cell(row, "Reg") || "UNKNOWN",
-          vehicle_make: "",
-          vehicle_model: "",
-          vehicle_colour: "",
-          pickup_contact_name: cell(row, "Client") || "Unknown",
-          pickup_contact_phone: "",
-          pickup_address_line1: cell(row, "Start PC") || "",
-          pickup_city: "",
-          pickup_postcode: cell(row, "Start PC") || "",
-          delivery_contact_name: cell(row, "Client") || "Unknown",
-          delivery_contact_phone: "",
-          delivery_address_line1: cell(row, "End PC") || "",
-          delivery_city: "",
-          delivery_postcode: cell(row, "End PC") || "",
-          client_name: cell(row, "Client") || null,
-          distance_miles: parseNum(cell(row, "Miles")),
-          rate_per_mile: parseNum(cell(row, "Rate")),
-          other_expenses: parseNum(cell(row, "Expenses")),
-          total_price: parseNum(cell(row, "Total")),
-          job_date: cell(row, "Date") || null,
-          sheet_row_index: sheetRowIndex,
-        };
+      // Check for duplicate (by external_job_number if present)
+      if (jobPayload.external_job_number) {
+        const { data: existing } = await supabase
+          .from("jobs")
+          .select("id")
+          .or(`sheet_job_id.eq.${jobPayload.external_job_number},external_job_number.eq.${jobPayload.external_job_number}`)
+          .maybeSingle();
+        
+        if (existing) {
+          // Already exists, write back the ID to Job Entry and skip
+          if (appJobIdHeader && hIdx[appJobIdHeader] !== undefined) {
+            const col = getColumnLetter(hIdx[appJobIdHeader]);
+            await updateCell(token, spreadsheetId, `'${jobEntryTab}'!${col}${sheetRowIndex}`, existing.id);
+          }
+          log.rows_skipped++;
+          continue;
+        }
       }
 
+      // 5. INSERT the job into the database
+      console.log(`Creating job from Job Entry row ${sheetRowIndex}:`, JSON.stringify(jobPayload));
       const { data: newJob, error: insertErr } = await supabase
         .from("jobs")
         .insert(jobPayload)
-        .select("id")
+        .select("id, external_job_number, created_at, status")
         .single();
 
       if (insertErr) {
-        log.errors.push({ row: sheetRowIndex, sheetJobId, error: insertErr.message });
+        console.error(`Insert error for row ${sheetRowIndex}:`, insertErr);
+        log.errors.push({ row: sheetRowIndex, error: insertErr.message });
+        log.rows_skipped++;
         continue;
       }
 
-      // For Job Master, write back App Job ID
-      if (isJobMaster && hIdx["App Job ID"] !== undefined) {
-        const appIdColLetter = getColumnLetter(hIdx["App Job ID"]);
-        await updateCell(token, spreadsheetId, `'${sheetName}'!${appIdColLetter}${sheetRowIndex}`, newJob.id);
+      console.log(`Job created: ${newJob.id} from row ${sheetRowIndex}`);
+
+      // 6. Write back to Job Entry: App Job ID + Imported At
+      const now = new Date().toISOString();
+      if (appJobIdHeader && hIdx[appJobIdHeader] !== undefined) {
+        const col = getColumnLetter(hIdx[appJobIdHeader]);
+        await updateCell(token, spreadsheetId, `'${jobEntryTab}'!${col}${sheetRowIndex}`, newJob.id);
+      }
+      if (importedAtHeader && hIdx[importedAtHeader] !== undefined) {
+        const col = getColumnLetter(hIdx[importedAtHeader]);
+        await updateCell(token, spreadsheetId, `'${jobEntryTab}'!${col}${sheetRowIndex}`, now);
+      }
+
+      // 7. Upsert to Job Master tab
+      if (sheetNames.includes(actualMasterTab)) {
+        try {
+          await upsertJobMasterRow(
+            supabase, token, spreadsheetId, actualMasterTab,
+            newJob, jobPayload, masterHIdx, masterAppJobIds, masterNextRow
+          );
+          // Update sheet_row_index on the job
+          const masterRow = masterAppJobIds[newJob.id] || masterNextRow;
+          if (!masterAppJobIds[newJob.id]) {
+            masterAppJobIds[newJob.id] = masterNextRow;
+            masterNextRow++;
+          }
+          await supabase.from("jobs").update({ sheet_row_index: masterRow }).eq("id", newJob.id);
+        } catch (masterErr: any) {
+          console.error(`Failed to upsert Job Master for ${newJob.id}:`, masterErr);
+          // Non-fatal: job was created, just master sync failed
+          log.errors.push({ row: sheetRowIndex, warning: `Job created but Job Master sync failed: ${masterErr.message}` });
+        }
       }
 
       log.rows_created++;
     }
 
-    // Update last_pull_at
+    // 8. Update last_pull_at
     const { data: cfgId } = await supabase.from("sheet_sync_config").select("id").single();
     if (cfgId) {
       await supabase.from("sheet_sync_config").update({ last_pull_at: new Date().toISOString() }).eq("id", cfgId.id);
     }
 
-    // Log sync
+    // 9. Log sync
     await supabase.from("sheet_sync_logs").insert({
       direction: "pull",
       status: log.errors.length ? "partial" : "success",
@@ -530,6 +749,7 @@ async function handlePull(
     return respond({ success: true, ...log });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Unknown error";
+    console.error("Pull error:", msg);
     log.errors.push({ error: msg });
     await supabase.from("sheet_sync_logs").insert({
       direction: "pull",
@@ -537,6 +757,85 @@ async function handlePull(
       ...log,
     });
     return respond({ success: false, error: msg, ...log }, 500);
+  }
+}
+
+// ─── Upsert a single job row into Job Master ─────────────────────────
+
+async function upsertJobMasterRow(
+  supabase: any,
+  token: string,
+  spreadsheetId: string,
+  masterTab: string,
+  newJob: { id: string; external_job_number?: string; created_at: string; status: string },
+  jobPayload: Record<string, any>,
+  masterHIdx: Record<string, number>,
+  masterAppJobIds: Record<string, number>,
+  masterNextRow: number,
+) {
+  const sheetStatus = REVERSE_STATUS_MAP[newJob.status] || newJob.status || "Booked";
+  
+  const rowValues = JOB_MASTER_HEADERS.map((header: string) => {
+    switch (header) {
+      case "Job ID": return jobPayload.external_job_number || "";
+      case "Job Date": return jobPayload.job_date || "";
+      case "Job Status": return sheetStatus;
+      case "Job Priority": return jobPayload.priority || "Normal";
+      case "Job Type": return jobPayload.job_type || "Single";
+      case "Job Source": return jobPayload.job_source || "";
+      case "Created At": return newJob.created_at || "";
+      case "Updated At": return new Date().toISOString();
+      case "Client Name": return jobPayload.client_name || "";
+      case "Client Notes": return jobPayload.client_notes || "";
+      case "Pickup Contact Name": return jobPayload.pickup_contact_name || "";
+      case "Pickup Contact Phone": return jobPayload.pickup_contact_phone || "";
+      case "Pickup Address Line 1": return jobPayload.pickup_address_line1 || "";
+      case "Pickup Town / City": return jobPayload.pickup_city || "";
+      case "Pickup Postcode": return jobPayload.pickup_postcode || "";
+      case "Pickup Time From": return jobPayload.pickup_time_from || "";
+      case "Pickup Time To": return jobPayload.pickup_time_to || "";
+      case "Pickup Access Notes": return jobPayload.pickup_access_notes || "";
+      case "Delivery Contact Name": return jobPayload.delivery_contact_name || "";
+      case "Delivery Contact Phone": return jobPayload.delivery_contact_phone || "";
+      case "Delivery Address Line 1": return jobPayload.delivery_address_line1 || "";
+      case "Delivery Town / City": return jobPayload.delivery_city || "";
+      case "Delivery Postcode": return jobPayload.delivery_postcode || "";
+      case "Delivery Time From": return jobPayload.delivery_time_from || "";
+      case "Delivery Time To": return jobPayload.delivery_time_to || "";
+      case "Delivery Access Notes": return jobPayload.delivery_access_notes || "";
+      case "Promise By Time": return jobPayload.promise_by_time || "";
+      case "Vehicle Reg": return jobPayload.vehicle_reg || "";
+      case "Vehicle Make": return jobPayload.vehicle_make || "";
+      case "Vehicle Model": return jobPayload.vehicle_model || "";
+      case "Vehicle Colour": return jobPayload.vehicle_colour || "";
+      case "Vehicle Type": return jobPayload.vehicle_type || "";
+      case "Vehicle Fuel Type": return jobPayload.vehicle_fuel_type || "";
+      case "Distance (Miles)": return jobPayload.distance_miles != null ? String(jobPayload.distance_miles) : "";
+      case "Rate (£ per mile)": return jobPayload.rate_per_mile != null ? String(jobPayload.rate_per_mile) : "";
+      case "Total Price (£)": return jobPayload.total_price != null ? String(jobPayload.total_price) : "";
+      case "CAZ/ULEZ?": return jobPayload.caz_ulez_flag || "";
+      case "CAZ/ULEZ Cost (£)": return jobPayload.caz_ulez_cost != null ? String(jobPayload.caz_ulez_cost) : "";
+      case "Other Expenses (£)": return jobPayload.other_expenses != null ? String(jobPayload.other_expenses) : "";
+      case "Driver Name": return jobPayload.driver_name || "";
+      case "Driver ID": return jobPayload.driver_external_id || "";
+      case "Job Notes": return jobPayload.job_notes || "";
+      case "Cancellation Reason": return "";
+      case "Sync to App?": return "YES";
+      case "App Job ID": return newJob.id;
+      case "Sync to Map?": return "NO";
+      case "Map Job ID": return "";
+      default: return "";
+    }
+  });
+
+  const lastCol = getColumnLetter(JOB_MASTER_HEADERS.length - 1);
+  const existingRow = masterAppJobIds[newJob.id];
+
+  if (existingRow) {
+    await updateRow(token, spreadsheetId, `'${masterTab}'!A${existingRow}:${lastCol}${existingRow}`, rowValues);
+  } else {
+    await updateRow(token, spreadsheetId, `'${masterTab}'!A${masterNextRow}:${lastCol}${masterNextRow}`, rowValues);
+    masterAppJobIds[newJob.id] = masterNextRow;
   }
 }
 
@@ -594,16 +893,15 @@ async function handlePush(
     for (let i = 0; i < headers.length; i++) hIdx[headers[i]] = i;
 
     const appJobIdColIdx = hIdx["App Job ID"];
-    // Build map of existing App Job IDs → row number (1-indexed)
     const existingAppIds: Record<string, number> = {};
     if (appJobIdColIdx !== undefined) {
       for (let r = 1; r < rows.length; r++) {
         const val = (rows[r]?.[appJobIdColIdx] ?? "").trim();
-        if (val) existingAppIds[val] = r + 1; // sheet row is 1-indexed + header
+        if (val) existingAppIds[val] = r + 1;
       }
     }
 
-    let nextRow = rows.length + 1; // next available row for appending
+    let nextRow = rows.length + 1;
 
     // 4. Push each job
     for (const job of jobs) {
@@ -668,12 +966,10 @@ async function handlePush(
       const lastCol = getColumnLetter(JOB_MASTER_HEADERS.length - 1);
 
       if (existingRow) {
-        // Update existing row
         await appendRow(token, spreadsheetId, `'${sheetName}'!A${existingRow}:${lastCol}${existingRow}`, rowValues);
         await supabase.from("jobs").update({ sheet_row_index: existingRow }).eq("id", job.id);
         log.rows_updated++;
       } else {
-        // Append new row
         const targetRow = nextRow;
         await appendRow(token, spreadsheetId, `'${sheetName}'!A${targetRow}:${lastCol}${targetRow}`, rowValues);
         await supabase.from("jobs").update({ sheet_row_index: targetRow }).eq("id", job.id);
