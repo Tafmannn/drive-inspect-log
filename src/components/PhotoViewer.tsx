@@ -62,6 +62,15 @@ export const PhotoViewer = ({ photos, title }: PhotoViewerProps) => {
               alt={photo.label || `Photo ${idx + 1}`}
               className="w-full h-full object-cover"
               loading="lazy"
+              crossOrigin="anonymous"
+              onError={(e) => {
+                const target = e.currentTarget;
+                target.style.display = 'none';
+                const placeholder = document.createElement('div');
+                placeholder.className = 'absolute inset-0 flex items-center justify-center bg-muted text-muted-foreground text-[10px] text-center p-1';
+                placeholder.textContent = 'Image unavailable';
+                target.parentNode?.appendChild(placeholder);
+              }}
             />
             {photo.label && (
               <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] px-1 py-0.5 truncate">
@@ -101,6 +110,15 @@ export const PhotoViewer = ({ photos, title }: PhotoViewerProps) => {
                   className="max-w-full max-h-full object-contain transition-transform duration-200"
                   style={{ transform: `scale(${zoom})` }}
                   draggable={false}
+                  crossOrigin="anonymous"
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    target.style.display = 'none';
+                    const placeholder = document.createElement('div');
+                    placeholder.className = 'flex items-center justify-center text-white text-sm';
+                    placeholder.textContent = 'Image could not be loaded';
+                    target.parentNode?.appendChild(placeholder);
+                  }}
                 />
               )}
             </div>
