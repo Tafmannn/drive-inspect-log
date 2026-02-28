@@ -22,6 +22,8 @@ import { Timesheets } from "./pages/Timesheets";
 import { QrConfirm } from "./pages/QrConfirm";
 import NotFound from "./pages/NotFound";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
+import { useEffect } from "react";
+import { retryAllPending } from "@/lib/pendingUploads";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,12 +34,20 @@ const queryClient = new QueryClient({
   },
 });
 
+function BackgroundUploader() {
+  useEffect(() => {
+    retryAllPending().catch(() => {}); // fire-and-forget on app mount
+  }, []);
+  return null;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
       <AppErrorBoundary>
+        <BackgroundUploader />
         <AuthProvider overrideRoles={["ADMIN", "DRIVER"]}>
           <BrowserRouter>
             <Routes>

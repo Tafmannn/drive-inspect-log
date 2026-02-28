@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as api from "@/lib/api";
-import { getAllPendingUploads } from "@/lib/pendingUploads";
+import { getPendingJobCount } from "@/lib/pendingUploads";
 import { safePushToSheet } from "@/lib/safePushToSheet";
 import type { Job, JobWithRelations, InspectionType, Inspection, DamageItem } from "@/lib/types";
 
@@ -23,14 +23,11 @@ export function useDashboardCounts() {
   return useQuery({
     queryKey: ["dashboard-counts"],
     queryFn: async () => {
-      const [active, completed, allPending] = await Promise.all([
+      const [active, completed] = await Promise.all([
         api.listActiveJobs(),
         api.listCompletedJobs(),
-        getAllPendingUploads(),
       ]);
-      const pendingUploads = allPending.filter(
-        (u) => u.status === "pending" || u.status === "failed"
-      ).length;
+      const pendingUploads = getPendingJobCount();
       return {
         myJobs: active.length,
         completedLast14Days: completed.length,
