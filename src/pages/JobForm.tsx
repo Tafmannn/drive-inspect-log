@@ -17,6 +17,8 @@ import { isValidUkPostcode, calculateRoute, type RouteResult } from "@/lib/mapsA
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import { saveDraft, loadDraft, clearDraft, draftKey } from "@/lib/autosave";
 import { lookupPostcode, type AddressSuggestion } from "@/lib/postcodeApi";
+import { BusinessSearchInput } from "@/components/BusinessSearchInput";
+import { getPlaceDetails, type BusinessResult } from "@/lib/businessSearchApi";
 
 type ErrorMap = Record<string, string>;
 
@@ -214,6 +216,55 @@ export const JobForm = () => {
     const pickupPC = side === "pickup" ? suggestion.postcode : (fd.get("pickup_postcode") as string || "");
     const deliveryPC = side === "delivery" ? suggestion.postcode : (fd.get("delivery_postcode") as string || "");
     if (pickupPC && deliveryPC) triggerRouteCalc(pickupPC, deliveryPC);
+
+    saveDraftFromForm();
+  }, [triggerRouteCalc, saveDraftFromForm]);
+
+  // Business search selection handler
+  const handleBusinessSelect = useCallback(async (side: "pickup" | "delivery", result: BusinessResult) => {
+    if (!formRef.current) return;
+    const fields = formRef.current.elements;
+    const setVal = (name: string, val: string) => {
+      const el = fields.namedItem(name);
+      if (el && "value" in el && !(el instanceof RadioNodeList)) {
+        const inputEl = el as HTMLInputElement;
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+        nativeInputValueSetter?.call(inputEl, val);
+        inputEl.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    };
+
+    // Fetch full place details
+    const details = await getPlaceDetails(result.placeId);
+    if (!details) return;
+
+    const addr = details.parsedAddress;
+
+    // Only overwrite address line 1 if it increases specificity
+    const currentLine1 = ((fields.namedItem(`${side}_address_line1`) as HTMLInputElement)?.value || "").trim();
+    if (!currentLine1 || addr.line1.length > currentLine1.length) {
+      setVal(`${side}_address_line1`, addr.line1);
+    }
+
+    // Always overwrite city & postcode when valid
+    if (addr.city) setVal(`${side}_city`, addr.city);
+    if (addr.postcode) setVal(`${side}_postcode`, addr.postcode);
+
+    // Phone: only fill if currently empty
+    if (details.phone) {
+      const phoneEl = fields.namedItem(`${side}_contact_phone`) as HTMLInputElement | null;
+      if (phoneEl && !phoneEl.value.trim()) {
+        setVal(`${side}_contact_phone`, details.phone);
+      }
+    }
+
+    // Trigger route calc
+    if (addr.postcode) {
+      const fd = new FormData(formRef.current);
+      const pickupPC = side === "pickup" ? addr.postcode : (fd.get("pickup_postcode") as string || "");
+      const deliveryPC = side === "delivery" ? addr.postcode : (fd.get("delivery_postcode") as string || "");
+      if (pickupPC && deliveryPC) triggerRouteCalc(pickupPC, deliveryPC);
+    }
 
     saveDraftFromForm();
   }, [triggerRouteCalc, saveDraftFromForm]);
@@ -614,9 +665,14 @@ export const JobForm = () => {
               <Label className="text-sm font-medium">
                 Company
               </Label>
-              <Input
+              <BusinessSearchInput
                 name="pickup_company"
                 defaultValue={existingJob?.pickup_company ?? ""}
+                postcode={(() => {
+                  if (!formRef.current) return undefined;
+                  return (new FormData(formRef.current).get("pickup_postcode") as string) || undefined;
+                })()}
+                onSelect={(r) => handleBusinessSelect("pickup", r)}
                 className="mt-1"
               />
             </div>
@@ -757,11 +813,14 @@ export const JobForm = () => {
               <Label className="text-sm font-medium">
                 Company
               </Label>
-              <Input
+              <BusinessSearchInput
                 name="delivery_company"
-                defaultValue={
-                  existingJob?.delivery_company ?? ""
-                }
+                defaultValue={existingJob?.delivery_company ?? ""}
+                postcode={(() => {
+                  if (!formRef.current) return undefined;
+                  return (new FormData(formRef.current).get("delivery_postcode") as string) || undefined;
+                })()}
+                onSelect={(r) => handleBusinessSelect("delivery", r)}
                 className="mt-1"
               />
             </div>
