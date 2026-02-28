@@ -118,7 +118,7 @@ export const ExpenseForm = () => {
         .eq("id", expenseId)
         .single();
       if (error || !data) {
-        toast({ title: "Expense not found", variant: "destructive" });
+        toast({ title: "Expense not found.", variant: "destructive" });
         navigate(-1);
         return;
       }
@@ -163,7 +163,7 @@ export const ExpenseForm = () => {
         if (result.amount && !amount) setAmount(String(result.amount));
         if (result.date && date === new Date().toISOString().slice(0, 10)) setDate(result.date);
         if (result.vendor && !label) setLabel(result.vendor);
-        toast({ title: "Receipt scanned", description: "Fields pre-filled from receipt. Please verify." });
+        toast({ title: "Receipt scanned. Please verify fields." });
       }
     } catch {
       // OCR failed silently — user can fill manually
@@ -180,13 +180,13 @@ export const ExpenseForm = () => {
   };
 
   const handleSubmit = async () => {
-    if (!jobId) { toast({ title: "Select a job", variant: "destructive" }); return; }
-    if (!category) { toast({ title: "Select a category", variant: "destructive" }); return; }
+    if (!jobId) { toast({ title: "Please select a job.", variant: "destructive" }); return; }
+    if (!category) { toast({ title: "Please select a category.", variant: "destructive" }); return; }
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
-      toast({ title: "Enter a valid amount", variant: "destructive" }); return;
+      toast({ title: "Please enter a valid amount.", variant: "destructive" }); return;
     }
     if (category === "Misc / Other" && !label.trim()) {
-      toast({ title: "Label required for Misc / Other", variant: "destructive" }); return;
+      toast({ title: "Label required for Misc / Other.", variant: "destructive" }); return;
     }
 
     setSaving(true);
@@ -224,11 +224,11 @@ export const ExpenseForm = () => {
         await uploadReceipt.mutateAsync({ expenseId: targetId!, file: r.file });
       }
 
-      toast({ title: isEdit ? "Expense updated" : "Expense saved" });
+      toast({ title: isEdit ? "Expense updated." : "Expense saved." });
       clearDraft(DRAFT_KEY);
       navigate(-1);
-    } catch (e: unknown) {
-      toast({ title: "Save failed", description: e instanceof Error ? e.message : "Unknown error", variant: "destructive" });
+    } catch {
+      toast({ title: "Save failed. Please try again.", variant: "destructive" });
     } finally {
       setSaving(false);
     }

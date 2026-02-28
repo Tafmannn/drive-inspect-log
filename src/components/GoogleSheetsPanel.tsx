@@ -64,9 +64,9 @@ export function GoogleSheetsPanel() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sheet-sync-config"] });
-      toast({ title: "Saved", description: "Sheet configuration updated." });
+      toast({ title: "Configuration saved." });
     },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: () => toast({ title: "Save failed. Please try again.", variant: "destructive" }),
   });
 
   const toggleEnabled = useMutation({
@@ -84,22 +84,20 @@ export function GoogleSheetsPanel() {
 
   const testConn = useMutation({
     mutationFn: syncApi.testSheetConnection,
-    onSuccess: (data) => {
-      toast({ title: "Connection OK", description: `Headers: ${data.headers?.join(", ")}` });
+    onSuccess: () => {
+      toast({ title: "Connection confirmed – sheet is configured correctly." });
     },
-    onError: (e: Error) => toast({ title: "Connection failed", description: e.message, variant: "destructive" }),
+    onError: () => toast({ title: "Connection failed – check sheet headers or API access.", variant: "destructive" }),
   });
 
   const pushSync = useMutation({
     mutationFn: () => syncApi.pushToSheet(),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["sheet-sync-logs", "sheet-sync-config"] });
-      toast({
-        title: "Push complete",
-        description: `${data.rows_created} created, ${data.rows_updated} updated, ${data.rows_skipped} skipped`,
-      });
+      const skipped = data.rows_skipped > 0;
+      toast({ title: skipped ? "Updates saved – some rows were skipped." : "Updates saved to Job Master." });
     },
-    onError: (e: Error) => toast({ title: "Push failed", description: e.message, variant: "destructive" }),
+    onError: () => toast({ title: "Push failed – check required fields.", variant: "destructive" }),
   });
 
   const pullSync = useMutation({
@@ -110,30 +108,26 @@ export function GoogleSheetsPanel() {
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
       qc.invalidateQueries({ queryKey: ["admin-jobs"] });
-      const parts: string[] = [];
-      if (data.rows_created > 0) parts.push(`${data.rows_created} new jobs imported`);
-      if (data.rows_updated > 0) parts.push(`${data.rows_updated} updated`);
-      if (data.rows_skipped > 0) parts.push(`${data.rows_skipped} skipped`);
-      if (data.errors?.length > 0) parts.push(`${data.errors.length} errors`);
-      const desc = parts.length > 0 ? parts.join(", ") : (data.message || "No eligible rows found");
-      toast({
-        title: data.rows_created > 0 ? `${data.rows_created} new jobs imported from Job Entry` : "Pull complete",
-        description: desc,
-        variant: data.errors?.length > 0 ? "destructive" : "default",
-      });
+      const hasErrors = data.errors?.length > 0;
+      const title = data.rows_created > 0
+        ? `${data.rows_created} new job(s) imported.`
+        : hasErrors
+          ? "Sync complete – some rows were skipped."
+          : "Sync complete – jobs updated.";
+      toast({ title, variant: hasErrors ? "destructive" : "default" });
     },
-    onError: (e: Error) => toast({ title: "Pull failed", description: e.message, variant: "destructive" }),
+    onError: () => toast({ title: "Sync failed – please try again.", variant: "destructive" }),
   });
 
   const isSyncing = pushSync.isPending || pullSync.isPending;
 
   const setupTab = useMutation({
     mutationFn: syncApi.setupJobMasterTab,
-    onSuccess: (data) => {
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["sheet-sync-config"] });
-      toast({ title: "Job Master tab created", description: data.message });
+      toast({ title: "Job Master tab created." });
     },
-    onError: (e: Error) => toast({ title: "Setup failed", description: e.message, variant: "destructive" }),
+    onError: () => toast({ title: "Setup failed. Please try again.", variant: "destructive" }),
   });
 
   if (configLoading) {

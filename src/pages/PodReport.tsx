@@ -56,13 +56,13 @@ export const PodReport = () => {
         await navigator.share({ title: subject, text: shareText });
       } catch (e: unknown) {
         if (e instanceof Error && e.name !== "AbortError") {
-          toast({ title: "Share failed", description: e.message, variant: "destructive" });
+          toast({ title: "Share failed. Please try again.", variant: "destructive" });
         }
       }
     } else {
       try {
         await navigator.clipboard.writeText(shareText);
-        toast({ title: "Copied to clipboard", description: "POD report text copied." });
+        toast({ title: "Copied to clipboard." });
       } catch {
         openPodEmail(job);
       }
@@ -83,7 +83,7 @@ export const PodReport = () => {
       await sharePodPdf(job, billable);
     } catch (e: unknown) {
       if (e instanceof Error && e.name !== "AbortError") {
-        toast({ title: "PDF share failed", description: e instanceof Error ? e.message : "Unknown error", variant: "destructive" });
+        toast({ title: "PDF share failed. Please try again.", variant: "destructive" });
       }
     } finally {
       setPdfLoading(false);
@@ -104,7 +104,7 @@ export const PodReport = () => {
       await emailPodPdf(job, billable);
     } catch (e: unknown) {
       if (e instanceof Error && e.name !== "AbortError") {
-        toast({ title: "Email failed", description: e instanceof Error ? e.message : "Unknown error", variant: "destructive" });
+        toast({ title: "Email failed. Please try again.", variant: "destructive" });
       }
     } finally {
       setPdfLoading(false);
@@ -316,7 +316,7 @@ export const PodReport = () => {
                             target.style.display = 'none';
                             const placeholder = document.createElement('div');
                             placeholder.className = 'h-14 border rounded bg-muted flex items-center justify-center text-[10px] text-muted-foreground';
-                            placeholder.textContent = 'Image unavailable';
+                            placeholder.textContent = 'Image couldn\u2019t be loaded.';
                             target.parentNode?.appendChild(placeholder);
                           }}
                         />
