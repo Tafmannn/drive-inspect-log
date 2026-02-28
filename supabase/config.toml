@@ -9,6 +9,9 @@ verify_jwt = false
 [functions.gcs-upload]
 verify_jwt = false
 
+[functions.gcs-proxy]
+verify_jwt = false
+
 [functions.vision-ocr]
 verify_jwt = false
 
