@@ -295,10 +295,11 @@ const JOB_ENTRY_HEADER_MAP: Record<string, string> = {
   "Sync to App?": "_import_flag",
 };
 
-// Minimum required fields to create a job
+// Minimum required fields to create a job (only these 4 block import)
 const JOB_ENTRY_REQUIRED_FIELDS = [
-  "pickup_address_line1",
-  "delivery_address_line1",
+  "client_name",
+  "pickup_postcode",
+  "delivery_postcode",
   "vehicle_reg",
 ];
 
@@ -549,6 +550,30 @@ async function handlePull(
       return isNaN(n) ? null : n;
     };
 
+    // Normalize date strings like "26-03-03" → "2026-03-03", "25/12/2024" → "2024-12-25"
+    const normalizeDate = (val: string): string | null => {
+      if (!val) return null;
+      const trimmed = val.trim();
+      // DD-MM-YY or DD/MM/YY
+      let m = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2})$/);
+      if (m) {
+        const yy = parseInt(m[3], 10);
+        const year = yy < 70 ? 2000 + yy : 1900 + yy;
+        return `${year}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+      }
+      // DD-MM-YYYY or DD/MM/YYYY
+      m = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+      if (m) {
+        return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+      }
+      // Already YYYY-MM-DD
+      m = trimmed.match(/^\d{4}-\d{2}-\d{2}$/);
+      if (m) return trimmed;
+      // Can't parse — return null to avoid DB error
+      console.warn(`Cannot parse date "${val}", skipping field`);
+      return null;
+    };
+
     // 4. Process each row
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
@@ -611,7 +636,10 @@ async function handlePull(
         jobPayload.external_job_number = fieldValues["external_job_number"];
         jobPayload.sheet_job_id = fieldValues["external_job_number"];
       }
-      if (fieldValues["job_date"]) jobPayload.job_date = fieldValues["job_date"];
+      if (fieldValues["job_date"]) {
+        const parsed = normalizeDate(fieldValues["job_date"]);
+        if (parsed) jobPayload.job_date = parsed;
+      }
       if (fieldValues["priority"]) jobPayload.priority = fieldValues["priority"];
       if (fieldValues["job_type"]) jobPayload.job_type = fieldValues["job_type"];
       if (fieldValues["job_source"]) jobPayload.job_source = fieldValues["job_source"];
@@ -647,19 +675,11 @@ async function handlePull(
       // Validate minimum required fields
       const missingFields: string[] = [];
       for (const reqField of JOB_ENTRY_REQUIRED_FIELDS) {
-        if (!jobPayload[reqField] || jobPayload[reqField] === "" || jobPayload[reqField] === "UNKNOWN") {
-          // Find the header name for this field for the error message
+        const val = jobPayload[reqField];
+        if (!val || val === "" || val === "UNKNOWN") {
           const headerName = Object.entries(headerToField).find(([_, f]) => f === reqField)?.[0] || reqField;
           missingFields.push(headerName);
         }
-      }
-
-      // Also check that we have at least pickup and delivery addresses
-      if (!jobPayload.pickup_address_line1 && !jobPayload.pickup_postcode) {
-        missingFields.push("Pickup Address / Postcode");
-      }
-      if (!jobPayload.delivery_address_line1 && !jobPayload.delivery_postcode) {
-        missingFields.push("Delivery Address / Postcode");
       }
 
       if (missingFields.length > 0) {
