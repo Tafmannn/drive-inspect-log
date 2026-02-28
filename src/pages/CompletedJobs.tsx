@@ -23,7 +23,6 @@ export const CompletedJobs = () => {
             status={job.status}
             jobDate={job.job_date ?? undefined}
             distanceMiles={job.distance_miles}
-            totalPrice={job.total_price}
             collectFrom={{
               name: job.pickup_contact_name,
               phone: job.pickup_contact_phone,

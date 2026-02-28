@@ -2,16 +2,16 @@ import { useNavigate, useParams } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { useJob } from "@/hooks/useJobs";
 import { useJobExpenses } from "@/hooks/useExpenses";
-import { Loader2, Phone, MapPin, Building, Edit, ClipboardCheck, Truck, FileText, Receipt, QrCode, User, PoundSterling } from "lucide-react";
+import { Loader2, Phone, MapPin, Building, Edit, ClipboardCheck, Truck, FileText, Receipt, QrCode, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { createQrConfirmation, getQrConfirmationsForJob, buildQrUrl, type QrConfirmation } from "@/lib/qrApi";
 import { QrDisplayModal } from "@/components/QrDisplayModal";
 import { useAuth } from "@/context/AuthContext";
-import { getStatusConfig, getStatusBadgeClasses } from "@/lib/statusConfig";
+import { getStatusStyle } from "@/lib/statusConfig";
+import { UKPlate } from "@/components/UKPlate";
 
 function mapsUrl(address: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
@@ -61,8 +61,7 @@ export const JobDetail = () => {
   const pickupInspection = job.inspections.find((i) => i.type === 'pickup');
   const deliveryInspection = job.inspections.find((i) => i.type === 'delivery');
   const jobRef = job.external_job_number || job.id.slice(0, 8);
-  const statusCfg = getStatusConfig(job.status);
-  const statusClasses = getStatusBadgeClasses(job.status);
+  const statusStyle = getStatusStyle(job.status);
 
   const pickupAddress = [job.pickup_address_line1, job.pickup_city, job.pickup_postcode].filter(Boolean).join(', ');
   const deliveryAddress = [job.delivery_address_line1, job.delivery_city, job.delivery_postcode].filter(Boolean).join(', ');
@@ -74,8 +73,13 @@ export const JobDetail = () => {
         {/* Vehicle header */}
         <Card className="p-4">
           <div className="flex items-center justify-between mb-2">
-            <Badge className="bg-warning text-warning-foreground font-bold px-3 py-1">{job.vehicle_reg}</Badge>
-            <Badge className={statusClasses}>{statusCfg.label}</Badge>
+            <UKPlate reg={job.vehicle_reg} />
+            <span
+              style={{ backgroundColor: statusStyle.backgroundColor, color: statusStyle.color }}
+              className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold uppercase leading-none"
+            >
+              {statusStyle.label}
+            </span>
           </div>
           <p className="text-sm text-muted-foreground">{job.vehicle_make} {job.vehicle_model} — {job.vehicle_colour}</p>
           {job.external_job_number && <p className="text-xs text-muted-foreground mt-1">Ref: {job.external_job_number}</p>}
@@ -135,30 +139,13 @@ export const JobDetail = () => {
           {job.delivery_notes && <p className="text-xs text-muted-foreground mt-1 italic">📝 {job.delivery_notes}</p>}
         </Card>
 
-        {/* Pricing */}
-        {(job.distance_miles != null || job.total_price != null) && (
-          <Card className="p-4 space-y-2">
-            <h3 className="font-semibold text-sm text-muted-foreground flex items-center gap-1.5">
-              <PoundSterling className="h-4 w-4" /> Pricing
-            </h3>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              {job.distance_miles != null && <div><span className="text-muted-foreground">Distance:</span> {job.distance_miles} mi</div>}
-              {job.rate_per_mile != null && <div><span className="text-muted-foreground">Rate:</span> £{job.rate_per_mile}/mi</div>}
-              {job.total_price != null && <div><span className="text-muted-foreground">Total:</span> <strong>£{job.total_price}</strong></div>}
-              {job.caz_ulez_flag && <div><span className="text-muted-foreground">CAZ/ULEZ:</span> {job.caz_ulez_flag}</div>}
-              {job.caz_ulez_cost != null && <div><span className="text-muted-foreground">CAZ Cost:</span> £{job.caz_ulez_cost}</div>}
-              {job.other_expenses != null && <div><span className="text-muted-foreground">Other:</span> £{job.other_expenses}</div>}
-            </div>
-          </Card>
-        )}
-
         {/* Inspections */}
         <Card className="p-4 space-y-3">
           <h3 className="font-semibold">Inspections</h3>
           <div className="flex items-center justify-between">
             <span className="text-sm">Pickup Inspection</span>
             {pickupInspection ? (
-              <Badge className="bg-success text-success-foreground">Complete</Badge>
+              <span style={{ backgroundColor: '#34C759', color: '#FFFFFF' }} className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase leading-none">Complete</span>
             ) : (
               <Button size="sm" onClick={() => navigate(`/inspection/${job.id}/pickup`)}>
                 <ClipboardCheck className="h-4 w-4 mr-1" /> Start
@@ -168,7 +155,7 @@ export const JobDetail = () => {
           <div className="flex items-center justify-between">
             <span className="text-sm">Delivery Inspection</span>
             {deliveryInspection ? (
-              <Badge className="bg-success text-success-foreground">Complete</Badge>
+              <span style={{ backgroundColor: '#34C759', color: '#FFFFFF' }} className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase leading-none">Complete</span>
             ) : (
               <Button size="sm" onClick={() => navigate(`/inspection/${job.id}/delivery`)}>
                 <Truck className="h-4 w-4 mr-1" /> Start
@@ -196,11 +183,11 @@ export const JobDetail = () => {
                 <div key={qr.id} className="flex justify-between text-xs py-1">
                   <span className="text-muted-foreground capitalize">{qr.event_type}</span>
                   {qr.confirmed_at ? (
-                    <Badge className="bg-success text-success-foreground text-[10px]">
+                    <span style={{ backgroundColor: '#34C759', color: '#FFFFFF' }} className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold leading-none">
                       ✓ {qr.customer_name} – {new Date(qr.confirmed_at).toLocaleString("en-GB")}
-                    </Badge>
+                    </span>
                   ) : (
-                    <Badge variant="outline" className="text-[10px]">Pending</Badge>
+                    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold leading-none border border-border text-muted-foreground">Pending</span>
                   )}
                 </div>
               ))}
@@ -214,7 +201,7 @@ export const JobDetail = () => {
             <h3 className="font-semibold text-sm flex items-center gap-2">
               <Receipt className="h-4 w-4 text-muted-foreground" /> Expenses
             </h3>
-            <Badge variant="outline">{jobExpenses?.length ?? 0} – £{expenseTotal.toFixed(2)}</Badge>
+            <span className="text-xs text-muted-foreground">{jobExpenses?.length ?? 0} items</span>
           </div>
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={() => navigate(`/expenses?jobId=${job.id}`)}>View Expenses</Button>
