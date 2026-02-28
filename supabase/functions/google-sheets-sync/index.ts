@@ -190,16 +190,16 @@ async function appendRow(
 // ─── Full 45-column Job Master headers (canonical order) ────────────
 
 const JOB_MASTER_HEADERS = [
-  "Created At", "Updated At", "App Job ID", "Status",
-  "Client Name", "Client Notes", "Client Phone", "Client Email", "Client Company",
+  "Job ID", "Job Date", "Job Status", "Job Priority", "Job Type", "Job Source",
+  "Created At", "Updated At", "Client Name", "Client Notes",
   "Pickup Contact Name", "Pickup Contact Phone", "Pickup Address Line 1", "Pickup Town / City", "Pickup Postcode",
   "Pickup Time From", "Pickup Time To", "Pickup Access Notes",
-  "Delivery Contact Name", "Delivery Contact Pho", "Delivery Address Line 1", "Delivery Town / City", "Delivery Postcode",
-  "Delivery Time Fr", "Delivery Time To", "Delivery Access Notes", "Promise By Time",
+  "Delivery Contact Name", "Delivery Contact Phone", "Delivery Address Line 1", "Delivery Town / City", "Delivery Postcode",
+  "Delivery Time From", "Delivery Time To", "Delivery Access Notes", "Promise By Time",
   "Vehicle Reg", "Vehicle Make", "Vehicle Model", "Vehicle Colour", "Vehicle Type", "Vehicle Fuel Type",
   "Distance (Miles)", "Rate (£ per mile)", "Total Price (£)", "CAZ/ULEZ?", "CAZ/ULEZ Cost (£)", "Other Expenses (£)",
   "Driver Name", "Driver ID", "Job Notes", "Cancellation Reason",
-  "Sync to App?", "Sync to Map?", "Map Job ID",
+  "Sync to App?", "App Job ID", "Sync to Map?", "Map Job ID",
 ];
 
 // ─── Job Entry column → app field mapping ────────────────────────────
@@ -382,9 +382,11 @@ Deno.serve(async (req) => {
       
       // Only validate Job Master headers if testing Job Master
       if (sheetName === "Job Master" || sheetName === jobMasterTab) {
-        const missing = JOB_MASTER_HEADERS.filter(h => !headers.includes(h));
+        // Only check critical headers, not all — sheet may have extra/reordered columns
+        const criticalHeaders = ["App Job ID", "Job Status", "Vehicle Reg", "Pickup Address Line 1", "Delivery Address Line 1"];
+        const missing = criticalHeaders.filter(h => !headers.includes(h));
         if (missing.length > 0) {
-          return respond({ success: false, error: `Missing headers: ${missing.join(", ")}`, headers }, 400);
+          return respond({ success: false, error: `Missing critical headers: ${missing.join(", ")}`, headers }, 400);
         }
       }
       
@@ -808,15 +810,16 @@ async function upsertJobMasterRow(
   
   const rowValues = JOB_MASTER_HEADERS.map((header: string) => {
     switch (header) {
+      case "Job ID": return newJob.external_job_number || "";
+      case "Job Date": return jobPayload.job_date || "";
+      case "Job Status": return sheetStatus;
+      case "Job Priority": return jobPayload.priority || "";
+      case "Job Type": return jobPayload.job_type || "";
+      case "Job Source": return jobPayload.job_source || "";
       case "Created At": return newJob.created_at || "";
       case "Updated At": return new Date().toISOString();
-      case "App Job ID": return newJob.id;
-      case "Status": return sheetStatus;
       case "Client Name": return jobPayload.client_name || "";
       case "Client Notes": return jobPayload.client_notes || "";
-      case "Client Phone": return jobPayload.client_phone || "";
-      case "Client Email": return jobPayload.client_email || "";
-      case "Client Company": return jobPayload.client_company || "";
       case "Pickup Contact Name": return jobPayload.pickup_contact_name || "";
       case "Pickup Contact Phone": return jobPayload.pickup_contact_phone || "";
       case "Pickup Address Line 1": return jobPayload.pickup_address_line1 || "";
@@ -826,11 +829,11 @@ async function upsertJobMasterRow(
       case "Pickup Time To": return jobPayload.pickup_time_to || "";
       case "Pickup Access Notes": return jobPayload.pickup_access_notes || "";
       case "Delivery Contact Name": return jobPayload.delivery_contact_name || "";
-      case "Delivery Contact Pho": return jobPayload.delivery_contact_phone || "";
+      case "Delivery Contact Phone": return jobPayload.delivery_contact_phone || "";
       case "Delivery Address Line 1": return jobPayload.delivery_address_line1 || "";
       case "Delivery Town / City": return jobPayload.delivery_city || "";
       case "Delivery Postcode": return jobPayload.delivery_postcode || "";
-      case "Delivery Time Fr": return jobPayload.delivery_time_from || "";
+      case "Delivery Time From": return jobPayload.delivery_time_from || "";
       case "Delivery Time To": return jobPayload.delivery_time_to || "";
       case "Delivery Access Notes": return jobPayload.delivery_access_notes || "";
       case "Promise By Time": return jobPayload.promise_by_time || "";
@@ -851,6 +854,7 @@ async function upsertJobMasterRow(
       case "Job Notes": return jobPayload.job_notes || "";
       case "Cancellation Reason": return jobPayload.cancellation_reason || "";
       case "Sync to App?": return "YES";
+      case "App Job ID": return newJob.id;
       case "Sync to Map?": return "NO";
       case "Map Job ID": return "";
       default: return "";
@@ -940,15 +944,16 @@ async function handlePush(
 
       const rowValues = JOB_MASTER_HEADERS.map((header: string) => {
         switch (header) {
+          case "Job ID": return job.external_job_number || "";
+          case "Job Date": return job.job_date || "";
+          case "Job Status": return sheetStatus;
+          case "Job Priority": return job.priority || "";
+          case "Job Type": return job.job_type || "";
+          case "Job Source": return job.job_source || "";
           case "Created At": return job.created_at || "";
           case "Updated At": return job.updated_at || "";
-          case "App Job ID": return job.id;
-          case "Status": return sheetStatus;
           case "Client Name": return job.client_name || "";
           case "Client Notes": return job.client_notes || "";
-          case "Client Phone": return job.client_phone || "";
-          case "Client Email": return job.client_email || "";
-          case "Client Company": return job.client_company || "";
           case "Pickup Contact Name": return job.pickup_contact_name || "";
           case "Pickup Contact Phone": return job.pickup_contact_phone || "";
           case "Pickup Address Line 1": return job.pickup_address_line1 || "";
@@ -958,11 +963,11 @@ async function handlePush(
           case "Pickup Time To": return job.pickup_time_to || "";
           case "Pickup Access Notes": return job.pickup_access_notes || "";
           case "Delivery Contact Name": return job.delivery_contact_name || "";
-          case "Delivery Contact Pho": return job.delivery_contact_phone || "";
+          case "Delivery Contact Phone": return job.delivery_contact_phone || "";
           case "Delivery Address Line 1": return job.delivery_address_line1 || "";
           case "Delivery Town / City": return job.delivery_city || "";
           case "Delivery Postcode": return job.delivery_postcode || "";
-          case "Delivery Time Fr": return job.delivery_time_from || "";
+          case "Delivery Time From": return job.delivery_time_from || "";
           case "Delivery Time To": return job.delivery_time_to || "";
           case "Delivery Access Notes": return job.delivery_access_notes || "";
           case "Promise By Time": return job.promise_by_time || "";
@@ -983,6 +988,7 @@ async function handlePush(
           case "Job Notes": return job.job_notes || "";
           case "Cancellation Reason": return job.cancellation_reason || "";
           case "Sync to App?": return "YES";
+          case "App Job ID": return job.id;
           case "Sync to Map?": return job.sync_to_map ? "YES" : "NO";
           case "Map Job ID": return "";
           default: return "";
