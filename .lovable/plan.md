@@ -1,49 +1,60 @@
 
 
+## Audit Summary
 
-## Plan: UK Postcode Lookup using Google Maps Geocoding API
+The current system already has most of the right architecture in place:
 
-### Approach
-Use the existing `GOOGLE_MAPS_API_KEY` secret with the Google Maps Geocoding API to resolve UK postcodes into address suggestions. No new secrets needed.
+### What works well
+- **Job status updates are non-blocking**: `handleFinalSubmit` in `InspectionFlow.tsx` already submits inspection metadata + signatures synchronously, then queues photos to the background via `addPendingUpload()` (fire-and-forget)
+- **Background retry**: After queuing, it calls `retryAllPending()` as fire-and-forget
+- **Signatures upload synchronously** (lines 514-533) — this is correct since they're small and critical for POD
+- **POD viewer** already uses `resolveImageUrl` for GCS proxying
 
-### Changes
+### What needs changing
 
-#### 1. Create edge function `supabase/functions/postcode-lookup/index.ts`
-- Accept `POST { postcode: "LS1 2AB" }`
-- Validate UK postcode format
-- Call `https://maps.googleapis.com/maps/api/geocode/json?address={postcode},+UK&components=country:GB&key={GOOGLE_MAPS_API_KEY}`
-- Parse `results[]` and map each to `{ id, label, line1, town, postcode }` using `address_components`
-- Return `{ results: AxentraAddressSuggestion[] }`
-- Include standard CORS headers
+1. **Pending Uploads screen is per-photo, not per-job** — each queued asset gets its own row, which is noisy and non-actionable for drivers
+2. **No automatic background retry on app launch** — if uploads fail and user doesn't visit Pending Uploads, they stay stuck
+3. **Dashboard count** shows raw pending photo count, not job count
+4. **`safePushToSheet` is not called after background uploads complete** — only called on mutation success, which happens before uploads finish
+5. **No sheet sync trigger after retry success**
 
-#### 2. Add to `supabase/config.toml`
-- `[functions.postcode-lookup]` with `verify_jwt = false`
+### Plan
 
-#### 3. Create `src/lib/postcodeApi.ts`
-- Export `lookupPostcode(postcode: string): Promise<AddressSuggestion[]>`
-- Calls the edge function, returns parsed results
-- Handles errors gracefully (returns empty array)
+#### Task 1: Add job-level grouping helpers to `pendingUploads.ts`
+- Add `getPendingUploadsByJob()` that returns `Map<jobId, { jobId, jobNumber, vehicleReg, pendingCount, failedCount, lastErrorAt, items }>` 
+- Add `retryJobUploads(jobId)` that retries only items for a specific job
+- After all items for a job succeed, fire `safePushToSheet([jobId])`
+- No schema changes
 
-#### 4. Update `src/pages/JobForm.tsx` — Pickup section
-- Add "Find Address" button next to Pickup Postcode field
-- On click: validate postcode, call `lookupPostcode()`, show dropdown of suggestions
-- On suggestion select: fill `pickup_address_line1`, `pickup_city`, `pickup_postcode` via form refs
-- Show "Can't find it? Enter address manually" footer in dropdown
-- All fields remain editable at all times
+#### Task 2: Redesign `PendingUploads.tsx` to job-level view
+- One card per job (not per photo)
+- Show: job number, vehicle reg, pending/failed count, last error timestamp
+- "Retry" button per job calls `retryJobUploads(jobId)`
+- "Retry All" retries all jobs
+- Remove per-photo detail rows
 
-#### 5. Update `src/pages/JobForm.tsx` — Delivery section
-- Same pattern as Pickup: "Find Address" button, dropdown, manual entry footer
+#### Task 3: Update Dashboard count to show job count, not photo count
+- In `useJobs.ts` `useDashboardCounts`, change `pendingUploads` to count distinct jobs with pending/failed uploads (not raw item count)
 
-#### 6. State management in JobForm
-- Add state: `pickupSuggestions`, `deliverySuggestions`, `pickupLookupLoading`, `deliveryLookupLoading`
-- Suggestions dropdown rendered as a simple list below the postcode field
-- Selecting a suggestion programmatically sets form field values and triggers route calculation
+#### Task 4: Add auto-retry on app mount
+- In `App.tsx` or a new `useBackgroundUploader` hook, trigger `retryAllPending()` once on mount (fire-and-forget)
+- This handles edge case A (app crash during upload — on reopen, retries automatically)
 
-### No draft/resume changes
-The existing autosave logic already works correctly — it saves on form change and restores on revisit. No gating changes needed per the user's current request (they only asked for postcode lookup with Google Maps).
+#### Task 5: Trigger `safePushToSheet` after successful job uploads
+- In the retry logic, after all items for a job complete, call `safePushToSheet([jobId])`
+- This ensures sheet sync happens even when uploads were deferred
 
-### Files
-1. **New**: `supabase/functions/postcode-lookup/index.ts`
-2. **Edit**: `supabase/config.toml` — add function config
-3. **New**: `src/lib/postcodeApi.ts`
-4. **Edit**: `src/pages/JobForm.tsx` — add Find Address UI for both sections
+### Files to modify
+- `src/lib/pendingUploads.ts` — add job-level grouping + retry + sheet sync trigger
+- `src/pages/PendingUploads.tsx` — redesign to job-level cards
+- `src/hooks/useJobs.ts` — change pending count to distinct job count
+- `src/App.tsx` — add auto-retry on mount (one line)
+
+### Files NOT modified
+- No DB schema changes
+- No Google Sheets changes
+- No edge function changes
+- `InspectionFlow.tsx` unchanged (already non-blocking)
+- `PodReport.tsx` unchanged (already works with partial uploads)
+- `safePushToSheet.ts` unchanged
+
