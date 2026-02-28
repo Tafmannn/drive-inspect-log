@@ -8,16 +8,6 @@ const corsHeaders = {
 
 const UK_POSTCODE_RE = /^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i;
 
-function getComponent(components: any[], type: string): string {
-  const c = components.find((c: any) => c.types?.includes(type));
-  return c?.long_name ?? "";
-}
-
-function getShortComponent(components: any[], type: string): string {
-  const c = components.find((c: any) => c.types?.includes(type));
-  return c?.short_name ?? "";
-}
-
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -42,36 +32,88 @@ serve(async (req) => {
 
     const normalised = postcode.trim().toUpperCase();
 
-    const url = new URL("https://maps.googleapis.com/maps/api/geocode/json");
-    url.searchParams.set("address", `${normalised}, UK`);
-    url.searchParams.set("components", "country:GB");
-    url.searchParams.set("key", MAPS_KEY);
+    // Use Google Places Text Search (New) for street-level results
+    const resp = await fetch("https://places.googleapis.com/v1/places:searchText", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": MAPS_KEY,
+        "X-Goog-FieldMask": "places.id,places.formattedAddress,places.addressComponents,places.displayName",
+      },
+      body: JSON.stringify({
+        textQuery: normalised,
+        regionCode: "GB",
+        languageCode: "en",
+        maxResultCount: 10,
+        locationBias: {
+          rectangle: {
+            low: { latitude: 49.9, longitude: -8.2 },
+            high: { latitude: 60.9, longitude: 1.8 },
+          },
+        },
+      }),
+    });
 
-    const resp = await fetch(url.toString());
     const data = await resp.json();
 
-    if (data.status !== "OK" || !data.results?.length) {
+    if (!data.places?.length) {
+      // Fallback to Geocoding API for basic postcode resolution
+      const geoUrl = new URL("https://maps.googleapis.com/maps/api/geocode/json");
+      geoUrl.searchParams.set("address", `${normalised}, UK`);
+      geoUrl.searchParams.set("components", "country:GB");
+      geoUrl.searchParams.set("key", MAPS_KEY);
+
+      const geoResp = await fetch(geoUrl.toString());
+      const geoData = await geoResp.json();
+
+      if (geoData.status !== "OK" || !geoData.results?.length) {
+        return new Response(
+          JSON.stringify({ results: [], error: "No addresses found" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const results = geoData.results.map((r: any, i: number) => {
+        const c = r.address_components || [];
+        const streetNum = c.find((x: any) => x.types?.includes("street_number"))?.long_name || "";
+        const route = c.find((x: any) => x.types?.includes("route"))?.long_name || "";
+        const line1 = [streetNum, route].filter(Boolean).join(" ") || r.formatted_address?.split(",")[0] || "";
+        const town = c.find((x: any) => x.types?.includes("postal_town"))?.long_name
+          || c.find((x: any) => x.types?.includes("locality"))?.long_name || "";
+        const pc = c.find((x: any) => x.types?.includes("postal_code"))?.long_name || normalised;
+
+        return { id: `geo-${i}`, label: r.formatted_address, line1, town, postcode: pc };
+      });
+
       return new Response(
-        JSON.stringify({ results: [], error: "No addresses found" }),
+        JSON.stringify({ results }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const results = data.results.map((r: any, i: number) => {
-      const c = r.address_components || [];
-      const streetNumber = getComponent(c, "street_number");
-      const route = getComponent(c, "route");
-      const line1 = [streetNumber, route].filter(Boolean).join(" ") || r.formatted_address?.split(",")[0] || "";
-      const town =
-        getComponent(c, "postal_town") ||
-        getComponent(c, "locality") ||
-        getShortComponent(c, "administrative_area_level_2") ||
-        "";
-      const pc = getComponent(c, "postal_code") || normalised;
+    // Parse Places (New) results
+    const results = data.places.map((place: any, i: number) => {
+      const components = place.addressComponents || [];
+      const getComp = (type: string) =>
+        components.find((c: any) => c.types?.includes(type))?.longText || "";
+
+      const streetNum = getComp("street_number");
+      const route = getComp("route");
+      const subpremise = getComp("subpremise");
+      const premise = getComp("premise");
+      
+      let line1 = [subpremise, premise, streetNum, route].filter(Boolean).join(" ");
+      if (!line1) {
+        // Use display name or first part of formatted address
+        line1 = place.displayName?.text || place.formattedAddress?.split(",")[0] || "";
+      }
+      
+      const town = getComp("postal_town") || getComp("locality") || "";
+      const pc = getComp("postal_code") || normalised;
 
       return {
-        id: `${i}-${pc}`,
-        label: r.formatted_address || `${line1}, ${town}, ${pc}`,
+        id: place.id || `place-${i}`,
+        label: place.formattedAddress || `${line1}, ${town}, ${pc}`,
         line1,
         town,
         postcode: pc,

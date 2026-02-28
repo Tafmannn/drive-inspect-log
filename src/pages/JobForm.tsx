@@ -68,11 +68,30 @@ export const JobForm = () => {
     isFeatureEnabled("MAPS_ENABLED").then(setMapsEnabled);
   }, []);
 
+  // Helper: check if draft has all required page-1 fields
+  const isDraftComplete = (d: Record<string, string>): boolean => {
+    const requiredFields = [
+      "vehicle_reg", "pickup_contact_name", "pickup_contact_phone",
+      "pickup_address_line1", "pickup_city", "pickup_postcode",
+      "delivery_contact_name", "delivery_contact_phone",
+      "delivery_address_line1", "delivery_city", "delivery_postcode",
+    ];
+    // vehicle_make/model may be stored as controlled state keys
+    const hasMake = !!(d.vehicle_make || d.vehicleMake);
+    const hasModel = !!(d.vehicle_model || d.vehicleModel);
+    const hasColour = !!d.vehicle_colour;
+    return hasMake && hasModel && hasColour &&
+      requiredFields.every((f) => !!d[f]?.trim());
+  };
+
   // ─── AUTOSAVE: check for draft on mount (new job only) ───
   useEffect(() => {
     if (!dk || isEdit) return;
-    const draft = loadDraft<JobFormDraft>(dk);
-    if (draft) setShowDraftPrompt(true);
+    const draft = loadDraft<Record<string, string> & JobFormDraft>(dk);
+    // Only show resume prompt if draft has all required page-1 fields
+    if (draft?.data && isDraftComplete(draft.data)) {
+      setShowDraftPrompt(true);
+    }
   }, [dk, isEdit]);
 
   // ─── AUTOSAVE: save draft on form input (new job only) ───
