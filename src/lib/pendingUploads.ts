@@ -316,5 +316,130 @@ export async function retryAllPending(options?: {
     else failed++;
   }
 
+  // After retrying all, trigger sheet sync for any jobs that are now fully uploaded
+  try {
+    const { safePushToSheet } = await import("./safePushToSheet");
+    const completedJobIds = getFullyUploadedJobIds();
+    if (completedJobIds.length > 0) {
+      safePushToSheet(completedJobIds); // fire-and-forget
+    }
+  } catch {
+    // Ignore — sheet sync is best-effort
+  }
+
   return { succeeded, failed };
+}
+
+// ─────────────────────────────────────────────────────────────
+// Job-level grouping helpers
+// ─────────────────────────────────────────────────────────────
+
+export interface JobUploadSummary {
+  jobId: string;
+  jobNumber: string | null;
+  vehicleReg: string | null;
+  pendingCount: number;
+  failedCount: number;
+  lastErrorAt: string | null;
+}
+
+/**
+ * Group all actionable (pending/failed) uploads by job.
+ * Returns one summary per job for the job-level Pending Uploads screen.
+ */
+export function getPendingUploadsByJob(): JobUploadSummary[] {
+  const all = loadAll().filter(
+    (u) => u.status === "pending" || u.status === "failed",
+  );
+
+  const map = new Map<string, JobUploadSummary>();
+
+  for (const u of all) {
+    let entry = map.get(u.jobId);
+    if (!entry) {
+      entry = {
+        jobId: u.jobId,
+        jobNumber: u.jobNumber ?? null,
+        vehicleReg: u.vehicleReg ?? null,
+        pendingCount: 0,
+        failedCount: 0,
+        lastErrorAt: null,
+      };
+      map.set(u.jobId, entry);
+    }
+
+    if (u.status === "pending") entry.pendingCount++;
+    if (u.status === "failed") {
+      entry.failedCount++;
+      if (u.errorMessage) {
+        // Track most recent error timestamp
+        const errTime = u.completedAt || u.createdAt;
+        if (!entry.lastErrorAt || errTime > entry.lastErrorAt) {
+          entry.lastErrorAt = errTime;
+        }
+      }
+    }
+  }
+
+  return Array.from(map.values());
+}
+
+/**
+ * Count distinct jobs with pending/failed uploads.
+ */
+export function getPendingJobCount(): number {
+  return getPendingUploadsByJob().length;
+}
+
+/**
+ * Retry uploads for a single job. Returns success/failure counts.
+ */
+export async function retryJobUploads(
+  jobId: string,
+): Promise<{ succeeded: number; failed: number }> {
+  const targets = loadAll().filter(
+    (u) =>
+      u.jobId === jobId &&
+      (u.status === "pending" || u.status === "failed"),
+  );
+
+  let succeeded = 0;
+  let failed = 0;
+
+  for (const u of targets) {
+    const ok = await retryUpload(u.id);
+    if (ok) succeeded++;
+    else failed++;
+  }
+
+  // If all items for this job succeeded, trigger sheet sync
+  if (failed === 0 && succeeded > 0) {
+    try {
+      const { safePushToSheet } = await import("./safePushToSheet");
+      safePushToSheet([jobId]); // fire-and-forget
+    } catch {
+      // Ignore
+    }
+  }
+
+  return { succeeded, failed };
+}
+
+/**
+ * Get job IDs where ALL items are "done" (fully uploaded).
+ * Used internally to trigger sheet sync after retryAllPending.
+ */
+function getFullyUploadedJobIds(): string[] {
+  const all = loadAll();
+  const jobMap = new Map<string, boolean>();
+
+  for (const u of all) {
+    const current = jobMap.get(u.jobId);
+    if (current === false) continue; // already has a non-done item
+    jobMap.set(u.jobId, u.status === "done");
+  }
+
+  return Array.from(jobMap.entries())
+    .filter(([, allDone]) => allDone)
+    .map(([jobId]) => jobId);
 }
