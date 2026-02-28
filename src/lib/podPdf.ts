@@ -122,7 +122,7 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
   doc.text("Proof of Delivery", pageWidth / 2, 19, { align: "center" });
 
   doc.setFontSize(8);
-  doc.text(`Ref: ${ref}`, pageWidth - MARGIN, 12, { align: "right" });
+  doc.text(`Job ${ref}`, pageWidth - MARGIN, 12, { align: "right" });
   doc.text(safeDate(job.completed_at || new Date().toISOString()), pageWidth - MARGIN, 18, { align: "right" });
 
   let y = 38;
@@ -143,7 +143,7 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
       ["Make / Model", `${job.vehicle_make} ${job.vehicle_model}`],
       ["Colour", job.vehicle_colour],
       ...(job.vehicle_year ? [["Year", job.vehicle_year]] : []),
-      ["Job Reference", ref],
+      ["Job ID", `Job ${ref}`],
       ["Route", `${job.pickup_city || "—"} \u2192 ${job.delivery_city || "—"}`],
       ["Collection Status", pickup ? "\u2713 Collected" : "Not collected"],
       ["Delivery Status", delivery ? "\u2713 Delivered" : "Not delivered"],
