@@ -81,7 +81,7 @@ export const JobCard = ({
           </Avatar>
           <div className="min-w-0">
             <h3 className="font-semibold text-sm leading-tight truncate">{displayName}</h3>
-            <p className="text-xs text-muted-foreground truncate">{jobId}</p>
+            <p className="text-xs font-medium text-primary truncate">Job {jobId}</p>
           </div>
         </div>
         <div className="shrink-0 ml-2">

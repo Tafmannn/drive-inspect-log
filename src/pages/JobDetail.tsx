@@ -68,7 +68,7 @@ export const JobDetail = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <AppHeader title={job.vehicle_reg} showBack onBack={() => navigate('/jobs')} />
+      <AppHeader title={`Job ${jobRef}`} showBack onBack={() => navigate('/jobs')} />
       <div className="p-4 space-y-4 max-w-lg mx-auto">
         {/* Vehicle header */}
         <Card className="p-4">
@@ -81,8 +81,8 @@ export const JobDetail = () => {
               {statusStyle.label}
             </span>
           </div>
+          <p className="text-sm font-semibold text-primary mt-1">Job {jobRef}</p>
           <p className="text-sm text-muted-foreground">{job.vehicle_make} {job.vehicle_model} — {job.vehicle_colour}</p>
-          {job.external_job_number && <p className="text-xs text-muted-foreground mt-1">Ref: {job.external_job_number}</p>}
           <p className="text-sm font-medium mt-2">{job.pickup_city} → {job.delivery_city}</p>
           {job.route_distance_miles != null && (
             <p className="text-xs text-muted-foreground mt-1">

@@ -183,7 +183,7 @@ function JobsTab({ archived = false }: { archived?: boolean }) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Ref</TableHead>
+            <TableHead>Job ID</TableHead>
             <TableHead>Reg</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Created</TableHead>
@@ -193,7 +193,7 @@ function JobsTab({ archived = false }: { archived?: boolean }) {
         <TableBody>
           {jobs.map((job) => (
             <TableRow key={job.id}>
-              <TableCell className="font-medium">{job.external_job_number || job.id.slice(0, 8)}</TableCell>
+              <TableCell className="font-medium">Job {job.external_job_number || job.id.slice(0, 8)}</TableCell>
               <TableCell><UKPlate reg={job.vehicle_reg} /></TableCell>
               <TableCell>
                 {(() => {

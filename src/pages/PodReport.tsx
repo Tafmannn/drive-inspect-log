@@ -171,7 +171,7 @@ export const PodReport = () => {
               </div>
               <div className="text-right text-xs">
                 <div className="font-medium tracking-widest">AXENTRA</div>
-                <div className="opacity-70">Ref: <span className="font-mono">{ref}</span></div>
+                <div className="opacity-70">Job <span className="font-mono">{ref}</span></div>
               </div>
             </div>
 
@@ -192,7 +192,7 @@ export const PodReport = () => {
                 <DetailRow label="Make / Model" value={`${job.vehicle_make} ${job.vehicle_model}`} />
                 <DetailRow label="Colour" value={job.vehicle_colour} />
                 {job.vehicle_year && <DetailRow label="Year" value={job.vehicle_year} />}
-                <DetailRow label="Job Reference" value={ref} />
+                <DetailRow label="Job ID" value={`Job ${ref}`} />
                 <DetailRow label="Route" value={`${job.pickup_city || "—"} → ${job.delivery_city || "—"}`} />
                 <DetailRow label="Collection Status" value={pickup ? "✓ Collected" : "Not collected"} />
                 <DetailRow label="Delivery Status" value={delivery ? "✓ Delivered" : "Not delivered"} />
