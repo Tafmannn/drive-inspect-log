@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { resolveImageUrl } from "@/lib/gcsProxyUrl";
 import { AppHeader } from "@/components/AppHeader";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -278,15 +279,15 @@ export const PodReport = () => {
                 <h3 className="text-sm font-semibold">Photos</h3>
                 <PhotoViewer
                   title="Collection Photos"
-                  photos={pickupPhotos.map(p => ({ url: p.url, label: p.label || p.type.replace("pickup_", "").replace(/_/g, " ") }))}
+                  photos={pickupPhotos.map(p => ({ url: resolveImageUrl(p.url) || p.url, label: p.label || p.type.replace("pickup_", "").replace(/_/g, " ") }))}
                 />
                 <PhotoViewer
                   title="Delivery Photos"
-                  photos={deliveryPhotos.map(p => ({ url: p.url, label: p.label || p.type.replace("delivery_", "").replace(/_/g, " ") }))}
+                  photos={deliveryPhotos.map(p => ({ url: resolveImageUrl(p.url) || p.url, label: p.label || p.type.replace("delivery_", "").replace(/_/g, " ") }))}
                 />
                 <PhotoViewer
                   title="Damage Close-ups"
-                  photos={damagePhotos.map(p => ({ url: p.url, label: p.label || "Damage" }))}
+                  photos={damagePhotos.map(p => ({ url: resolveImageUrl(p.url) || p.url, label: p.label || "Damage" }))}
                 />
                 <p className="text-[11px] text-muted-foreground pt-1">
                   Full-resolution images are stored securely within Axentra and can be supplied on request.
@@ -297,10 +298,10 @@ export const PodReport = () => {
                 <h3 className="text-sm font-semibold">Signatures</h3>
                 <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
                   {[
-                    { label: "Pickup Driver", name: pickup?.inspected_by_name, url: pickup?.driver_signature_url },
-                    { label: "Pickup Customer", name: pickup?.customer_name, url: pickup?.customer_signature_url },
-                    { label: "Delivery Driver", name: delivery?.inspected_by_name, url: delivery?.driver_signature_url },
-                    { label: "Delivery Customer", name: delivery?.customer_name, url: delivery?.customer_signature_url },
+                    { label: "Pickup Driver", name: pickup?.inspected_by_name, url: resolveImageUrl(pickup?.driver_signature_url) },
+                    { label: "Pickup Customer", name: pickup?.customer_name, url: resolveImageUrl(pickup?.customer_signature_url) },
+                    { label: "Delivery Driver", name: delivery?.inspected_by_name, url: resolveImageUrl(delivery?.driver_signature_url) },
+                    { label: "Delivery Customer", name: delivery?.customer_name, url: resolveImageUrl(delivery?.customer_signature_url) },
                   ].map((sig, i) => (
                     <div key={i} className="space-y-1">
                       <div className="text-[10px] text-muted-foreground font-medium">{sig.label}</div>
