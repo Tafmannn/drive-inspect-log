@@ -20,7 +20,6 @@ export const JobList = () => {
   const navigate = useNavigate();
   const { data: jobs, isLoading } = useActiveJobs();
 
-  // Sort by job_date ascending (soonest first), then created_at
   const sortedJobs = jobs?.slice().sort((a, b) => {
     if (a.job_date && b.job_date) return a.job_date.localeCompare(b.job_date);
     if (a.job_date) return -1;
@@ -30,11 +29,7 @@ export const JobList = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <AppHeader
-        title="Your Current Jobs"
-        showBack
-        onBack={() => navigate('/')}
-      >
+      <AppHeader title="Your Current Jobs" showBack onBack={() => navigate('/')}>
         <Button size="sm" variant="ghost" className="text-app-header-foreground hover:bg-white/20" onClick={() => navigate('/jobs/new')}>
           <Plus className="h-5 w-5" />
         </Button>
@@ -65,7 +60,6 @@ export const JobList = () => {
               status={job.status}
               jobDate={job.job_date ?? undefined}
               distanceMiles={job.distance_miles}
-              totalPrice={job.total_price}
               collectFrom={{
                 name: job.pickup_contact_name,
                 phone: job.pickup_contact_phone,

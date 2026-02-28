@@ -19,7 +19,6 @@ interface JobCardProps {
   status?: string;
   jobDate?: string;
   distanceMiles?: number | null;
-  totalPrice?: number | null;
   collectFrom: ContactInfo;
   deliverTo: ContactInfo;
   instructions?: string;
@@ -54,7 +53,6 @@ export const JobCard = ({
   status,
   jobDate,
   distanceMiles,
-  totalPrice,
   collectFrom,
   deliverTo,
   instructions,
@@ -70,7 +68,6 @@ export const JobCard = ({
   const summaryParts: string[] = [];
   if (jobDate) summaryParts.push(formatDate(jobDate));
   if (distanceMiles != null) summaryParts.push(`${distanceMiles} mi`);
-  if (totalPrice != null) summaryParts.push(`£${totalPrice}`);
 
   return (
     <Card className="p-4 mb-3 border border-border cursor-pointer active:bg-muted/50 transition-colors" onClick={onCardClick}>
@@ -92,7 +89,7 @@ export const JobCard = ({
         </div>
       </div>
 
-      {/* Summary line */}
+      {/* Summary line — no price */}
       {(summaryParts.length > 0 || statusStyle) && (
         <div className="flex items-center gap-2 mb-3 flex-wrap">
           {summaryParts.length > 0 && (

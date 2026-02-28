@@ -6,7 +6,7 @@ import { useDashboardCounts } from "@/hooks/useJobs";
 import { toast } from "@/hooks/use-toast";
 import { exportJobsCsv, exportInspectionsCsv } from "@/lib/export";
 import { exportExpensesCsv } from "@/lib/expenseApi";
-import { pullFromSheet } from "@/lib/sheetSyncApi";
+import { pushToSheet, pullFromSheet } from "@/lib/sheetSyncApi";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
@@ -17,7 +17,7 @@ export const Dashboard = () => {
   const { data: counts, isLoading } = useDashboardCounts();
   const { isAdmin } = useAuth();
   const [exporting, setExporting] = useState(false);
-  const [pulling, setPulling] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const qc = useQueryClient();
 
   const handleExport = async (type: 'jobs' | 'inspections' | 'expenses') => {
@@ -35,19 +35,29 @@ export const Dashboard = () => {
   };
 
   const handleDownloadJobs = async () => {
-    setPulling(true);
+    setSyncing(true);
     try {
+      // Phase 1: Push all app jobs to Job Master
+      try {
+        await pushToSheet();
+      } catch (pushErr: unknown) {
+        console.warn("Push phase warning:", pushErr);
+        // Non-fatal: continue to pull
+      }
+
+      // Phase 2: Pull new jobs from Job Entry
       const result = await pullFromSheet();
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
+      qc.invalidateQueries({ queryKey: ["admin-jobs"] });
       toast({
-        title: 'Jobs Downloaded',
-        description: `${result.rows_created} new, ${result.rows_skipped} skipped, ${result.errors?.length ?? 0} errors.`,
+        title: 'Jobs synced',
+        description: `${result.rows_created} new, ${result.rows_updated} updated, ${result.rows_skipped} skipped.`,
       });
     } catch (e: unknown) {
-      toast({ title: 'Download failed', description: e instanceof Error ? e.message : 'Unknown error', variant: 'destructive' });
+      toast({ title: 'Sync failed', description: e instanceof Error ? e.message : 'Unknown error', variant: 'destructive' });
     } finally {
-      setPulling(false);
+      setSyncing(false);
     }
   };
 
@@ -88,10 +98,10 @@ export const Dashboard = () => {
         />
         
         <DashboardCard
-          icon={pulling ? <Loader2 className="h-6 w-6 animate-spin" /> : <Download className="h-6 w-6" />}
+          icon={syncing ? <Loader2 className="h-6 w-6 animate-spin" /> : <Download className="h-6 w-6" />}
           title="Download Jobs"
-          subtitle={pulling ? "Pulling from Job Entry…" : "Import new jobs from Google Sheet"}
-          onClick={pulling ? undefined : handleDownloadJobs}
+          subtitle={syncing ? "Syncing jobs…" : "Refresh and sync your jobs"}
+          onClick={syncing ? undefined : handleDownloadJobs}
         />
 
         {isAdmin && (

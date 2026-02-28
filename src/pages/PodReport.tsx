@@ -12,6 +12,8 @@ import { openPodEmail, generatePodEmailBody } from "@/lib/podEmail";
 import { sharePodPdf, emailPodPdf } from "@/lib/podPdf";
 import { FUEL_PERCENT_TO_LABEL } from "@/lib/types";
 import { toast } from "@/hooks/use-toast";
+import { getStatusStyle } from "@/lib/statusConfig";
+import { UKPlate } from "@/components/UKPlate";
 import type { Inspection } from "@/lib/types";
 
 const fuelLabel = (pct: number | null | undefined): string => {
@@ -72,7 +74,6 @@ export const PodReport = () => {
   const { data: job, isLoading } = useJob(jobId ?? "");
   const { data: jobExpenses } = useJobExpenses(jobId ?? "");
   const [pdfLoading, setPdfLoading] = useState(false);
-  const expenseTotal = jobExpenses?.reduce((sum, e) => sum + Number(e.amount), 0) ?? 0;
 
   const handleShare = async () => {
     if (!job) return;
@@ -151,6 +152,7 @@ export const PodReport = () => {
   }
 
   const ref = job.external_job_number || job.id.slice(0, 8).toUpperCase();
+  const statusStyle = getStatusStyle(job.status);
   const pickup = job.inspections.find((i) => i.type === "pickup");
   const delivery = job.inspections.find((i) => i.type === "delivery");
   const pickupDamages = job.damage_items.filter(d => pickup && d.inspection_id === pickup.id);
@@ -158,9 +160,6 @@ export const PodReport = () => {
   const pickupPhotos = job.photos.filter(p => p.type.startsWith("pickup_"));
   const deliveryPhotos = job.photos.filter(p => p.type.startsWith("delivery_"));
   const damagePhotos = job.photos.filter(p => p.type === "damage_close_up");
-
-  const pickupOdo = pickup?.odometer ?? null;
-  const deliveryOdo = delivery?.odometer ?? null;
 
   const pickupChecklistItems = getChecklistItems(pickup);
   const deliveryChecklistItems = getChecklistItems(delivery);
@@ -206,7 +205,17 @@ export const PodReport = () => {
             </div>
 
             <div className="p-6 space-y-6">
+              {/* Vehicle + Status header with UKPlate */}
               <Card className="p-4 space-y-1">
+                <div className="flex items-center justify-between mb-2">
+                  <UKPlate reg={job.vehicle_reg} variant="rear" />
+                  <span
+                    style={{ backgroundColor: statusStyle.backgroundColor, color: statusStyle.color }}
+                    className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold uppercase leading-none"
+                  >
+                    {statusStyle.label}
+                  </span>
+                </div>
                 <h3 className="text-sm font-semibold mb-2">Vehicle Details</h3>
                 <DetailRow label="Registration" value={job.vehicle_reg} />
                 <DetailRow label="Make / Model" value={`${job.vehicle_make} ${job.vehicle_model}`} />
@@ -326,7 +335,20 @@ export const PodReport = () => {
                       <div className="text-[10px] text-muted-foreground font-medium">{sig.label}</div>
                       <div className="text-xs text-foreground">{sig.name || "—"}</div>
                       {sig.url ? (
-                        <img src={sig.url} alt={`${sig.label} signature`} className="h-14 border rounded bg-white p-1 w-full object-contain" />
+                        <img
+                          src={sig.url}
+                          alt={`${sig.label} signature`}
+                          className="h-14 border rounded bg-white p-1 w-full object-contain"
+                          crossOrigin="anonymous"
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            target.style.display = 'none';
+                            const placeholder = document.createElement('div');
+                            placeholder.className = 'h-14 border rounded bg-muted flex items-center justify-center text-[10px] text-muted-foreground';
+                            placeholder.textContent = 'Image unavailable';
+                            target.parentNode?.appendChild(placeholder);
+                          }}
+                        />
                       ) : (
                         <div className="h-14 border rounded bg-muted flex items-center justify-center text-[10px] text-muted-foreground">Not signed</div>
                       )}
@@ -335,22 +357,20 @@ export const PodReport = () => {
                 </div>
               </Card>
 
-              {/* ── Expenses (billable only on POD) ── */}
+              {/* ── Expenses (billable only on POD) — no amounts visible to drivers ── */}
               {(() => {
                 const billableExpenses = (jobExpenses ?? []).filter((e: any) => e.billable_on_pod !== false);
-                const billableTotal = billableExpenses.reduce((sum: number, e: any) => sum + Number(e.amount), 0);
                 return (
                   <Card className="p-4 space-y-2">
                     <div className="flex items-center justify-between">
                       <h3 className="text-sm font-semibold">Billable Expenses</h3>
-                      <span className="text-xs font-medium text-foreground">{billableExpenses.length} expenses – £{billableTotal.toFixed(2)}</span>
+                      <span className="text-xs font-medium text-foreground">{billableExpenses.length} expenses</span>
                     </div>
                     {billableExpenses.length > 0 ? (
                       <div className="space-y-1">
                         {billableExpenses.map((e: any) => (
                           <div key={e.id} className="flex justify-between text-xs py-0.5">
                             <span className="text-muted-foreground">{e.category}{e.label ? ` – ${e.label}` : ''}</span>
-                            <span className="font-medium">£{Number(e.amount).toFixed(2)}</span>
                           </div>
                         ))}
                       </div>
