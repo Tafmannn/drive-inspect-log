@@ -1,5 +1,6 @@
 
 
+
 ## Plan: UK Postcode Lookup using Google Maps Geocoding API
 
 ### Approach
@@ -46,4 +47,3 @@ The existing autosave logic already works correctly — it saves on form change 
 2. **Edit**: `supabase/config.toml` — add function config
 3. **New**: `src/lib/postcodeApi.ts`
 4. **Edit**: `src/pages/JobForm.tsx` — add Find Address UI for both sections
-
