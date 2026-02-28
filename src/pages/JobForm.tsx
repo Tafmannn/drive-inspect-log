@@ -203,7 +203,16 @@ export const JobForm = () => {
         inputEl.dispatchEvent(new Event("input", { bubbles: true }));
       }
     };
-    setVal(`${side}_address_line1`, suggestion.line1);
+
+    // Attempt to split line1 into house number + street
+    const parts = suggestion.line1.match(/^(\d+\w?)\s+(.+)$/);
+    if (parts) {
+      setVal(`${side}_address_line1`, parts[1]);
+      setVal(`${side}_address_line2`, parts[2]);
+    } else {
+      setVal(`${side}_address_line1`, suggestion.line1);
+      setVal(`${side}_address_line2`, "");
+    }
     setVal(`${side}_city`, suggestion.town);
     setVal(`${side}_postcode`, suggestion.postcode);
 
@@ -220,7 +229,7 @@ export const JobForm = () => {
     saveDraftFromForm();
   }, [triggerRouteCalc, saveDraftFromForm]);
 
-  // Business search selection handler
+  // Business search selection handler — always overrides fields with fresh data
   const handleBusinessSelect = useCallback(async (side: "pickup" | "delivery", result: BusinessResult) => {
     if (!formRef.current) return;
     const fields = formRef.current.elements;
@@ -240,10 +249,14 @@ export const JobForm = () => {
 
     const addr = details.parsedAddress;
 
-    // Only overwrite address line 1 if it increases specificity
-    const currentLine1 = ((fields.namedItem(`${side}_address_line1`) as HTMLInputElement)?.value || "").trim();
-    if (!currentLine1 || addr.line1.length > currentLine1.length) {
+    // Split address: house → line1, street → line2 when both available
+    if (addr.house && addr.street) {
+      setVal(`${side}_address_line1`, addr.house);
+      setVal(`${side}_address_line2`, addr.street);
+    } else {
+      // Fallback: combined into line1, blank line2
       setVal(`${side}_address_line1`, addr.line1);
+      setVal(`${side}_address_line2`, "");
     }
 
     // Always overwrite city & postcode when valid

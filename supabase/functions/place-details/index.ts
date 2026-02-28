@@ -62,22 +62,31 @@ serve(async (req) => {
     const locality = getComp("locality");
     const postalCode = getComp("postal_code");
 
-    // Build line1 with maximum specificity
-    let line1 = "";
-    if (subpremise && streetNumber && route) {
-      line1 = `${subpremise}, ${streetNumber} ${route}`;
-    } else if (premise && streetNumber && route) {
-      line1 = `${premise}, ${streetNumber} ${route}`;
-    } else if (streetNumber && route) {
-      line1 = `${streetNumber} ${route}`;
-    } else if (premise && route) {
-      line1 = `${premise}, ${route}`;
-    } else if (route) {
-      line1 = route;
+    // Build house (number/name) and street separately
+    let house = "";
+    if (subpremise && streetNumber) {
+      house = `${subpremise}, ${streetNumber}`;
+    } else if (subpremise) {
+      house = subpremise;
+    } else if (premise && streetNumber) {
+      house = `${premise}, ${streetNumber}`;
+    } else if (streetNumber) {
+      house = streetNumber;
     } else if (premise) {
-      line1 = premise;
+      house = premise;
+    }
+
+    const street = route || "";
+
+    // Fallback combined line1 for when split isn't clean
+    let line1 = "";
+    if (house && street) {
+      line1 = `${house} ${street}`;
+    } else if (street) {
+      line1 = street;
+    } else if (house) {
+      line1 = house;
     } else {
-      // Fallback: first part of formatted address
       line1 = place.formattedAddress?.split(",")[0] || "";
     }
 
@@ -91,7 +100,7 @@ serve(async (req) => {
       JSON.stringify({
         name: place.displayName?.text || "",
         types: place.types || [],
-        parsedAddress: { line1, city, postcode },
+        parsedAddress: { house, street, line1, city, postcode },
         phone,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
