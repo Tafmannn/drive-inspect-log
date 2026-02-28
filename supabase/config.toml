@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.vision-ocr]
 verify_jwt = false
+
+[functions.postcode-lookup]
+verify_jwt = false

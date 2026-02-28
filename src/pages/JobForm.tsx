@@ -11,11 +11,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 // Native select used instead of Radix Select to avoid BubbleSelect DOM crash
 import { useCreateJob, useUpdateJob, useJob } from "@/hooks/useJobs";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, MapPin, Navigation } from "lucide-react";
+import { Loader2, MapPin, Navigation, Search } from "lucide-react";
 import { CAR_MAKES, getModelsForMake } from "@/lib/carData";
 import { isValidUkPostcode, calculateRoute, type RouteResult } from "@/lib/mapsApi";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import { saveDraft, loadDraft, clearDraft, draftKey } from "@/lib/autosave";
+import { lookupPostcode, type AddressSuggestion } from "@/lib/postcodeApi";
 
 type ErrorMap = Record<string, string>;
 
@@ -54,6 +55,14 @@ export const JobForm = () => {
   const [mapsEnabled, setMapsEnabled] = useState(false);
   const routeDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Postcode lookup state
+  const [pickupSuggestions, setPickupSuggestions] = useState<AddressSuggestion[]>([]);
+  const [deliverySuggestions, setDeliverySuggestions] = useState<AddressSuggestion[]>([]);
+  const [pickupLookupLoading, setPickupLookupLoading] = useState(false);
+  const [deliveryLookupLoading, setDeliveryLookupLoading] = useState(false);
+  const [pickupLookupError, setPickupLookupError] = useState("");
+  const [deliveryLookupError, setDeliveryLookupError] = useState("");
 
   useEffect(() => {
     isFeatureEnabled("MAPS_ENABLED").then(setMapsEnabled);
@@ -131,6 +140,64 @@ export const JobForm = () => {
       }
     }, 750);
   }, [mapsEnabled]);
+
+  // Postcode lookup handler
+  const handleFindAddress = useCallback(async (side: "pickup" | "delivery") => {
+    if (!formRef.current) return;
+    const fd = new FormData(formRef.current);
+    const pc = (fd.get(`${side}_postcode`) as string || "").trim();
+    if (!pc || !isValidUkPostcode(pc)) {
+      toast({ title: "Enter a valid postcode to search.", variant: "destructive" });
+      return;
+    }
+    const setLoading = side === "pickup" ? setPickupLookupLoading : setDeliveryLookupLoading;
+    const setSuggestions = side === "pickup" ? setPickupSuggestions : setDeliverySuggestions;
+    const setError = side === "pickup" ? setPickupLookupError : setDeliveryLookupError;
+    setLoading(true);
+    setError("");
+    setSuggestions([]);
+    try {
+      const results = await lookupPostcode(pc);
+      if (results.length > 0) {
+        setSuggestions(results);
+      } else {
+        setError("No addresses found. Please enter the address manually.");
+      }
+    } catch {
+      setError("Couldn't fetch addresses. Please enter the address manually.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleSelectSuggestion = useCallback((side: "pickup" | "delivery", suggestion: AddressSuggestion) => {
+    if (!formRef.current) return;
+    const fields = formRef.current.elements;
+    const setVal = (name: string, val: string) => {
+      const el = fields.namedItem(name);
+      if (el && "value" in el && !(el instanceof RadioNodeList)) {
+        const inputEl = el as HTMLInputElement;
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+        nativeInputValueSetter?.call(inputEl, val);
+        inputEl.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    };
+    setVal(`${side}_address_line1`, suggestion.line1);
+    setVal(`${side}_city`, suggestion.town);
+    setVal(`${side}_postcode`, suggestion.postcode);
+
+    // Clear suggestions
+    if (side === "pickup") setPickupSuggestions([]);
+    else setDeliverySuggestions([]);
+
+    // Trigger route calc if both postcodes now valid
+    const fd = new FormData(formRef.current);
+    const pickupPC = side === "pickup" ? suggestion.postcode : (fd.get("pickup_postcode") as string || "");
+    const deliveryPC = side === "delivery" ? suggestion.postcode : (fd.get("delivery_postcode") as string || "");
+    if (pickupPC && deliveryPC) triggerRouteCalc(pickupPC, deliveryPC);
+
+    saveDraftFromForm();
+  }, [triggerRouteCalc, saveDraftFromForm]);
 
   // Sync make/model when editing once job is loaded
   useEffect(() => {
@@ -591,6 +658,41 @@ export const JobForm = () => {
                 <ErrorText field="pickup_postcode" />
               </div>
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full"
+              disabled={pickupLookupLoading}
+              onClick={() => handleFindAddress("pickup")}
+            >
+              {pickupLookupLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Search className="h-4 w-4 mr-2" />}
+              Find Address
+            </Button>
+            {pickupLookupError && (
+              <p className="text-xs text-muted-foreground">{pickupLookupError}</p>
+            )}
+            {pickupSuggestions.length > 0 && (
+              <div className="border border-border rounded-md bg-popover shadow-md max-h-48 overflow-y-auto">
+                {pickupSuggestions.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground border-b border-border last:border-b-0"
+                    onClick={() => handleSelectSuggestion("pickup", s)}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className="w-full text-left px-3 py-2 text-xs text-muted-foreground hover:bg-accent"
+                  onClick={() => setPickupSuggestions([])}
+                >
+                  Can't find it? Enter address manually instead.
+                </button>
+              </div>
+            )}
             <div>
               <Label className="text-sm font-medium">
                 Pickup Notes
@@ -701,6 +803,41 @@ export const JobForm = () => {
                 <ErrorText field="delivery_postcode" />
               </div>
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full"
+              disabled={deliveryLookupLoading}
+              onClick={() => handleFindAddress("delivery")}
+            >
+              {deliveryLookupLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Search className="h-4 w-4 mr-2" />}
+              Find Address
+            </Button>
+            {deliveryLookupError && (
+              <p className="text-xs text-muted-foreground">{deliveryLookupError}</p>
+            )}
+            {deliverySuggestions.length > 0 && (
+              <div className="border border-border rounded-md bg-popover shadow-md max-h-48 overflow-y-auto">
+                {deliverySuggestions.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground border-b border-border last:border-b-0"
+                    onClick={() => handleSelectSuggestion("delivery", s)}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className="w-full text-left px-3 py-2 text-xs text-muted-foreground hover:bg-accent"
+                  onClick={() => setDeliverySuggestions([])}
+                >
+                  Can't find it? Enter address manually instead.
+                </button>
+              </div>
+            )}
             <div>
               <Label className="text-sm font-medium">
                 Delivery Notes
