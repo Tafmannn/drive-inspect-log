@@ -42,9 +42,10 @@ serve(async (req) => {
     const bucket = "axentra_db";
     const fileBytes = Uint8Array.from(atob(fileBase64), (c) => c.charCodeAt(0));
 
-    // Upload to GCS using JSON API
-    const uploadUrl = `https://storage.googleapis.com/upload/storage/v1/b/${bucket}/o?uploadType=media&name=${encodeURIComponent(fileName)}&predefinedAcl=publicRead`;
-
+    // Upload to GCS using JSON API.
+    // NOTE: With Uniform bucket-level access enabled, per-object ACL params
+    // (like predefinedAcl=publicRead) are invalid and must not be sent.
+    const uploadUrl = `https://storage.googleapis.com/upload/storage/v1/b/${bucket}/o?uploadType=media&name=${encodeURIComponent(fileName)}`;
     const uploadRes = await fetch(uploadUrl, {
       method: "POST",
       headers: {
