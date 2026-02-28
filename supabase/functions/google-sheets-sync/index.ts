@@ -842,7 +842,7 @@ async function upsertJobMasterRow(
       case "Client Notes": return jobPayload.client_notes || "";
       case "Pickup Contact Name": return jobPayload.pickup_contact_name || "";
       case "Pickup Contact Phone": return jobPayload.pickup_contact_phone || "";
-      case "Pickup Address Line 1": return jobPayload.pickup_address_line1 || "";
+      case "Pickup Address Line 1": return [jobPayload.pickup_address_line1, jobPayload.pickup_address_line2].filter(Boolean).join(" ") || "";
       case "Pickup Town / City": return jobPayload.pickup_city || "";
       case "Pickup Postcode": return jobPayload.pickup_postcode || "";
       case "Pickup Time From": return jobPayload.pickup_time_from || "";
@@ -850,7 +850,7 @@ async function upsertJobMasterRow(
       case "Pickup Access Notes": return jobPayload.pickup_access_notes || "";
       case "Delivery Contact Name": return jobPayload.delivery_contact_name || "";
       case "Delivery Contact Phone": return jobPayload.delivery_contact_phone || "";
-      case "Delivery Address Line 1": return jobPayload.delivery_address_line1 || "";
+      case "Delivery Address Line 1": return [jobPayload.delivery_address_line1, jobPayload.delivery_address_line2].filter(Boolean).join(" ") || "";
       case "Delivery Town / City": return jobPayload.delivery_city || "";
       case "Delivery Postcode": return jobPayload.delivery_postcode || "";
       case "Delivery Time From": return jobPayload.delivery_time_from || "";
@@ -976,7 +976,7 @@ async function handlePush(
           case "Client Notes": return job.client_notes || "";
           case "Pickup Contact Name": return job.pickup_contact_name || "";
           case "Pickup Contact Phone": return job.pickup_contact_phone || "";
-          case "Pickup Address Line 1": return job.pickup_address_line1 || "";
+          case "Pickup Address Line 1": return [job.pickup_address_line1, job.pickup_address_line2].filter(Boolean).join(" ") || "";
           case "Pickup Town / City": return job.pickup_city || "";
           case "Pickup Postcode": return job.pickup_postcode || "";
           case "Pickup Time From": return job.pickup_time_from || "";
@@ -984,7 +984,7 @@ async function handlePush(
           case "Pickup Access Notes": return job.pickup_access_notes || "";
           case "Delivery Contact Name": return job.delivery_contact_name || "";
           case "Delivery Contact Phone": return job.delivery_contact_phone || "";
-          case "Delivery Address Line 1": return job.delivery_address_line1 || "";
+          case "Delivery Address Line 1": return [job.delivery_address_line1, job.delivery_address_line2].filter(Boolean).join(" ") || "";
           case "Delivery Town / City": return job.delivery_city || "";
           case "Delivery Postcode": return job.delivery_postcode || "";
           case "Delivery Time From": return job.delivery_time_from || "";

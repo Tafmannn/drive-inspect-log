@@ -20,7 +20,9 @@ export interface PlaceDetails {
   name: string;
   types: string[];
   parsedAddress: {
-    line1: string;
+    house: string;
+    street: string;
+    line1: string; // fallback combined
     city: string;
     postcode: string;
   };
