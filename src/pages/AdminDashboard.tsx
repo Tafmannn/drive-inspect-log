@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
+import { getStatusStyle } from "@/lib/statusConfig";
+import { UKPlate } from "@/components/UKPlate";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -193,8 +194,20 @@ function JobsTab({ archived = false }: { archived?: boolean }) {
           {jobs.map((job) => (
             <TableRow key={job.id}>
               <TableCell className="font-medium">{job.external_job_number || job.id.slice(0, 8)}</TableCell>
-              <TableCell>{job.vehicle_reg}</TableCell>
-              <TableCell><Badge variant="outline" className="text-xs">{job.status.replace(/_/g, " ")}</Badge></TableCell>
+              <TableCell><UKPlate reg={job.vehicle_reg} /></TableCell>
+              <TableCell>
+                {(() => {
+                  const s = getStatusStyle(job.status);
+                  return (
+                    <span
+                      style={{ backgroundColor: s.backgroundColor, color: s.color }}
+                      className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase leading-none"
+                    >
+                      {s.label}
+                    </span>
+                  );
+                })()}
+              </TableCell>
               <TableCell className="text-xs text-muted-foreground">{new Date(job.created_at).toLocaleDateString()}</TableCell>
               <TableCell className="text-right space-x-1">
                 <Button size="icon" variant="ghost" onClick={() => navigate(`/jobs/${job.id}`)} title="View">

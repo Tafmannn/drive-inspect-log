@@ -145,7 +145,7 @@ export const JobDetail = () => {
           <div className="flex items-center justify-between">
             <span className="text-sm">Pickup Inspection</span>
             {pickupInspection ? (
-              <span style={{ backgroundColor: '#34C759', color: '#FFFFFF' }} className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase leading-none">Complete</span>
+              <span style={{ backgroundColor: getStatusStyle('completed').backgroundColor, color: getStatusStyle('completed').color }} className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase leading-none">Complete</span>
             ) : (
               <Button size="sm" onClick={() => navigate(`/inspection/${job.id}/pickup`)}>
                 <ClipboardCheck className="h-4 w-4 mr-1" /> Start
@@ -155,7 +155,7 @@ export const JobDetail = () => {
           <div className="flex items-center justify-between">
             <span className="text-sm">Delivery Inspection</span>
             {deliveryInspection ? (
-              <span style={{ backgroundColor: '#34C759', color: '#FFFFFF' }} className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase leading-none">Complete</span>
+              <span style={{ backgroundColor: getStatusStyle('completed').backgroundColor, color: getStatusStyle('completed').color }} className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase leading-none">Complete</span>
             ) : (
               <Button size="sm" onClick={() => navigate(`/inspection/${job.id}/delivery`)}>
                 <Truck className="h-4 w-4 mr-1" /> Start
