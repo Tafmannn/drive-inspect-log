@@ -213,7 +213,7 @@ export const InspectionFlow = () => {
       if (typeof _currentStep === "number" && _currentStep >= 1 && _currentStep <= totalSteps) {
         setCurrentStep(_currentStep);
       }
-      toast({ title: "Draft restored", description: "Your previous progress has been loaded." });
+      toast({ title: "Draft restored." });
     }
     sessionActive.current = true;
     setShowDraftPrompt(false);
@@ -498,8 +498,7 @@ export const InspectionFlow = () => {
     const missing = validateBeforeSubmit();
     if (missing.length > 0) {
       toast({
-        title: "Missing fields",
-        description: missing.join(", "),
+        title: `Please complete ${missing.length} required field(s).`,
         variant: "destructive",
       });
       return;
@@ -634,24 +633,12 @@ export const InspectionFlow = () => {
       import("@/lib/pendingUploads").then(m => m.retryAllPending()).catch(() => {});
 
       const jobRef = job?.external_job_number || jobId.slice(0, 8);
-      const reg = job?.vehicle_reg || "";
-      let desc = `${
-        type === "pickup" ? "Pickup" : "Delivery"
-      } inspection submitted for ${jobRef} (${reg}).`;
-      if (pendingCount > 0) {
-        desc += ` ${pendingCount} photo(s) uploading in background.`;
-      }
-
-      toast({ title: "Success", description: desc });
+      const label = type === "pickup" ? "Pickup" : "Delivery";
+      toast({ title: `${label} completed for job ${jobRef}.` });
       if (dk) clearDraft(dk);
       navigate(`/jobs/${jobId}`);
-    } catch (e: unknown) {
-      toast({
-        title: "Error",
-        description:
-          e instanceof Error ? e.message : "Inspection submission failed",
-        variant: "destructive",
-      });
+    } catch {
+      toast({ title: "Submission failed. Please try again.", variant: "destructive" });
     } finally {
       setSubmitting(false);
     }
@@ -670,8 +657,7 @@ export const InspectionFlow = () => {
     const missing = validateStep(currentStep);
     if (missing.length > 0) {
       toast({
-        title: "Please complete required fields",
-        description: missing.join(", "),
+        title: `Please complete ${missing.length} required field(s).`,
         variant: "destructive",
       });
       return;

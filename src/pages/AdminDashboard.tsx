@@ -108,9 +108,9 @@ function OverviewTab() {
       if (type === "jobs") await exportJobsCsv();
       else if (type === "inspections") await exportInspectionsCsv();
       else await exportExpensesCsv();
-      toast({ title: "Exported", description: `${type} CSV downloaded.` });
-    } catch (e: unknown) {
-      toast({ title: "Export failed", description: e instanceof Error ? e.message : "Unknown error", variant: "destructive" });
+      toast({ title: "Exported." });
+    } catch {
+      toast({ title: "Export failed. Please try again.", variant: "destructive" });
     } finally {
       setExporting(false);
     }
@@ -170,7 +170,7 @@ function JobsTab({ archived = false }: { archived?: boolean }) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-jobs"] });
       qc.invalidateQueries({ queryKey: ["admin-stats"] });
-      toast({ title: archived ? "Job restored" : "Job archived" });
+      toast({ title: archived ? "Job restored." : "Job archived." });
     },
   });
 
@@ -250,7 +250,7 @@ function ExpensesTab({ archived = false }: { archived?: boolean }) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-expenses"] });
       qc.invalidateQueries({ queryKey: ["admin-stats"] });
-      toast({ title: archived ? "Expense restored" : "Expense archived" });
+      toast({ title: archived ? "Expense restored." : "Expense archived." });
     },
   });
 

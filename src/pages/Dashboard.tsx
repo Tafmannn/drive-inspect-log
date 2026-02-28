@@ -26,9 +26,9 @@ export const Dashboard = () => {
       if (type === 'jobs') await exportJobsCsv();
       else if (type === 'inspections') await exportInspectionsCsv();
       else await exportExpensesCsv();
-      toast({ title: 'Exported', description: `${type} CSV downloaded.` });
-    } catch (e: unknown) {
-      toast({ title: 'Export failed', description: e instanceof Error ? e.message : 'Unknown error', variant: 'destructive' });
+      toast({ title: "Exported." });
+    } catch {
+      toast({ title: "Export failed. Please try again.", variant: "destructive" });
     } finally {
       setExporting(false);
     }
@@ -50,12 +50,9 @@ export const Dashboard = () => {
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
       qc.invalidateQueries({ queryKey: ["admin-jobs"] });
-      toast({
-        title: 'Jobs synced',
-        description: `${result.rows_created} new, ${result.rows_updated} updated, ${result.rows_skipped} skipped.`,
-      });
-    } catch (e: unknown) {
-      toast({ title: 'Sync failed', description: e instanceof Error ? e.message : 'Unknown error', variant: 'destructive' });
+      toast({ title: "Jobs updated." });
+    } catch {
+      toast({ title: "Sync failed. Please try again.", variant: "destructive" });
     } finally {
       setSyncing(false);
     }

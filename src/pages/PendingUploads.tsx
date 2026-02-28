@@ -29,8 +29,8 @@ export const PendingUploads = () => {
   const handleRetry = async (id: string) => {
     setRetrying(id);
     const ok = await retryUpload(id);
-    if (ok) toast({ title: "Upload succeeded" });
-    else toast({ title: "Upload failed", variant: "destructive" });
+    if (ok) toast({ title: "Upload complete." });
+    else toast({ title: "Upload failed. Tap to retry.", variant: "destructive" });
     await refresh();
     setRetrying(null);
   };
@@ -38,7 +38,7 @@ export const PendingUploads = () => {
   const handleRetryAll = async () => {
     setRetryingAll(true);
     const { succeeded, failed } = await retryAllPending();
-    toast({ title: "Retry complete", description: `${succeeded} succeeded, ${failed} failed.` });
+    toast({ title: failed > 0 ? "Some uploads failed. Please try again." : "All uploads complete." });
     await refresh();
     setRetryingAll(false);
   };

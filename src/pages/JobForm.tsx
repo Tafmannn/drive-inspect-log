@@ -101,7 +101,7 @@ export const JobForm = () => {
           if (el && "value" in el && !(el instanceof RadioNodeList)) (el as HTMLInputElement).value = val as string;
         }
       });
-      toast({ title: "Draft restored", description: "Your previous job form has been loaded." });
+      toast({ title: "Draft restored." });
     }
     setShowDraftPrompt(false);
   };
@@ -183,8 +183,7 @@ export const JobForm = () => {
 
     if (Object.keys(e).length > 0) {
       toast({
-        title: "Validation Error",
-        description: `${Object.keys(e).length} field(s) require attention.`,
+        title: `Please complete ${Object.keys(e).length} required field(s).`,
         variant: "destructive",
       });
       return false;
@@ -250,26 +249,18 @@ export const JobForm = () => {
     try {
       if (isEdit && jobId) {
         await updateMutation.mutateAsync({ jobId, input: payload });
-        toast({ title: "Job Updated" });
+        const updRef = payload.external_job_number || jobId.slice(0, 8);
+        toast({ title: `Job ${updRef} updated.` });
         navigate(`/jobs/${jobId}`);
       } else {
         if (dk) clearDraft(dk);
         const job = await createMutation.mutateAsync(payload);
-        toast({
-          title: "Job Created",
-          description: `${job.external_job_number ?? ""} – ${
-            job.vehicle_reg
-          }`,
-        });
+        const newRef = job.external_job_number || job.id.slice(0, 8);
+        toast({ title: `Job ${newRef} created.` });
         navigate(`/jobs/${job.id}`);
       }
-    } catch (e: unknown) {
-      toast({
-        title: "Error",
-        description:
-          e instanceof Error ? e.message : "Unknown error",
-        variant: "destructive",
-      });
+    } catch {
+      toast({ title: "Save failed. Please try again.", variant: "destructive" });
     }
   };
 

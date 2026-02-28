@@ -43,7 +43,7 @@ export const JobDetail = () => {
       const url = buildQrUrl(qr.token);
       setQrModal({ open: true, url, eventType });
     } catch (e: unknown) {
-      toast({ title: "Failed", description: e instanceof Error ? e.message : "Error", variant: "destructive" });
+      toast({ title: "QR generation failed. Please try again.", variant: "destructive" });
     } finally {
       setGeneratingQr(false);
     }
