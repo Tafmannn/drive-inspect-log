@@ -1,42 +1,60 @@
 
 
-## Plan: UK Number Plate Badge + Status Colour System
+## Plan: Canonical Human Job ID (`AX0001`) — Generation, Sync & Display
 
-### 1. Create `src/components/UKPlate.tsx` — Reusable UK reg plate component
+### Current State
+- `external_job_number` stores `AX####` IDs in the DB
+- App-side `generateJobNumber()` in `api.ts` already generates `AX####` on job creation
+- Edge function also generates `AX####` during pull if missing
+- **Problem**: The AX ID is shown inconsistently — as a subtitle on cards, buried as "Ref:" on detail/POD pages, not prominently displayed
 
-- Horizontal rectangle, white background (`#FFFFFF`), 1px `#999` border, `border-radius: 3px`
-- Left blue bar (~16% width): `#003399` background with white "UK" text vertically
-- Reg text: system sans-serif, `font-weight: 700`, `letter-spacing: 2px`, uppercase, `font-size: 14px`
-- Subtle `box-shadow` for depth
-- Props: `reg: string`, optional `variant: 'front' | 'rear'` (rear = yellow `#FCD116`)
-- Responsive: uses `whitespace-nowrap`, fixed padding `px-2 py-0.5`
+### Strategy: Option A (App Generates Job ID)
+The app already generates `AX####` via `generateJobNumber()`. The edge function also generates them during import. This means "Job ID" in Job Master is always populated on first push, so the Apps Script never overwrites.
 
-### 2. Update `src/lib/statusConfig.ts` — New colour system with exact hex values
+No changes needed to the generation logic — it already works correctly.
 
-Replace the current semantic colour approach with explicit hex-based classes:
+---
 
-| Status | Label | BG | Text |
-|---|---|---|---|
-| `ready_for_pickup` | READY | `#34C759` | white |
-| `pickup_in_progress`, `pickup_complete`, `in_transit`, `delivery_in_progress` | IN PROGRESS | `#FF9500` | white |
-| `delivery_complete`, `pod_ready`, `completed` | COMPLETED | `#5856D6` | white |
-| `cancelled` | CANCELLED | `#FF3B30` | white |
-| `new`, `draft`, `incomplete` | NEW / DRAFT | `#007AFF` / `#8E8E93` | white |
+### Changes Required
 
-- `getStatusBadgeClasses` returns inline-style-friendly hex values instead of Tailwind semantic classes
-- Export a `getStatusStyle()` function returning `{ backgroundColor, color, label }`
-- Status pills: uppercase, `rounded-full`, `px-2.5 py-1`, `text-xs font-semibold`
+#### 1. `src/components/JobCard.tsx` — Show AX ID prominently
+- Change the card header to display `jobId` (AX number) as the **primary subtitle** below client name
+- Currently `jobId` prop shows as `p` subtitle — make it more prominent: `"Job {jobId}"` format
+- Keep client name as the main h3
 
-### 3. Update `src/components/JobCard.tsx` — Integrate both components
+#### 2. `src/pages/JobDetail.tsx` (line ~63, 71, 85)
+- Change header title from `job.vehicle_reg` to `Job {jobRef}` (e.g., "Job AX0007")
+- Move "Ref: {job.external_job_number}" into a more prominent position in the vehicle card — display as `"Job AX0007"` with bold styling instead of muted "Ref:" text
 
-- Replace the `<Badge>` for `plateNumber` with `<UKPlate reg={plateNumber} />`
-- Replace the status `<Badge>` with an inline-styled pill using `getStatusStyle()`
-- Ensure plate is top-right, status pill is in the summary meta line
+#### 3. `src/pages/PodReport.tsx` (line ~125, 170, 195)
+- Change POD heading from `"Ref: {ref}"` to `"Job {ref}"`
+- Update the DetailRow label from `"Job Reference"` to display `"Job {ref}"` prominently in the header area
 
-### 4. Update `src/index.css` — No changes needed (hex values used directly)
+#### 4. `src/pages/CompletedJobs.tsx` (line ~20)
+- Already passes `job.external_job_number || job.id.slice(0, 8)` as `jobId` — no change needed
 
-### Files modified:
-1. **New**: `src/components/UKPlate.tsx`
-2. **Edit**: `src/lib/statusConfig.ts`
-3. **Edit**: `src/components/JobCard.tsx`
+#### 5. `src/pages/JobList.tsx`
+- Already passes `job.external_job_number || job.id.slice(0, 8)` — no change needed
+
+#### 6. `src/pages/AdminDashboard.tsx` (line ~186, 196)
+- Change "Ref" table header to "Job ID"
+- Already displays `job.external_job_number || job.id.slice(0, 8)` — format as `"Job {id}"`
+
+#### 7. `src/lib/podPdf.ts` (line ~96, 125)
+- Change PDF `"Ref: {ref}"` to `"Job {ref}"`
+
+#### 8. `supabase/functions/google-sheets-sync/index.ts`
+- **Push handler**: Verify "Job ID" column writes `external_job_number` (already does at line 833) — confirmed correct
+- **Pull handler**: Verify imported jobs get `external_job_number` set (already does at lines 635-638 + 734-752) — confirmed correct
+- No edge function changes needed
+
+### Files to modify
+1. `src/components/JobCard.tsx` — prominent AX ID display
+2. `src/pages/JobDetail.tsx` — header + vehicle card
+3. `src/pages/PodReport.tsx` — POD header
+4. `src/pages/AdminDashboard.tsx` — table header label
+5. `src/lib/podPdf.ts` — PDF header text
+
+### No DB or edge function changes required
+The generation and sync logic is already correct. This is purely a UI visibility upgrade.
 
