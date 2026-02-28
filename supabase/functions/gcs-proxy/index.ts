@@ -3,21 +3,28 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+    "authorization, x-client-info, apikey, content-type",
 };
 
-interface UploadRequest {
-  fileName: string; // e.g. "jobs/{jobId}/photos/{type}/{timestamp}.jpg"
-  contentType: string;
-  fileBase64: string; // base64-encoded file data
-}
-
+/**
+ * Proxies GCS object reads through a signed request.
+ * Accepts ?path=jobs/xxx/photos/yyy.jpg and streams the image back.
+ */
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    const url = new URL(req.url);
+    const objectPath = url.searchParams.get("path");
+    if (!objectPath) {
+      return new Response(
+        JSON.stringify({ error: "Missing ?path= parameter" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const serviceAccountJson = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_JSON");
     if (!serviceAccountJson) {
       return new Response(
@@ -28,56 +35,34 @@ serve(async (req) => {
 
     const sa = JSON.parse(serviceAccountJson);
     const accessToken = await getAccessToken(sa);
-
-    const body: UploadRequest = await req.json();
-    const { fileName, contentType, fileBase64 } = body;
-
-    if (!fileName || !fileBase64) {
-      return new Response(
-        JSON.stringify({ error: "fileName and fileBase64 are required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     const bucket = "axentra_db";
-    const fileBytes = Uint8Array.from(atob(fileBase64), (c) => c.charCodeAt(0));
 
-    // Upload to GCS using JSON API
-    const uploadUrl = `https://storage.googleapis.com/upload/storage/v1/b/${bucket}/o?uploadType=media&name=${encodeURIComponent(fileName)}&predefinedAcl=publicRead`;
-
-    const uploadRes = await fetch(uploadUrl, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": contentType || "image/jpeg",
-      },
-      body: fileBytes,
+    // Try using the JSON API alt=media endpoint (works with read_write scope)
+    const gcsUrl = `https://storage.googleapis.com/storage/v1/b/${bucket}/o/${encodeURIComponent(objectPath)}?alt=media`;
+    const gcsRes = await fetch(gcsUrl, {
+      headers: { Authorization: `Bearer ${accessToken}` },
     });
 
-    if (!uploadRes.ok) {
-      const errText = await uploadRes.text();
-      console.error("GCS upload failed:", errText);
+    if (!gcsRes.ok) {
+      const errText = await gcsRes.text();
+      console.error("GCS proxy error:", gcsRes.status, errText);
       return new Response(
-        JSON.stringify({ error: "GCS upload failed", details: errText }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: "Object not found or inaccessible", status: gcsRes.status }),
+        { status: gcsRes.status === 404 ? 404 : 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const result = await uploadRes.json();
-    const publicUrl = `https://storage.googleapis.com/${bucket}/${fileName}`;
+    const contentType = gcsRes.headers.get("Content-Type") || "image/jpeg";
+    const body = await gcsRes.arrayBuffer();
 
-    return new Response(
-      JSON.stringify({
-        url: publicUrl,
-        backend: "googleCloud",
-        backendRef: fileName,
-        bucket,
-        size: result.size,
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(body, {
+      headers: {
+        ...corsHeaders,
+        "Content-Type": contentType,
+        "Cache-Control": "public, max-age=86400, immutable",
+      },
+    });
   } catch (e) {
-    console.error("gcs-upload error:", e);
     return new Response(
       JSON.stringify({ error: e.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -85,8 +70,7 @@ serve(async (req) => {
   }
 });
 
-// ─── Google Auth via Service Account JWT ───────────────────────────
-
+// ─── Google Auth ───
 async function getAccessToken(sa: { client_email: string; private_key: string }): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const header = { alg: "RS256", typ: "JWT" };
@@ -108,7 +92,6 @@ async function getAccessToken(sa: { client_email: string; private_key: string })
     .replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
 
   const jwt = `${unsigned}.${sigB64}`;
-
   const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -116,7 +99,7 @@ async function getAccessToken(sa: { client_email: string; private_key: string })
   });
 
   const tokenData = await tokenRes.json();
-  if (!tokenData.access_token) throw new Error("Failed to get access token: " + JSON.stringify(tokenData));
+  if (!tokenData.access_token) throw new Error("Failed to get access token");
   return tokenData.access_token;
 }
 
