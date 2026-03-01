@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
+import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -235,7 +236,7 @@ export const ExpenseForm = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20">
       {/* Draft restore dialog */}
       <Dialog open={showDraftDialog} onOpenChange={setShowDraftDialog}>
         <DialogContent>
@@ -380,6 +381,7 @@ export const ExpenseForm = () => {
         </>
         )}
       </div>
+      <BottomNav />
     </div>
   );
 };

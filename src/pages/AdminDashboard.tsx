@@ -1,5 +1,6 @@
 import { AppHeader } from "@/components/AppHeader";
-import { Card } from "@/components/ui/card";
+import { BottomNav } from "@/components/BottomNav";
+import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -116,41 +117,41 @@ function OverviewTab() {
     }
   };
 
-  const Widget = ({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string | number; color?: string }) => (
-    <Card className="p-4 flex items-center gap-3">
-      <div className={`p-2 rounded-lg ${color ?? "bg-primary/10 text-primary"}`}>{icon}</div>
+  const Widget = ({ icon, label, value, iconClass }: { icon: React.ReactNode; label: string; value: string | number; iconClass?: string }) => (
+    <div className="p-4 rounded-xl bg-card border border-border shadow-sm flex items-center gap-3">
+      <div className={`w-10 h-10 flex items-center justify-center rounded-lg ${iconClass ?? "bg-primary/10 text-primary"}`}>{icon}</div>
       <div>
-        <p className="text-2xl font-bold text-foreground">{isLoading ? "…" : value}</p>
-        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="text-[20px] font-semibold text-foreground">{isLoading ? "…" : value}</p>
+        <p className="text-[13px] text-muted-foreground">{label}</p>
       </div>
-    </Card>
+    </div>
   );
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
-        <Widget icon={<Truck className="h-5 w-5" />} label="Jobs In Progress" value={stats?.jobsInProgress ?? 0} />
-        <Widget icon={<CheckCircle className="h-5 w-5" />} label="Completed Today" value={stats?.completedToday ?? 0} color="bg-success/10 text-success" />
-        <Widget icon={<Clock className="h-5 w-5" />} label="Completed This Week" value={stats?.completedWeek ?? 0} color="bg-info/10 text-info" />
-        <Widget icon={<AlertTriangle className="h-5 w-5" />} label="Pending Uploads" value={stats?.pendingUploads ?? 0} color="bg-warning/10 text-warning" />
-        <Widget icon={<Receipt className="h-5 w-5" />} label="Expenses This Week" value={`£${(stats?.weekExpenses ?? 0).toFixed(2)}`} />
+        <Widget icon={<Truck className="w-5 h-5 stroke-[2]" />} label="Jobs In Progress" value={stats?.jobsInProgress ?? 0} />
+        <Widget icon={<CheckCircle className="w-5 h-5 stroke-[2]" />} label="Completed Today" value={stats?.completedToday ?? 0} iconClass="bg-success/10 text-success" />
+        <Widget icon={<Clock className="w-5 h-5 stroke-[2]" />} label="Completed This Week" value={stats?.completedWeek ?? 0} iconClass="bg-info/10 text-info" />
+        <Widget icon={<AlertTriangle className="w-5 h-5 stroke-[2]" />} label="Pending Uploads" value={stats?.pendingUploads ?? 0} iconClass="bg-warning/10 text-warning" />
+        <Widget icon={<Receipt className="w-5 h-5 stroke-[2]" />} label="Expenses This Week" value={`£${(stats?.weekExpenses ?? 0).toFixed(2)}`} />
       </div>
 
       <Separator />
-      <div className="space-y-2">
-        <h3 className="text-sm font-semibold text-muted-foreground">Exports</h3>
+      <section>
+        <h2 className="text-[14px] font-semibold text-muted-foreground mb-3">Exports</h2>
         <div className="grid grid-cols-3 gap-3">
-          <Button variant="outline" onClick={() => handleExport("jobs")} disabled={exporting}>
-            <FileDown className="h-4 w-4 mr-1" /> Jobs
+          <Button variant="outline" onClick={() => handleExport("jobs")} disabled={exporting} className="min-h-[44px] rounded-lg">
+            <FileDown className="w-4 h-4 mr-1" /> Jobs
           </Button>
-          <Button variant="outline" onClick={() => handleExport("inspections")} disabled={exporting}>
-            <FileDown className="h-4 w-4 mr-1" /> Inspections
+          <Button variant="outline" onClick={() => handleExport("inspections")} disabled={exporting} className="min-h-[44px] rounded-lg">
+            <FileDown className="w-4 h-4 mr-1" /> Inspections
           </Button>
-          <Button variant="outline" onClick={() => handleExport("expenses")} disabled={exporting}>
-            <FileDown className="h-4 w-4 mr-1" /> Expenses
+          <Button variant="outline" onClick={() => handleExport("expenses")} disabled={exporting} className="min-h-[44px] rounded-lg">
+            <FileDown className="w-4 h-4 mr-1" /> Expenses
           </Button>
         </div>
-      </div>
+      </section>
     </div>
   );
 }
@@ -174,26 +175,26 @@ function JobsTab({ archived = false }: { archived?: boolean }) {
     },
   });
 
-  if (isLoading) return <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+  if (isLoading) return <DashboardSkeleton />;
 
-  if (!jobs?.length) return <p className="text-muted-foreground text-center py-8">No {archived ? "archived" : ""} jobs found.</p>;
+  if (!jobs?.length) return <p className="text-[14px] text-muted-foreground text-center py-8">No {archived ? "archived" : ""} jobs found.</p>;
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto rounded-xl border border-border">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Job ID</TableHead>
-            <TableHead>Reg</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Created</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
+            <TableHead className="text-[13px]">Job ID</TableHead>
+            <TableHead className="text-[13px]">Reg</TableHead>
+            <TableHead className="text-[13px]">Status</TableHead>
+            <TableHead className="text-[13px]">Created</TableHead>
+            <TableHead className="text-[13px] text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {jobs.map((job) => (
             <TableRow key={job.id}>
-              <TableCell className="font-medium">Job {job.external_job_number || job.id.slice(0, 8)}</TableCell>
+              <TableCell className="text-[14px] font-medium">Job {job.external_job_number || job.id.slice(0, 8)}</TableCell>
               <TableCell><UKPlate reg={job.vehicle_reg} /></TableCell>
               <TableCell>
                 {(() => {
@@ -201,31 +202,31 @@ function JobsTab({ archived = false }: { archived?: boolean }) {
                   return (
                     <span
                       style={{ backgroundColor: s.backgroundColor, color: s.color }}
-                      className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase leading-none"
+                      className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[13px] font-semibold uppercase leading-none"
                     >
                       {s.label}
                     </span>
                   );
                 })()}
               </TableCell>
-              <TableCell className="text-xs text-muted-foreground">{new Date(job.created_at).toLocaleDateString()}</TableCell>
+              <TableCell className="text-[13px] text-muted-foreground">{new Date(job.created_at).toLocaleDateString()}</TableCell>
               <TableCell className="text-right space-x-1">
-                <Button size="icon" variant="ghost" onClick={() => navigate(`/jobs/${job.id}`)} title="View">
-                  <Eye className="h-4 w-4" />
+                <Button size="icon" variant="ghost" onClick={() => navigate(`/jobs/${job.id}`)} title="View" className="min-h-[44px] min-w-[44px]">
+                  <Eye className="w-5 h-5 stroke-[2]" />
                 </Button>
                 {!archived && (
                   <>
-                    <Button size="icon" variant="ghost" onClick={() => navigate(`/jobs/${job.id}/edit`)} title="Edit">
-                      <Edit className="h-4 w-4" />
+                    <Button size="icon" variant="ghost" onClick={() => navigate(`/jobs/${job.id}/edit`)} title="Edit" className="min-h-[44px] min-w-[44px]">
+                      <Edit className="w-5 h-5 stroke-[2]" />
                     </Button>
-                    <Button size="icon" variant="ghost" onClick={() => toggleHide.mutate({ jobId: job.id, hide: true })} title="Archive">
-                      <Archive className="h-4 w-4" />
+                    <Button size="icon" variant="ghost" onClick={() => toggleHide.mutate({ jobId: job.id, hide: true })} title="Archive" className="min-h-[44px] min-w-[44px]">
+                      <Archive className="w-5 h-5 stroke-[2]" />
                     </Button>
                   </>
                 )}
                 {archived && (
-                  <Button size="icon" variant="ghost" onClick={() => toggleHide.mutate({ jobId: job.id, hide: false })} title="Restore">
-                    <RotateCcw className="h-4 w-4" />
+                  <Button size="icon" variant="ghost" onClick={() => toggleHide.mutate({ jobId: job.id, hide: false })} title="Restore" className="min-h-[44px] min-w-[44px]">
+                    <RotateCcw className="w-5 h-5 stroke-[2]" />
                   </Button>
                 )}
               </TableCell>
@@ -254,36 +255,36 @@ function ExpensesTab({ archived = false }: { archived?: boolean }) {
     },
   });
 
-  if (isLoading) return <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
-  if (!expenses?.length) return <p className="text-muted-foreground text-center py-8">No {archived ? "archived" : ""} expenses.</p>;
+  if (isLoading) return <DashboardSkeleton />;
+  if (!expenses?.length) return <p className="text-[14px] text-muted-foreground text-center py-8">No {archived ? "archived" : ""} expenses.</p>;
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto rounded-xl border border-border">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Date</TableHead>
-            <TableHead>Category</TableHead>
-            <TableHead>Amount</TableHead>
-            <TableHead>Job</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
+            <TableHead className="text-[13px]">Date</TableHead>
+            <TableHead className="text-[13px]">Category</TableHead>
+            <TableHead className="text-[13px]">Amount</TableHead>
+            <TableHead className="text-[13px]">Job</TableHead>
+            <TableHead className="text-[13px] text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {expenses.map((exp: any) => (
             <TableRow key={exp.id}>
-              <TableCell className="text-xs">{exp.date}</TableCell>
-              <TableCell>{exp.category}</TableCell>
-              <TableCell>£{Number(exp.amount).toFixed(2)}</TableCell>
-              <TableCell className="text-xs">{exp.jobs?.vehicle_reg ?? "—"}</TableCell>
+              <TableCell className="text-[13px]">{exp.date}</TableCell>
+              <TableCell className="text-[14px]">{exp.category}</TableCell>
+              <TableCell className="text-[14px]">£{Number(exp.amount).toFixed(2)}</TableCell>
+              <TableCell className="text-[13px]">{exp.jobs?.vehicle_reg ?? "—"}</TableCell>
               <TableCell className="text-right">
                 {!archived ? (
-                  <Button size="icon" variant="ghost" onClick={() => toggleHide.mutate({ id: exp.id, hide: true })} title="Archive">
-                    <Archive className="h-4 w-4" />
+                  <Button size="icon" variant="ghost" onClick={() => toggleHide.mutate({ id: exp.id, hide: true })} title="Archive" className="min-h-[44px] min-w-[44px]">
+                    <Archive className="w-5 h-5 stroke-[2]" />
                   </Button>
                 ) : (
-                  <Button size="icon" variant="ghost" onClick={() => toggleHide.mutate({ id: exp.id, hide: false })} title="Restore">
-                    <RotateCcw className="h-4 w-4" />
+                  <Button size="icon" variant="ghost" onClick={() => toggleHide.mutate({ id: exp.id, hide: false })} title="Restore" className="min-h-[44px] min-w-[44px]">
+                    <RotateCcw className="w-5 h-5 stroke-[2]" />
                   </Button>
                 )}
               </TableCell>
@@ -295,13 +296,13 @@ function ExpensesTab({ archived = false }: { archived?: boolean }) {
   );
 }
 
-// ─── Users Tab (stub – ready for auth) ────────────────────────────
+// ─── Users Tab ────────────────────────────────────────────────────
 function UsersTab() {
   return (
     <div className="text-center py-8 space-y-2">
-      <Users className="h-10 w-10 mx-auto text-muted-foreground" />
-      <p className="text-muted-foreground">User management will be available when authentication is enabled.</p>
-      <p className="text-xs text-muted-foreground">Roles: DRIVER, ADMIN, SUPERADMIN</p>
+      <Users className="w-10 h-10 mx-auto text-muted-foreground stroke-[2]" />
+      <p className="text-[14px] text-muted-foreground">User management will be available when authentication is enabled.</p>
+      <p className="text-[13px] text-muted-foreground">Roles: DRIVER, ADMIN, SUPERADMIN</p>
     </div>
   );
 }
@@ -311,19 +312,19 @@ function SettingsTab() {
   const { isSuperAdmin } = useAuth();
   return (
     <div className="space-y-4">
-      <Card className="p-4 space-y-2">
-        <h4 className="font-semibold text-sm">ETA Notifications</h4>
-        <p className="text-xs text-muted-foreground">Configure per-job notification flags on the job edit screen.</p>
-      </Card>
-      <Card className="p-4 space-y-2">
-        <h4 className="font-semibold text-sm">CSV Export</h4>
-        <p className="text-xs text-muted-foreground">Exports use UTF-8 BOM encoding, Google Sheets compatible.</p>
-      </Card>
+      <div className="p-4 rounded-xl bg-card border border-border shadow-sm space-y-2">
+        <h4 className="text-[16px] font-medium text-foreground">ETA Notifications</h4>
+        <p className="text-[13px] text-muted-foreground">Configure per-job notification flags on the job edit screen.</p>
+      </div>
+      <div className="p-4 rounded-xl bg-card border border-border shadow-sm space-y-2">
+        <h4 className="text-[16px] font-medium text-foreground">CSV Export</h4>
+        <p className="text-[13px] text-muted-foreground">Exports use UTF-8 BOM encoding, Google Sheets compatible.</p>
+      </div>
       {isSuperAdmin && (
-        <Card className="p-4 space-y-2 border-destructive/50">
-          <h4 className="font-semibold text-sm text-destructive">SuperAdmin Settings</h4>
-          <p className="text-xs text-muted-foreground">Global feature flags and auth configuration will be available here.</p>
-        </Card>
+        <div className="p-4 rounded-xl bg-card border border-destructive/50 shadow-sm space-y-2">
+          <h4 className="text-[16px] font-medium text-destructive">SuperAdmin Settings</h4>
+          <p className="text-[13px] text-muted-foreground">Global feature flags and auth configuration will be available here.</p>
+        </div>
       )}
     </div>
   );
@@ -336,46 +337,45 @@ export const AdminDashboard = () => {
 
   if (!isAdmin) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background pb-20">
         <AppHeader title="Access Denied" showBack onBack={() => navigate("/")} />
-        <p className="text-center py-12 text-muted-foreground">You do not have permission to access this page.</p>
+        <p className="text-center py-12 text-[14px] text-muted-foreground">You do not have permission to access this page.</p>
+        <BottomNav />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20">
       <AppHeader title="Admin Dashboard" showBack onBack={() => navigate("/")} />
       <div className="p-4 max-w-4xl mx-auto">
         {/* Global search */}
         <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground stroke-[2]" />
           <Input
             placeholder="Search jobs by reg, ref, client, postcode…"
-            className="pl-9"
+            className="pl-10 min-h-[44px] rounded-lg"
             onChange={(e) => {
               const q = e.target.value.toLowerCase().trim();
-              // Store search query as URL param for filtering within tabs
               const url = new URL(window.location.href);
               if (q) url.searchParams.set("q", q);
               else url.searchParams.delete("q");
               window.history.replaceState({}, "", url.toString());
-              // Force re-render of job tabs
               document.dispatchEvent(new CustomEvent("admin-search", { detail: q }));
             }}
           />
         </div>
         <Tabs defaultValue="overview">
           <TabsList className="w-full grid grid-cols-4 lg:grid-cols-8 mb-4">
-            <TabsTrigger value="overview"><BarChart3 className="h-4 w-4 mr-1 hidden sm:inline" />Overview</TabsTrigger>
+            <TabsTrigger value="overview"><BarChart3 className="w-4 h-4 mr-1 hidden sm:inline" />Overview</TabsTrigger>
             <TabsTrigger value="jobs">Jobs</TabsTrigger>
             <TabsTrigger value="archived-jobs">Archived</TabsTrigger>
             <TabsTrigger value="expenses">Expenses</TabsTrigger>
             <TabsTrigger value="archived-expenses" className="hidden lg:flex">Exp. Archive</TabsTrigger>
-            <TabsTrigger value="sheets"><Sheet className="h-4 w-4 mr-1 hidden sm:inline" />Sheets</TabsTrigger>
+            <TabsTrigger value="sheets"><Sheet className="w-4 h-4 mr-1 hidden sm:inline" />Sheets</TabsTrigger>
             <TabsTrigger value="timesheets" onClick={() => navigate("/admin/timesheets")}>Timesheets</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
-            <TabsTrigger value="settings"><Settings className="h-4 w-4" /></TabsTrigger>
+            <TabsTrigger value="settings"><Settings className="w-4 h-4" /></TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview"><OverviewTab /></TabsContent>
@@ -388,6 +388,7 @@ export const AdminDashboard = () => {
           <TabsContent value="settings"><SettingsTab /></TabsContent>
         </Tabs>
       </div>
+      <BottomNav />
     </div>
   );
 };

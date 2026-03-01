@@ -2,9 +2,11 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/AppHeader";
+import { BottomNav } from "@/components/BottomNav";
+import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 
 interface SyncError {
   id: string;
@@ -33,43 +35,41 @@ export function SyncErrors() {
   });
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20">
       <AppHeader title="Sync Errors" showBack onBack={() => navigate("/admin")} />
 
-      <div className="p-4">
+      <div className="p-4 max-w-2xl mx-auto">
         {isLoading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
+          <DashboardSkeleton />
         ) : !errors?.length ? (
           <div className="text-center py-12 space-y-2">
-            <AlertTriangle className="h-8 w-8 text-muted-foreground mx-auto" />
-            <p className="text-muted-foreground">No sync errors. All clear!</p>
+            <AlertTriangle className="w-10 h-10 text-muted-foreground mx-auto stroke-[2]" />
+            <p className="text-[14px] text-muted-foreground">No sync errors. All clear!</p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-md border">
+          <div className="overflow-x-auto rounded-xl border border-border">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-xs">Row</TableHead>
-                  <TableHead className="text-xs">Sheet Job ID</TableHead>
-                  <TableHead className="text-xs">Missing Fields</TableHead>
-                  <TableHead className="text-xs">Time</TableHead>
+                  <TableHead className="text-[13px]">Row</TableHead>
+                  <TableHead className="text-[13px]">Sheet Job ID</TableHead>
+                  <TableHead className="text-[13px]">Missing Fields</TableHead>
+                  <TableHead className="text-[13px]">Time</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {errors.map(err => (
                   <TableRow key={err.id}>
-                    <TableCell className="font-mono text-xs">{err.sheet_row_index}</TableCell>
-                    <TableCell className="text-xs">{err.sheet_job_id || "—"}</TableCell>
+                    <TableCell className="font-mono text-[13px]">{err.sheet_row_index}</TableCell>
+                    <TableCell className="text-[13px]">{err.sheet_job_id || "—"}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
                         {err.missing_fields.map(f => (
-                          <Badge key={f} variant="destructive" className="text-xs">{f}</Badge>
+                          <Badge key={f} variant="destructive" className="text-[13px]">{f}</Badge>
                         ))}
                       </div>
                     </TableCell>
-                    <TableCell className="text-xs whitespace-nowrap">
+                    <TableCell className="text-[13px] whitespace-nowrap">
                       {new Date(err.created_at).toLocaleString()}
                     </TableCell>
                   </TableRow>
@@ -79,6 +79,7 @@ export function SyncErrors() {
           </div>
         )}
       </div>
+      <BottomNav />
     </div>
   );
 }
