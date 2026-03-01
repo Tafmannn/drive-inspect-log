@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
+import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -435,7 +436,7 @@ export const JobForm = () => {
     ) : null;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20">
       {/* Draft restore prompt */}
       <Dialog open={showDraftPrompt} onOpenChange={setShowDraftPrompt}>
         <DialogContent>
@@ -994,6 +995,7 @@ export const JobForm = () => {
           </Button>
         </form>
       </div>
+      <BottomNav />
     </div>
   );
 };

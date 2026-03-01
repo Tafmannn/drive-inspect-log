@@ -1,10 +1,11 @@
 import { AppHeader } from "@/components/AppHeader";
-import { Card } from "@/components/ui/card";
+import { BottomNav } from "@/components/BottomNav";
+import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, FileDown } from "lucide-react";
+import { FileDown } from "lucide-react";
 import { useState } from "react";
 
 interface TimesheetDay {
@@ -24,26 +25,22 @@ function useTimesheetData(days: number) {
       since.setDate(since.getDate() - days);
       const sinceStr = since.toISOString();
 
-      // Get activity logs for time range
       const { data: logs } = await supabase
         .from("job_activity_log")
         .select("job_id, created_at")
         .gte("created_at", sinceStr)
         .order("created_at", { ascending: true });
 
-      // Get inspections for mileage
       const { data: inspections } = await supabase
         .from("inspections")
         .select("job_id, type, odometer, inspected_at")
         .gte("created_at", sinceStr);
 
-      // Get expenses
       const { data: expenses } = await supabase
         .from("expenses")
         .select("date, amount")
         .gte("date", since.toISOString().slice(0, 10));
 
-      // Group by date
       const dayMap: Record<string, TimesheetDay> = {};
 
       for (const log of logs ?? []) {
@@ -55,7 +52,6 @@ function useTimesheetData(days: number) {
         if (log.created_at > dayMap[date].lastActivity) dayMap[date].lastActivity = log.created_at;
       }
 
-      // Count unique jobs per day
       const jobsByDay: Record<string, Set<string>> = {};
       for (const log of logs ?? []) {
         const date = new Date(log.created_at).toISOString().slice(0, 10);
@@ -66,7 +62,6 @@ function useTimesheetData(days: number) {
         if (dayMap[date]) dayMap[date].totalJobs = jobs.size;
       }
 
-      // Calculate mileage per job per day
       const inspByJob: Record<string, { pickup?: number; delivery?: number; date?: string }> = {};
       for (const insp of inspections ?? []) {
         if (!inspByJob[insp.job_id]) inspByJob[insp.job_id] = {};
@@ -84,7 +79,6 @@ function useTimesheetData(days: number) {
         }
       }
 
-      // Expenses per day
       for (const exp of expenses ?? []) {
         const date = exp.date;
         if (dayMap[date]) {
@@ -138,65 +132,66 @@ export const Timesheets = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20">
       <AppHeader title="Timesheets" showBack onBack={() => navigate("/admin")}>
-        <Button size="sm" variant="ghost" onClick={exportCsv}>
-          <FileDown className="h-4 w-4 mr-1" /> CSV
+        <Button size="sm" variant="ghost" onClick={exportCsv} className="min-h-[44px] min-w-[44px]">
+          <FileDown className="w-5 h-5 stroke-[2] mr-1" /> CSV
         </Button>
       </AppHeader>
 
       <div className="p-4 max-w-2xl mx-auto space-y-4">
         <div className="flex gap-2">
           {[7, 14, 30].map(d => (
-            <Button key={d} size="sm" variant={range === d ? "default" : "outline"} onClick={() => setRange(d)}>
+            <Button key={d} size="sm" variant={range === d ? "default" : "outline"} onClick={() => setRange(d)} className="min-h-[44px] rounded-lg">
               {d} days
             </Button>
           ))}
         </div>
 
         {/* Summary */}
-        <Card className="p-4">
+        <div className="p-4 rounded-xl bg-card border border-border shadow-sm">
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
-              <p className="text-xl font-bold text-foreground">{totalJobs}</p>
-              <p className="text-xs text-muted-foreground">Total Jobs</p>
+              <p className="text-[20px] font-semibold text-foreground">{totalJobs}</p>
+              <p className="text-[13px] text-muted-foreground">Total Jobs</p>
             </div>
             <div>
-              <p className="text-xl font-bold text-foreground">{totalMileage.toLocaleString("en-GB")}</p>
-              <p className="text-xs text-muted-foreground">Miles</p>
+              <p className="text-[20px] font-semibold text-foreground">{totalMileage.toLocaleString("en-GB")}</p>
+              <p className="text-[13px] text-muted-foreground">Miles</p>
             </div>
             <div>
-              <p className="text-xl font-bold text-foreground">£{totalExpenses.toFixed(2)}</p>
-              <p className="text-xs text-muted-foreground">Expenses</p>
+              <p className="text-[20px] font-semibold text-foreground">£{totalExpenses.toFixed(2)}</p>
+              <p className="text-[13px] text-muted-foreground">Expenses</p>
             </div>
           </div>
-        </Card>
+        </div>
 
         {isLoading ? (
-          <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+          <DashboardSkeleton />
         ) : rows && rows.length > 0 ? (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {rows.map(row => (
-              <Card key={row.date} className="p-3">
+              <div key={row.date} className="p-4 rounded-xl bg-card border border-border shadow-sm">
                 <div className="flex justify-between items-center">
                   <div>
-                    <p className="text-sm font-semibold text-foreground">{formatDate(row.date)}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[16px] font-medium text-foreground">{formatDate(row.date)}</p>
+                    <p className="text-[13px] text-muted-foreground">
                       {formatTime(row.firstActivity)} – {formatTime(row.lastActivity)}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-medium text-foreground">{row.totalJobs} jobs • {row.totalMileage} mi</p>
-                    <p className="text-xs text-muted-foreground">£{row.totalExpenses.toFixed(2)}</p>
+                    <p className="text-[14px] font-medium text-foreground">{row.totalJobs} jobs • {row.totalMileage} mi</p>
+                    <p className="text-[13px] text-muted-foreground">£{row.totalExpenses.toFixed(2)}</p>
                   </div>
                 </div>
-              </Card>
+              </div>
             ))}
           </div>
         ) : (
-          <p className="text-center text-muted-foreground py-8">No activity in this period</p>
+          <p className="text-center text-[14px] text-muted-foreground py-8">No activity in this period</p>
         )}
       </div>
+      <BottomNav />
     </div>
   );
 };
