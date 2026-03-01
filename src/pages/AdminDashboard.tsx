@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useNavigate } from "react-router-dom";
-import { getStatusStyle } from "@/lib/statusConfig";
+import { getStatusStyle, ACTIVE_STATUSES } from "@/lib/statusConfig";
 import { UKPlate } from "@/components/UKPlate";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -39,7 +39,7 @@ function useAdminStats() {
       const [activeRes, completedTodayRes, completedWeekRes, expWeekRes, pendingUploads] = await Promise.all([
         supabase.from("jobs").select("id", { count: "exact", head: true })
           .eq("is_hidden", false)
-          .in("status", ["ready_for_pickup", "pickup_in_progress", "pickup_complete", "in_transit", "delivery_in_progress"]),
+          .in("status", ACTIVE_STATUSES as string[]),
         supabase.from("jobs").select("id", { count: "exact", head: true })
           .eq("is_hidden", false)
           .not("completed_at", "is", null).gte("completed_at", `${todayStr}T00:00:00`),

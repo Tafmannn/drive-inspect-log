@@ -32,6 +32,39 @@ export type Database = {
         }
         Relationships: []
       }
+      client_logs: {
+        Row: {
+          context: Json | null
+          created_at: string
+          event: string
+          id: string
+          job_id: string | null
+          message: string | null
+          severity: string
+          user_id: string | null
+        }
+        Insert: {
+          context?: Json | null
+          created_at?: string
+          event: string
+          id?: string
+          job_id?: string | null
+          message?: string | null
+          severity?: string
+          user_id?: string | null
+        }
+        Update: {
+          context?: Json | null
+          created_at?: string
+          event?: string
+          id?: string
+          job_id?: string | null
+          message?: string | null
+          severity?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       damage_items: {
         Row: {
           area: string | null

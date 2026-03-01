@@ -5,6 +5,7 @@
 
 import { storageService } from "./storage";
 import { insertPhoto } from "./api";
+import { logClientEvent } from "./logger";
 import type {
   InspectionType,
   PhotoType,
@@ -288,6 +289,13 @@ export async function retryUpload(
       status: "failed",
       errorMessage: msg,
     }));
+
+    // Log failure to client_logs
+    const item = loadAll().find((u) => u.id === id);
+    void logClientEvent("photo_upload_failed", "error", {
+      jobId: item?.jobId,
+      context: { pendingId: id, error: msg },
+    });
 
     return false;
   } finally {

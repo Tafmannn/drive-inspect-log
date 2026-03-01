@@ -35,6 +35,7 @@ import * as api from "@/lib/api";
 import { PhotoViewer } from "@/components/PhotoViewer";
 import { useAuth } from "@/context/AuthContext";
 import { saveDraft, loadDraft, clearDraft, draftKey } from "@/lib/autosave";
+import { JOB_STATUS } from "@/lib/statusConfig";
 
 interface InspectionFormState {
   odometer: string;
@@ -243,13 +244,12 @@ export const InspectionFlow = () => {
   const statusMarked = useRef(false);
   const markInProgress = useCallback(async () => {
     if (statusMarked.current || !jobId || !job) return;
-    const targetStatus = type === "pickup" ? "pickup_in_progress" : "delivery_in_progress";
-    // Only transition if the job is in an earlier state
-    const earlyStatuses = ["ready_for_pickup", "pickup_complete", "in_transit"];
+    const targetStatus = type === "pickup" ? JOB_STATUS.PICKUP_IN_PROGRESS : JOB_STATUS.DELIVERY_IN_PROGRESS;
+    const earlyStatuses: string[] = [JOB_STATUS.READY_FOR_PICKUP, JOB_STATUS.PICKUP_COMPLETE, JOB_STATUS.IN_TRANSIT];
     if (type === "pickup" && earlyStatuses.includes(job.status)) {
       statusMarked.current = true;
       api.updateJob(jobId, { status: targetStatus } as Partial<Job>).catch(() => {});
-    } else if (type === "delivery" && ["pickup_complete", "in_transit"].includes(job.status)) {
+    } else if (type === "delivery" && [JOB_STATUS.PICKUP_COMPLETE, JOB_STATUS.IN_TRANSIT].includes(job.status as any)) {
       statusMarked.current = true;
       api.updateJob(jobId, { status: targetStatus } as Partial<Job>).catch(() => {});
     }
