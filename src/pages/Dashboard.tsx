@@ -1,5 +1,7 @@
 import { AppHeader } from "@/components/AppHeader";
 import { DashboardCard } from "@/components/DashboardCard";
+import { DashboardSkeleton } from "@/components/DashboardSkeleton";
+import { BottomNav } from "@/components/BottomNav";
 import { Truck, Clock, AlertTriangle, Download, FileDown, Receipt, ShieldCheck, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useDashboardCounts } from "@/hooks/useJobs";
@@ -37,16 +39,12 @@ export const Dashboard = () => {
   const handleDownloadJobs = async () => {
     setSyncing(true);
     try {
-      // Phase 1: Push all app jobs to Job Master
       try {
         await pushToSheet();
       } catch (pushErr: unknown) {
         console.warn("Push phase warning:", pushErr);
-        // Non-fatal: continue to pull
       }
-
-      // Phase 2: Pull new jobs from Job Entry
-      const result = await pullFromSheet();
+      await pullFromSheet();
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
       qc.invalidateQueries({ queryKey: ["admin-jobs"] });
@@ -59,72 +57,111 @@ export const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <AppHeader title="AXENTRA" />
-      
-      <div className="p-4 space-y-4 max-w-lg mx-auto">
-        <DashboardCard
-          icon={<Truck className="h-6 w-6" />}
-          title="My Jobs"
-          subtitle="View your current jobs"
-          count={isLoading ? undefined : counts?.myJobs ?? 0}
-          onClick={() => navigate('/jobs')}
-        />
-        
-        <DashboardCard
-          icon={<Clock className="h-6 w-6" />}
-          title="Last 14 days"
-          subtitle="Completed jobs within the last 2 weeks"
-          count={isLoading ? undefined : counts?.completedLast14Days ?? 0}
-          onClick={() => navigate('/jobs/completed')}
-        />
-        
-        <DashboardCard
-          icon={<AlertTriangle className="h-6 w-6" />}
-          title="Pending Uploads"
-          subtitle="Photos awaiting upload"
-          count={isLoading ? undefined : counts?.pendingUploads ?? 0}
-          onClick={() => navigate('/pending-uploads')}
-        />
+    <div className="min-h-screen bg-background pb-20">
+      <AppHeader title="Dashboard" />
 
-        <DashboardCard
-          icon={<Receipt className="h-6 w-6" />}
-          title="Expenses"
-          subtitle="Log and view your expenses"
-          onClick={() => navigate('/expenses')}
-        />
-        
-        <DashboardCard
-          icon={syncing ? <Loader2 className="h-6 w-6 animate-spin" /> : <Download className="h-6 w-6" />}
-          title="Download Jobs"
-          subtitle={syncing ? "Syncing jobs…" : "Refresh and sync your jobs"}
-          onClick={syncing ? undefined : handleDownloadJobs}
-        />
+      <div className="p-4 space-y-6 max-w-lg mx-auto">
+        {/* Workflows */}
+        <section>
+          <h2 className="text-[14px] font-semibold text-muted-foreground mb-3">Workflows</h2>
+          {isLoading ? (
+            <DashboardSkeleton />
+          ) : (
+            <div className="space-y-3">
+              <DashboardCard
+                icon={<Truck className="w-6 h-6 stroke-[2]" />}
+                title="My Jobs"
+                subtitle="View your current jobs"
+                count={counts?.myJobs ?? 0}
+                onClick={() => navigate('/jobs')}
+              />
+              <DashboardCard
+                icon={<Clock className="w-6 h-6 stroke-[2]" />}
+                title="Last 14 Days"
+                subtitle="Completed jobs within the last 2 weeks"
+                count={counts?.completedLast14Days ?? 0}
+                onClick={() => navigate('/jobs/completed')}
+              />
+              <DashboardCard
+                icon={<AlertTriangle className="w-6 h-6 stroke-[2]" />}
+                title="Pending Uploads"
+                subtitle="Photos awaiting upload"
+                count={counts?.pendingUploads ?? 0}
+                onClick={() => navigate('/pending-uploads')}
+                iconClassName="bg-warning/10 text-warning"
+              />
+            </div>
+          )}
+        </section>
 
-        {isAdmin && (
-          <DashboardCard
-            icon={<ShieldCheck className="h-6 w-6" />}
-            title="Admin Dashboard"
-            subtitle="Stats, timesheets & management"
-            onClick={() => navigate('/admin')}
-          />
-        )}
+        {/* Utilities */}
+        <section>
+          <h2 className="text-[14px] font-semibold text-muted-foreground mb-3">Utilities</h2>
+          <div className="space-y-3">
+            <DashboardCard
+              icon={syncing ? <Loader2 className="w-6 h-6 stroke-[2] animate-spin" /> : <Download className="w-6 h-6 stroke-[2]" />}
+              title="Download Jobs"
+              subtitle={syncing ? "Syncing jobs…" : "Refresh and sync your jobs"}
+              onClick={syncing ? undefined : handleDownloadJobs}
+            />
+            {isAdmin && (
+              <DashboardCard
+                icon={<ShieldCheck className="w-6 h-6 stroke-[2]" />}
+                title="Admin Dashboard"
+                subtitle="Stats, timesheets & management"
+                onClick={() => navigate('/admin')}
+                iconClassName="bg-accent/10 text-accent"
+              />
+            )}
+          </div>
+        </section>
 
-        <div className="pt-2 space-y-2">
-          <h3 className="text-sm font-semibold text-muted-foreground">Exports</h3>
+        {/* Account */}
+        <section>
+          <h2 className="text-[14px] font-semibold text-muted-foreground mb-3">Account</h2>
+          <div className="space-y-3">
+            <DashboardCard
+              icon={<Receipt className="w-6 h-6 stroke-[2]" />}
+              title="Expenses"
+              subtitle="Log and view your expenses"
+              onClick={() => navigate('/expenses')}
+            />
+          </div>
+        </section>
+
+        {/* Exports */}
+        <section>
+          <h2 className="text-[14px] font-semibold text-muted-foreground mb-3">Exports</h2>
           <div className="grid grid-cols-3 gap-3">
-            <Button variant="outline" onClick={() => handleExport('jobs')} disabled={exporting}>
-              <FileDown className="h-4 w-4 mr-1" /> Jobs
+            <Button
+              variant="outline"
+              onClick={() => handleExport('jobs')}
+              disabled={exporting}
+              className="min-h-[44px] rounded-lg"
+            >
+              <FileDown className="w-4 h-4 mr-1" /> Jobs
             </Button>
-            <Button variant="outline" onClick={() => handleExport('inspections')} disabled={exporting}>
-              <FileDown className="h-4 w-4 mr-1" /> Inspections
+            <Button
+              variant="outline"
+              onClick={() => handleExport('inspections')}
+              disabled={exporting}
+              className="min-h-[44px] rounded-lg"
+            >
+              <FileDown className="w-4 h-4 mr-1" /> Inspections
             </Button>
-            <Button variant="outline" onClick={() => handleExport('expenses')} disabled={exporting}>
-              <FileDown className="h-4 w-4 mr-1" /> Expenses
+            <Button
+              variant="outline"
+              onClick={() => handleExport('expenses')}
+              disabled={exporting}
+              className="min-h-[44px] rounded-lg"
+            >
+              <FileDown className="w-4 h-4 mr-1" /> Expenses
             </Button>
           </div>
-        </div>
+        </section>
       </div>
+
+      <BottomNav />
     </div>
   );
 };

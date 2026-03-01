@@ -1,19 +1,22 @@
 import { AppHeader } from "@/components/AppHeader";
 import { JobCard } from "@/components/JobCard";
+import { BottomNav } from "@/components/BottomNav";
+import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { useNavigate } from "react-router-dom";
 import { usePendingJobs } from "@/hooks/useJobs";
-import { Loader2 } from "lucide-react";
 
 export const PendingJobs = () => {
   const navigate = useNavigate();
   const { data: jobs, isLoading } = usePendingJobs();
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20">
       <AppHeader title="Pending Jobs" showBack onBack={() => navigate('/')} />
       <div className="p-4">
-        {isLoading && <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}
-        {!isLoading && (!jobs || jobs.length === 0) && <p className="text-center py-12 text-muted-foreground">No pending jobs.</p>}
+        {isLoading && <DashboardSkeleton />}
+        {!isLoading && (!jobs || jobs.length === 0) && (
+          <p className="text-center py-12 text-[14px] text-muted-foreground">No pending jobs.</p>
+        )}
         {jobs?.map((job) => (
           <JobCard
             key={job.id}
@@ -27,6 +30,7 @@ export const PendingJobs = () => {
           />
         ))}
       </div>
+      <BottomNav />
     </div>
   );
 };

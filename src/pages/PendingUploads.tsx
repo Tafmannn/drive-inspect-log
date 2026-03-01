@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { AppHeader } from "@/components/AppHeader";
+import { BottomNav } from "@/components/BottomNav";
+import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import {
@@ -11,7 +12,7 @@ import {
   pruneDone,
   type JobUploadSummary,
 } from "@/lib/pendingUploads";
-import { Loader2, RefreshCw, AlertTriangle } from "lucide-react";
+import { Loader2, RefreshCw, AlertTriangle, Upload } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 export const PendingUploads = () => {
@@ -57,26 +58,25 @@ export const PendingUploads = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <AppHeader title="Pending Uploads" showBack onBack={() => navigate(-1)} />
+    <div className="min-h-screen bg-background pb-20">
+      <AppHeader title="Pending Uploads" showBack onBack={() => navigate('/')} />
       <div className="p-4 space-y-4 max-w-lg mx-auto">
         {jobs.length > 0 && (
-          <Button onClick={handleRetryAll} disabled={retryingAll} className="w-full">
-            {retryingAll ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+          <Button onClick={handleRetryAll} disabled={retryingAll} className="w-full min-h-[44px] rounded-lg">
+            {retryingAll ? <Loader2 className="mr-2 w-5 h-5 animate-spin" /> : <RefreshCw className="mr-2 w-5 h-5 stroke-[2]" />}
             Retry All ({jobs.length} job{jobs.length !== 1 ? "s" : ""})
           </Button>
         )}
 
-        {loading && (
-          <div className="flex justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        )}
+        {loading && <DashboardSkeleton />}
 
         {!loading && jobs.length === 0 && (
-          <p className="text-center py-12 text-muted-foreground">
-            No pending uploads. All photos are synced.
-          </p>
+          <div className="text-center py-12">
+            <Upload className="w-12 h-12 mx-auto text-muted-foreground mb-3 stroke-[2]" />
+            <p className="text-[14px] text-muted-foreground">
+              No pending uploads. All photos are synced.
+            </p>
+          </div>
         )}
 
         {jobs.map((job) => {
@@ -84,20 +84,20 @@ export const PendingUploads = () => {
           const isRetrying = retryingJob === job.jobId;
 
           return (
-            <Card key={job.jobId} className="p-4 space-y-2">
+            <div key={job.jobId} className="p-4 rounded-xl bg-card border border-border shadow-sm space-y-3">
               <div className="flex items-center justify-between">
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold truncate">
+                  <p className="text-[16px] font-medium text-foreground truncate">
                     {job.jobNumber || job.jobId.slice(0, 8)}
                   </p>
                   {job.vehicleReg && (
-                    <p className="text-xs text-muted-foreground">{job.vehicleReg}</p>
+                    <p className="text-[14px] text-muted-foreground">{job.vehicleReg}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
                   {job.failedCount > 0 && (
                     <Badge variant="destructive" className="flex items-center gap-1">
-                      <AlertTriangle className="h-3 w-3" />
+                      <AlertTriangle className="w-3 h-3" />
                       {job.failedCount} failed
                     </Badge>
                   )}
@@ -108,7 +108,7 @@ export const PendingUploads = () => {
               </div>
 
               <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground">
+                <p className="text-[13px] text-muted-foreground">
                   {totalPending} upload{totalPending !== 1 ? "s" : ""} remaining
                   {job.lastErrorAt && (
                     <> · Last error {new Date(job.lastErrorAt).toLocaleString()}</>
@@ -119,19 +119,21 @@ export const PendingUploads = () => {
                   variant="outline"
                   onClick={() => handleRetryJob(job.jobId)}
                   disabled={isRetrying}
+                  className="min-h-[44px] rounded-lg"
                 >
                   {isRetrying ? (
-                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    <Loader2 className="mr-1 w-4 h-4 animate-spin" />
                   ) : (
-                    <RefreshCw className="mr-1 h-3 w-3" />
+                    <RefreshCw className="mr-1 w-4 h-4 stroke-[2]" />
                   )}
                   Retry
                 </Button>
               </div>
-            </Card>
+            </div>
           );
         })}
       </div>
+      <BottomNav />
     </div>
   );
 };

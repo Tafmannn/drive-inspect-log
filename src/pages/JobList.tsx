@@ -1,9 +1,11 @@
 import { AppHeader } from "@/components/AppHeader";
 import { JobCard } from "@/components/JobCard";
+import { BottomNav } from "@/components/BottomNav";
 import { useNavigate } from "react-router-dom";
 import { useActiveJobs } from "@/hooks/useJobs";
-import { Loader2, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import type { Job } from "@/lib/types";
 
 function getJobCta(job: Job): { label: string; route: string } {
@@ -28,24 +30,27 @@ export const JobList = () => {
   });
 
   return (
-    <div className="min-h-screen bg-background">
-      <AppHeader title="Your Current Jobs" showBack onBack={() => navigate('/')}>
-        <Button size="sm" variant="ghost" className="text-app-header-foreground hover:bg-white/20" onClick={() => navigate('/jobs/new')}>
-          <Plus className="h-5 w-5" />
+    <div className="min-h-screen bg-background pb-20">
+      <AppHeader title="My Jobs" showBack onBack={() => navigate('/')}>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="min-h-[44px] min-w-[44px] text-muted-foreground hover:bg-muted"
+          onClick={() => navigate('/jobs/new')}
+        >
+          <Plus className="w-6 h-6 stroke-[2]" />
         </Button>
       </AppHeader>
 
       <div className="p-4 max-w-lg mx-auto">
-        {isLoading && (
-          <div className="flex justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        )}
+        {isLoading && <DashboardSkeleton />}
 
         {!isLoading && (!sortedJobs || sortedJobs.length === 0) && (
           <div className="text-center py-12 space-y-4">
-            <p className="text-muted-foreground">No active jobs found.</p>
-            <Button onClick={() => navigate('/jobs/new')}>Create Job</Button>
+            <p className="text-[14px] text-muted-foreground">No active jobs found.</p>
+            <Button onClick={() => navigate('/jobs/new')} className="min-h-[44px] rounded-lg">
+              Create Job
+            </Button>
           </div>
         )}
 
@@ -81,6 +86,8 @@ export const JobList = () => {
           );
         })}
       </div>
+
+      <BottomNav />
     </div>
   );
 };

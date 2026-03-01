@@ -1,19 +1,22 @@
 import { AppHeader } from "@/components/AppHeader";
 import { JobCard } from "@/components/JobCard";
+import { BottomNav } from "@/components/BottomNav";
+import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { useNavigate } from "react-router-dom";
 import { useCompletedJobs } from "@/hooks/useJobs";
-import { Loader2 } from "lucide-react";
 
 export const CompletedJobs = () => {
   const navigate = useNavigate();
   const { data: jobs, isLoading } = useCompletedJobs();
 
   return (
-    <div className="min-h-screen bg-background">
-      <AppHeader title="Completed (14 days)" showBack onBack={() => navigate('/')} />
+    <div className="min-h-screen bg-background pb-20">
+      <AppHeader title="Last 14 Days" showBack onBack={() => navigate('/')} />
       <div className="p-4 max-w-lg mx-auto">
-        {isLoading && <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}
-        {!isLoading && (!jobs || jobs.length === 0) && <p className="text-center py-12 text-muted-foreground">No completed jobs in the last 14 days.</p>}
+        {isLoading && <DashboardSkeleton />}
+        {!isLoading && (!jobs || jobs.length === 0) && (
+          <p className="text-center py-12 text-[14px] text-muted-foreground">No completed jobs in the last 14 days.</p>
+        )}
         {jobs?.map((job) => (
           <JobCard
             key={job.id}
@@ -41,6 +44,7 @@ export const CompletedJobs = () => {
           />
         ))}
       </div>
+      <BottomNav />
     </div>
   );
 };

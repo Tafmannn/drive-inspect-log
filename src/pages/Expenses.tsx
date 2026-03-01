@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
+import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useExpenses, useExpenseTotals } from "@/hooks/useExpenses";
 import { EXPENSE_CATEGORIES } from "@/lib/expenseApi";
-import { Loader2, Plus, Receipt, Filter } from "lucide-react";
+import { DashboardSkeleton } from "@/components/DashboardSkeleton";
+import { Plus, Receipt, Filter } from "lucide-react";
 
 const DATE_RANGES = [
   { label: "Today", value: "today" },
@@ -41,37 +42,37 @@ export const Expenses = () => {
   const fmt = (n: number) => `£${n.toFixed(2)}`;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20">
       <AppHeader title="Expenses" showBack onBack={() => navigate("/")} />
 
       <div className="p-4 space-y-4 max-w-lg mx-auto">
         {/* Totals */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-3">
           {[
             { label: "Today", value: totals?.today ?? 0 },
             { label: "This Week", value: totals?.thisWeek ?? 0 },
             { label: "This Month", value: totals?.thisMonth ?? 0 },
           ].map(t => (
-            <Card key={t.label} className="p-3 text-center">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{t.label}</p>
-              <p className="text-lg font-bold text-foreground">{fmt(t.value)}</p>
-            </Card>
+            <div key={t.label} className="p-3 rounded-xl bg-card border border-border text-center">
+              <p className="text-[13px] text-muted-foreground uppercase tracking-wide">{t.label}</p>
+              <p className="text-[16px] font-semibold text-foreground">{fmt(t.value)}</p>
+            </div>
           ))}
         </div>
 
         {/* Filters */}
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setShowFilters(f => !f)}>
-            <Filter className="h-4 w-4 mr-1" /> Filters
+          <Button variant="outline" size="sm" onClick={() => setShowFilters(f => !f)} className="min-h-[44px] rounded-lg">
+            <Filter className="w-4 h-4 mr-1" /> Filters
           </Button>
-          <div className="flex gap-1 flex-1 overflow-x-auto">
+          <div className="flex gap-2 flex-1 overflow-x-auto">
             {DATE_RANGES.map(r => (
               <Button
                 key={r.value}
                 size="sm"
                 variant={dateRange === r.value ? "default" : "outline"}
                 onClick={() => setDateRange(r.value)}
-                className="text-xs"
+                className="text-[13px] min-h-[44px] rounded-lg"
               >
                 {r.label}
               </Button>
@@ -80,7 +81,7 @@ export const Expenses = () => {
         </div>
 
         {showFilters && (
-          <Card className="p-3">
+          <div className="p-4 rounded-xl bg-card border border-border">
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
               <SelectTrigger><SelectValue placeholder="All categories" /></SelectTrigger>
               <SelectContent>
@@ -90,54 +91,60 @@ export const Expenses = () => {
                 ))}
               </SelectContent>
             </Select>
-          </Card>
-        )}
-
-        {/* List */}
-        {isLoading && (
-          <div className="flex justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         )}
 
+        {/* List */}
+        {isLoading && <DashboardSkeleton />}
+
         {!isLoading && expenses?.length === 0 && (
           <div className="text-center py-12">
-            <Receipt className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-            <p className="text-muted-foreground">No expenses found</p>
+            <Receipt className="w-12 h-12 mx-auto text-muted-foreground mb-3 stroke-[2]" />
+            <p className="text-[14px] text-muted-foreground">No expenses found</p>
           </div>
         )}
 
         {expenses?.map(e => (
-          <Card key={e.id} className="p-4 space-y-1 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/expenses/${e.id}/edit`)}>
+          <div
+            key={e.id}
+            className="p-4 rounded-xl bg-card border border-border shadow-sm space-y-2 cursor-pointer active:bg-muted/50 transition-colors"
+            onClick={() => navigate(`/expenses/${e.id}/edit`)}
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-xs font-mono">
+                <Badge variant="outline" className="text-[13px] font-mono">
                   {e.job_number || e.job_id.slice(0, 6)}
                 </Badge>
-                <span className="text-xs text-muted-foreground">{e.job_reg}</span>
+                <span className="text-[13px] text-muted-foreground">{e.job_reg}</span>
               </div>
-              <span className="font-bold text-foreground">{fmt(Number(e.amount))}</span>
+              <span className="text-[16px] font-semibold text-foreground">{fmt(Number(e.amount))}</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="text-xs">{e.category}</Badge>
-                {e.label && <span className="text-xs text-muted-foreground truncate max-w-[140px]">{e.label}</span>}
+                <Badge variant="secondary" className="text-[13px]">{e.category}</Badge>
+                {e.label && <span className="text-[13px] text-muted-foreground truncate max-w-[140px]">{e.label}</span>}
               </div>
-              <span className="text-xs text-muted-foreground">{new Date(e.date).toLocaleDateString("en-GB")}</span>
+              <span className="text-[13px] text-muted-foreground">{new Date(e.date).toLocaleDateString("en-GB")}</span>
             </div>
             {e.receipts.length > 0 && (
-              <p className="text-[10px] text-muted-foreground">{e.receipts.length} receipt{e.receipts.length !== 1 ? "s" : ""}</p>
+              <p className="text-[13px] text-muted-foreground">{e.receipts.length} receipt{e.receipts.length !== 1 ? "s" : ""}</p>
             )}
-          </Card>
+          </div>
         ))}
 
         {/* FAB */}
-        <div className="fixed bottom-6 right-6">
-          <Button size="lg" className="rounded-full shadow-lg h-14 w-14 p-0" onClick={() => navigate("/expenses/new")}>
-            <Plus className="h-6 w-6" />
+        <div className="fixed bottom-20 right-4 z-40">
+          <Button
+            size="lg"
+            className="rounded-full shadow-lg h-14 w-14 p-0 min-h-[44px] min-w-[44px]"
+            onClick={() => navigate("/expenses/new")}
+          >
+            <Plus className="w-6 h-6 stroke-[2]" />
           </Button>
         </div>
       </div>
+
+      <BottomNav />
     </div>
   );
 };

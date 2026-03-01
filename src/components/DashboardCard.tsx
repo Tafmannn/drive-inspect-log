@@ -1,4 +1,3 @@
-import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 interface DashboardCardProps {
@@ -8,45 +7,55 @@ interface DashboardCardProps {
   count?: number;
   onClick?: () => void;
   className?: string;
+  iconClassName?: string;
 }
 
-export const DashboardCard = ({ 
-  icon, 
-  title, 
-  subtitle, 
-  count, 
-  onClick, 
-  className 
+export const DashboardCard = ({
+  icon,
+  title,
+  subtitle,
+  count,
+  onClick,
+  className,
+  iconClassName,
 }: DashboardCardProps) => {
   return (
-    <Card 
+    <div
       className={cn(
-        "p-4 cursor-pointer hover:shadow-lg transition-all duration-200 relative overflow-hidden",
+        "flex items-center justify-between p-4 rounded-xl bg-card shadow-sm border border-border cursor-pointer active:bg-muted/50 transition-all min-h-[44px]",
         className
       )}
       onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === "Enter" && onClick?.()}
     >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center text-primary-foreground">
-            {icon}
-          </div>
-          <div>
-            <h3 className="font-semibold text-card-foreground">{title}</h3>
-            <p className="text-sm text-muted-foreground">{subtitle}</p>
-          </div>
+      <div className="flex items-center gap-4">
+        <div
+          className={cn(
+            "w-10 h-10 flex items-center justify-center rounded-lg bg-primary/10 text-primary",
+            iconClassName
+          )}
+        >
+          {icon}
         </div>
-        {count !== undefined && (
-          <div className="absolute right-4 top-4">
-            <span className={cn(
-              "inline-flex items-center justify-center min-w-[32px] h-8 px-2 rounded-full text-sm font-medium",
-              count > 0 ? "bg-success text-success-foreground" : "bg-muted text-muted-foreground"
-            )}>
-              {count}
-            </span>
-          </div>
-        )}
+        <div className="flex flex-col">
+          <p className="text-[16px] font-medium text-foreground">{title}</p>
+          <p className="text-[14px] text-muted-foreground">{subtitle}</p>
+        </div>
       </div>
-    </Card>
+      {count !== undefined && (
+        <div
+          className={cn(
+            "w-7 h-7 rounded-full text-[12px] font-medium flex items-center justify-center shrink-0",
+            count > 0
+              ? "bg-success text-success-foreground"
+              : "bg-muted text-muted-foreground"
+          )}
+        >
+          {count}
+        </div>
+      )}
+    </div>
   );
 };
