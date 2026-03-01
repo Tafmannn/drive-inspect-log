@@ -537,12 +537,23 @@ export const InspectionFlow = () => {
       for (const d of formState.damages) {
         // Queue damage photo to background — don't block submission
         if (d.photo) {
-          addPendingUpload(d.photo, {
-            jobId,
-            inspectionType: type,
-            photoType: "damage_close_up",
-            label: null,
-          }).catch(() => {});
+          try {
+            await addPendingUpload(d.photo, {
+              jobId,
+              inspectionType: type,
+              photoType: "damage_close_up",
+              label: null,
+            });
+            toast({ title: "Photo saved offline", description: "We'll upload it when you're online." });
+          } catch (err) {
+            const msg = String(err).toLowerCase();
+            const isStorageError = msg.includes("storage") || msg.includes("quota") || msg.includes("localstorage");
+            toast({
+              title: isStorageError ? "Photo not saved – storage issue" : "Photo could not be saved",
+              description: isStorageError ? "Your device storage is full or blocked. Clear space and try again." : "Please try again.",
+              variant: "destructive",
+            });
+          }
         }
         damageItemsPayload.push({
           x: d.x,
@@ -609,24 +620,46 @@ export const InspectionFlow = () => {
         const file = formState.standardPhotos[pt.key];
         if (file) {
           pendingCount++;
-          addPendingUpload(file, {
-            jobId,
-            inspectionType: type,
-            photoType: pt.key,
-            label: null,
-          }).catch(() => {});
+          try {
+            await addPendingUpload(file, {
+              jobId,
+              inspectionType: type,
+              photoType: pt.key,
+              label: null,
+            });
+            toast({ title: "Photo saved offline", description: "We'll upload it when you're online." });
+          } catch (err) {
+            const msg = String(err).toLowerCase();
+            const isStorageError = msg.includes("storage") || msg.includes("quota") || msg.includes("localstorage");
+            toast({
+              title: isStorageError ? "Photo not saved – storage issue" : "Photo could not be saved",
+              description: isStorageError ? "Your device storage is full or blocked. Clear space and try again." : "Please try again.",
+              variant: "destructive",
+            });
+          }
         }
       }
 
       for (const ap of formState.additionalPhotos) {
         const photoKey = type === "pickup" ? "pickup_other" : "delivery_other";
         pendingCount++;
-        addPendingUpload(ap.file, {
-          jobId,
-          inspectionType: type,
-          photoType: photoKey,
-          label: ap.label,
-        }).catch(() => {});
+        try {
+          await addPendingUpload(ap.file, {
+            jobId,
+            inspectionType: type,
+            photoType: photoKey,
+            label: ap.label,
+          });
+          toast({ title: "Photo saved offline", description: "We'll upload it when you're online." });
+        } catch (err) {
+          const msg = String(err).toLowerCase();
+          const isStorageError = msg.includes("storage") || msg.includes("quota") || msg.includes("localstorage");
+          toast({
+            title: isStorageError ? "Photo not saved – storage issue" : "Photo could not be saved",
+            description: isStorageError ? "Your device storage is full or blocked. Clear space and try again." : "Please try again.",
+            variant: "destructive",
+          });
+        }
       }
 
       // ── 5) Immediately trigger background retry (best-effort) ──

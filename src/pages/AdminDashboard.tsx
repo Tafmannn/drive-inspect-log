@@ -12,14 +12,15 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Loader2, Truck, CheckCircle, AlertTriangle, Receipt, Clock, FileDown,
-  Eye, Edit, Archive, RotateCcw, Settings, Users, BarChart3, Sheet, Search
+  Eye, Edit, Archive, RotateCcw, Settings, Users, BarChart3, Sheet, Search, HardDrive
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { GoogleSheetsPanel } from "@/components/GoogleSheetsPanel";
+import { AdminPendingUploads } from "@/components/AdminPendingUploads";
 import { exportJobsCsv, exportInspectionsCsv } from "@/lib/export";
 import { exportExpensesCsv } from "@/lib/expenseApi";
 import { toast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { getAllPendingUploads } from "@/lib/pendingUploads";
 import { useAuth } from "@/context/AuthContext";
 import type { Job } from "@/lib/types";
@@ -163,6 +164,17 @@ function JobsTab({ archived = false }: { archived?: boolean }) {
   const qc = useQueryClient();
   const { isSuperAdmin } = useAuth();
 
+  const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const custom = event as CustomEvent<string>;
+      setSearchQuery(custom.detail ?? "");
+    };
+    document.addEventListener("admin-search", handler as EventListener);
+    return () => document.removeEventListener("admin-search", handler as EventListener);
+  }, []);
+
   const toggleHide = useMutation({
     mutationFn: async ({ jobId, hide }: { jobId: string; hide: boolean }) => {
       const { error } = await supabase.from("jobs").update({ is_hidden: hide } as any).eq("id", jobId);
@@ -177,7 +189,22 @@ function JobsTab({ archived = false }: { archived?: boolean }) {
 
   if (isLoading) return <DashboardSkeleton />;
 
-  if (!jobs?.length) return <p className="text-[14px] text-muted-foreground text-center py-8">No {archived ? "archived" : ""} jobs found.</p>;
+  const filteredJobs = (jobs ?? []).filter((job) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      (job.client_name ?? "").toLowerCase().includes(q) ||
+      (job.vehicle_reg ?? "").toLowerCase().includes(q) ||
+      (job.external_job_number ?? "").toLowerCase().includes(q) ||
+      (job.sheet_job_id ?? "").toLowerCase().includes(q) ||
+      (job.pickup_city ?? "").toLowerCase().includes(q) ||
+      (job.pickup_postcode ?? "").toLowerCase().includes(q) ||
+      (job.delivery_city ?? "").toLowerCase().includes(q) ||
+      (job.delivery_postcode ?? "").toLowerCase().includes(q)
+    );
+  });
+
+  if (!filteredJobs.length) return <p className="text-[14px] text-muted-foreground text-center py-8">No {archived ? "archived" : ""} jobs found.</p>;
 
   return (
     <div className="overflow-x-auto rounded-xl border border-border">
@@ -192,7 +219,7 @@ function JobsTab({ archived = false }: { archived?: boolean }) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {jobs.map((job) => (
+          {filteredJobs.map((job) => (
             <TableRow key={job.id}>
               <TableCell className="text-[14px] font-medium">Job {job.external_job_number || job.id.slice(0, 8)}</TableCell>
               <TableCell><UKPlate reg={job.vehicle_reg} /></TableCell>
@@ -366,12 +393,13 @@ export const AdminDashboard = () => {
           />
         </div>
         <Tabs defaultValue="overview">
-          <TabsList className="w-full grid grid-cols-4 lg:grid-cols-8 mb-4">
+          <TabsList className="w-full grid grid-cols-4 lg:grid-cols-9 mb-4">
             <TabsTrigger value="overview"><BarChart3 className="w-4 h-4 mr-1 hidden sm:inline" />Overview</TabsTrigger>
             <TabsTrigger value="jobs">Jobs</TabsTrigger>
             <TabsTrigger value="archived-jobs">Archived</TabsTrigger>
             <TabsTrigger value="expenses">Expenses</TabsTrigger>
             <TabsTrigger value="archived-expenses" className="hidden lg:flex">Exp. Archive</TabsTrigger>
+            <TabsTrigger value="pending-uploads"><HardDrive className="w-4 h-4 mr-1 hidden sm:inline" />Uploads</TabsTrigger>
             <TabsTrigger value="sheets"><Sheet className="w-4 h-4 mr-1 hidden sm:inline" />Sheets</TabsTrigger>
             <TabsTrigger value="timesheets" onClick={() => navigate("/admin/timesheets")}>Timesheets</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
@@ -383,6 +411,7 @@ export const AdminDashboard = () => {
           <TabsContent value="archived-jobs"><JobsTab archived /></TabsContent>
           <TabsContent value="expenses"><ExpensesTab /></TabsContent>
           <TabsContent value="archived-expenses"><ExpensesTab archived /></TabsContent>
+          <TabsContent value="pending-uploads"><AdminPendingUploads /></TabsContent>
           <TabsContent value="sheets"><GoogleSheetsPanel /></TabsContent>
           <TabsContent value="users"><UsersTab /></TabsContent>
           <TabsContent value="settings"><SettingsTab /></TabsContent>

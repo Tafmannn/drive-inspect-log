@@ -45,6 +45,11 @@ export function GoogleSheetsPanel() {
   const qc = useQueryClient();
   const [spreadsheetId, setSpreadsheetId] = useState("");
   const [sheetName, setSheetName] = useState("Job Master");
+  const [diagnostics, setDiagnostics] = useState<{
+    missingHeaders?: string[];
+    unexpectedHeaders?: string[];
+    details?: string;
+  } | null>(null);
 
   const { data: config, isLoading: configLoading } = useQuery({
     queryKey: ["sheet-sync-config"],
@@ -84,10 +89,29 @@ export function GoogleSheetsPanel() {
 
   const testConn = useMutation({
     mutationFn: syncApi.testSheetConnection,
-    onSuccess: () => {
-      toast({ title: "Connection confirmed – sheet is configured correctly." });
+    onSuccess: (data: any) => {
+      const missingHeaders = data?.missingHeaders ?? [];
+      const unexpectedHeaders = data?.unexpectedHeaders ?? [];
+      setDiagnostics({
+        missingHeaders: missingHeaders.length ? missingHeaders : undefined,
+        unexpectedHeaders: unexpectedHeaders.length ? unexpectedHeaders : undefined,
+        details: data?.details,
+      });
+
+      if (missingHeaders.length > 0) {
+        toast({
+          title: "Connection OK but headers are missing",
+          description: `Missing: ${missingHeaders.join(", ")}`,
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Connection confirmed – sheet is configured correctly." });
+      }
     },
-    onError: () => toast({ title: "Connection failed – check sheet headers or API access.", variant: "destructive" }),
+    onError: () => {
+      setDiagnostics(null);
+      toast({ title: "Connection failed – check sheet headers or API access.", variant: "destructive" });
+    },
   });
 
   const pushSync = useMutation({
@@ -190,6 +214,39 @@ export function GoogleSheetsPanel() {
           <p className="text-xs text-muted-foreground">Last pull: {new Date(config.last_pull_at).toLocaleString()}</p>
         )}
       </Card>
+
+      {/* Diagnostics */}
+      {diagnostics && (diagnostics.missingHeaders || diagnostics.unexpectedHeaders) && (
+        <Card className="p-4 space-y-3 border-warning/50">
+          <h4 className="font-semibold text-sm flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-warning" />
+            Sheet Diagnostics
+          </h4>
+          {diagnostics.missingHeaders && (
+            <div>
+              <p className="text-xs font-medium text-destructive mb-1">Missing Headers:</p>
+              <ul className="text-xs text-muted-foreground list-disc list-inside">
+                {diagnostics.missingHeaders.map((h) => (
+                  <li key={h}>{h}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {diagnostics.unexpectedHeaders && (
+            <div>
+              <p className="text-xs font-medium text-warning mb-1">Unexpected Headers:</p>
+              <ul className="text-xs text-muted-foreground list-disc list-inside">
+                {diagnostics.unexpectedHeaders.map((h) => (
+                  <li key={h}>{h}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {diagnostics.details && (
+            <p className="text-xs text-muted-foreground">{diagnostics.details}</p>
+          )}
+        </Card>
+      )}
 
       {/* Sync Actions */}
       {config && (
