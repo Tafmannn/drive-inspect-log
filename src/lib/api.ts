@@ -7,9 +7,11 @@ import type {
   Photo,
   JobActivityLog,
   InspectionType,
-  JobStatus,
 } from './types';
+import type { JobStatusValue } from './statusConfig';
+import { JOB_STATUS, ACTIVE_STATUSES, PENDING_STATUSES } from './statusConfig';
 import { isFeatureEnabled } from './featureFlags';
+import { logClientEvent } from './logger';
 
 // ─── Sheet Sync Helper ───────────────────────────────────────────────
 
@@ -35,9 +37,7 @@ export async function listJobs(filter?: { statuses?: string[] }): Promise<Job[]>
 }
 
 export async function listActiveJobs(): Promise<Job[]> {
-  return listJobs({
-    statuses: ['ready_for_pickup', 'pickup_in_progress', 'pickup_complete', 'in_transit', 'delivery_in_progress'],
-  });
+  return listJobs({ statuses: ACTIVE_STATUSES as string[] });
 }
 
 export async function listCompletedJobs(): Promise<Job[]> {
@@ -55,7 +55,7 @@ export async function listCompletedJobs(): Promise<Job[]> {
 }
 
 export async function listPendingJobs(): Promise<Job[]> {
-  return listJobs({ statuses: ['pod_ready', 'delivery_complete'] });
+  return listJobs({ statuses: PENDING_STATUSES as string[] });
 }
 
 export async function getJob(jobId: string): Promise<Job> {
@@ -114,7 +114,7 @@ export async function createJob(input: Partial<Omit<Job, 'id' | 'status' | 'has_
   }
   const { data, error } = await supabase.from('jobs').insert(payload).select().single();
   if (error) throw error;
-  await logJobActivity(data.id, 'job_created', undefined, 'ready_for_pickup');
+  await logJobActivity(data.id, 'job_created', undefined, JOB_STATUS.READY_FOR_PICKUP);
   return data as Job;
 }
 
@@ -197,13 +197,13 @@ export async function submitInspection(
 
   const job = await getJob(jobId);
   const fromStatus = job.status;
-  let toStatus: JobStatus = job.status;
+  let toStatus: JobStatusValue | string = job.status;
 
   if (type === 'pickup') {
-    toStatus = 'pickup_complete';
+    toStatus = JOB_STATUS.PICKUP_COMPLETE;
     await updateJob(jobId, { has_pickup_inspection: true, status: toStatus } as Partial<Job>);
   } else {
-    toStatus = job.has_pickup_inspection ? 'pod_ready' : 'delivery_complete';
+    toStatus = job.has_pickup_inspection ? JOB_STATUS.POD_READY : JOB_STATUS.DELIVERY_COMPLETE;
     await updateJob(jobId, {
       has_delivery_inspection: true,
       status: toStatus,
@@ -212,6 +212,12 @@ export async function submitInspection(
   }
 
   await logJobActivity(jobId, `${type}_inspection_submitted`, fromStatus, toStatus);
+
+  // Log to client_logs
+  void logClientEvent("inspection_submitted", "info", {
+    jobId,
+    context: { inspectionType: type, newStatus: toStatus },
+  });
 
   // Auto-sync to Google Sheet if feature flag is enabled
   if (await isFeatureEnabled("AUTO_SHEET_SYNC_ON_JOB_UPDATE")) {

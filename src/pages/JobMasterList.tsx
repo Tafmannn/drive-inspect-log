@@ -12,27 +12,35 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Search, Filter, ChevronRight } from "lucide-react";
 import type { Job } from "@/lib/types";
+import { JOB_STATUS } from "@/lib/statusConfig";
 
-const STATUS_OPTIONS = ["ready_for_pickup", "pickup_complete", "in_transit", "delivery_complete", "pod_ready", "cancelled"];
+const STATUS_OPTIONS = [
+  JOB_STATUS.READY_FOR_PICKUP,
+  JOB_STATUS.PICKUP_COMPLETE,
+  JOB_STATUS.IN_TRANSIT,
+  JOB_STATUS.DELIVERY_COMPLETE,
+  JOB_STATUS.POD_READY,
+  JOB_STATUS.CANCELLED,
+];
 const STATUS_LABELS: Record<string, string> = {
-  ready_for_pickup: "Booked",
-  pickup_in_progress: "Pickup In Progress",
-  pickup_complete: "Pickup Complete",
-  in_transit: "En Route",
-  delivery_in_progress: "Delivery In Progress",
-  delivery_complete: "Completed",
-  pod_ready: "POD Ready",
-  cancelled: "Cancelled",
+  [JOB_STATUS.READY_FOR_PICKUP]: "Booked",
+  [JOB_STATUS.PICKUP_IN_PROGRESS]: "Pickup In Progress",
+  [JOB_STATUS.PICKUP_COMPLETE]: "Pickup Complete",
+  [JOB_STATUS.IN_TRANSIT]: "En Route",
+  [JOB_STATUS.DELIVERY_IN_PROGRESS]: "Delivery In Progress",
+  [JOB_STATUS.DELIVERY_COMPLETE]: "Completed",
+  [JOB_STATUS.POD_READY]: "POD Ready",
+  [JOB_STATUS.CANCELLED]: "Cancelled",
 };
 const PRIORITY_ORDER: Record<string, number> = { Urgent: 0, High: 1, Normal: 2, Low: 3 };
 const TYPE_OPTIONS = ["Single", "Return", "MultiDrop", "TradePlate"];
 
 function statusColor(status: string) {
   switch (status) {
-    case "ready_for_pickup": return "bg-primary/10 text-primary";
-    case "in_transit": return "bg-warning/10 text-warning";
-    case "delivery_complete": case "pod_ready": return "bg-success/10 text-success";
-    case "cancelled": return "bg-destructive/10 text-destructive";
+    case JOB_STATUS.READY_FOR_PICKUP: return "bg-primary/10 text-primary";
+    case JOB_STATUS.IN_TRANSIT: return "bg-warning/10 text-warning";
+    case JOB_STATUS.DELIVERY_COMPLETE: case JOB_STATUS.POD_READY: return "bg-success/10 text-success";
+    case JOB_STATUS.CANCELLED: return "bg-destructive/10 text-destructive";
     default: return "bg-muted text-muted-foreground";
   }
 }

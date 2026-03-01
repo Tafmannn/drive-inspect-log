@@ -42,8 +42,10 @@ function BackgroundUploader() {
 }
 
 const App = () => {
-  const params = new URLSearchParams(window.location.search);
-  const isAdminOverride = params.get("admin") === "1";
+  const isAdminOverride =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("admin") === "1"
+      : false;
 
   return (
   <QueryClientProvider client={queryClient}>
