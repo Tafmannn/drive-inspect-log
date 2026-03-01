@@ -9,6 +9,18 @@ import type {
   InspectionType,
   JobStatus,
 } from './types';
+import { isFeatureEnabled } from './featureFlags';
+
+// ─── Sheet Sync Helper ───────────────────────────────────────────────
+
+async function syncJobToSheetIfEnabled(jobId: string): Promise<void> {
+  try {
+    const { safePushToSheet } = await import("./safePushToSheet");
+    void safePushToSheet([jobId]); // fire-and-forget
+  } catch {
+    // allow silent fail – error is already handled by safePushToSheet
+  }
+}
 
 // ─── Jobs ────────────────────────────────────────────────────────────
 
@@ -200,6 +212,11 @@ export async function submitInspection(
   }
 
   await logJobActivity(jobId, `${type}_inspection_submitted`, fromStatus, toStatus);
+
+  // Auto-sync to Google Sheet if feature flag is enabled
+  if (await isFeatureEnabled("AUTO_SHEET_SYNC_ON_JOB_UPDATE")) {
+    void syncJobToSheetIfEnabled(jobId);
+  }
 }
 
 // ─── Photos ──────────────────────────────────────────────────────────

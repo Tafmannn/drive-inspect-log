@@ -6,7 +6,7 @@ let loaded = false;
 
 async function loadFlags(): Promise<void> {
   if (loaded) return;
-  const keys = ["MAPS_ENABLED", "CLOUD_STORAGE_ENABLED", "VISION_AI_ENABLED"];
+  const keys = ["MAPS_ENABLED", "CLOUD_STORAGE_ENABLED", "VISION_AI_ENABLED", "AUTO_SHEET_SYNC_ON_JOB_UPDATE"];
   const { data } = await supabase
     .from("app_settings")
     .select("key, value")
