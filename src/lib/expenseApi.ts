@@ -279,3 +279,61 @@ export async function getExpenseTotals(filters?: {
     count: rows.length,
   };
 }
+export async function exportExpensesCsv(): Promise<void> {
+  // Re-use the existing listExpenses() helper to fetch full expense data
+  const expenses = await listExpenses();
+
+  // CSV header row
+  const headers = [
+    "Job Number",
+    "Registration",
+    "Date",
+    "Time",
+    "Category",
+    "Label",
+    "Amount",
+    "Currency",
+    "Notes",
+    "Driver",
+    "Receipts",
+  ];
+
+  // Escape values for CSV (quotes, commas, newlines)
+  function esc(v: string | null | undefined) {
+    if (v == null) return "";
+    const s = String(v);
+    return s.includes(",") || s.includes('"') || s.includes("\n")
+      ? `"${s.replace(/"/g, '""')}"`
+      : s;
+  }
+
+  // Build data rows
+  const rows = expenses.map((e) =>
+    [
+      esc(e.job_number),
+      esc(e.job_reg),
+      esc(e.date),
+      esc(e.time),
+      esc(e.category),
+      esc(e.label),
+      String(e.amount),
+      esc(e.currency),
+      esc(e.notes),
+      esc(e.driver_id),
+      String(e.receipts.length),
+    ].join(","),
+  );
+
+  // Add a UTF-8 BOM so Excel opens it nicely
+  const BOM = "\uFEFF";
+  const csv = [headers.join(","), ...rows].join("\n");
+  const blob = new Blob([BOM + csv], { type: "text/csv;charset=utf-8;" });
+
+  // Trigger download in the browser
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "axentra-expenses.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
