@@ -12,7 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 export const Profile = () => {
   const navigate = useNavigate();
-  const { user, isAdmin, isSuperAdmin } = useAuth();
+  const { user, isAdmin, isSuperAdmin, logout } = useAuth();
   const [jobCount, setJobCount] = useState<number | null>(null);
   const [expenseTotal, setExpenseTotal] = useState<string | null>(null);
 
@@ -46,7 +46,7 @@ export const Profile = () => {
   const roleLabels: string[] = [];
   if (isSuperAdmin) roleLabels.push("Super Admin");
   else if (isAdmin) roleLabels.push("Admin");
-  if (user.roles.includes("DRIVER")) roleLabels.push("Driver");
+  if (user?.roles.includes("DRIVER")) roleLabels.push("Driver");
 
   const shortcuts = [
     { icon: Receipt, label: "Expenses", path: "/expenses" },
@@ -64,8 +64,8 @@ export const Profile = () => {
           <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
             <User className="w-8 h-8 text-primary" />
           </div>
-          <p className="text-lg font-semibold text-foreground">{user.name || "Unknown user"}</p>
-          <p className="text-sm text-muted-foreground">{user.email || "No email set"}</p>
+          <p className="text-lg font-semibold text-foreground">{user?.name || "Unknown user"}</p>
+          <p className="text-sm text-muted-foreground">{user?.email || "No email set"}</p>
           <div className="flex gap-1.5 mt-1">
             {roleLabels.map((r) => (
               <Badge key={r} variant="secondary" className="text-xs">{r}</Badge>
@@ -115,8 +115,8 @@ export const Profile = () => {
         <Button
           variant="destructive"
           className="w-full"
-          onClick={() => {
-            // TODO: wire to real logout when auth is enabled
+          onClick={async () => {
+            await logout();
             navigate("/");
           }}
         >
