@@ -19,6 +19,7 @@ import { Expenses } from "./pages/Expenses";
 import { ExpenseForm } from "./pages/ExpenseForm";
 import { AdminDashboard } from "./pages/AdminDashboard";
 import { Timesheets } from "./pages/Timesheets";
+import { Profile } from "./pages/Profile";
 import { QrConfirm } from "./pages/QrConfirm";
 import NotFound from "./pages/NotFound";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
@@ -68,6 +69,7 @@ const App = () => {
               <Route path="/jobs/:jobId/pod" element={<PodReport />} />
               <Route path="/inspection/:jobId/:inspectionType" element={<InspectionFlow />} />
               <Route path="/pending-uploads" element={<PendingUploads />} />
+              <Route path="/profile" element={<Profile />} />
               <Route path="/expenses" element={<Expenses />} />
               <Route path="/expenses/new" element={<ExpenseForm />} />
               <Route path="/expenses/:expenseId/edit" element={<ExpenseForm />} />

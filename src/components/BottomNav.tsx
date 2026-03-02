@@ -6,7 +6,7 @@ const tabs = [
   { icon: Home, label: "Dashboard", path: "/" },
   { icon: Briefcase, label: "Jobs", path: "/jobs" },
   { icon: Upload, label: "Uploads", path: "/pending-uploads" },
-  { icon: User, label: "Profile", path: "/expenses" },
+  { icon: User, label: "Profile", path: "/profile" },
 ] as const;
 
 export const BottomNav = () => {
