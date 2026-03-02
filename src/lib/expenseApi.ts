@@ -279,6 +279,9 @@ export async function getExpenseTotals(filters?: {
     count: rows.length,
   };
 }
+
+// ─── CSV Export ──────────────────────────────────────────────────────
+
 export async function exportExpensesCsv(): Promise<void> {
   // Re-use the existing listExpenses() helper to fetch full expense data
   const expenses = await listExpenses();
