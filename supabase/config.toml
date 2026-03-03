@@ -32,3 +32,9 @@ verify_jwt = true
 
 [functions.promote-admin]
 verify_jwt = true
+
+[functions.assign-driver]
+verify_jwt = true
+
+[functions.get-org-users]
+verify_jwt = true

@@ -20,6 +20,7 @@ import { ExpenseForm } from "./pages/ExpenseForm";
 import { AdminDashboard } from "./pages/AdminDashboard";
 import { Timesheets } from "./pages/Timesheets";
 import { AdminUsers } from "./pages/AdminUsers";
+import { OrgAdminDashboard } from "./pages/OrgAdminDashboard";
 import { Profile } from "./pages/Profile";
 import { QrConfirm } from "./pages/QrConfirm";
 import { Auth } from "./pages/Auth";
@@ -148,6 +149,14 @@ const App = () => {
                     element={
                       <AdminRoute>
                         <AdminUsers />
+                      </AdminRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/dashboard"
+                    element={
+                      <AdminRoute>
+                        <OrgAdminDashboard />
                       </AdminRoute>
                     }
                   />
