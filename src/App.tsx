@@ -19,6 +19,7 @@ import { Expenses } from "./pages/Expenses";
 import { ExpenseForm } from "./pages/ExpenseForm";
 import { AdminDashboard } from "./pages/AdminDashboard";
 import { Timesheets } from "./pages/Timesheets";
+import { AdminUsers } from "./pages/AdminUsers";
 import { Profile } from "./pages/Profile";
 import { QrConfirm } from "./pages/QrConfirm";
 import { Auth } from "./pages/Auth";
@@ -139,6 +140,14 @@ const App = () => {
                     element={
                       <AdminRoute>
                         <SyncErrors />
+                      </AdminRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/users"
+                    element={
+                      <AdminRoute>
+                        <AdminUsers />
                       </AdminRoute>
                     }
                   />
