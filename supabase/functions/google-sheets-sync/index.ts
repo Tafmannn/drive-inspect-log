@@ -1,10 +1,22 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const ALLOWED_ORIGINS = [
+  "http://localhost:5173",
+  "https://id-preview--3a41afcd-01f5-4632-9ca9-6cdb511c4f9c.lovable.app",
+  "https://axentra.lovable.app",
+];
+
+function cors(origin: string | null) {
+  const allowed = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowed,
+    "Vary": "Origin",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, content-type, apikey",
+  };
+}
+
+// Dynamic corsHeaders set per-request
+let corsHeaders: Record<string, string> = cors(null);
 
 // ─── Google Auth via Service Account ─────────────────────────────────
 
@@ -306,12 +318,41 @@ const JOB_ENTRY_REQUIRED_FIELDS = [
 // ─── Main handler ────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
+  const origin = req.headers.get("Origin");
+  corsHeaders = cors(origin);
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    // ─── Auth (admin-only) ───
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const authClient = createClient(SUPABASE_URL, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: authData, error: authError } = await authClient.auth.getUser();
+    if (authError || !authData?.user) {
+      return new Response(JSON.stringify({ error: "UNAUTHENTICATED" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const userOrgId = authData.user.user_metadata?.org_id ?? null;
+    const role = authData.user.user_metadata?.role ?? null;
+    if (!userOrgId) {
+      return new Response(JSON.stringify({ error: "NO_ORG" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (role !== "admin") {
+      return new Response(JSON.stringify({ error: "ADMIN_ONLY" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ─── Original logic ───
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const SA_JSON_STR = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_JSON");
 

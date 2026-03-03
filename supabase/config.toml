@@ -1,31 +1,31 @@
 project_id = "lynkvfduzqdyvlzgriyh"
 
 [functions.google-sheets-sync]
-verify_jwt = false
+verify_jwt = true
 
 [functions.maps-directions]
-verify_jwt = false
+verify_jwt = true
 
 [functions.gcs-upload]
-verify_jwt = false
+verify_jwt = true
 
 [functions.gcs-proxy]
-verify_jwt = false
+verify_jwt = true
 
 [functions.vision-ocr]
-verify_jwt = false
+verify_jwt = true
 
 [functions.postcode-lookup]
-verify_jwt = false
+verify_jwt = true
 
 [functions.business-search]
-verify_jwt = false
+verify_jwt = true
 
 [functions.place-details]
-verify_jwt = false
+verify_jwt = true
 
 [functions.vehicle-lookup]
-verify_jwt = false
+verify_jwt = true
 
 [functions.gcs-fix-acl]
-verify_jwt = false
+verify_jwt = true
