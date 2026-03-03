@@ -46,38 +46,15 @@ serve(async (req) => {
     const callerOrgId = caller.user_metadata?.org_id ?? null;
     const callerRole = caller.user_metadata?.role ?? null;
 
-    if (callerRole !== "super_admin") {
-      return new Response(JSON.stringify({ error: "SUPER_ADMIN_ONLY" }), {
+    // Only super_admin or admin can assign drivers
+    if (callerRole !== "super_admin" && callerRole !== "admin") {
+      return new Response(JSON.stringify({ error: "ADMIN_OR_SUPER_ADMIN_ONLY" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const body = await req.json();
-    const adminClient = createClient(supabaseUrl, serviceRoleKey);
-
-    // ── LIST action ──
-    if (body._action === "list") {
-      const { data: listData, error: listError } = await adminClient.auth.admin.listUsers();
-      if (listError) {
-        return new Response(JSON.stringify({ error: "LIST_USERS_FAILED" }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const users = listData.users.map((u) => ({
-        id: u.id,
-        email: u.email ?? "",
-        role: u.user_metadata?.role ?? "driver",
-        org_id: u.user_metadata?.org_id ?? null,
-      }));
-      return new Response(JSON.stringify({ users }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // ── PROMOTE action ──
     const { email, org_id } = body;
 
     if (!email || typeof email !== "string") {
@@ -86,6 +63,25 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Resolve destination org
+    let targetOrgId: string | null;
+    if (callerRole === "admin") {
+      // Admin can only assign into their own org
+      targetOrgId = callerOrgId;
+    } else {
+      // super_admin can specify or fallback
+      targetOrgId = org_id ?? callerOrgId;
+    }
+
+    if (!targetOrgId) {
+      return new Response(JSON.stringify({ error: "NO_TARGET_ORG" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
     const { data: listData, error: listError } = await adminClient.auth.admin.listUsers();
     if (listError) {
@@ -106,12 +102,15 @@ serve(async (req) => {
       });
     }
 
-    const targetOrgId = org_id ?? callerOrgId;
-    if (!targetOrgId) {
-      return new Response(JSON.stringify({ error: "NO_TARGET_ORG" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    // Admin cannot assign users from other orgs
+    if (callerRole === "admin") {
+      const targetCurrentOrg = targetUser.user_metadata?.org_id ?? null;
+      if (targetCurrentOrg && targetCurrentOrg !== callerOrgId) {
+        return new Response(JSON.stringify({ error: "CROSS_ORG_FORBIDDEN" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     const existingMeta = targetUser.user_metadata ?? {};
@@ -120,7 +119,7 @@ serve(async (req) => {
       {
         user_metadata: {
           ...existingMeta,
-          role: "admin",
+          role: "driver",
           org_id: targetOrgId,
         },
       }

@@ -46,47 +46,31 @@ serve(async (req) => {
     const callerOrgId = caller.user_metadata?.org_id ?? null;
     const callerRole = caller.user_metadata?.role ?? null;
 
-    if (callerRole !== "super_admin") {
-      return new Response(JSON.stringify({ error: "SUPER_ADMIN_ONLY" }), {
+    if (callerRole !== "super_admin" && callerRole !== "admin") {
+      return new Response(JSON.stringify({ error: "ADMIN_OR_SUPER_ADMIN_ONLY" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const body = await req.json();
-    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+    let filterOrgId: string | null = null;
 
-    // ── LIST action ──
-    if (body._action === "list") {
-      const { data: listData, error: listError } = await adminClient.auth.admin.listUsers();
-      if (listError) {
-        return new Response(JSON.stringify({ error: "LIST_USERS_FAILED" }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+    // Parse optional body
+    try {
+      const body = await req.json();
+      if (callerRole === "super_admin" && body?.org_id) {
+        filterOrgId = body.org_id;
       }
-      const users = listData.users.map((u) => ({
-        id: u.id,
-        email: u.email ?? "",
-        role: u.user_metadata?.role ?? "driver",
-        org_id: u.user_metadata?.org_id ?? null,
-      }));
-      return new Response(JSON.stringify({ users }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    } catch {
+      // No body or invalid JSON — that's fine
     }
 
-    // ── PROMOTE action ──
-    const { email, org_id } = body;
-
-    if (!email || typeof email !== "string") {
-      return new Response(JSON.stringify({ error: "EMAIL_REQUIRED" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    // Admin always restricted to own org
+    if (callerRole === "admin") {
+      filterOrgId = callerOrgId;
     }
 
+    const adminClient = createClient(supabaseUrl, serviceRoleKey);
     const { data: listData, error: listError } = await adminClient.auth.admin.listUsers();
     if (listError) {
       return new Response(JSON.stringify({ error: "LIST_USERS_FAILED" }), {
@@ -95,45 +79,18 @@ serve(async (req) => {
       });
     }
 
-    const targetUser = listData.users.find(
-      (u) => u.email?.toLowerCase() === email.toLowerCase()
-    );
+    let users = listData.users.map((u) => ({
+      id: u.id,
+      email: u.email ?? "",
+      role: u.user_metadata?.role ?? "driver",
+      org_id: u.user_metadata?.org_id ?? null,
+    }));
 
-    if (!targetUser) {
-      return new Response(JSON.stringify({ error: "USER_NOT_FOUND" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (filterOrgId) {
+      users = users.filter((u) => u.org_id === filterOrgId);
     }
 
-    const targetOrgId = org_id ?? callerOrgId;
-    if (!targetOrgId) {
-      return new Response(JSON.stringify({ error: "NO_TARGET_ORG" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const existingMeta = targetUser.user_metadata ?? {};
-    const { error: updateError } = await adminClient.auth.admin.updateUserById(
-      targetUser.id,
-      {
-        user_metadata: {
-          ...existingMeta,
-          role: "admin",
-          org_id: targetOrgId,
-        },
-      }
-    );
-
-    if (updateError) {
-      return new Response(JSON.stringify({ error: "UPDATE_FAILED" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    return new Response(JSON.stringify({ success: true }), {
+    return new Response(JSON.stringify({ users }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

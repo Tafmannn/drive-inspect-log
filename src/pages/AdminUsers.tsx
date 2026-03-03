@@ -1,15 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
-import { PromoteAdminButton } from "@/components/Admin/PromoteAdminButton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { getOrgUsers } from "@/lib/adminApi";
+import { UserListTable } from "@/components/Admin/UserListTable";
 import { Loader2 } from "lucide-react";
 
 interface UserRow {
@@ -20,21 +12,15 @@ interface UserRow {
 }
 
 export function AdminUsers() {
-  const { isSuperAdmin } = useAuth();
+  const { isSuperAdmin, isAdmin } = useAuth();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("promote-admin", {
-        body: { _action: "list" },
-      });
-      if (error || data?.error) {
-        setUsers([]);
-      } else {
-        setUsers(data?.users ?? []);
-      }
+      const result = await getOrgUsers();
+      setUsers(result);
     } catch {
       setUsers([]);
     } finally {
@@ -43,10 +29,10 @@ export function AdminUsers() {
   }, []);
 
   useEffect(() => {
-    if (isSuperAdmin) fetchUsers();
-  }, [isSuperAdmin, fetchUsers]);
+    if (isSuperAdmin || isAdmin) fetchUsers();
+  }, [isSuperAdmin, isAdmin, fetchUsers]);
 
-  if (!isSuperAdmin) {
+  if (!isSuperAdmin && !isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <p className="text-muted-foreground">Access denied</p>
@@ -65,35 +51,7 @@ export function AdminUsers() {
       ) : users.length === 0 ? (
         <p className="text-muted-foreground">No users found.</p>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Email</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Org ID</TableHead>
-              <TableHead>Action</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {users.map((u) => (
-              <TableRow key={u.id}>
-                <TableCell>{u.email}</TableCell>
-                <TableCell>{u.role || "driver"}</TableCell>
-                <TableCell className="font-mono text-xs">
-                  {u.org_id || "—"}
-                </TableCell>
-                <TableCell>
-                  <PromoteAdminButton
-                    email={u.email}
-                    orgId={u.org_id ?? undefined}
-                    currentRole={u.role}
-                    onPromoted={fetchUsers}
-                  />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <UserListTable users={users} onRefresh={fetchUsers} />
       )}
     </div>
   );
