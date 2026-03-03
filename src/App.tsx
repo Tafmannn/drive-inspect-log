@@ -23,7 +23,7 @@ import { AdminUsers } from "./pages/AdminUsers";
 import { OrgAdminDashboard } from "./pages/OrgAdminDashboard";
 import { Profile } from "./pages/Profile";
 import { QrConfirm } from "./pages/QrConfirm";
-import { Auth } from "./pages/Auth";
+// Auth.tsx is no longer used directly — public routes are outside AuthGate
 import { Login } from "./pages/Login";
 import { ForgotPassword } from "./pages/ForgotPassword";
 import { ResetPassword } from "./pages/ResetPassword";
@@ -74,8 +74,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Not logged in
-  if (!user) return <Auth />;
+  // Not logged in → redirect to branded login page
+  if (!user) return <Navigate to="/login" replace />;
 
   return <>{children}</>;
 }
@@ -99,77 +99,87 @@ const App = () => {
             overrideRoles={isAdminOverride ? ["ADMIN", "DRIVER"] : ["DRIVER"]}
           >
             <BrowserRouter>
-              <AuthGate>
-                <Routes>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/jobs" element={<JobList />} />
-                  <Route path="/jobs/master" element={<JobMasterList />} />
-                  <Route path="/jobs/new" element={<JobForm />} />
-                  <Route path="/jobs/completed" element={<CompletedJobs />} />
-                  <Route path="/jobs/pending" element={<PendingJobs />} />
-                  <Route path="/jobs/:jobId" element={<JobDetail />} />
-                  <Route path="/jobs/:jobId/edit" element={<JobForm />} />
-                  <Route path="/jobs/:jobId/pod" element={<PodReport />} />
-                  <Route
-                    path="/inspection/:jobId/:inspectionType"
-                    element={<InspectionFlow />}
-                  />
-                  <Route path="/pending-uploads" element={<PendingUploads />} />
-                  <Route path="/profile" element={<Profile />} />
-                  <Route path="/expenses" element={<Expenses />} />
-                  <Route path="/expenses/new" element={<ExpenseForm />} />
-                  <Route
-                    path="/expenses/:expenseId/edit"
-                    element={<ExpenseForm />}
-                  />
-                  {/* Admin-only routes */}
-                  <Route
-                    path="/admin"
-                    element={
-                      <AdminRoute>
-                        <AdminDashboard />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/timesheets"
-                    element={
-                      <AdminRoute>
-                        <Timesheets />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/sync-errors"
-                    element={
-                      <AdminRoute>
-                        <SyncErrors />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/users"
-                    element={
-                      <AdminRoute>
-                        <AdminUsers />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin/dashboard"
-                    element={
-                      <AdminRoute>
-                        <OrgAdminDashboard />
-                      </AdminRoute>
-                    }
-                  />
-                  <Route path="/login" element={<Login />} />
-                  <Route path="/forgot-password" element={<ForgotPassword />} />
-                  <Route path="/reset-password" element={<ResetPassword />} />
-                  <Route path="/confirm" element={<QrConfirm />} />
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </AuthGate>
+              <Routes>
+                {/* ── Public routes (outside AuthGate) ── */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/confirm" element={<QrConfirm />} />
+
+                {/* ── Protected routes ── */}
+                <Route
+                  path="*"
+                  element={
+                    <AuthGate>
+                      <Routes>
+                        <Route path="/" element={<Dashboard />} />
+                        <Route path="/jobs" element={<JobList />} />
+                        <Route path="/jobs/master" element={<JobMasterList />} />
+                        <Route path="/jobs/new" element={<JobForm />} />
+                        <Route path="/jobs/completed" element={<CompletedJobs />} />
+                        <Route path="/jobs/pending" element={<PendingJobs />} />
+                        <Route path="/jobs/:jobId" element={<JobDetail />} />
+                        <Route path="/jobs/:jobId/edit" element={<JobForm />} />
+                        <Route path="/jobs/:jobId/pod" element={<PodReport />} />
+                        <Route
+                          path="/inspection/:jobId/:inspectionType"
+                          element={<InspectionFlow />}
+                        />
+                        <Route path="/pending-uploads" element={<PendingUploads />} />
+                        <Route path="/profile" element={<Profile />} />
+                        <Route path="/expenses" element={<Expenses />} />
+                        <Route path="/expenses/new" element={<ExpenseForm />} />
+                        <Route
+                          path="/expenses/:expenseId/edit"
+                          element={<ExpenseForm />}
+                        />
+                        {/* Admin-only routes */}
+                        <Route
+                          path="/admin"
+                          element={
+                            <AdminRoute>
+                              <AdminDashboard />
+                            </AdminRoute>
+                          }
+                        />
+                        <Route
+                          path="/admin/timesheets"
+                          element={
+                            <AdminRoute>
+                              <Timesheets />
+                            </AdminRoute>
+                          }
+                        />
+                        <Route
+                          path="/admin/sync-errors"
+                          element={
+                            <AdminRoute>
+                              <SyncErrors />
+                            </AdminRoute>
+                          }
+                        />
+                        <Route
+                          path="/admin/users"
+                          element={
+                            <AdminRoute>
+                              <AdminUsers />
+                            </AdminRoute>
+                          }
+                        />
+                        <Route
+                          path="/admin/dashboard"
+                          element={
+                            <AdminRoute>
+                              <OrgAdminDashboard />
+                            </AdminRoute>
+                          }
+                        />
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
+                    </AuthGate>
+                  }
+                />
+              </Routes>
             </BrowserRouter>
           </AuthProvider>
         </AppErrorBoundary>
