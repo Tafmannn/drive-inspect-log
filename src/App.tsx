@@ -24,6 +24,7 @@ import { OrgAdminDashboard } from "./pages/OrgAdminDashboard";
 import { Profile } from "./pages/Profile";
 import { QrConfirm } from "./pages/QrConfirm";
 import { Auth } from "./pages/Auth";
+import { Login } from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { useEffect } from "react";
@@ -160,6 +161,7 @@ const App = () => {
                       </AdminRoute>
                     }
                   />
+                  <Route path="/login" element={<Login />} />
                   <Route path="/confirm" element={<QrConfirm />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
