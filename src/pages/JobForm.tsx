@@ -519,6 +519,23 @@ export const JobForm = () => {
                     try {
                       const result = await lookupVehicle(reg);
                       if (result.success) {
+                        // Helper: namedItem may return RadioNodeList; only set value on real form controls
+                        const setInputValue = (name: string, value: string) => {
+                          const el = formRef.current?.elements.namedItem(name);
+                          if (!el) return;
+                          if (
+                            el instanceof HTMLInputElement ||
+                            el instanceof HTMLTextAreaElement ||
+                            el instanceof HTMLSelectElement
+                          ) {
+                            const proto = Object.getPrototypeOf(el) as any;
+                            const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+                            setter?.call(el, value);
+                            el.dispatchEvent(new Event("input", { bubbles: true }));
+                            el.dispatchEvent(new Event("change", { bubbles: true }));
+                          }
+                        };
+
                         if (result.make) {
                           const makeKnown = CAR_MAKES.includes(result.make);
                           if (makeKnown) {
@@ -527,32 +544,20 @@ export const JobForm = () => {
                           } else {
                             setCustomMake(true);
                             setVehicleMake(result.make);
-                            // Set the custom input value
-                            requestAnimationFrame(() => {
-                              if (!formRef.current) return;
-                              const el = formRef.current.elements.namedItem("vehicle_make");
-                              if (el && "value" in el) (el as HTMLInputElement).value = result.make!;
-                            });
+                            requestAnimationFrame(() => setInputValue("vehicle_make", result.make!));
                           }
+                          // DVLA doesn't provide model; switch to manual model entry
                           setCustomModel(true);
                           setVehicleModel("");
                         }
+
                         if (result.colour) {
-                          const colourEl = formRef.current.elements.namedItem("vehicle_colour");
-                          if (colourEl && "value" in colourEl) {
-                            const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
-                            nativeSetter?.call(colourEl as HTMLInputElement, result.colour);
-                            (colourEl as HTMLInputElement).dispatchEvent(new Event("input", { bubbles: true }));
-                          }
+                          setInputValue("vehicle_colour", result.colour);
                         }
                         if (result.year) {
-                          const yearEl = formRef.current.elements.namedItem("vehicle_year");
-                          if (yearEl && "value" in yearEl) {
-                            const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
-                            nativeSetter?.call(yearEl as HTMLInputElement, result.year);
-                            (yearEl as HTMLInputElement).dispatchEvent(new Event("input", { bubbles: true }));
-                          }
+                          setInputValue("vehicle_year", result.year);
                         }
+
                         toast({ title: `Found: ${result.make} (${result.colour})` });
                         saveDraftFromForm();
                       } else {
