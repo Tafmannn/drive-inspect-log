@@ -1,11 +1,20 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const ALLOWED_ORIGINS = [
+  "http://localhost:5173",
+  "https://id-preview--3a41afcd-01f5-4632-9ca9-6cdb511c4f9c.lovable.app",
+  "https://axentra.lovable.app",
+];
+
+function cors(origin: string | null) {
+  const allowed = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowed,
+    "Vary": "Origin",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, content-type, apikey",
+  };
+}
 
 interface UploadRequest {
   fileName: string;
@@ -18,27 +27,35 @@ const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "application/pdf"];
 
 serve(async (req) => {
+  const origin = req.headers.get("Origin");
+  const corsHeaders = cors(origin);
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // ─── Auth check ───
-    const authHeader = req.headers.get("Authorization");
-    let orgId: string | null = null;
-
-    if (authHeader?.startsWith("Bearer ")) {
-      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-      const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-      const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-        global: { headers: { Authorization: authHeader } },
+    // ─── Auth ───
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData?.user) {
+      return new Response(JSON.stringify({ error: "UNAUTHENTICATED" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-      const { data, error } = await supabase.auth.getUser();
-      if (!error && data?.user) {
-        orgId = data.user.user_metadata?.org_id ?? null;
-      }
+    }
+    const userOrgId = authData.user.user_metadata?.org_id ?? null;
+    if (!userOrgId) {
+      return new Response(JSON.stringify({ error: "NO_ORG" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
+    // ─── Service account for GCS ───
     const serviceAccountJson = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_JSON");
     if (!serviceAccountJson) {
       return new Response(
@@ -77,6 +94,21 @@ serve(async (req) => {
         JSON.stringify({ error: "File too large (max 10 MB)" }),
         { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // ─── Job ownership check ───
+    if (body.jobId) {
+      const { data: job } = await supabase
+        .from("jobs")
+        .select("id, org_id")
+        .eq("id", body.jobId)
+        .single();
+
+      if (!job || job.org_id !== userOrgId) {
+        return new Response(JSON.stringify({ error: "FORBIDDEN" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     // Server-side file naming for security
@@ -121,7 +153,7 @@ serve(async (req) => {
     console.error("gcs-upload error:", e);
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : String(e) }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { ...cors(req.headers.get("Origin")), "Content-Type": "application/json" } }
     );
   }
 });
