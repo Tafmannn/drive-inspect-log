@@ -75,6 +75,7 @@ export type Database = {
           item: string | null
           location: string | null
           notes: string | null
+          org_id: string
           photo_url: string | null
           x: number | null
           y: number | null
@@ -88,6 +89,7 @@ export type Database = {
           item?: string | null
           location?: string | null
           notes?: string | null
+          org_id: string
           photo_url?: string | null
           x?: number | null
           y?: number | null
@@ -101,6 +103,7 @@ export type Database = {
           item?: string | null
           location?: string | null
           notes?: string | null
+          org_id?: string
           photo_url?: string | null
           x?: number | null
           y?: number | null
@@ -111,6 +114,13 @@ export type Database = {
             columns: ["inspection_id"]
             isOneToOne: false
             referencedRelation: "inspections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "damage_items_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
         ]
@@ -167,6 +177,7 @@ export type Database = {
           job_id: string
           label: string | null
           notes: string | null
+          org_id: string
           time: string | null
           updated_at: string
           upload_status: string
@@ -184,6 +195,7 @@ export type Database = {
           job_id: string
           label?: string | null
           notes?: string | null
+          org_id: string
           time?: string | null
           updated_at?: string
           upload_status?: string
@@ -201,6 +213,7 @@ export type Database = {
           job_id?: string
           label?: string | null
           notes?: string | null
+          org_id?: string
           time?: string | null
           updated_at?: string
           upload_status?: string
@@ -211,6 +224,13 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
         ]
@@ -240,6 +260,7 @@ export type Database = {
           number_of_keys: string | null
           odometer: number | null
           oil_level_status: string | null
+          org_id: string
           parcel_shelf: string | null
           sat_nav_working: string | null
           service_book: string | null
@@ -277,6 +298,7 @@ export type Database = {
           number_of_keys?: string | null
           odometer?: number | null
           oil_level_status?: string | null
+          org_id: string
           parcel_shelf?: string | null
           sat_nav_working?: string | null
           service_book?: string | null
@@ -314,6 +336,7 @@ export type Database = {
           number_of_keys?: string | null
           odometer?: number | null
           oil_level_status?: string | null
+          org_id?: string
           parcel_shelf?: string | null
           sat_nav_working?: string | null
           service_book?: string | null
@@ -335,6 +358,13 @@ export type Database = {
             referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "inspections_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       job_activity_log: {
@@ -345,6 +375,7 @@ export type Database = {
           id: string
           job_id: string
           notes: string | null
+          org_id: string
           to_status: string | null
         }
         Insert: {
@@ -354,6 +385,7 @@ export type Database = {
           id?: string
           job_id: string
           notes?: string | null
+          org_id: string
           to_status?: string | null
         }
         Update: {
@@ -363,6 +395,7 @@ export type Database = {
           id?: string
           job_id?: string
           notes?: string | null
+          org_id?: string
           to_status?: string | null
         }
         Relationships: [
@@ -371,6 +404,13 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_activity_log_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
         ]
@@ -416,6 +456,7 @@ export type Database = {
           notify_customer_on_arrival: boolean
           notify_customer_on_complete: boolean
           notify_customer_on_start: boolean
+          org_id: string
           other_expenses: number | null
           pickup_access_notes: string | null
           pickup_address_line1: string
@@ -488,6 +529,7 @@ export type Database = {
           notify_customer_on_arrival?: boolean
           notify_customer_on_complete?: boolean
           notify_customer_on_start?: boolean
+          org_id: string
           other_expenses?: number | null
           pickup_access_notes?: string | null
           pickup_address_line1: string
@@ -560,6 +602,7 @@ export type Database = {
           notify_customer_on_arrival?: boolean
           notify_customer_on_complete?: boolean
           notify_customer_on_start?: boolean
+          org_id?: string
           other_expenses?: number | null
           pickup_access_notes?: string | null
           pickup_address_line1?: string
@@ -592,6 +635,32 @@ export type Database = {
           vehicle_type?: string | null
           vehicle_year?: string | null
         }
+        Relationships: [
+          {
+            foreignKeyName: "jobs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organisations: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
         Relationships: []
       }
       photos: {
@@ -603,6 +672,7 @@ export type Database = {
           inspection_id: string | null
           job_id: string
           label: string | null
+          org_id: string
           thumbnail_url: string | null
           type: string
           url: string
@@ -615,6 +685,7 @@ export type Database = {
           inspection_id?: string | null
           job_id: string
           label?: string | null
+          org_id: string
           thumbnail_url?: string | null
           type: string
           url: string
@@ -627,6 +698,7 @@ export type Database = {
           inspection_id?: string | null
           job_id?: string
           label?: string | null
+          org_id?: string
           thumbnail_url?: string | null
           type?: string
           url?: string
@@ -644,6 +716,13 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "photos_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
         ]
@@ -802,7 +881,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      user_org_id: { Args: never; Returns: string }
+      user_role: { Args: never; Returns: string }
     }
     Enums: {
       [_ in never]: never

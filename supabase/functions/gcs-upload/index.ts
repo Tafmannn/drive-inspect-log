@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,10 +8,14 @@ const corsHeaders = {
 };
 
 interface UploadRequest {
-  fileName: string; // e.g. "jobs/{jobId}/photos/{type}/{timestamp}.jpg"
+  fileName: string;
   contentType: string;
-  fileBase64: string; // base64-encoded file data
+  fileBase64: string;
+  jobId?: string;
 }
+
+const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "application/pdf"];
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -18,6 +23,22 @@ serve(async (req) => {
   }
 
   try {
+    // ─── Auth check ───
+    const authHeader = req.headers.get("Authorization");
+    let orgId: string | null = null;
+
+    if (authHeader?.startsWith("Bearer ")) {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+      const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data, error } = await supabase.auth.getUser();
+      if (!error && data?.user) {
+        orgId = data.user.user_metadata?.org_id ?? null;
+      }
+    }
+
     const serviceAccountJson = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_JSON");
     if (!serviceAccountJson) {
       return new Response(
@@ -39,13 +60,32 @@ serve(async (req) => {
       );
     }
 
+    // Validate content type
+    if (contentType && !ALLOWED_TYPES.includes(contentType.toLowerCase())) {
+      return new Response(
+        JSON.stringify({ error: `Content type not allowed: ${contentType}` }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const bucket = "axentra_db";
     const fileBytes = Uint8Array.from(atob(fileBase64), (c) => c.charCodeAt(0));
 
-    // Upload to GCS using JSON API.
-    // NOTE: With Uniform bucket-level access enabled, per-object ACL params
-    // (like predefinedAcl=publicRead) are invalid and must not be sent.
-    const uploadUrl = `https://storage.googleapis.com/upload/storage/v1/b/${bucket}/o?uploadType=media&name=${encodeURIComponent(fileName)}`;
+    // Validate file size
+    if (fileBytes.length > MAX_SIZE) {
+      return new Response(
+        JSON.stringify({ error: "File too large (max 10 MB)" }),
+        { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Server-side file naming for security
+    const ext = fileName.split('.').pop() || 'jpg';
+    const safeName = `${crypto.randomUUID()}-${Date.now()}.${ext}`;
+    const pathPrefix = fileName.includes('/') ? fileName.substring(0, fileName.lastIndexOf('/') + 1) : '';
+    const finalName = pathPrefix ? `${pathPrefix}${safeName}` : safeName;
+
+    const uploadUrl = `https://storage.googleapis.com/upload/storage/v1/b/${bucket}/o?uploadType=media&name=${encodeURIComponent(finalName)}`;
     const uploadRes = await fetch(uploadUrl, {
       method: "POST",
       headers: {
@@ -65,22 +105,22 @@ serve(async (req) => {
     }
 
     const result = await uploadRes.json();
-    const publicUrl = `https://storage.googleapis.com/${bucket}/${fileName}`;
+    const publicUrl = `https://storage.googleapis.com/${bucket}/${finalName}`;
 
     return new Response(
       JSON.stringify({
         url: publicUrl,
         backend: "googleCloud",
-        backendRef: fileName,
+        backendRef: finalName,
         bucket,
         size: result.size,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (e) {
+  } catch (e: unknown) {
     console.error("gcs-upload error:", e);
     return new Response(
-      JSON.stringify({ error: e.message }),
+      JSON.stringify({ error: e instanceof Error ? e.message : String(e) }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

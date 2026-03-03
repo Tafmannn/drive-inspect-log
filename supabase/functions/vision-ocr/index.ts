@@ -50,7 +50,6 @@ serve(async (req) => {
       );
     }
 
-    // Call Google Vision API
     const visionUrl = "https://vision.googleapis.com/v1/images:annotate";
     const visionRes = await fetch(visionUrl, {
       method: "POST",
@@ -91,10 +90,10 @@ serve(async (req) => {
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (e) {
+  } catch (e: unknown) {
     console.error("vision-ocr error:", e);
     return new Response(
-      JSON.stringify({ error: e.message }),
+      JSON.stringify({ error: e instanceof Error ? e.message : String(e) }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
@@ -105,7 +104,6 @@ serve(async (req) => {
 function parseReceipt(text: string): ReceiptResult {
   const result: ReceiptResult = { amount: null, date: null, vendor: null, rawText: text };
 
-  // Extract amount: look for £ or GBP followed by numbers, or TOTAL line
   const amountPatterns = [
     /(?:total|amount|balance|due)[:\s]*[£$]?\s*(\d+[.,]\d{2})/i,
     /[£]\s*(\d+[.,]\d{2})/,
@@ -119,7 +117,6 @@ function parseReceipt(text: string): ReceiptResult {
     }
   }
 
-  // Extract date: DD/MM/YYYY or DD-MM-YYYY or YYYY-MM-DD
   const datePatterns = [
     /(\d{2})[\/\-](\d{2})[\/\-](\d{4})/,
     /(\d{4})[\/\-](\d{2})[\/\-](\d{2})/,
@@ -136,7 +133,6 @@ function parseReceipt(text: string): ReceiptResult {
     }
   }
 
-  // Vendor: first non-empty line, typically the store name
   const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
   if (lines.length > 0) {
     result.vendor = lines[0].slice(0, 60);
@@ -150,10 +146,8 @@ function parseReceipt(text: string): ReceiptResult {
 function parseOdometer(text: string): OdometerResult {
   const result: OdometerResult = { reading: null, rawText: text };
 
-  // Look for large numbers (4-7 digits) that could be odometer readings
   const numbers = text.match(/\b(\d{4,7})\b/g);
   if (numbers && numbers.length > 0) {
-    // Take the largest number as the likely odometer reading
     const parsed = numbers.map(Number).sort((a, b) => b - a);
     result.reading = parsed[0];
   }

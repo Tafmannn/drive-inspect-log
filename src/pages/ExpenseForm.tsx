@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { useCreateExpense, useUpdateExpense, useUploadReceipt } from "@/hooks/useExpenses";
-import { EXPENSE_CATEGORIES, getExpensesForJob } from "@/lib/expenseApi";
+import { EXPENSE_CATEGORIES } from "@/lib/expenseApi";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Camera, ImagePlus, X, ScanLine } from "lucide-react";
 import type { Job } from "@/lib/types";
@@ -23,7 +23,7 @@ import {
   DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 
-type ExistingReceipt = { id: string; url: string; pdf_url?: string | null };
+type ExistingReceipt = { id: string; url: string };
 
 export const ExpenseForm = () => {
   const navigate = useNavigate();
@@ -68,12 +68,11 @@ export const ExpenseForm = () => {
   }
 
   const saveDraftNow = useCallback(() => {
-    if (isEdit) return; // don't autosave edits
+    if (isEdit) return;
     const draft: DraftData = { jobId, category, amount, date, time, label, notes };
     saveDraft(DRAFT_KEY, draft);
   }, [jobId, category, amount, date, time, label, notes, isEdit, DRAFT_KEY]);
 
-  // Autosave on field changes (debounced)
   useEffect(() => {
     if (isEdit) return;
     const t = setTimeout(saveDraftNow, 1500);
@@ -83,22 +82,19 @@ export const ExpenseForm = () => {
   // Load draft on mount for new expenses
   useEffect(() => {
     if (isEdit) return;
-
     const draft = loadDraft<DraftData>(DRAFT_KEY);
-    if (draft && draft.jobId === jobId) {
-      setCategory(draft.category);
-      setAmount(draft.amount);
-      setDate(draft.date);
-      setTime(draft.time);
-      setLabel(draft.label);
-      setNotes(draft.notes);
+    if (draft?.data && draft.data.jobId === jobId) {
+      setCategory(draft.data.category);
+      setAmount(draft.data.amount);
+      setDate(draft.data.date);
+      setTime(draft.data.time);
+      setLabel(draft.data.label);
+      setNotes(draft.data.notes);
     }
   }, [DRAFT_KEY, jobId, isEdit]);
 
   const clearDraftAndNavigateBack = () => {
-    if (!isEdit) {
-      clearDraft(DRAFT_KEY);
-    }
+    if (!isEdit) clearDraft(DRAFT_KEY);
     navigate(jobId ? `/jobs/${jobId}` : "/expenses");
   };
 
@@ -146,7 +142,7 @@ export const ExpenseForm = () => {
       // Load existing receipts for this expense
       const { data: receipts, error: rErr } = await supabase
         .from("expense_receipts")
-        .select("id, url, pdf_url")
+        .select("id, url")
         .eq("expense_id", expenseId);
 
       if (rErr) {
@@ -160,9 +156,7 @@ export const ExpenseForm = () => {
     loadJobAndExpense();
   }, [expenseId, jobId]);
 
-  const handleFileSelect = (
-    files: FileList | null,
-  ) => {
+  const handleFileSelect = (files: FileList | null) => {
     if (!files) return;
     const newFiles: { file: File; preview: string }[] = [];
     for (const file of Array.from(files)) {
@@ -171,7 +165,6 @@ export const ExpenseForm = () => {
     }
     setReceiptFiles(prev => [...prev, ...newFiles]);
 
-    // Auto-scan first receipt for OCR if Vision AI is enabled
     if (newFiles.length > 0 && !amount) {
       void handleOcrScan(newFiles[0].file);
     }
@@ -184,7 +177,7 @@ export const ExpenseForm = () => {
       if (result) {
         if (result.amount && !amount) setAmount(String(result.amount));
         if (result.date && date === new Date().toISOString().slice(0, 10)) setDate(result.date);
-        if (result.label && !label) setLabel(result.label);
+        if (result.vendor && !label) setLabel(result.vendor);
       }
     } catch (err) {
       console.error("OCR failed", err);
@@ -202,19 +195,14 @@ export const ExpenseForm = () => {
     setReceiptFiles(prev => {
       const next = [...prev];
       const [removed] = next.splice(index, 1);
-      if (removed?.preview) {
-        URL.revokeObjectURL(removed.preview);
-      }
+      if (removed?.preview) URL.revokeObjectURL(removed.preview);
       return next;
     });
   };
 
   useEffect(() => {
     return () => {
-      // Revoke preview URLs on unmount
-      receiptFiles.forEach(r => {
-        URL.revokeObjectURL(r.preview);
-      });
+      receiptFiles.forEach(r => URL.revokeObjectURL(r.preview));
     };
   }, [receiptFiles]);
 
@@ -223,28 +211,16 @@ export const ExpenseForm = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!jobId) {
-      toast({
-        title: "Job is required",
-        description: "You must select a job before saving an expense.",
-        variant: "destructive",
-      });
+      toast({ title: "Job is required", description: "You must select a job before saving an expense.", variant: "destructive" });
       return;
     }
     if (!category) {
-      toast({
-        title: "Category required",
-        description: "Please select an expense category.",
-        variant: "destructive",
-      });
+      toast({ title: "Category required", description: "Please select an expense category.", variant: "destructive" });
       return;
     }
     const amt = Number(amount);
     if (!amt || isNaN(amt) || amt <= 0) {
-      toast({
-        title: "Invalid amount",
-        description: "Please enter a valid amount greater than zero.",
-        variant: "destructive",
-      });
+      toast({ title: "Invalid amount", description: "Please enter a valid amount greater than zero.", variant: "destructive" });
       return;
     }
 
@@ -271,36 +247,25 @@ export const ExpenseForm = () => {
           notes: notes || null,
         });
 
-        // Clear draft on successful creation
         clearDraft(DRAFT_KEY);
 
-        // Attach receipts to new expense
         for (const { file } of receiptFiles) {
           await uploadReceipt.mutateAsync({ expenseId: created.id, file });
         }
       }
 
-      toast({
-        title: "Saved",
-        description: "Expense has been saved successfully.",
-      });
-
+      toast({ title: "Saved", description: "Expense has been saved successfully." });
       clearDraftAndNavigateBack();
     } catch (err) {
       console.error("Failed to save expense", err);
-      toast({
-        title: "Save failed",
-        description: "We couldn't save this expense. Please try again.",
-        variant: "destructive",
-      });
+      toast({ title: "Save failed", description: "We couldn't save this expense. Please try again.", variant: "destructive" });
       setSaving(false);
     }
   };
 
   const handleBack = () => {
     if (!isEdit) {
-      const hasDraftChanges =
-        category || amount || notes || receiptFiles.length > 0 || label;
+      const hasDraftChanges = category || amount || notes || receiptFiles.length > 0 || label;
       if (hasDraftChanges) {
         setShowDraftDialog(true);
         return;
@@ -330,7 +295,7 @@ export const ExpenseForm = () => {
             <Card className="p-3 text-sm">
               <p className="font-medium">{job.vehicle_reg}</p>
               <p className="text-muted-foreground">
-                {job.pickup_town} → {job.delivery_town}
+                {job.pickup_city} → {job.delivery_city}
               </p>
               {job.external_job_number && (
                 <p className="text-xs text-muted-foreground mt-1">
@@ -350,9 +315,7 @@ export const ExpenseForm = () => {
                   </SelectTrigger>
                   <SelectContent>
                     {EXPENSE_CATEGORIES.map((cat) => (
-                      <SelectItem key={cat} value={cat}>
-                        {cat}
-                      </SelectItem>
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -361,57 +324,28 @@ export const ExpenseForm = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="amount">Amount (£)</Label>
-                  <Input
-                    id="amount"
-                    type="number"
-                    inputMode="decimal"
-                    step="0.01"
-                    min="0"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                  />
+                  <Input id="amount" type="number" inputMode="decimal" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="date">Date</Label>
-                  <Input
-                    id="date"
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                  />
+                  <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="time">Time (optional)</Label>
-                  <Input
-                    id="time"
-                    type="time"
-                    value={time}
-                    onChange={(e) => setTime(e.target.value)}
-                  />
+                  <Input id="time" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="label">Label (optional)</Label>
-                  <Input
-                    id="label"
-                    placeholder="e.g. Fuel in Leeds"
-                    value={label}
-                    onChange={(e) => setLabel(e.target.value)}
-                  />
+                  <Input id="label" placeholder="e.g. Fuel in Leeds" value={label} onChange={(e) => setLabel(e.target.value)} />
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="notes">Notes (optional)</Label>
-                <Textarea
-                  id="notes"
-                  rows={3}
-                  placeholder="Anything helpful for accounts…"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                />
+                <Textarea id="notes" rows={3} placeholder="Anything helpful for accounts…" value={notes} onChange={(e) => setNotes(e.target.value)} />
               </div>
             </Card>
 
@@ -419,101 +353,36 @@ export const ExpenseForm = () => {
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
                   <p className="font-medium">Receipts</p>
-                  <p className="text-xs text-muted-foreground">
-                    Add clear photos of your receipts for this expense.
-                  </p>
+                  <p className="text-xs text-muted-foreground">Add clear photos of your receipts for this expense.</p>
                 </div>
                 <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="outline"
-                    onClick={() => cameraInputRef.current?.click()}
-                  >
+                  <Button type="button" size="icon" variant="outline" onClick={() => cameraInputRef.current?.click()}>
                     <Camera className="w-4 h-4" />
                   </Button>
                   {canUseGallery && (
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="outline"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
+                    <Button type="button" size="icon" variant="outline" onClick={() => fileInputRef.current?.click()}>
                       <ImagePlus className="w-4 h-4" />
                     </Button>
                   )}
                 </div>
               </div>
 
-              <input
-                ref={cameraInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                onChange={e => handleFileSelect(e.target.files)}
-              />
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={e => handleFileSelect(e.target.files)}
-              />
+              <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e => handleFileSelect(e.target.files)} />
+              <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={e => handleFileSelect(e.target.files)} />
 
-              {/* Existing receipts (edit mode) */}
               {existingReceipts.length > 0 && (
-                <div className="space-y-2">
-                  <PhotoViewer
-                    title="Existing receipts"
-                    photos={existingReceipts.map((r) => ({
-                      url: r.url,
-                      label: "Receipt",
-                    }))}
-                  />
-
-                  {existingReceipts.some((r) => r.pdf_url) && (
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">PDF receipts</p>
-                      <div className="flex flex-col gap-1">
-                        {existingReceipts
-                          .filter((r) => r.pdf_url)
-                          .map((r) => (
-                            <Button
-                              key={r.id}
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="justify-start"
-                              onClick={() => {
-                                if (!r.pdf_url) return;
-                                window.open(r.pdf_url, "_blank", "noopener,noreferrer");
-                              }}
-                            >
-                              View PDF receipt
-                            </Button>
-                          ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <PhotoViewer
+                  title="Existing receipts"
+                  photos={existingReceipts.map((r) => ({ url: r.url, label: "Receipt" }))}
+                />
               )}
 
               {receiptFiles.length > 0 && (
                 <div className="grid grid-cols-3 gap-2">
                   {receiptFiles.map((r, i) => (
                     <div key={i} className="relative">
-                      <img
-                        src={r.preview}
-                        alt={`New receipt ${i + 1}`}
-                        className="w-full h-20 object-cover rounded border"
-                      />
-                      <button
-                        type="button"
-                        className="absolute -top-1 -right-1 bg-background rounded-full shadow p-1"
-                        onClick={() => handleRemoveNewReceipt(i)}
-                      >
+                      <img src={r.preview} alt={`Receipt ${i + 1}`} className="rounded-lg w-full aspect-square object-cover border border-border" />
+                      <button type="button" onClick={() => handleRemoveNewReceipt(i)} className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-0.5">
                         <X className="w-3 h-3" />
                       </button>
                     </div>
@@ -521,56 +390,36 @@ export const ExpenseForm = () => {
                 </div>
               )}
 
-              {!receiptFiles.length && !existingReceipts.length && (
-                <p className="text-xs text-muted-foreground">
-                  You can still save an expense without a photo, but receipts help with accounts.
-                </p>
-              )}
-
               {scanning && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <ScanLine className="w-3 h-3 animate-pulse" />
-                  <span>Scanning receipt for amount and date…</span>
+                  <ScanLine className="w-4 h-4 animate-pulse" />
+                  <span>Scanning receipt…</span>
                 </div>
               )}
             </Card>
 
-            <Button type="submit" className="w-full" disabled={saving}>
-              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              {isEdit ? "Save changes" : "Save expense"}
-            </Button>
+            <div className="flex gap-3">
+              <Button type="button" variant="outline" className="flex-1 min-h-[44px]" onClick={handleBack}>Cancel</Button>
+              <Button type="submit" className="flex-1 min-h-[44px]" disabled={saving}>
+                {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                {isEdit ? "Update" : "Save"}
+              </Button>
+            </div>
           </form>
         </div>
       </main>
       <BottomNav />
 
+      {/* Draft dialog */}
       <Dialog open={showDraftDialog} onOpenChange={setShowDraftDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Discard draft?</DialogTitle>
-            <DialogDescription>
-              You have unsaved changes for this expense. What would you like to do?
-            </DialogDescription>
+            <DialogTitle>Unsaved changes</DialogTitle>
+            <DialogDescription>You have unsaved expense data. Would you like to keep it as a draft?</DialogDescription>
           </DialogHeader>
-          <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowDraftDialog(false);
-                clearDraftAndNavigateBack();
-              }}
-            >
-              Discard draft
-            </Button>
-            <Button
-              onClick={() => {
-                saveDraftNow();
-                setShowDraftDialog(false);
-                clearDraftAndNavigateBack();
-              }}
-            >
-              Save draft &amp; exit
-            </Button>
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={() => { clearDraft(DRAFT_KEY); clearDraftAndNavigateBack(); }}>Discard</Button>
+            <Button onClick={() => { saveDraftNow(); clearDraftAndNavigateBack(); }}>Keep Draft</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

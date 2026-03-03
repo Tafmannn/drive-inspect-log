@@ -25,31 +25,26 @@ serve(async (req) => {
     const accessToken = await getAccessToken(sa);
     const bucket = "axentra_db";
 
-    // Get all GCS-stored photo backend_refs + signature URLs from the DB
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // 1. Get all GCS photo backend_refs
     const { data: photos } = await supabase
       .from("photos")
       .select("id, backend_ref")
       .eq("backend", "googleCloud")
       .not("backend_ref", "is", null);
 
-    // 2. Get all inspection signature URLs that point to GCS
     const { data: inspections } = await supabase
       .from("inspections")
       .select("id, driver_signature_url, customer_signature_url");
 
     const objectNames: string[] = [];
 
-    // Add photo backend_refs
     for (const p of (photos || [])) {
       if (p.backend_ref) objectNames.push(p.backend_ref);
     }
 
-    // Add GCS signature paths (extract from URL if they're GCS URLs)
     for (const insp of (inspections || [])) {
       for (const url of [insp.driver_signature_url, insp.customer_signature_url]) {
         if (url && url.includes(`storage.googleapis.com/${bucket}/`)) {
@@ -59,7 +54,6 @@ serve(async (req) => {
       }
     }
 
-    // Deduplicate
     const unique = [...new Set(objectNames)];
     let fixed = 0;
     let alreadyPublic = 0;
@@ -75,10 +69,7 @@ serve(async (req) => {
             Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            entity: "allUsers",
-            role: "READER",
-          }),
+          body: JSON.stringify({ entity: "allUsers", role: "READER" }),
         });
 
         if (aclRes.ok) {
@@ -92,10 +83,10 @@ serve(async (req) => {
             errorDetails.push(`${name}: ${aclRes.status} ${errText.slice(0, 100)}`);
           }
         }
-      } catch (e) {
+      } catch (e: unknown) {
         errors++;
         if (errorDetails.length < 10) {
-          errorDetails.push(`${name}: ${e.message}`);
+          errorDetails.push(`${name}: ${e instanceof Error ? e.message : String(e)}`);
         }
       }
     }
@@ -104,15 +95,15 @@ serve(async (req) => {
       JSON.stringify({ total: unique.length, fixed, alreadyPublic, errors, errorDetails }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (e) {
+  } catch (e: unknown) {
     return new Response(
-      JSON.stringify({ error: e.message }),
+      JSON.stringify({ error: e instanceof Error ? e.message : String(e) }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
 
-// ─── Google Auth (full_control scope needed for ACL changes) ───
+// ─── Google Auth ───
 async function getAccessToken(sa: { client_email: string; private_key: string }): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const header = { alg: "RS256", typ: "JWT" };

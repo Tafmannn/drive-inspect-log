@@ -38,8 +38,6 @@ const yesNo = (val: string | null | undefined): string => {
   return val;
 };
 
-// CHECKLIST_FIELDS and getChecklistItems imported from @/lib/inspectionFields
-
 export const PodReport = () => {
   const navigate = useNavigate();
   const { jobId } = useParams<{ jobId: string }>();
@@ -79,7 +77,7 @@ export const PodReport = () => {
         category: e.category,
         label: e.label ?? null,
         amount: Number(e.amount),
-        billable_on_pod: e.billable_on_pod,
+        billable_on_pod: (e as any).billable_on_pod ?? true,
       }));
       await sharePodPdf(job, billable);
     } catch (e: unknown) {
@@ -100,7 +98,7 @@ export const PodReport = () => {
         category: e.category,
         label: e.label ?? null,
         amount: Number(e.amount),
-        billable_on_pod: e.billable_on_pod,
+        billable_on_pod: (e as any).billable_on_pod ?? true,
       }));
       await emailPodPdf(job, billable);
     } catch (e: unknown) {
@@ -177,14 +175,10 @@ export const PodReport = () => {
             </div>
 
             <div className="p-6 space-y-6">
-              {/* Vehicle + Status header with UKPlate */}
               <Card className="p-4 space-y-1">
                 <div className="flex items-center justify-between mb-2">
                   <UKPlate reg={job.vehicle_reg} variant="rear" />
-                  <span
-                    style={{ backgroundColor: statusStyle.backgroundColor, color: statusStyle.color }}
-                    className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold uppercase leading-none"
-                  >
+                  <span style={{ backgroundColor: statusStyle.backgroundColor, color: statusStyle.color }} className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold uppercase leading-none">
                     {statusStyle.label}
                   </span>
                 </div>
@@ -277,21 +271,10 @@ export const PodReport = () => {
 
               <Card className="p-4 space-y-4">
                 <h3 className="text-sm font-semibold">Photos</h3>
-                <PhotoViewer
-                  title="Collection Photos"
-                  photos={pickupPhotos.map(p => ({ url: resolveImageUrl(p.url) || p.url, label: p.label || p.type.replace("pickup_", "").replace(/_/g, " ") }))}
-                />
-                <PhotoViewer
-                  title="Delivery Photos"
-                  photos={deliveryPhotos.map(p => ({ url: resolveImageUrl(p.url) || p.url, label: p.label || p.type.replace("delivery_", "").replace(/_/g, " ") }))}
-                />
-                <PhotoViewer
-                  title="Damage Close-ups"
-                  photos={damagePhotos.map(p => ({ url: resolveImageUrl(p.url) || p.url, label: p.label || "Damage" }))}
-                />
-                <p className="text-[11px] text-muted-foreground pt-1">
-                  Full-resolution images are stored securely within Axentra and can be supplied on request.
-                </p>
+                <PhotoViewer title="Collection Photos" photos={pickupPhotos.map(p => ({ url: resolveImageUrl(p.url) || p.url, label: p.label || p.type.replace("pickup_", "").replace(/_/g, " ") }))} />
+                <PhotoViewer title="Delivery Photos" photos={deliveryPhotos.map(p => ({ url: resolveImageUrl(p.url) || p.url, label: p.label || p.type.replace("delivery_", "").replace(/_/g, " ") }))} />
+                <PhotoViewer title="Damage Close-ups" photos={damagePhotos.map(p => ({ url: resolveImageUrl(p.url) || p.url, label: p.label || "Damage" }))} />
+                <p className="text-[11px] text-muted-foreground pt-1">Full-resolution images are stored securely within Axentra and can be supplied on request.</p>
               </Card>
 
               <Card className="p-4 space-y-2">
@@ -307,19 +290,8 @@ export const PodReport = () => {
                       <div className="text-[10px] text-muted-foreground font-medium">{sig.label}</div>
                       <div className="text-xs text-foreground">{sig.name || "—"}</div>
                       {sig.url ? (
-                        <img
-                          src={sig.url}
-                          alt={`${sig.label} signature`}
-                          className="h-14 border rounded bg-white p-1 w-full object-contain"
-                          crossOrigin="anonymous"
-                          onError={(e) => {
-                            const target = e.currentTarget;
-                            target.style.display = 'none';
-                            const placeholder = document.createElement('div');
-                            placeholder.className = 'h-14 border rounded bg-muted flex items-center justify-center text-[10px] text-muted-foreground';
-                            placeholder.textContent = 'Image couldn\u2019t be loaded.';
-                            target.parentNode?.appendChild(placeholder);
-                          }}
+                        <img src={sig.url} alt={`${sig.label} signature`} className="h-14 border rounded bg-white p-1 w-full object-contain" crossOrigin="anonymous"
+                          onError={(e) => { const target = e.currentTarget; target.style.display = 'none'; const placeholder = document.createElement('div'); placeholder.className = 'h-14 border rounded bg-muted flex items-center justify-center text-[10px] text-muted-foreground'; placeholder.textContent = 'Image couldn\u2019t be loaded.'; target.parentNode?.appendChild(placeholder); }}
                         />
                       ) : (
                         <div className="h-14 border rounded bg-muted flex items-center justify-center text-[10px] text-muted-foreground">Not signed</div>
@@ -329,7 +301,7 @@ export const PodReport = () => {
                 </div>
               </Card>
 
-              {/* ── Expenses (billable only on POD) — no amounts visible to drivers ── */}
+              {/* Expenses (billable only on POD) */}
               {(() => {
                 const billableExpenses = (jobExpenses ?? []).filter((e: any) => e.billable_on_pod !== false);
                 return (
@@ -355,17 +327,9 @@ export const PodReport = () => {
               })()}
 
               <Card className="p-4 space-y-2 text-xs text-muted-foreground">
-                <h3 className="text-sm font-semibold text-foreground">Customer Declaration</h3>
-                <p>
-                  The customer confirms that the vehicle described above has been received at the delivery address in the
-                  condition recorded on this report and any noted damage or exceptions have been agreed at the point of handover.
-                </p>
+                <p>This Proof of Delivery report was generated by the Axentra Vehicle Logistics system.</p>
+                <p>Report reference: <span className="font-mono">{ref}</span></p>
               </Card>
-
-              <div className="flex items-center justify-between pt-2 text-[10px] text-muted-foreground">
-                <span>Generated by Axentra Vehicle Logistics</span>
-                <span>{new Date().toLocaleString("en-GB")} • Job {ref}</span>
-              </div>
             </div>
           </Card>
         </div>

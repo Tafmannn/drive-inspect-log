@@ -12,6 +12,7 @@ import type { JobStatusValue } from './statusConfig';
 import { JOB_STATUS, ACTIVE_STATUSES, PENDING_STATUSES } from './statusConfig';
 import { isFeatureEnabled } from './featureFlags';
 import { logClientEvent } from './logger';
+import { getOrgId } from './orgHelper';
 
 // ─── Sheet Sync Helper ───────────────────────────────────────────────
 
@@ -20,7 +21,7 @@ async function syncJobToSheetIfEnabled(jobId: string): Promise<void> {
     const { safePushToSheet } = await import("./safePushToSheet");
     void safePushToSheet([jobId]); // fire-and-forget
   } catch {
-    // allow silent fail – error is already handled by safePushToSheet
+    // allow silent fail
   }
 }
 
@@ -108,9 +109,10 @@ async function generateJobNumber(): Promise<string> {
 }
 
 export async function createJob(input: Partial<Omit<Job, 'id' | 'status' | 'has_pickup_inspection' | 'has_delivery_inspection' | 'completed_at' | 'created_at' | 'updated_at'>> & Pick<Job, 'vehicle_reg' | 'vehicle_make' | 'vehicle_model' | 'vehicle_colour' | 'pickup_contact_name' | 'pickup_contact_phone' | 'pickup_address_line1' | 'pickup_city' | 'pickup_postcode' | 'delivery_contact_name' | 'delivery_contact_phone' | 'delivery_address_line1' | 'delivery_city' | 'delivery_postcode'>): Promise<Job> {
-  const payload = { ...input };
+  const orgId = await getOrgId();
+  const payload = { ...input, org_id: orgId } as any;
   if (!payload.external_job_number) {
-    (payload as Record<string, unknown>).external_job_number = await generateJobNumber();
+    payload.external_job_number = await generateJobNumber();
   }
   const { data, error } = await supabase.from('jobs').insert(payload).select().single();
   if (error) throw error;
@@ -119,7 +121,7 @@ export async function createJob(input: Partial<Omit<Job, 'id' | 'status' | 'has_
 }
 
 export async function updateJob(jobId: string, input: Partial<Job>): Promise<Job> {
-  const { data, error } = await supabase.from('jobs').update(input).eq('id', jobId).select().single();
+  const { data, error } = await supabase.from('jobs').update(input as any).eq('id', jobId).select().single();
   if (error) throw error;
   return data as Job;
 }
@@ -159,16 +161,17 @@ export async function upsertInspection(
   if (existing) {
     const { data, error } = await supabase
       .from('inspections')
-      .update({ ...payload, updated_at: new Date().toISOString() })
+      .update({ ...payload, updated_at: new Date().toISOString() } as any)
       .eq('id', existing.id)
       .select()
       .single();
     if (error) throw error;
     return data as Inspection;
   } else {
+    const orgId = await getOrgId();
     const { data, error } = await supabase
       .from('inspections')
-      .insert({ job_id: jobId, type, ...payload })
+      .insert({ job_id: jobId, type, org_id: orgId, ...payload } as any)
       .select()
       .single();
     if (error) throw error;
@@ -190,8 +193,9 @@ export async function submitInspection(
 
   await supabase.from('damage_items').delete().eq('inspection_id', inspection.id);
   if (damageItems.length > 0) {
-    const items = damageItems.map((d) => ({ ...d, inspection_id: inspection.id }));
-    const { error } = await supabase.from('damage_items').insert(items);
+    const orgId = await getOrgId();
+    const items = damageItems.map((d) => ({ ...d, inspection_id: inspection.id, org_id: orgId }));
+    const { error } = await supabase.from('damage_items').insert(items as any);
     if (error) throw error;
   }
 
@@ -213,13 +217,11 @@ export async function submitInspection(
 
   await logJobActivity(jobId, `${type}_inspection_submitted`, fromStatus, toStatus);
 
-  // Log to client_logs
   void logClientEvent("inspection_submitted", "info", {
     jobId,
     context: { inspectionType: type, newStatus: toStatus },
   });
 
-  // Auto-sync to Google Sheet if feature flag is enabled
   if (await isFeatureEnabled("AUTO_SHEET_SYNC_ON_JOB_UPDATE")) {
     void syncJobToSheetIfEnabled(jobId);
   }
@@ -228,7 +230,8 @@ export async function submitInspection(
 // ─── Photos ──────────────────────────────────────────────────────────
 
 export async function insertPhoto(payload: Omit<Photo, 'id' | 'created_at'>): Promise<Photo> {
-  const { data, error } = await supabase.from('photos').insert(payload).select().single();
+  const orgId = await getOrgId();
+  const { data, error } = await supabase.from('photos').insert({ ...payload, org_id: orgId } as any).select().single();
   if (error) throw error;
   return data as Photo;
 }
@@ -242,13 +245,15 @@ export async function logJobActivity(
   toStatus?: string,
   notes?: string,
 ): Promise<void> {
+  const orgId = await getOrgId();
   await supabase.from('job_activity_log').insert({
     job_id: jobId,
     action,
     from_status: fromStatus ?? null,
     to_status: toStatus ?? null,
     notes: notes ?? null,
-  });
+    org_id: orgId,
+  } as any);
 }
 
 // ─── Dashboard Counts ────────────────────────────────────────────────

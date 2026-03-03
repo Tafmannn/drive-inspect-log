@@ -6,10 +6,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-/**
- * Proxies GCS object reads through a signed request.
- * Accepts ?path=jobs/xxx/photos/yyy.jpg and streams the image back.
- */
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -37,7 +33,6 @@ serve(async (req) => {
     const accessToken = await getAccessToken(sa);
     const bucket = "axentra_db";
 
-    // Try using the JSON API alt=media endpoint (works with read_write scope)
     const gcsUrl = `https://storage.googleapis.com/storage/v1/b/${bucket}/o/${encodeURIComponent(objectPath)}?alt=media`;
     const gcsRes = await fetch(gcsUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -62,9 +57,9 @@ serve(async (req) => {
         "Cache-Control": "public, max-age=86400, immutable",
       },
     });
-  } catch (e) {
+  } catch (e: unknown) {
     return new Response(
-      JSON.stringify({ error: e.message }),
+      JSON.stringify({ error: e instanceof Error ? e.message : String(e) }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
