@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -121,13 +121,12 @@ export const Login = () => {
                   Remember me
                 </Label>
               </div>
-              <button
-                type="button"
+              <Link
+                to="/forgot-password"
                 className="text-xs text-[#0c6bbf] hover:text-[#3b9af5] transition-colors"
-                onClick={() => {}}
               >
                 Forgot password?
-              </button>
+              </Link>
             </div>
 
             {/* Error */}

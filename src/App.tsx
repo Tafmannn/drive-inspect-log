@@ -25,6 +25,8 @@ import { Profile } from "./pages/Profile";
 import { QrConfirm } from "./pages/QrConfirm";
 import { Auth } from "./pages/Auth";
 import { Login } from "./pages/Login";
+import { ForgotPassword } from "./pages/ForgotPassword";
+import { ResetPassword } from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { useEffect } from "react";
@@ -162,6 +164,8 @@ const App = () => {
                     }
                   />
                   <Route path="/login" element={<Login />} />
+                  <Route path="/forgot-password" element={<ForgotPassword />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/confirm" element={<QrConfirm />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
