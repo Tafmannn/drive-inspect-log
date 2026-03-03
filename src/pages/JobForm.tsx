@@ -15,6 +15,7 @@ import { toast } from "@/hooks/use-toast";
 import { Loader2, MapPin, Navigation, Search } from "lucide-react";
 import { CAR_MAKES, getModelsForMake } from "@/lib/carData";
 import { isValidUkPostcode, calculateRoute, type RouteResult } from "@/lib/mapsApi";
+import { lookupVehicle } from "@/lib/vehicleLookupApi";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import { saveDraft, loadDraft, clearDraft, draftKey } from "@/lib/autosave";
 import { lookupPostcode, type AddressSuggestion } from "@/lib/postcodeApi";
@@ -488,18 +489,84 @@ export const JobForm = () => {
               <ErrorText field="external_job_number" />
             </div>
 
-            {/* Registration */}
+            {/* Registration + DVLA Lookup */}
             <div>
               <Label className="text-sm font-medium">
                 Registration *
               </Label>
-              <Input
-                name="vehicle_reg"
-                placeholder="Vehicle registration"
-                defaultValue={existingJob?.vehicle_reg ?? ""}
-                autoCapitalize="characters"
-                className="mt-1"
-              />
+              <div className="flex gap-2 mt-1">
+                <Input
+                  name="vehicle_reg"
+                  placeholder="Vehicle registration"
+                  defaultValue={existingJob?.vehicle_reg ?? ""}
+                  autoCapitalize="characters"
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 gap-1"
+                  disabled={routeLoading}
+                  onClick={async () => {
+                    if (!formRef.current) return;
+                    const fd = new FormData(formRef.current);
+                    const reg = (fd.get("vehicle_reg") as string || "").trim();
+                    if (!reg) {
+                      toast({ title: "Enter a registration first.", variant: "destructive" });
+                      return;
+                    }
+                    try {
+                      const result = await lookupVehicle(reg);
+                      if (result.success) {
+                        if (result.make) {
+                          const makeKnown = CAR_MAKES.includes(result.make);
+                          if (makeKnown) {
+                            setVehicleMake(result.make);
+                            setCustomMake(false);
+                          } else {
+                            setCustomMake(true);
+                            setVehicleMake(result.make);
+                            // Set the custom input value
+                            requestAnimationFrame(() => {
+                              if (!formRef.current) return;
+                              const el = formRef.current.elements.namedItem("vehicle_make");
+                              if (el && "value" in el) (el as HTMLInputElement).value = result.make!;
+                            });
+                          }
+                          setCustomModel(true);
+                          setVehicleModel("");
+                        }
+                        if (result.colour) {
+                          const colourEl = formRef.current.elements.namedItem("vehicle_colour");
+                          if (colourEl && "value" in colourEl) {
+                            const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+                            nativeSetter?.call(colourEl as HTMLInputElement, result.colour);
+                            (colourEl as HTMLInputElement).dispatchEvent(new Event("input", { bubbles: true }));
+                          }
+                        }
+                        if (result.year) {
+                          const yearEl = formRef.current.elements.namedItem("vehicle_year");
+                          if (yearEl && "value" in yearEl) {
+                            const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+                            nativeSetter?.call(yearEl as HTMLInputElement, result.year);
+                            (yearEl as HTMLInputElement).dispatchEvent(new Event("input", { bubbles: true }));
+                          }
+                        }
+                        toast({ title: `Found: ${result.make} (${result.colour})` });
+                        saveDraftFromForm();
+                      } else {
+                        toast({ title: result.error || "Vehicle not found", variant: "destructive" });
+                      }
+                    } catch {
+                      toast({ title: "DVLA lookup failed", variant: "destructive" });
+                    }
+                  }}
+                >
+                  <Search className="w-4 h-4" />
+                  DVLA
+                </Button>
+              </div>
               <ErrorText field="vehicle_reg" />
             </div>
 

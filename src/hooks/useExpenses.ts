@@ -44,8 +44,10 @@ export function useCreateExpense() {
 export function useUpdateExpense() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, input }: { id: string; input: Partial<expApi.Expense> }) =>
-      expApi.updateExpense(id, input),
+    mutationFn: (params: { id: string } & Partial<expApi.Expense>) => {
+      const { id, ...fields } = params;
+      return expApi.updateExpense({ id, ...fields });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['expenses'] });
       qc.invalidateQueries({ queryKey: ['expense-totals'] });

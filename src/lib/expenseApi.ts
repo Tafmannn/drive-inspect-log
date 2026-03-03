@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { getOrgId } from './orgHelper';
 
 export const EXPENSE_CATEGORIES = [
   'Fuel',
@@ -15,7 +16,6 @@ export const EXPENSE_CATEGORIES = [
 
 export type ExpenseCategory = typeof EXPENSE_CATEGORIES[number];
 
-/** Categories that appear on the POD as breakdown rows */
 export const POD_EXPENSE_CATEGORIES: ExpenseCategory[] = [
   'Fuel',
   'Tolls',
@@ -39,6 +39,7 @@ export interface Expense {
   label: string | null;
   notes: string | null;
   driver_id: string | null;
+  billable_on_pod: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -51,9 +52,6 @@ interface ExpenseReceipt {
   backend: string;
   backend_ref: string | null;
   created_at: string;
-  // Optional link to a generated single-page PDF of this receipt.
-  // This will be null or empty until you add the column in Supabase and backfill it.
-  pdf_url: string | null;
 }
 
 export interface ExpenseWithReceipts extends Expense {
@@ -80,25 +78,15 @@ export async function listExpenses(filters?: {
     .order('date', { ascending: false })
     .order('created_at', { ascending: false });
 
-  if (filters?.jobId) {
-    query = query.eq('job_id', filters.jobId);
-  }
-  if (filters?.category) {
-    query = query.eq('category', filters.category);
-  }
-  if (filters?.dateFrom) {
-    query = query.gte('date', filters.dateFrom);
-  }
-  if (filters?.dateTo) {
-    query = query.lte('date', filters.dateTo);
-  }
+  if (filters?.jobId) query = query.eq('job_id', filters.jobId);
+  if (filters?.category) query = query.eq('category', filters.category);
+  if (filters?.dateFrom) query = query.gte('date', filters.dateFrom);
+  if (filters?.dateTo) query = query.lte('date', filters.dateTo);
 
   const { data, error } = await query;
   if (error) throw error;
 
   const expenses = (data ?? []) as Expense[];
-
-  // Fetch receipts for all expenses
   const expenseIds = expenses.map(e => e.id);
   let receipts: ExpenseReceipt[] = [];
   if (expenseIds.length > 0) {
@@ -106,12 +94,10 @@ export async function listExpenses(filters?: {
       .from('expense_receipts')
       .select('*')
       .in('expense_id', expenseIds);
-
     if (rErr) throw rErr;
     receipts = (rData ?? []) as ExpenseReceipt[];
   }
 
-  // Fetch job info
   const jobIds = [...new Set(expenses.map(e => e.job_id))];
   let jobMap: Record<string, { reg: string; num: string }> = {};
   if (jobIds.length > 0) {
@@ -119,9 +105,7 @@ export async function listExpenses(filters?: {
       .from('jobs')
       .select('id, vehicle_reg, external_job_number')
       .in('id', jobIds);
-
     if (jErr) throw jErr;
-
     for (const j of jobs ?? []) {
       jobMap[j.id] = { reg: j.vehicle_reg, num: j.external_job_number || '' };
     }
@@ -141,7 +125,6 @@ export async function getExpensesForJob(jobId: string): Promise<ExpenseWithRecei
     .select('*')
     .eq('job_id', jobId)
     .order('date', { ascending: false });
-
   if (error) throw error;
   const expenses = (data ?? []) as Expense[];
 
@@ -152,7 +135,6 @@ export async function getExpensesForJob(jobId: string): Promise<ExpenseWithRecei
       .from('expense_receipts')
       .select('*')
       .in('expense_id', expenseIds);
-
     if (rErr) throw rErr;
     receipts = (rData ?? []) as ExpenseReceipt[];
   }
@@ -176,6 +158,7 @@ export async function createExpense(input: {
   notes?: string | null;
   driver_id?: string | null;
 }): Promise<Expense> {
+  const orgId = await getOrgId();
   const { data, error } = await supabase
     .from('expenses')
     .insert({
@@ -188,10 +171,10 @@ export async function createExpense(input: {
       label: input.label ?? null,
       notes: input.notes ?? null,
       driver_id: input.driver_id ?? null,
-    })
+      org_id: orgId,
+    } as any)
     .select()
     .single();
-
   if (error) throw error;
   return data as Expense;
 }
@@ -213,7 +196,6 @@ export async function updateExpense(input: {
     .eq('id', id)
     .select()
     .single();
-
   if (error) throw error;
   return data as Expense;
 }
@@ -222,6 +204,11 @@ export async function updateExpense(input: {
 
 export async function deleteExpense(id: string): Promise<void> {
   const { error } = await supabase.from('expenses').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteReceipt(id: string): Promise<void> {
+  const { error } = await supabase.from('expense_receipts').delete().eq('id', id);
   if (error) throw error;
 }
 
@@ -243,65 +230,46 @@ export async function uploadReceipt(expenseId: string, file: File): Promise<void
     backend: 'supabase',
     backend_ref: path,
   });
-
   if (insertErr) throw insertErr;
 }
 
 // ─── Totals ──────────────────────────────────────────────────────────
 
-export async function getExpenseTotals(filters?: {
-  jobId?: string;
-  dateFrom?: string;
-  dateTo?: string;
-}) {
-  let query = supabase
+export async function getExpenseTotals() {
+  const { data, error } = await supabase
     .from('expenses')
-    .select('amount, job_id, date');
-
-  if (filters?.jobId) {
-    query = query.eq('job_id', filters.jobId);
-  }
-  if (filters?.dateFrom) {
-    query = query.gte('date', filters.dateFrom);
-  }
-  if (filters?.dateTo) {
-    query = query.lte('date', filters.dateTo);
-  }
-
-  const { data, error } = await query;
+    .select('amount, date');
   if (error) throw error;
 
   const rows = data ?? [];
-  const total = rows.reduce((sum, row: any) => sum + (row.amount ?? 0), 0);
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+  const weekAgo = new Date(now);
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  const weekStr = weekAgo.toISOString().slice(0, 10);
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
 
-  return {
-    total,
-    count: rows.length,
-  };
+  let today = 0, thisWeek = 0, thisMonth = 0, total = 0;
+  for (const row of rows) {
+    const amt = Number(row.amount) || 0;
+    total += amt;
+    if (row.date >= todayStr) today += amt;
+    if (row.date >= weekStr) thisWeek += amt;
+    if (row.date >= monthStart) thisMonth += amt;
+  }
+
+  return { total, count: rows.length, today, thisWeek, thisMonth };
 }
 
 // ─── CSV Export ──────────────────────────────────────────────────────
 
 export async function exportExpensesCsv(): Promise<void> {
-  // Re-use the existing listExpenses() helper to fetch full expense data
   const expenses = await listExpenses();
-
-  // CSV header row
   const headers = [
-    "Job Number",
-    "Registration",
-    "Date",
-    "Time",
-    "Category",
-    "Label",
-    "Amount",
-    "Currency",
-    "Notes",
-    "Driver",
-    "Receipts",
+    "Job Number", "Registration", "Date", "Time", "Category",
+    "Label", "Amount", "Currency", "Notes", "Driver", "Receipts",
   ];
 
-  // Escape values for CSV (quotes, commas, newlines)
   function esc(v: string | null | undefined) {
     if (v == null) return "";
     const s = String(v);
@@ -310,29 +278,17 @@ export async function exportExpensesCsv(): Promise<void> {
       : s;
   }
 
-  // Build data rows
   const rows = expenses.map((e) =>
     [
-      esc(e.job_number),
-      esc(e.job_reg),
-      esc(e.date),
-      esc(e.time),
-      esc(e.category),
-      esc(e.label),
-      String(e.amount),
-      esc(e.currency),
-      esc(e.notes),
-      esc(e.driver_id),
-      String(e.receipts.length),
+      esc(e.job_number), esc(e.job_reg), esc(e.date), esc(e.time),
+      esc(e.category), esc(e.label), String(e.amount), esc(e.currency),
+      esc(e.notes), esc(e.driver_id), String(e.receipts.length),
     ].join(","),
   );
 
-  // Add a UTF-8 BOM so Excel opens it nicely
   const BOM = "\uFEFF";
   const csv = [headers.join(","), ...rows].join("\n");
   const blob = new Blob([BOM + csv], { type: "text/csv;charset=utf-8;" });
-
-  // Trigger download in the browser
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
