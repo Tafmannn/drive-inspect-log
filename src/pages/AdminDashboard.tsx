@@ -325,10 +325,26 @@ function ExpensesTab({ archived = false }: { archived?: boolean }) {
 
 // ─── Users Tab ────────────────────────────────────────────────────
 function UsersTab() {
+  const navigate = useNavigate();
+  const { authEnabled } = useAuth();
+
+  if (authEnabled) {
+    return (
+      <div className="text-center py-8 space-y-3">
+        <Users className="w-10 h-10 mx-auto text-muted-foreground stroke-[2]" />
+        <p className="text-[14px] text-muted-foreground">Manage your organisation's users.</p>
+        <Button variant="outline" onClick={() => navigate("/admin/users")} className="min-h-[44px]">
+          <Users className="w-4 h-4 mr-1" /> Open User Management
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="text-center py-8 space-y-2">
       <Users className="w-10 h-10 mx-auto text-muted-foreground stroke-[2]" />
-      <p className="text-[14px] text-muted-foreground">User management will be available when authentication is enabled.</p>
+      <p className="text-[14px] text-muted-foreground">User management requires authentication to be enabled.</p>
+      <p className="text-[13px] text-muted-foreground">Set <code className="bg-muted px-1 rounded text-xs">VITE_ENABLE_AUTH=true</code> to enable.</p>
       <p className="text-[13px] text-muted-foreground">Roles: DRIVER, ADMIN, SUPERADMIN</p>
     </div>
   );
