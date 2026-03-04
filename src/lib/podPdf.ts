@@ -3,6 +3,7 @@ import autoTable from "jspdf-autotable";
 import type { JobWithRelations, Inspection } from "./types";
 import { FUEL_PERCENT_TO_LABEL } from "./types";
 import { CHECKLIST_FIELDS } from "./inspectionFields";
+import { resolveImageUrlAsync } from "./gcsProxyUrl";
 
 const MARGIN = 20;
 
@@ -45,8 +46,10 @@ function addSectionTitle(doc: jsPDF, title: string, y: number): number {
 
 async function loadImageAsBase64(url: string): Promise<string | null> {
   try {
-    // For cross-origin images, try with no-cors first, then fallback
-    const response = await fetch(url, { mode: 'cors' });
+    // Resolve GCS URLs through authenticated proxy
+    const resolvedUrl = await resolveImageUrlAsync(url) ?? url;
+    
+    const response = await fetch(resolvedUrl, { mode: 'cors' });
     if (!response.ok) return null;
     const blob = await response.blob();
     return new Promise((resolve) => {
@@ -56,7 +59,7 @@ async function loadImageAsBase64(url: string): Promise<string | null> {
       reader.readAsDataURL(blob);
     });
   } catch {
-    // Try without CORS as fallback
+    // Fallback: try original URL directly
     try {
       const response = await fetch(url);
       if (!response.ok) return null;
@@ -102,6 +105,25 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
   const pickupPhotos = job.photos.filter(p => p.type.startsWith("pickup_"));
   const deliveryPhotos = job.photos.filter(p => p.type.startsWith("delivery_"));
 
+  // ── Pre-load all images in parallel ──
+  const allPhotoUrls = [...pickupPhotos, ...deliveryPhotos].map(p => p.url);
+  const sigUrls = [
+    pickup?.driver_signature_url,
+    pickup?.customer_signature_url,
+    delivery?.driver_signature_url,
+    delivery?.customer_signature_url,
+  ].filter(Boolean) as string[];
+  
+  const allUrls = [...allPhotoUrls, ...sigUrls];
+  const imageCache = new Map<string, string | null>();
+  
+  const loadResults = await Promise.allSettled(
+    allUrls.map(async (url) => {
+      const data = await loadImageAsBase64(url);
+      imageCache.set(url, data);
+    })
+  );
+
   // ── Header banner ──
   doc.setFillColor(33, 37, 41);
   doc.rect(0, 0, pageWidth, 30, "F");
@@ -127,7 +149,7 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
 
   let y = 38;
 
-  // ── Vehicle Details (no pricing) ──
+  // ── Vehicle Details ──
   y = addSectionTitle(doc, "Vehicle Details", y);
   autoTable(doc, {
     startY: y,
@@ -151,7 +173,7 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
   });
   y = (doc as any).lastAutoTable.finalY + 8;
 
-  // ── Billable Expenses (categories only, no amounts) ──
+  // ── Billable Expenses ──
   const billableExpenses = (expenses ?? []).filter(e => e.billable_on_pod !== false);
   if (billableExpenses.length > 0) {
     y = addSectionTitle(doc, `Billable Expenses (${billableExpenses.length} items)`, y);
@@ -307,17 +329,17 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
     y = (doc as any).lastAutoTable.finalY + 8;
   }
 
-  // ── Photos ──
+  // ── Photos (from pre-loaded cache) ──
   const allPhotos = [...pickupPhotos, ...deliveryPhotos];
   if (allPhotos.length > 0) {
     y = addSectionTitle(doc, "Photos", y);
-    const photoWidth = (contentWidth - 6) / 3; // 3 columns with 3mm gaps
+    const photoWidth = (contentWidth - 6) / 3;
     const photoHeight = photoWidth * 0.75;
     let col = 0;
     
     for (const photo of allPhotos) {
       y = ensureSpace(doc, y, photoHeight + 10);
-      const imgData = await loadImageAsBase64(photo.url);
+      const imgData = imageCache.get(photo.url) ?? null;
       if (imgData) {
         try {
           const x = MARGIN + col * (photoWidth + 3);
@@ -331,12 +353,28 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
             y += photoHeight + 8;
           }
         } catch { /* skip failed photo */ }
+      } else {
+        // Draw placeholder for unavailable photo
+        const x = MARGIN + col * (photoWidth + 3);
+        doc.setDrawColor(200, 200, 200);
+        doc.setFillColor(245, 245, 245);
+        doc.rect(x, y, photoWidth, photoHeight, "FD");
+        doc.setFontSize(7);
+        doc.setTextColor(160, 160, 160);
+        doc.text("Photo unavailable", x + photoWidth / 2, y + photoHeight / 2, { align: "center" });
+        doc.setFontSize(6);
+        doc.text(photo.label || photo.type, x, y + photoHeight + 3);
+        col++;
+        if (col >= 3) {
+          col = 0;
+          y += photoHeight + 8;
+        }
       }
     }
     if (col > 0) y += photoHeight + 8;
   }
 
-  // ── Signatures (horizontal layout, 4 across) ──
+  // ── Signatures (from pre-loaded cache) ──
   y = addSectionTitle(doc, "Signatures", y);
   y = ensureSpace(doc, y, 40);
 
@@ -362,7 +400,7 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
     doc.text(sig.name, sigX, sigStartY + 4);
 
     if (sig.url) {
-      const imgData = await loadImageAsBase64(sig.url);
+      const imgData = imageCache.get(sig.url) ?? null;
       if (imgData) {
         try {
           doc.setDrawColor(200, 200, 200);
@@ -371,7 +409,6 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
           doc.addImage(imgData, "PNG", sigX + 1, sigStartY + 7, sigWidth - 2, 16);
         } catch { /* skip */ }
       } else {
-        // Signature URL exists but failed to load
         doc.setDrawColor(200, 200, 200);
         doc.setLineWidth(0.3);
         doc.rect(sigX, sigStartY + 6, sigWidth, 18);
@@ -472,6 +509,10 @@ export async function emailPodPdf(job: JobWithRelations, expenses?: PodExpense[]
     }
   }
 
-  const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  window.location.href = mailto;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  URL.revokeObjectURL(url);
 }

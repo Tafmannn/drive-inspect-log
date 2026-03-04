@@ -12,8 +12,22 @@ serve(async (req) => {
   }
 
   try {
-    // ─── Auth ───
-    const authHeader = req.headers.get("Authorization") ?? "";
+    const url = new URL(req.url);
+    const objectPath = url.searchParams.get("path");
+    if (!objectPath) {
+      return new Response(
+        JSON.stringify({ error: "Missing ?path= parameter" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ─── Auth: accept header OR query param (for <img> tags) ───
+    let authHeader = req.headers.get("Authorization") ?? "";
+    const tokenParam = url.searchParams.get("token");
+    if (!authHeader && tokenParam) {
+      authHeader = `Bearer ${tokenParam}`;
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -25,23 +39,27 @@ serve(async (req) => {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const orgId = authData.user.user_metadata?.org_id ?? null;
-    if (!orgId) {
-      return new Response(JSON.stringify({ error: "NO_ORG" }), {
-        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+
+    // org_id check — skip for super admins
+    const email = (authData.user.email ?? "").toLowerCase();
+    const isSuperAdmin = [
+      "axentravehiclelogistics@gmail.com",
+      "info@axentravehicles.com",
+    ].includes(email);
+
+    if (!isSuperAdmin) {
+      const orgId =
+        authData.user.user_metadata?.org_id ??
+        authData.user.app_metadata?.org_id ??
+        null;
+      if (!orgId) {
+        return new Response(JSON.stringify({ error: "NO_ORG" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
-    // ─── Original logic ───
-    const url = new URL(req.url);
-    const objectPath = url.searchParams.get("path");
-    if (!objectPath) {
-      return new Response(
-        JSON.stringify({ error: "Missing ?path= parameter" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
+    // ─── Fetch from GCS ───
     const serviceAccountJson = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_JSON");
     if (!serviceAccountJson) {
       return new Response(
