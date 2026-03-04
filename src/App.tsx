@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { DevRoleBanner } from "@/components/DevRoleBanner";
 import { Dashboard } from "./pages/Dashboard";
 import { JobList } from "./pages/JobList";
 import { JobMasterList } from "./pages/JobMasterList";
@@ -21,9 +22,9 @@ import { AdminDashboard } from "./pages/AdminDashboard";
 import { Timesheets } from "./pages/Timesheets";
 import { AdminUsers } from "./pages/AdminUsers";
 import { OrgAdminDashboard } from "./pages/OrgAdminDashboard";
+import { SuperAdminDashboard } from "./pages/SuperAdminDashboard";
 import { Profile } from "./pages/Profile";
 import { QrConfirm } from "./pages/QrConfirm";
-// Auth.tsx is no longer used directly — public routes are outside AuthGate
 import { Login } from "./pages/Login";
 import { ForgotPassword } from "./pages/ForgotPassword";
 import { ResetPassword } from "./pages/ResetPassword";
@@ -57,15 +58,24 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/* ── Super-admin-only route guard ─────────────────────────────────── */
+
+function SuperAdminRoute({ children }: { children: React.ReactNode }) {
+  const { isSuperAdmin, isAdmin } = useAuth();
+  if (!isSuperAdmin) {
+    // Redirect admins to /admin, others to /
+    return <Navigate to={isAdmin ? "/admin" : "/"} replace />;
+  }
+  return <>{children}</>;
+}
+
 /* ── Auth gate (only active when authEnabled) ─────────────────────── */
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { authEnabled, authLoading, user } = useAuth();
 
-  // Dev mode — no gate
   if (!authEnabled) return <>{children}</>;
 
-  // Loading session
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -74,19 +84,25 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Not logged in → redirect to branded login page
   if (!user) return <Navigate to="/login" replace />;
 
   return <>{children}</>;
 }
 
+/* ── Dev override roles ───────────────────────────────────────────── */
+
+function getDevOverrideRoles(): import("@/context/AuthContext").AppRole[] {
+  if (typeof window === "undefined") return ["DRIVER"];
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("super") === "1") return ["SUPERADMIN", "ADMIN", "DRIVER"];
+  if (params.get("admin") === "1") return ["ADMIN", "DRIVER"];
+  return ["DRIVER"];
+}
+
 /* ── App ──────────────────────────────────────────────────────────── */
 
 const App = () => {
-  const isAdminOverride =
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("admin") === "1"
-      : false;
+  const overrideRoles = getDevOverrideRoles();
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -95,9 +111,8 @@ const App = () => {
         <Sonner />
         <AppErrorBoundary>
           <BackgroundUploader />
-          <AuthProvider
-            overrideRoles={isAdminOverride ? ["ADMIN", "DRIVER"] : ["DRIVER"]}
-          >
+          <AuthProvider overrideRoles={overrideRoles}>
+            <DevRoleBanner />
             <BrowserRouter>
               <Routes>
                 {/* ── Public routes (outside AuthGate) ── */}
@@ -172,6 +187,15 @@ const App = () => {
                             <AdminRoute>
                               <OrgAdminDashboard />
                             </AdminRoute>
+                          }
+                        />
+                        {/* Super-admin-only route */}
+                        <Route
+                          path="/super-admin"
+                          element={
+                            <SuperAdminRoute>
+                              <SuperAdminDashboard />
+                            </SuperAdminRoute>
                           }
                         />
                         <Route path="*" element={<NotFound />} />

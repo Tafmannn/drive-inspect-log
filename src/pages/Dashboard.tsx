@@ -17,7 +17,7 @@ import { useQueryClient } from "@tanstack/react-query";
 export const Dashboard = () => {
   const navigate = useNavigate();
   const { data: counts, isLoading } = useDashboardCounts();
-  const { isAdmin } = useAuth();
+  const { isAdmin, isSuperAdmin } = useAuth();
   const [exporting, setExporting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const qc = useQueryClient();
@@ -111,6 +111,15 @@ export const Dashboard = () => {
                 subtitle="Stats, timesheets & management"
                 onClick={() => navigate('/admin')}
                 iconClassName="bg-accent/10 text-accent"
+              />
+            )}
+            {isSuperAdmin && (
+              <DashboardCard
+                icon={<ShieldCheck className="w-6 h-6 stroke-[2]" />}
+                title="Super Admin"
+                subtitle="Global control centre"
+                onClick={() => navigate('/super-admin')}
+                iconClassName="bg-destructive/10 text-destructive"
               />
             )}
           </div>
