@@ -14,16 +14,24 @@ import type { User as SupaUser, Session } from "@supabase/supabase-js";
 
 const AUTH_ENABLED =
   typeof import.meta !== "undefined" &&
-  (import.meta.env.VITE_ENABLE_AUTH as string | undefined) === "true";
+  (import.meta.env.VITE_ENABLE_AUTH as string | undefined) !== "false";
 
-const SUPERADMIN_EMAILS: string[] = (
-  (typeof import.meta !== "undefined"
-    ? (import.meta.env.VITE_SUPERADMIN_EMAILS as string | undefined)
-    : undefined) ?? ""
-)
-  .split(",")
-  .map((e) => e.trim().toLowerCase())
-  .filter(Boolean);
+const DEFAULT_SUPERADMIN_EMAILS = [
+  "axentravehiclelogistics@gmail.com",
+  "info@axentravehicles.com",
+];
+
+const SUPERADMIN_EMAILS: string[] = Array.from(
+  new Set([
+    ...(((typeof import.meta !== "undefined"
+      ? (import.meta.env.VITE_SUPERADMIN_EMAILS as string | undefined)
+      : undefined) ?? "")
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean)),
+    ...DEFAULT_SUPERADMIN_EMAILS,
+  ])
+);
 
 /* ── Public types ──────────────────────────────────────────────────── */
 
@@ -73,11 +81,18 @@ function deriveAppUser(supaUser: SupaUser): AppUser {
   }
 
   // Merge any metadata roles
-  const metaRoles = (supaUser.user_metadata?.roles ?? []) as string[];
+  const metaRoles = [
+    ...((supaUser.user_metadata?.roles ?? []) as string[]),
+    ...((supaUser.app_metadata?.roles ?? []) as string[]),
+    typeof supaUser.user_metadata?.role === "string" ? supaUser.user_metadata.role : "",
+    typeof supaUser.app_metadata?.role === "string" ? supaUser.app_metadata.role : "",
+  ].filter(Boolean);
+
   for (const r of metaRoles) {
-    const upper = r.toUpperCase() as AppRole;
-    if (["DRIVER", "ADMIN", "SUPERADMIN"].includes(upper) && !roles.includes(upper)) {
-      roles.push(upper);
+    const normalized = String(r).toUpperCase().replace(/-/g, "_");
+    const mapped = (normalized === "SUPER_ADMIN" ? "SUPERADMIN" : normalized) as AppRole;
+    if (["DRIVER", "ADMIN", "SUPERADMIN"].includes(mapped) && !roles.includes(mapped)) {
+      roles.push(mapped);
     }
   }
 

@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 serve(async (req) => {
@@ -30,11 +30,29 @@ serve(async (req) => {
     }
 
     const caller = authData.user;
-    const callerOrgId = caller.user_metadata?.org_id ?? null;
-    const callerRole = caller.user_metadata?.role ?? null;
+    const callerOrgId =
+      caller.user_metadata?.org_id ?? caller.app_metadata?.org_id ?? null;
+    const directRole = String(
+      caller.user_metadata?.role ?? caller.app_metadata?.role ?? ""
+    ).toLowerCase();
+    const roleSet = new Set(
+      [
+        ...((caller.user_metadata?.roles ?? []) as string[]),
+        ...((caller.app_metadata?.roles ?? []) as string[]),
+      ].map((r) => String(r).toUpperCase().replace(/-/g, "_"))
+    );
+    const callerEmail = (caller.email ?? "").toLowerCase();
+    const isSuperAdmin =
+      directRole === "super_admin" ||
+      directRole === "superadmin" ||
+      roleSet.has("SUPERADMIN") ||
+      roleSet.has("SUPER_ADMIN") ||
+      callerEmail === "axentravehiclelogistics@gmail.com" ||
+      callerEmail === "info@axentravehicles.com";
+    const isAdmin = isSuperAdmin || directRole === "admin" || roleSet.has("ADMIN");
 
     // Only super_admin or admin can assign drivers
-    if (callerRole !== "super_admin" && callerRole !== "admin") {
+    if (!isAdmin) {
       return new Response(JSON.stringify({ error: "ADMIN_OR_SUPER_ADMIN_ONLY" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -53,7 +71,7 @@ serve(async (req) => {
 
     // Resolve destination org
     let targetOrgId: string | null;
-    if (callerRole === "admin") {
+    if (isAdmin && !isSuperAdmin) {
       // Admin can only assign into their own org
       targetOrgId = callerOrgId;
     } else {
@@ -90,7 +108,7 @@ serve(async (req) => {
     }
 
     // Admin cannot assign users from other orgs
-    if (callerRole === "admin") {
+    if (isAdmin && !isSuperAdmin) {
       const targetCurrentOrg = targetUser.user_metadata?.org_id ?? null;
       if (targetCurrentOrg && targetCurrentOrg !== callerOrgId) {
         return new Response(JSON.stringify({ error: "CROSS_ORG_FORBIDDEN" }), {

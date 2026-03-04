@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 // ─── Google Auth via Service Account ─────────────────────────────────
@@ -324,14 +324,35 @@ Deno.serve(async (req) => {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const userOrgId = authData.user.user_metadata?.org_id ?? null;
-    const role = authData.user.user_metadata?.role ?? null;
-    if (!userOrgId) {
+    const userOrgId =
+      authData.user.user_metadata?.org_id ??
+      authData.user.app_metadata?.org_id ??
+      null;
+    const directRole = String(
+      authData.user.user_metadata?.role ?? authData.user.app_metadata?.role ?? ""
+    ).toLowerCase();
+    const roleSet = new Set(
+      [
+        ...((authData.user.user_metadata?.roles ?? []) as string[]),
+        ...((authData.user.app_metadata?.roles ?? []) as string[]),
+      ].map((r) => String(r).toUpperCase().replace(/-/g, "_"))
+    );
+    const email = (authData.user.email ?? "").toLowerCase();
+    const isSuperAdmin =
+      directRole === "super_admin" ||
+      directRole === "superadmin" ||
+      roleSet.has("SUPERADMIN") ||
+      roleSet.has("SUPER_ADMIN") ||
+      email === "axentravehiclelogistics@gmail.com" ||
+      email === "info@axentravehicles.com";
+    const isAdmin = isSuperAdmin || directRole === "admin" || roleSet.has("ADMIN");
+
+    if (!userOrgId && !isSuperAdmin) {
       return new Response(JSON.stringify({ error: "NO_ORG" }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    if (role !== "admin") {
+    if (!isAdmin) {
       return new Response(JSON.stringify({ error: "ADMIN_ONLY" }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
