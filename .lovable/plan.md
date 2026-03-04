@@ -1,60 +1,78 @@
 
 
-## Audit Summary
+## End-to-End Fix Plan: Broken Integrations
 
-The current system already has most of the right architecture in place:
+### Root Causes Identified
 
-### What works well
-- **Job status updates are non-blocking**: `handleFinalSubmit` in `InspectionFlow.tsx` already submits inspection metadata + signatures synchronously, then queues photos to the background via `addPendingUpload()` (fire-and-forget)
-- **Background retry**: After queuing, it calls `retryAllPending()` as fire-and-forget
-- **Signatures upload synchronously** (lines 514-533) — this is correct since they're small and critical for POD
-- **POD viewer** already uses `resolveImageUrl` for GCS proxying
+**Issue 1 — CORS blocks all edge function calls from the preview domain**
 
-### What needs changing
+Every single edge function (11 functions) uses a hardcoded `ALLOWED_ORIGINS` list containing only `localhost:5173`, `*.lovable.app`, and `axentra.lovable.app`. The actual preview runs on `*.lovableproject.com`, which is NOT in this list. When the origin doesn't match, the function returns `Access-Control-Allow-Origin: http://localhost:5173`, which the browser rejects. This silently breaks DVLA lookup, company search, postcode lookup, maps directions, GCS upload/proxy, vision OCR, sheet sync, and all admin functions.
 
-1. **Pending Uploads screen is per-photo, not per-job** — each queued asset gets its own row, which is noisy and non-actionable for drivers
-2. **No automatic background retry on app launch** — if uploads fail and user doesn't visit Pending Uploads, they stay stuck
-3. **Dashboard count** shows raw pending photo count, not job count
-4. **`safePushToSheet` is not called after background uploads complete** — only called on mutation success, which happens before uploads finish
-5. **No sheet sync trigger after retry success**
+**Issue 2 — Client APIs send anon key instead of user session token**
 
-### Plan
+Four client-side API modules (`businessSearchApi.ts`, `postcodeApi.ts`, `mapsApi.ts`, `sheetSyncApi.ts`) use raw `fetch()` with `Authorization: Bearer ${ANON_KEY}`. The edge functions then call `supabase.auth.getUser()` which returns null for anon keys, causing a 401 UNAUTHENTICATED response. Only `vehicleLookupApi.ts`, `adminApi.ts`, `visionApi.ts`, and `gcsStorageService.ts` correctly use `supabase.functions.invoke()` which sends the real user token.
 
-#### Task 1: Add job-level grouping helpers to `pendingUploads.ts`
-- Add `getPendingUploadsByJob()` that returns `Map<jobId, { jobId, jobNumber, vehicleReg, pendingCount, failedCount, lastErrorAt, items }>` 
-- Add `retryJobUploads(jobId)` that retries only items for a specific job
-- After all items for a job succeed, fire `safePushToSheet([jobId])`
-- No schema changes
+---
 
-#### Task 2: Redesign `PendingUploads.tsx` to job-level view
-- One card per job (not per photo)
-- Show: job number, vehicle reg, pending/failed count, last error timestamp
-- "Retry" button per job calls `retryJobUploads(jobId)`
-- "Retry All" retries all jobs
-- Remove per-photo detail rows
+### Fix Plan
 
-#### Task 3: Update Dashboard count to show job count, not photo count
-- In `useJobs.ts` `useDashboardCounts`, change `pendingUploads` to count distinct jobs with pending/failed uploads (not raw item count)
+#### Part 1: Fix CORS in all 11 edge functions
 
-#### Task 4: Add auto-retry on app mount
-- In `App.tsx` or a new `useBackgroundUploader` hook, trigger `retryAllPending()` once on mount (fire-and-forget)
-- This handles edge case A (app crash during upload — on reopen, retries automatically)
+Replace the restrictive `ALLOWED_ORIGINS` + `cors()` function in every edge function with the standard Lovable CORS pattern:
 
-#### Task 5: Trigger `safePushToSheet` after successful job uploads
-- In the retry logic, after all items for a job complete, call `safePushToSheet([jobId])`
-- This ensures sheet sync happens even when uploads were deferred
+```javascript
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+```
 
-### Files to modify
-- `src/lib/pendingUploads.ts` — add job-level grouping + retry + sheet sync trigger
-- `src/pages/PendingUploads.tsx` — redesign to job-level cards
-- `src/hooks/useJobs.ts` — change pending count to distinct job count
-- `src/App.tsx` — add auto-retry on mount (one line)
+**Files to update (CORS block, lines 4-16 in each):**
+- `supabase/functions/vehicle-lookup/index.ts`
+- `supabase/functions/business-search/index.ts`
+- `supabase/functions/place-details/index.ts`
+- `supabase/functions/postcode-lookup/index.ts`
+- `supabase/functions/maps-directions/index.ts`
+- `supabase/functions/gcs-upload/index.ts`
+- `supabase/functions/gcs-proxy/index.ts`
+- `supabase/functions/gcs-fix-acl/index.ts`
+- `supabase/functions/vision-ocr/index.ts`
+- `supabase/functions/promote-admin/index.ts`
+- `supabase/functions/assign-driver/index.ts`
+- `supabase/functions/get-org-users/index.ts`
+- `supabase/functions/google-sheets-sync/index.ts` (same pattern, slightly different location)
 
-### Files NOT modified
-- No DB schema changes
-- No Google Sheets changes
-- No edge function changes
-- `InspectionFlow.tsx` unchanged (already non-blocking)
-- `PodReport.tsx` unchanged (already works with partial uploads)
-- `safePushToSheet.ts` unchanged
+Also replace `cors(req.headers.get("Origin"))` in catch blocks with just `corsHeaders`.
+
+#### Part 2: Switch client APIs to use `supabase.functions.invoke()`
+
+**`src/lib/businessSearchApi.ts`** — Replace raw fetch calls with `supabase.functions.invoke('business-search', ...)` and `supabase.functions.invoke('place-details', ...)`. This sends the user's real auth token.
+
+**`src/lib/postcodeApi.ts`** — Replace raw fetch with `supabase.functions.invoke('postcode-lookup', ...)`.
+
+**`src/lib/mapsApi.ts`** — Replace raw fetch with `supabase.functions.invoke('maps-directions', ...)`.
+
+**`src/lib/sheetSyncApi.ts`** — Replace raw fetch `callSync` function with `supabase.functions.invoke('google-sheets-sync', ...)`.
+
+#### Part 3: Deploy all edge functions
+
+All 13 edge functions must be redeployed after CORS fixes.
+
+---
+
+### Summary of what this fixes
+
+| Feature | Broken because | Fix |
+|---|---|---|
+| DVLA Lookup | CORS block | Fix CORS headers |
+| Company Search | CORS + anon key auth | Fix CORS + use `supabase.functions.invoke` |
+| Postcode Lookup | CORS + anon key auth | Fix CORS + use `supabase.functions.invoke` |
+| Maps/Route Calc | CORS + anon key auth | Fix CORS + use `supabase.functions.invoke` |
+| Google Sheets Sync | CORS + anon key auth | Fix CORS + use `supabase.functions.invoke` |
+| GCS Photo Upload | CORS block | Fix CORS headers |
+| GCS Photo Proxy | CORS block | Fix CORS headers |
+| Vision OCR | CORS block | Fix CORS headers |
+| Admin user mgmt | CORS block | Fix CORS headers |
+
+No database, RLS, routing, or business logic changes needed.
 
