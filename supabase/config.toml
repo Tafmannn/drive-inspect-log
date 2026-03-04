@@ -1,40 +1,40 @@
 project_id = "lynkvfduzqdyvlzgriyh"
 
 [functions.google-sheets-sync]
-verify_jwt = true
+verify_jwt = false
 
 [functions.maps-directions]
-verify_jwt = true
+verify_jwt = false
 
 [functions.gcs-upload]
-verify_jwt = true
+verify_jwt = false
 
 [functions.gcs-proxy]
-verify_jwt = true
+verify_jwt = false
 
 [functions.vision-ocr]
-verify_jwt = true
+verify_jwt = false
 
 [functions.postcode-lookup]
-verify_jwt = true
+verify_jwt = false
 
 [functions.business-search]
-verify_jwt = true
+verify_jwt = false
 
 [functions.place-details]
-verify_jwt = true
+verify_jwt = false
 
 [functions.vehicle-lookup]
-verify_jwt = true
+verify_jwt = false
 
 [functions.gcs-fix-acl]
-verify_jwt = true
+verify_jwt = false
 
 [functions.promote-admin]
-verify_jwt = true
+verify_jwt = false
 
 [functions.assign-driver]
-verify_jwt = true
+verify_jwt = false
 
 [functions.get-org-users]
-verify_jwt = true
+verify_jwt = false
