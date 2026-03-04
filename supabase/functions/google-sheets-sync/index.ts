@@ -1,22 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
-const ALLOWED_ORIGINS = [
-  "http://localhost:5173",
-  "https://id-preview--3a41afcd-01f5-4632-9ca9-6cdb511c4f9c.lovable.app",
-  "https://axentra.lovable.app",
-];
-
-function cors(origin: string | null) {
-  const allowed = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
-  return {
-    "Access-Control-Allow-Origin": allowed,
-    "Vary": "Origin",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, content-type, apikey",
-  };
-}
-
-// Dynamic corsHeaders set per-request
-let corsHeaders: Record<string, string> = cors(null);
+const corsHeaders: Record<string, string> = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 // ─── Google Auth via Service Account ─────────────────────────────────
 
@@ -318,8 +305,6 @@ const JOB_ENTRY_REQUIRED_FIELDS = [
 // ─── Main handler ────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
-  const origin = req.headers.get("Origin");
-  corsHeaders = cors(origin);
 
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });

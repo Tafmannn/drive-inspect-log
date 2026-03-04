@@ -1,13 +1,6 @@
 // Business search & place details via Google Places edge functions
 
-const PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID as string;
-const ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
-
-const headers = {
-  "Content-Type": "application/json",
-  apikey: ANON_KEY,
-  Authorization: `Bearer ${ANON_KEY}`,
-};
+import { supabase } from '@/integrations/supabase/client';
 
 export interface BusinessResult {
   placeId: string;
@@ -34,14 +27,14 @@ export async function searchBusinesses(
   postcode?: string
 ): Promise<BusinessResult[]> {
   try {
-    const url = `https://${PROJECT_ID}.supabase.co/functions/v1/business-search`;
-    const resp = await fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ query, postcode: postcode || undefined }),
+    const { data, error } = await supabase.functions.invoke('business-search', {
+      body: { query, postcode: postcode || undefined },
     });
-    const data = await resp.json();
-    return data.results ?? [];
+    if (error) {
+      console.warn('[BusinessSearch] invoke error:', error.message);
+      return [];
+    }
+    return data?.results ?? [];
   } catch {
     return [];
   }
@@ -51,14 +44,15 @@ export async function getPlaceDetails(
   placeId: string
 ): Promise<PlaceDetails | null> {
   try {
-    const url = `https://${PROJECT_ID}.supabase.co/functions/v1/place-details`;
-    const resp = await fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ placeId }),
+    const { data, error } = await supabase.functions.invoke('place-details', {
+      body: { placeId },
     });
-    if (!resp.ok) return null;
-    return await resp.json();
+    if (error) {
+      console.warn('[PlaceDetails] invoke error:', error.message);
+      return null;
+    }
+    if (data?.error) return null;
+    return data as PlaceDetails;
   } catch {
     return null;
   }
