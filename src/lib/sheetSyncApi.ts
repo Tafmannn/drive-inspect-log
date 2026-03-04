@@ -1,20 +1,11 @@
 import { supabase } from "@/integrations/supabase/client";
 
-const PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-const ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-const FN_URL = `https://${PROJECT_ID}.supabase.co/functions/v1/google-sheets-sync`;
-
 async function callSync(body: Record<string, unknown>) {
-  const res = await fetch(FN_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${ANON_KEY}`,
-    },
-    body: JSON.stringify(body),
+  const { data, error } = await supabase.functions.invoke('google-sheets-sync', {
+    body,
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || `Sync failed (${res.status})`);
+  if (error) throw new Error(error.message ?? "Sync failed");
+  if (data?.error) throw new Error(data.error);
   return data;
 }
 
