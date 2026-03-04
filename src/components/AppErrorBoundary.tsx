@@ -1,4 +1,5 @@
 import { Component, ReactNode } from "react";
+import { logClientEvent } from "@/lib/logger";
 
 interface Props {
   children: ReactNode;
@@ -20,8 +21,15 @@ export class AppErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: unknown, info: unknown) {
-    // Optional: log to Supabase / Sentry later
-    // console.error("App error boundary caught:", error, info);
+    logClientEvent("error_boundary_caught", "error", {
+      message: error instanceof Error ? error.message : String(error),
+      source: "ui",
+      type: "unknown",
+      context: {
+        stack: error instanceof Error ? error.stack?.slice(0, 500) : undefined,
+        componentStack: (info as any)?.componentStack?.slice(0, 500),
+      },
+    });
   }
 
   render() {
@@ -38,6 +46,12 @@ export class AppErrorBoundary extends Component<Props, State> {
                 {this.state.message}
               </p>
             )}
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg"
+            >
+              Reload App
+            </button>
             <p className="text-xs text-muted-foreground">
               Try refreshing the preview. If this keeps happening, send this
               error text to your dev assistant.
