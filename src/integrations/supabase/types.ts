@@ -881,6 +881,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      is_super_admin: { Args: never; Returns: boolean }
       user_org_id: { Args: never; Returns: string }
       user_role: { Args: never; Returns: string }
     }
