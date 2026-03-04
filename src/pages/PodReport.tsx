@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { resolveImageUrl } from "@/lib/gcsProxyUrl";
+import { useState, useEffect } from "react";
+import { resolveImageUrl, preloadAuthToken } from "@/lib/gcsProxyUrl";
 import { AppHeader } from "@/components/AppHeader";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -8,7 +8,7 @@ import { PhotoViewer } from "@/components/PhotoViewer";
 import { useJob } from "@/hooks/useJobs";
 import { useJobExpenses } from "@/hooks/useExpenses";
 import { useNavigate, useParams } from "react-router-dom";
-import { Loader2, Mail, Share2, FileDown } from "lucide-react";
+import { Loader2, Mail, Share2, FileDown, ImageOff, PenLine } from "lucide-react";
 import { openPodEmail, generatePodEmailBody } from "@/lib/podEmail";
 import { sharePodPdf, emailPodPdf } from "@/lib/podPdf";
 import { FUEL_PERCENT_TO_LABEL } from "@/lib/types";
@@ -38,12 +38,53 @@ const yesNo = (val: string | null | undefined): string => {
   return val;
 };
 
+/** Signature card with graceful fallback */
+const SignatureCard = ({ label, name, url }: { label: string; name: string | null | undefined; url: string | null }) => {
+  const [failed, setFailed] = useState(false);
+
+  return (
+    <div className="space-y-1">
+      <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{label}</div>
+      <div className="text-xs text-foreground font-medium">{name || "—"}</div>
+      {url && !failed ? (
+        <img
+          src={url}
+          alt={`${label} signature`}
+          className="h-16 border rounded-md bg-white p-1.5 w-full object-contain"
+          crossOrigin="anonymous"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <div className="h-16 border border-dashed rounded-md bg-muted/50 flex flex-col items-center justify-center gap-0.5">
+          {url ? (
+            <>
+              <ImageOff className="h-4 w-4 text-muted-foreground/50" />
+              <span className="text-[10px] text-muted-foreground">Couldn't load</span>
+            </>
+          ) : (
+            <>
+              <PenLine className="h-4 w-4 text-muted-foreground/50" />
+              <span className="text-[10px] text-muted-foreground">Not signed</span>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const PodReport = () => {
   const navigate = useNavigate();
   const { jobId } = useParams<{ jobId: string }>();
   const { data: job, isLoading } = useJob(jobId ?? "");
   const { data: jobExpenses } = useJobExpenses(jobId ?? "");
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [tokenReady, setTokenReady] = useState(false);
+
+  // Warm the auth token cache before rendering images
+  useEffect(() => {
+    preloadAuthToken().then(() => setTokenReady(true));
+  }, []);
 
   const handleShare = async () => {
     if (!job) return;
@@ -110,7 +151,7 @@ export const PodReport = () => {
     }
   };
 
-  if (isLoading || !job) {
+  if (isLoading || !job || !tokenReady) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <AppHeader title="POD Report" showBack />
@@ -142,28 +183,31 @@ export const PodReport = () => {
   );
 
   return (
-    <div className="min-h-screen bg-muted flex flex-col">
-      <AppHeader title="POD Report" showBack>
-        <div className="flex gap-1">
-          <Button size="sm" variant="ghost" className="gap-1" onClick={handleSharePdf} disabled={pdfLoading}>
-            {pdfLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-            PDF
-          </Button>
-          <Button size="sm" variant="ghost" className="gap-1" onClick={handleEmailPdf} disabled={pdfLoading}>
-            <Mail className="h-4 w-4" />
-            Email
-          </Button>
-          <Button size="sm" variant="ghost" className="gap-1" onClick={handleShare}>
-            <Share2 className="h-4 w-4" />
-            Share
-          </Button>
-        </div>
-      </AppHeader>
+    <div className="min-h-screen bg-muted flex flex-col print:bg-white">
+      <div className="print:hidden">
+        <AppHeader title="POD Report" showBack>
+          <div className="flex gap-1">
+            <Button size="sm" variant="ghost" className="gap-1" onClick={handleSharePdf} disabled={pdfLoading}>
+              {pdfLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+              PDF
+            </Button>
+            <Button size="sm" variant="ghost" className="gap-1" onClick={handleEmailPdf} disabled={pdfLoading}>
+              <Mail className="h-4 w-4" />
+              Email
+            </Button>
+            <Button size="sm" variant="ghost" className="gap-1" onClick={handleShare}>
+              <Share2 className="h-4 w-4" />
+              Share
+            </Button>
+          </div>
+        </AppHeader>
+      </div>
 
       <main className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto py-6 px-3 sm:px-6 space-y-4">
-          <Card className="border border-border shadow-sm">
-            <div className="flex items-center justify-between px-6 py-4 bg-foreground text-background rounded-t-lg">
+        <div className="max-w-4xl mx-auto py-6 px-3 sm:px-6 space-y-4 print:py-0 print:px-0">
+          <Card className="border border-border shadow-sm print:shadow-none print:border-none">
+            {/* Header Banner */}
+            <div className="flex items-center justify-between px-6 py-4 bg-foreground text-background rounded-t-lg print:rounded-none">
               <div className="flex flex-col">
                 <span className="text-xs tracking-[0.15em] uppercase opacity-70">Axentra Vehicle Logistics</span>
                 <span className="text-lg font-semibold tracking-wide">Proof of Delivery</span>
@@ -171,10 +215,12 @@ export const PodReport = () => {
               <div className="text-right text-xs">
                 <div className="font-medium tracking-widest">AXENTRA</div>
                 <div className="opacity-70">Job <span className="font-mono">{ref}</span></div>
+                <div className="opacity-50 text-[10px]">{safeDate(job.completed_at || new Date().toISOString())}</div>
               </div>
             </div>
 
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-6 print:p-4 print:space-y-4">
+              {/* Vehicle Summary */}
               <Card className="p-4 space-y-1">
                 <div className="flex items-center justify-between mb-2">
                   <UKPlate reg={job.vehicle_reg} variant="rear" />
@@ -193,8 +239,9 @@ export const PodReport = () => {
                 <DetailRow label="Delivery Status" value={delivery ? "✓ Delivered" : "Not delivered"} />
               </Card>
 
-              <Separator />
+              <Separator className="print:hidden" />
 
+              {/* Pickup Details */}
               <Card className="p-4 space-y-1">
                 <h3 className="text-sm font-semibold mb-2">Pickup Details</h3>
                 <DetailRow label="Contact" value={`${job.pickup_contact_name} (${job.pickup_contact_phone})`} />
@@ -209,6 +256,7 @@ export const PodReport = () => {
                 <DetailRow label="Photos" value={String(pickupPhotos.length)} />
               </Card>
 
+              {/* Pickup Checklist */}
               {pickup && pickupChecklistItems.length > 0 && (
                 <Card className="p-4 space-y-2">
                   <h3 className="text-sm font-semibold">Pickup Checklist</h3>
@@ -226,6 +274,7 @@ export const PodReport = () => {
                 </Card>
               )}
 
+              {/* Delivery Details */}
               <Card className="p-4 space-y-1">
                 <h3 className="text-sm font-semibold mb-2">Delivery Details</h3>
                 <DetailRow label="Contact" value={`${job.delivery_contact_name} (${job.delivery_contact_phone})`} />
@@ -240,6 +289,7 @@ export const PodReport = () => {
                 <DetailRow label="Photos" value={String(deliveryPhotos.length)} />
               </Card>
 
+              {/* Delivery Checklist */}
               {delivery && deliveryChecklistItems.length > 0 && (
                 <Card className="p-4 space-y-2">
                   <h3 className="text-sm font-semibold">Delivery Checklist</h3>
@@ -257,6 +307,7 @@ export const PodReport = () => {
                 </Card>
               )}
 
+              {/* Damage Summary */}
               {(pickupDamages.length > 0 || deliveryDamages.length > 0) && (
                 <Card className="p-4 space-y-2">
                   <h3 className="text-sm font-semibold">Damage Summary</h3>
@@ -269,6 +320,7 @@ export const PodReport = () => {
                 </Card>
               )}
 
+              {/* Photos */}
               <Card className="p-4 space-y-4">
                 <h3 className="text-sm font-semibold">Photos</h3>
                 <PhotoViewer title="Collection Photos" photos={pickupPhotos.map(p => ({ url: resolveImageUrl(p.url) || p.url, label: p.label || p.type.replace("pickup_", "").replace(/_/g, " ") }))} />
@@ -277,31 +329,18 @@ export const PodReport = () => {
                 <p className="text-[11px] text-muted-foreground pt-1">Full-resolution images are stored securely within Axentra and can be supplied on request.</p>
               </Card>
 
-              <Card className="p-4 space-y-2">
+              {/* Signatures */}
+              <Card className="p-4 space-y-3">
                 <h3 className="text-sm font-semibold">Signatures</h3>
                 <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
-                  {[
-                    { label: "Pickup Driver", name: pickup?.inspected_by_name, url: resolveImageUrl(pickup?.driver_signature_url) },
-                    { label: "Pickup Customer", name: pickup?.customer_name, url: resolveImageUrl(pickup?.customer_signature_url) },
-                    { label: "Delivery Driver", name: delivery?.inspected_by_name, url: resolveImageUrl(delivery?.driver_signature_url) },
-                    { label: "Delivery Customer", name: delivery?.customer_name, url: resolveImageUrl(delivery?.customer_signature_url) },
-                  ].map((sig, i) => (
-                    <div key={i} className="space-y-1">
-                      <div className="text-[10px] text-muted-foreground font-medium">{sig.label}</div>
-                      <div className="text-xs text-foreground">{sig.name || "—"}</div>
-                      {sig.url ? (
-                        <img src={sig.url} alt={`${sig.label} signature`} className="h-14 border rounded bg-white p-1 w-full object-contain" crossOrigin="anonymous"
-                          onError={(e) => { const target = e.currentTarget; target.style.display = 'none'; const placeholder = document.createElement('div'); placeholder.className = 'h-14 border rounded bg-muted flex items-center justify-center text-[10px] text-muted-foreground'; placeholder.textContent = 'Image couldn\u2019t be loaded.'; target.parentNode?.appendChild(placeholder); }}
-                        />
-                      ) : (
-                        <div className="h-14 border rounded bg-muted flex items-center justify-center text-[10px] text-muted-foreground">Not signed</div>
-                      )}
-                    </div>
-                  ))}
+                  <SignatureCard label="Pickup Driver" name={pickup?.inspected_by_name} url={resolveImageUrl(pickup?.driver_signature_url)} />
+                  <SignatureCard label="Pickup Customer" name={pickup?.customer_name} url={resolveImageUrl(pickup?.customer_signature_url)} />
+                  <SignatureCard label="Delivery Driver" name={delivery?.inspected_by_name} url={resolveImageUrl(delivery?.driver_signature_url)} />
+                  <SignatureCard label="Delivery Customer" name={delivery?.customer_name} url={resolveImageUrl(delivery?.customer_signature_url)} />
                 </div>
               </Card>
 
-              {/* Expenses (billable only on POD) */}
+              {/* Expenses */}
               {(() => {
                 const billableExpenses = (jobExpenses ?? []).filter((e: any) => e.billable_on_pod !== false);
                 return (
@@ -321,14 +360,18 @@ export const PodReport = () => {
                     ) : (
                       <p className="text-xs text-muted-foreground">No billable expenses recorded</p>
                     )}
-                    <Button size="sm" variant="outline" onClick={() => navigate(`/expenses/new?jobId=${jobId}`)}>Add Expense</Button>
+                    <div className="print:hidden">
+                      <Button size="sm" variant="outline" onClick={() => navigate(`/expenses/new?jobId=${jobId}`)}>Add Expense</Button>
+                    </div>
                   </Card>
                 );
               })()}
 
+              {/* Footer */}
               <Card className="p-4 space-y-2 text-xs text-muted-foreground">
                 <p>This Proof of Delivery report was generated by the Axentra Vehicle Logistics system.</p>
-                <p>Report reference: <span className="font-mono">{ref}</span></p>
+                <p>Report reference: <span className="font-mono">{ref}</span> • Generated: {safeDate(new Date().toISOString())}</p>
+                <p className="text-[10px] opacity-70">All images and data are stored securely. Unauthorised reproduction is prohibited.</p>
               </Card>
             </div>
           </Card>
