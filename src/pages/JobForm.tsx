@@ -21,6 +21,7 @@ import { saveDraft, loadDraft, clearDraft, draftKey } from "@/lib/autosave";
 import { lookupPostcode, type AddressSuggestion } from "@/lib/postcodeApi";
 import { BusinessSearchInput } from "@/components/BusinessSearchInput";
 import { getPlaceDetails, type BusinessResult } from "@/lib/businessSearchApi";
+import { logClientEvent } from "@/lib/logger";
 
 type ErrorMap = Record<string, string>;
 
@@ -29,6 +30,9 @@ interface JobFormDraft {
   vehicleModel: string;
   customMake: boolean;
   customModel: boolean;
+  vehicle_colour?: string;
+  vehicle_year?: string;
+  [key: string]: unknown;
 }
 
 export const JobForm = () => {
@@ -43,11 +47,14 @@ export const JobForm = () => {
   const formRef = useRef<HTMLFormElement | null>(null);
   const [errors, setErrors] = useState<ErrorMap>({});
 
-  // Vehicle make/model selection state
+  // Vehicle make/model selection state — SINGLE SOURCE OF TRUTH
   const [vehicleMake, setVehicleMake] = useState<string>("");
   const [vehicleModel, setVehicleModel] = useState<string>("");
   const [customMake, setCustomMake] = useState(false);
   const [customModel, setCustomModel] = useState(false);
+  // For custom inputs, we use controlled values to avoid defaultValue conflicts
+  const [customMakeValue, setCustomMakeValue] = useState("");
+  const [customModelValue, setCustomModelValue] = useState("");
 
   // Autosave draft state
   const [showDraftPrompt, setShowDraftPrompt] = useState(false);
@@ -68,6 +75,9 @@ export const JobForm = () => {
   const [pickupLookupError, setPickupLookupError] = useState("");
   const [deliveryLookupError, setDeliveryLookupError] = useState("");
 
+  // Track if edit data has been hydrated
+  const editHydrated = useRef(false);
+
   useEffect(() => {
     isFeatureEnabled("MAPS_ENABLED").then(setMapsEnabled);
   }, []);
@@ -80,7 +90,6 @@ export const JobForm = () => {
       "delivery_contact_name", "delivery_contact_phone",
       "delivery_address_line1", "delivery_city", "delivery_postcode",
     ];
-    // vehicle_make/model may be stored as controlled state keys
     const hasMake = !!(d.vehicle_make || d.vehicleMake);
     const hasModel = !!(d.vehicle_model || d.vehicleModel);
     const hasColour = !!d.vehicle_colour;
@@ -92,7 +101,6 @@ export const JobForm = () => {
   useEffect(() => {
     if (!dk || isEdit) return;
     const draft = loadDraft<Record<string, string> & JobFormDraft>(dk);
-    // Only show resume prompt if draft has all required page-1 fields
     if (draft?.data && isDraftComplete(draft.data)) {
       setShowDraftPrompt(true);
     }
@@ -109,26 +117,56 @@ export const JobForm = () => {
       data.forEach((val, key) => {
         if (typeof val === "string") draft[key] = val;
       });
-      saveDraft(dk, { ...draft, vehicleMake, vehicleModel, customMake, customModel });
+      // Always store the controlled state values for make/model
+      const effectiveMake = customMake ? customMakeValue : vehicleMake;
+      const effectiveModel = (customModel || customMake) ? customModelValue : vehicleModel;
+      saveDraft(dk, {
+        ...draft,
+        vehicleMake: effectiveMake,
+        vehicleModel: effectiveModel,
+        customMake,
+        customModel,
+        customMakeValue,
+        customModelValue,
+      });
     }, 800);
-  }, [dk, isEdit, vehicleMake, vehicleModel, customMake, customModel]);
+  }, [dk, isEdit, vehicleMake, vehicleModel, customMake, customModel, customMakeValue, customModelValue]);
 
   const handleRestoreDraft = () => {
     if (!dk) return;
-    const draft = loadDraft<Record<string, string> & JobFormDraft>(dk);
+    const draft = loadDraft<Record<string, string> & JobFormDraft & { customMakeValue?: string; customModelValue?: string }>(dk);
     if (draft?.data && formRef.current) {
       const d = draft.data;
       // Restore controlled state
-      if (d.vehicleMake) setVehicleMake(d.vehicleMake);
-      if (d.vehicleModel) setVehicleModel(d.vehicleModel);
-      if (d.customMake != null) setCustomMake(!!d.customMake);
-      if (d.customModel != null) setCustomModel(!!d.customModel);
+      const restoredMake = d.vehicleMake || "";
+      const restoredModel = d.vehicleModel || "";
+      const isCustomMake = !!d.customMake;
+      const isCustomModel = !!d.customModel;
+
+      setCustomMake(isCustomMake);
+      setCustomModel(isCustomModel);
+
+      if (isCustomMake) {
+        setCustomMakeValue(d.customMakeValue || restoredMake);
+        setVehicleMake(d.customMakeValue || restoredMake);
+      } else {
+        setVehicleMake(restoredMake);
+      }
+
+      if (isCustomModel || isCustomMake) {
+        setCustomModelValue(d.customModelValue || restoredModel);
+        setVehicleModel(d.customModelValue || restoredModel);
+      } else {
+        setVehicleModel(restoredModel);
+      }
+
       // Restore uncontrolled form fields
       requestAnimationFrame(() => {
         if (!formRef.current) return;
         const fields = formRef.current.elements;
+        const skipKeys = ["vehicleMake", "vehicleModel", "customMake", "customModel", "customMakeValue", "customModelValue", "vehicle_make", "vehicle_model"];
         for (const [key, val] of Object.entries(d)) {
-          if (["vehicleMake", "vehicleModel", "customMake", "customModel"].includes(key)) continue;
+          if (skipKeys.includes(key)) continue;
           const el = fields.namedItem(key);
           if (el && "value" in el && !(el instanceof RadioNodeList)) (el as HTMLInputElement).value = val as string;
         }
@@ -206,7 +244,6 @@ export const JobForm = () => {
       }
     };
 
-    // Attempt to split line1 into house number + street
     const parts = suggestion.line1.match(/^(\d+\w?)\s+(.+)$/);
     if (parts) {
       setVal(`${side}_address_line1`, parts[1]);
@@ -218,11 +255,9 @@ export const JobForm = () => {
     setVal(`${side}_city`, suggestion.town);
     setVal(`${side}_postcode`, suggestion.postcode);
 
-    // Clear suggestions
     if (side === "pickup") setPickupSuggestions([]);
     else setDeliverySuggestions([]);
 
-    // Trigger route calc if both postcodes now valid
     const fd = new FormData(formRef.current);
     const pickupPC = side === "pickup" ? suggestion.postcode : (fd.get("pickup_postcode") as string || "");
     const deliveryPC = side === "delivery" ? suggestion.postcode : (fd.get("delivery_postcode") as string || "");
@@ -231,7 +266,7 @@ export const JobForm = () => {
     saveDraftFromForm();
   }, [triggerRouteCalc, saveDraftFromForm]);
 
-  // Business search selection handler — always overrides fields with fresh data
+  // Business search selection handler
   const handleBusinessSelect = useCallback(async (side: "pickup" | "delivery", result: BusinessResult) => {
     if (!formRef.current) return;
     const fields = formRef.current.elements;
@@ -245,27 +280,22 @@ export const JobForm = () => {
       }
     };
 
-    // Fetch full place details
     const details = await getPlaceDetails(result.placeId);
     if (!details) return;
 
     const addr = details.parsedAddress;
 
-    // Split address: house → line1, street → line2 when both available
     if (addr.house && addr.street) {
       setVal(`${side}_address_line1`, addr.house);
       setVal(`${side}_address_line2`, addr.street);
     } else {
-      // Fallback: combined into line1, blank line2
       setVal(`${side}_address_line1`, addr.line1);
       setVal(`${side}_address_line2`, "");
     }
 
-    // Always overwrite city & postcode when valid
     if (addr.city) setVal(`${side}_city`, addr.city);
     if (addr.postcode) setVal(`${side}_postcode`, addr.postcode);
 
-    // Phone: only fill if currently empty
     if (details.phone) {
       const phoneEl = fields.namedItem(`${side}_contact_phone`) as HTMLInputElement | null;
       if (phoneEl && !phoneEl.value.trim()) {
@@ -273,7 +303,6 @@ export const JobForm = () => {
       }
     }
 
-    // Trigger route calc
     if (addr.postcode) {
       const fd = new FormData(formRef.current);
       const pickupPC = side === "pickup" ? addr.postcode : (fd.get("pickup_postcode") as string || "");
@@ -286,7 +315,8 @@ export const JobForm = () => {
 
   // Sync make/model when editing once job is loaded
   useEffect(() => {
-    if (isEdit && existingJob) {
+    if (isEdit && existingJob && !editHydrated.current) {
+      editHydrated.current = true;
       const makeKnown = CAR_MAKES.includes(existingJob.vehicle_make);
       const modelKnown =
         makeKnown &&
@@ -298,10 +328,21 @@ export const JobForm = () => {
       setVehicleModel(existingJob.vehicle_model);
       setCustomMake(!makeKnown);
       setCustomModel(!modelKnown);
+
+      if (!makeKnown) {
+        setCustomMakeValue(existingJob.vehicle_make);
+      }
+      if (!modelKnown) {
+        setCustomModelValue(existingJob.vehicle_model);
+      }
     }
   }, [isEdit, existingJob]);
 
   const models = getModelsForMake(vehicleMake || "");
+
+  // Compute effective make/model for submission
+  const getEffectiveMake = (): string => customMake ? customMakeValue : vehicleMake;
+  const getEffectiveModel = (): string => (customModel || customMake) ? customModelValue : vehicleModel;
 
   // ─────────────────────────────────────────────
   // Validation based on FormData (uncontrolled)
@@ -343,7 +384,6 @@ export const JobForm = () => {
     return true;
   };
 
-  // Helper to pull string safely
   const getStr = (data: FormData, key: string): string => {
     const v = data.get(key);
     return (typeof v === "string" ? v : "").trim();
@@ -353,13 +393,9 @@ export const JobForm = () => {
     if (!formRef.current) return;
     const data = new FormData(formRef.current);
 
-    // Make/model come from controlled Selects if not using "custom" inputs
-    if (!customMake) {
-      data.set("vehicle_make", vehicleMake);
-    }
-    if (!customModel) {
-      data.set("vehicle_model", vehicleModel);
-    }
+    // Always set make/model from our controlled state
+    data.set("vehicle_make", getEffectiveMake());
+    data.set("vehicle_model", getEffectiveModel());
 
     if (!validate(data)) return;
 
@@ -390,7 +426,6 @@ export const JobForm = () => {
       delivery_notes: getStr(data, "delivery_notes") || null,
 
       earliest_delivery_date: getStr(data, "earliest_delivery_date") || null,
-      // Include route data if calculated
       ...(routeResult?.valid ? {
         route_distance_miles: routeResult.distanceMiles,
         route_eta_minutes: routeResult.etaMinutes,
@@ -411,7 +446,8 @@ export const JobForm = () => {
         toast({ title: `Job ${newRef} created.` });
         navigate(`/jobs/${job.id}`);
       }
-    } catch {
+    } catch (err) {
+      logClientEvent("job_save_failed", "error", { message: String(err) });
       toast({ title: "Save failed. Please try again.", variant: "destructive" });
     }
   };
@@ -419,7 +455,6 @@ export const JobForm = () => {
   const isMutating =
     createMutation.isPending || updateMutation.isPending;
 
-  // Show loader while fetching existing job
   if (isEdit && jobLoading && !existingJob) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -428,7 +463,6 @@ export const JobForm = () => {
     );
   }
 
-  // Small field helper just for error display; inputs themselves are uncontrolled
   const ErrorText = ({ field }: { field: string }) =>
     errors[field] ? (
       <p className="text-xs text-destructive mt-1">
@@ -446,8 +480,8 @@ export const JobForm = () => {
           </DialogHeader>
           <p className="text-sm text-muted-foreground">You have an unsaved job form from a previous session. Would you like to restore it?</p>
           <div className="flex gap-2 justify-end pt-2">
-            <Button variant="outline" onClick={handleDiscardDraft}>Discard</Button>
-            <Button onClick={handleRestoreDraft}>Restore Draft</Button>
+            <Button type="button" variant="outline" onClick={handleDiscardDraft}>Discard</Button>
+            <Button type="button" onClick={handleRestoreDraft}>Restore Draft</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -455,7 +489,7 @@ export const JobForm = () => {
       <AppHeader
         title={isEdit ? "Edit Job" : "New Job"}
         showBack
-        onBack={() => navigate(-1)}
+        onBack={() => navigate(isEdit ? `/jobs/${jobId}` : "/jobs")}
       />
       <div className="p-4 space-y-6 max-w-lg mx-auto">
         <form
@@ -519,7 +553,6 @@ export const JobForm = () => {
                     try {
                       const result = await lookupVehicle(reg);
                       if (result.success) {
-                        // Helper: namedItem may return RadioNodeList; only set value on real form controls
                         const setInputValue = (name: string, value: string) => {
                           const el = formRef.current?.elements.namedItem(name);
                           if (!el) return;
@@ -541,14 +574,16 @@ export const JobForm = () => {
                           if (makeKnown) {
                             setVehicleMake(result.make);
                             setCustomMake(false);
+                            setCustomMakeValue("");
                           } else {
                             setCustomMake(true);
                             setVehicleMake(result.make);
-                            requestAnimationFrame(() => setInputValue("vehicle_make", result.make!));
+                            setCustomMakeValue(result.make);
                           }
                           // DVLA doesn't provide model; switch to manual model entry
                           setCustomModel(true);
                           setVehicleModel("");
+                          setCustomModelValue("");
                         }
 
                         if (result.colour) {
@@ -575,7 +610,7 @@ export const JobForm = () => {
               <ErrorText field="vehicle_reg" />
             </div>
 
-            {/* Make */}
+            {/* Make — fully controlled */}
             <div>
               <Label className="text-sm font-medium">Make *</Label>
               {customMake ? (
@@ -583,8 +618,9 @@ export const JobForm = () => {
                   <Input
                     name="vehicle_make"
                     placeholder="Enter make"
-                    defaultValue={existingJob?.vehicle_make ?? ""}
-                    onBlur={(e) => {
+                    value={customMakeValue}
+                    onChange={(e) => {
+                      setCustomMakeValue(e.target.value);
                       setVehicleMake(e.target.value);
                     }}
                   />
@@ -594,8 +630,10 @@ export const JobForm = () => {
                     type="button"
                     onClick={() => {
                       setCustomMake(false);
+                      setCustomMakeValue("");
                       setVehicleMake("");
                       setVehicleModel("");
+                      setCustomModelValue("");
                     }}
                   >
                     List
@@ -611,11 +649,14 @@ export const JobForm = () => {
                       if (v === "__other__") {
                         setCustomMake(true);
                         setVehicleMake("");
+                        setCustomMakeValue("");
                         setVehicleModel("");
+                        setCustomModelValue("");
                       } else {
                         setVehicleMake(v);
                         setVehicleModel("");
                         setCustomModel(false);
+                        setCustomModelValue("");
                       }
                     }}
                     className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 mt-1"
@@ -631,7 +672,7 @@ export const JobForm = () => {
               <ErrorText field="vehicle_make" />
             </div>
 
-            {/* Model */}
+            {/* Model — fully controlled */}
             <div>
               <Label className="text-sm font-medium">
                 Model *
@@ -641,8 +682,9 @@ export const JobForm = () => {
                   <Input
                     name="vehicle_model"
                     placeholder="Enter model"
-                    defaultValue={existingJob?.vehicle_model ?? ""}
-                    onBlur={(e) => {
+                    value={customModelValue}
+                    onChange={(e) => {
+                      setCustomModelValue(e.target.value);
                       setVehicleModel(e.target.value);
                     }}
                   />
@@ -651,7 +693,11 @@ export const JobForm = () => {
                       variant="outline"
                       size="sm"
                       type="button"
-                      onClick={() => setCustomModel(false)}
+                      onClick={() => {
+                        setCustomModel(false);
+                        setCustomModelValue("");
+                        setVehicleModel("");
+                      }}
                     >
                       List
                     </Button>
@@ -667,6 +713,7 @@ export const JobForm = () => {
                       if (v === "__other__") {
                         setCustomModel(true);
                         setVehicleModel("");
+                        setCustomModelValue("");
                       } else {
                         setVehicleModel(v);
                       }
