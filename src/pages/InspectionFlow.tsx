@@ -128,11 +128,9 @@ export const InspectionFlow = () => {
   const [pendingPhotoPreview, setPendingPhotoPreview] = useState<string | null>(null);
   const [showPhotoLabelModal, setShowPhotoLabelModal] = useState(false);
 
-  // Signature refs and state
-  const driverCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const customerCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const driverCanvasInitialized = useRef(false);
-  const customerCanvasInitialized = useRef(false);
+  // Signature refs (new DPR-aware SignaturePad)
+  const driverSigRef = useRef<SignaturePadRef>(null);
+  const customerSigRef = useRef<SignaturePadRef>(null);
   const [driverSigned, setDriverSigned] = useState(false);
   const [customerSigned, setCustomerSigned] = useState(false);
 
