@@ -841,11 +841,10 @@ export const InspectionFlow = () => {
             className="mt-1"
           />
         </div>
-        <canvas
-          ref={(el) => initCanvas(el, true)}
-          width={320}
-          height={120}
-          className="w-full border-2 border-dashed border-muted-foreground/25 rounded-lg bg-white touch-none"
+        <SignaturePad
+          ref={driverSigRef}
+          onSignStart={() => setDriverSigned(true)}
+          className="w-full"
         />
         <div className="flex items-center justify-between">
           {driverSigned && <p className="text-xs text-success">Signed ✓</p>}
@@ -874,11 +873,10 @@ export const InspectionFlow = () => {
             className="mt-1"
           />
         </div>
-        <canvas
-          ref={(el) => initCanvas(el, false)}
-          width={320}
-          height={120}
-          className="w-full border-2 border-dashed border-muted-foreground/25 rounded-lg bg-white touch-none"
+        <SignaturePad
+          ref={customerSigRef}
+          onSignStart={() => setCustomerSigned(true)}
+          className="w-full"
         />
         <div className="flex items-center justify-between">
           {customerSigned && <p className="text-xs text-success">Signed ✓</p>}
