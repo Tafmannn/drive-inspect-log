@@ -430,8 +430,8 @@ export const InspectionFlow = () => {
       let driverSigUrl: string | null = null;
       let customerSigUrl: string | null = null;
 
-      if (driverCanvasRef.current && driverSigned) {
-        const file = await canvasToFile(driverCanvasRef.current, "driver.png");
+      if (driverSigRef.current && driverSigned) {
+        const file = await driverSigRef.current.toFile("driver.png");
         const result = await storageService.uploadImage(
           file,
           `jobs/${jobId}/signatures/${type}/driver`
@@ -439,11 +439,8 @@ export const InspectionFlow = () => {
         driverSigUrl = result.url;
       }
 
-      if (customerCanvasRef.current && customerSigned) {
-        const file = await canvasToFile(
-          customerCanvasRef.current,
-          "customer.png"
-        );
+      if (customerSigRef.current && customerSigned) {
+        const file = await customerSigRef.current.toFile("customer.png");
         const result = await storageService.uploadImage(
           file,
           `jobs/${jobId}/signatures/${type}/customer`
