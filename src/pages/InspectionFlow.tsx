@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { VehicleDiagram } from "@/components/VehicleDiagram";
 import { VehicleDamageModal } from "@/components/VehicleDamageModal";
 import { PhotoLabelModal } from "@/components/PhotoLabelModal";
+import { SignaturePad, type SignaturePadRef } from "@/components/SignaturePad";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft,
