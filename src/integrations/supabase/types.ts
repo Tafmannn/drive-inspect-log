@@ -477,6 +477,7 @@ export type Database = {
           route_eta_minutes: number | null
           sheet_job_id: string | null
           sheet_row_index: number | null
+          sort_order: number | null
           status: string
           sync_to_map: boolean | null
           total_price: number | null
@@ -550,6 +551,7 @@ export type Database = {
           route_eta_minutes?: number | null
           sheet_job_id?: string | null
           sheet_row_index?: number | null
+          sort_order?: number | null
           status?: string
           sync_to_map?: boolean | null
           total_price?: number | null
@@ -623,6 +625,7 @@ export type Database = {
           route_eta_minutes?: number | null
           sheet_job_id?: string | null
           sheet_row_index?: number | null
+          sort_order?: number | null
           status?: string
           sync_to_map?: boolean | null
           total_price?: number | null
