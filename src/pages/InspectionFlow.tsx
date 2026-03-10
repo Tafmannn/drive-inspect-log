@@ -332,98 +332,18 @@ export const InspectionFlow = () => {
     }));
   };
 
-  // ───────────────── SIGNATURE DRAWING ─────────────────
-  // Setup canvas ONCE via a ref callback that checks an initialized flag.
-  // This prevents re-attaching listeners and clearing the canvas on re-render.
-
-  const initCanvas = useCallback(
-    (canvas: HTMLCanvasElement | null, isDriver: boolean) => {
-      if (!canvas) return;
-      const flag = isDriver ? driverCanvasInitialized : customerCanvasInitialized;
-      if (flag.current) return;
-      flag.current = true;
-
-      if (isDriver) driverCanvasRef.current = canvas;
-      else customerCanvasRef.current = canvas;
-
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-
-      let drawing = false;
-
-      const getPos = (e: MouseEvent | TouchEvent) => {
-        const rect = canvas.getBoundingClientRect();
-        const clientX =
-          "touches" in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
-        const clientY =
-          "touches" in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
-        return { x: clientX - rect.left, y: clientY - rect.top };
-      };
-
-      const start = (e: MouseEvent | TouchEvent) => {
-        e.preventDefault();
-        drawing = true;
-        const pos = getPos(e);
-        ctx.beginPath();
-        ctx.moveTo(pos.x, pos.y);
-      };
-
-      const move = (e: MouseEvent | TouchEvent) => {
-        if (!drawing) return;
-        e.preventDefault();
-        const pos = getPos(e);
-        ctx.lineTo(pos.x, pos.y);
-        ctx.strokeStyle = "hsl(215 28% 17%)";
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      };
-
-      const end = () => {
-        if (!drawing) return;
-        drawing = false;
-        if (isDriver) setDriverSigned(true);
-        else setCustomerSigned(true);
-      };
-
-      canvas.addEventListener("mousedown", start);
-      canvas.addEventListener("mousemove", move);
-      canvas.addEventListener("mouseup", end);
-      canvas.addEventListener("mouseleave", end);
-      canvas.addEventListener("touchstart", start, { passive: false });
-      canvas.addEventListener("touchmove", move, { passive: false });
-      canvas.addEventListener("touchend", end);
-    },
-    []
-  );
+  // ───────────────── SIGNATURE HELPERS (using SignaturePad refs) ─────────────────
 
   const clearDriverSignature = useCallback(() => {
-    const canvas = driverCanvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext("2d");
-      ctx?.clearRect(0, 0, canvas.width, canvas.height);
-    }
+    driverSigRef.current?.clear();
     setDriverSigned(false);
   }, []);
 
   const clearCustomerSignature = useCallback(() => {
-    const canvas = customerCanvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext("2d");
-      ctx?.clearRect(0, 0, canvas.width, canvas.height);
-    }
+    customerSigRef.current?.clear();
     setCustomerSigned(false);
   }, []);
 
-  const canvasToFile = async (
-    canvas: HTMLCanvasElement,
-    name: string
-  ): Promise<File> => {
-    return new Promise((resolve) => {
-      canvas.toBlob((blob) => {
-        resolve(new File([blob!], name, { type: "image/png" }));
-      }, "image/png");
-    });
-  };
 
   // tryUploadPhoto removed — all photos now go through background queue
 
