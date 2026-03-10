@@ -2,7 +2,10 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { getOrgUsers } from "@/lib/adminApi";
+import {
+  listAllUsers, createOrganisation, createUser, setUserRole,
+  deactivateUser, reactivateUser,
+} from "@/lib/adminApi";
 import { logClientEvent } from "@/lib/logger";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
@@ -10,18 +13,23 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
   Loader2, Building2, Users, Briefcase, Activity, AlertCircle,
   Settings, Eye, Search, RefreshCw, Shield, UserPlus,
-  BarChart3, ClipboardCheck, Car, Sheet,
+  BarChart3, ClipboardCheck, Car, Sheet, Power, PowerOff,
 } from "lucide-react";
 import { getStatusStyle, ACTIVE_STATUSES } from "@/lib/statusConfig";
 import { UKPlate } from "@/components/UKPlate";
+import { toast } from "@/hooks/use-toast";
 import type { Job } from "@/lib/types";
 
 /* ── Shared helpers ──────────────────────────────────────────────── */
@@ -55,7 +63,6 @@ function LoadingSpinner() {
 /* ── Overview Tab ────────────────────────────────────────────────── */
 
 function OverviewTab() {
-  const { authEnabled } = useAuth();
   const [stats, setStats] = useState<Record<string, number | string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,11 +71,6 @@ function OverviewTab() {
     setLoading(true);
     setError(null);
     try {
-      if (!authEnabled) {
-        setStats({ orgs: 2, users: 8, jobsToday: 3, jobsWeek: 21, dvlaFails: 0, syncFails: 0, uploadsPending: 1 });
-        return;
-      }
-
       const [orgRes, jobsTodayRes, jobsWeekRes] = await Promise.all([
         supabase.from("organisations").select("id", { count: "exact", head: true }),
         supabase.from("jobs").select("id", { count: "exact", head: true })
@@ -76,26 +78,18 @@ function OverviewTab() {
         supabase.from("jobs").select("id", { count: "exact", head: true })
           .gte("created_at", (() => { const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString(); })()),
       ]);
-
       let userCount = 0;
-      try { const users = await getOrgUsers(); userCount = users.length; } catch { /* ok */ }
-
+      try { const users = await listAllUsers(); userCount = users.length; } catch { /* ok */ }
       setStats({
-        orgs: orgRes.count ?? 0,
-        users: userCount,
-        jobsToday: jobsTodayRes.count ?? 0,
-        jobsWeek: jobsWeekRes.count ?? 0,
-        dvlaFails: "—",
-        syncFails: "—",
-        uploadsPending: "—",
+        orgs: orgRes.count ?? 0, users: userCount,
+        jobsToday: jobsTodayRes.count ?? 0, jobsWeek: jobsWeekRes.count ?? 0,
       });
     } catch (e: any) {
       setError(e.message ?? "Failed to load stats");
-      logClientEvent("superadmin_overview_error", "error", { message: e.message });
     } finally {
       setLoading(false);
     }
-  }, [authEnabled]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
@@ -107,13 +101,10 @@ function OverviewTab() {
     { label: "Users", value: stats.users, icon: Users },
     { label: "Jobs Today", value: stats.jobsToday, icon: Briefcase },
     { label: "Jobs (7d)", value: stats.jobsWeek, icon: BarChart3 },
-    { label: "DVLA Fails (24h)", value: stats.dvlaFails, icon: Car },
-    { label: "Sync Failures (24h)", value: stats.syncFails, icon: Sheet },
-    { label: "Uploads Pending", value: stats.uploadsPending, icon: ClipboardCheck },
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
       {tiles.map(({ label, value, icon: Icon }) => (
         <Card key={label}>
           <CardHeader className="flex flex-row items-center justify-between pb-1 pt-3 px-4">
@@ -132,32 +123,45 @@ function OverviewTab() {
 /* ── Organisations Tab ───────────────────────────────────────────── */
 
 function OrganisationsTab() {
-  const { authEnabled } = useAuth();
   const [orgs, setOrgs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [creating, setCreating] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      if (!authEnabled) {
-        setOrgs([{ id: "mock-1", name: "Axentra Vehicles", created_at: new Date().toISOString() }]);
-        return;
-      }
       const { data, error: err } = await supabase.from("organisations").select("*").order("name");
       if (err) throw err;
       setOrgs(data ?? []);
     } catch (e: any) {
       setError(e.message);
-      logClientEvent("superadmin_orgs_error", "error", { message: e.message });
     } finally {
       setLoading(false);
     }
-  }, [authEnabled]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const handleCreate = async () => {
+    if (!newName.trim()) return;
+    setCreating(true);
+    try {
+      await createOrganisation(newName.trim());
+      toast({ title: "Organisation created" });
+      setNewName("");
+      setShowCreate(false);
+      load();
+    } catch (e: any) {
+      toast({ title: "Failed to create org", description: e.message, variant: "destructive" });
+    } finally {
+      setCreating(false);
+    }
+  };
 
   if (loading) return <LoadingSpinner />;
   if (error) return <ErrorPanel message={error} onRetry={load} />;
@@ -171,10 +175,11 @@ function OrganisationsTab() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input placeholder="Search organisations…" className="pl-9 min-h-[44px]" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <Button variant="outline" className="min-h-[44px]" disabled>
-          <Building2 className="w-4 h-4 mr-1" /> Create Org (TODO)
+        <Button variant="outline" className="min-h-[44px]" onClick={() => setShowCreate(true)}>
+          <Building2 className="w-4 h-4 mr-1" /> Create Org
         </Button>
       </div>
+
       {!filtered.length ? <EmptyState message="No organisations found." /> : (
         <div className="rounded-xl border border-border overflow-x-auto">
           <Table>
@@ -197,6 +202,24 @@ function OrganisationsTab() {
           </Table>
         </div>
       )}
+
+      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Create Organisation</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Organisation Name</Label>
+              <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="e.g. Axentra Vehicles" className="mt-1 min-h-[44px]" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
+            <Button onClick={handleCreate} disabled={creating || !newName.trim()}>
+              {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -204,36 +227,84 @@ function OrganisationsTab() {
 /* ── Users Tab ───────────────────────────────────────────────────── */
 
 function SuperUsersTab() {
-  const { authEnabled } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
+  const [orgs, setOrgs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [showCreate, setShowCreate] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [newRole, setNewRole] = useState("driver");
+  const [newOrgId, setNewOrgId] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      if (!authEnabled) {
-        setUsers([
-          { id: "1", email: "driver@test.com", role: "driver", org_id: "mock-1" },
-          { id: "2", email: "admin@test.com", role: "admin", org_id: "mock-1" },
-          { id: "3", email: "super@test.com", role: "super_admin", org_id: null },
-        ]);
-        return;
-      }
-      const data = await getOrgUsers();
-      setUsers(data);
+      const [userData, orgData] = await Promise.all([
+        listAllUsers(),
+        supabase.from("organisations").select("*").order("name"),
+      ]);
+      setUsers(userData);
+      setOrgs(orgData.data ?? []);
     } catch (e: any) {
       setError(e.message);
-      logClientEvent("superadmin_users_error", "error", { message: e.message });
     } finally {
       setLoading(false);
     }
-  }, [authEnabled]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const handleCreate = async () => {
+    if (!newEmail.trim() || !newOrgId) return;
+    setCreating(true);
+    try {
+      await createUser(newEmail.trim(), newRole, newOrgId);
+      toast({ title: `User invited as ${newRole}` });
+      setNewEmail(""); setNewRole("driver"); setNewOrgId("");
+      setShowCreate(false);
+      load();
+    } catch (e: any) {
+      toast({ title: "Failed", description: e.message, variant: "destructive" });
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleRoleChange = async (userId: string, role: string) => {
+    setActionLoading(userId);
+    try {
+      await setUserRole(userId, role);
+      toast({ title: `Role updated to ${role}` });
+      load();
+    } catch (e: any) {
+      toast({ title: "Failed", description: e.message, variant: "destructive" });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleToggleActive = async (userId: string, currentlyActive: boolean) => {
+    setActionLoading(userId);
+    try {
+      if (currentlyActive) {
+        await deactivateUser(userId);
+        toast({ title: "User deactivated" });
+      } else {
+        await reactivateUser(userId);
+        toast({ title: "User reactivated" });
+      }
+      load();
+    } catch (e: any) {
+      toast({ title: "Failed", description: e.message, variant: "destructive" });
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   if (loading) return <LoadingSpinner />;
   if (error) return <ErrorPanel message={error} onRetry={load} />;
@@ -259,14 +330,10 @@ function SuperUsersTab() {
           ))}
         </div>
       </div>
-      <div className="flex gap-2">
-        <Button variant="outline" className="min-h-[44px]" disabled>
-          <UserPlus className="w-4 h-4 mr-1" /> Create Driver (TODO)
-        </Button>
-        <Button variant="outline" className="min-h-[44px]" disabled>
-          <UserPlus className="w-4 h-4 mr-1" /> Create Admin (TODO)
-        </Button>
-      </div>
+      <Button variant="outline" className="min-h-[44px]" onClick={() => setShowCreate(true)}>
+        <UserPlus className="w-4 h-4 mr-1" /> Create User
+      </Button>
+
       {!filtered.length ? <EmptyState message="No users found." /> : (
         <div className="rounded-xl border border-border overflow-x-auto">
           <Table>
@@ -275,24 +342,89 @@ function SuperUsersTab() {
                 <TableHead className="text-xs">Email</TableHead>
                 <TableHead className="text-xs">Role</TableHead>
                 <TableHead className="text-xs">Org</TableHead>
+                <TableHead className="text-xs">Status</TableHead>
+                <TableHead className="text-xs">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map(u => (
-                <TableRow key={u.id}>
-                  <TableCell className="text-sm">{u.email}</TableCell>
-                  <TableCell>
-                    <Badge variant={u.role === "super_admin" ? "destructive" : u.role === "admin" ? "default" : "secondary"} className="capitalize text-xs">
-                      {u.role?.replace("_", " ")}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground font-mono">{u.org_id?.slice(0, 8) ?? "—"}</TableCell>
-                </TableRow>
-              ))}
+              {filtered.map(u => {
+                const isActive = u.is_active !== false;
+                const orgName = orgs.find(o => o.id === u.org_id)?.name;
+                return (
+                  <TableRow key={u.id} className={!isActive ? "opacity-50" : ""}>
+                    <TableCell className="text-sm">{u.email}</TableCell>
+                    <TableCell>
+                      <Select defaultValue={u.role} onValueChange={v => handleRoleChange(u.id, v)} disabled={actionLoading === u.id}>
+                        <SelectTrigger className="w-[110px] h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="driver">Driver</SelectItem>
+                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="super_admin">Super Admin</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{orgName ?? u.org_id?.slice(0, 8) ?? "—"}</TableCell>
+                    <TableCell>
+                      <Badge variant={isActive ? "secondary" : "destructive"} className="text-xs">
+                        {isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        size="sm" variant="ghost"
+                        onClick={() => handleToggleActive(u.id, isActive)}
+                        disabled={actionLoading === u.id}
+                        className="min-h-[36px]"
+                      >
+                        {actionLoading === u.id ? <Loader2 className="w-3 h-3 animate-spin" /> : isActive ? <PowerOff className="w-3 h-3" /> : <Power className="w-3 h-3" />}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
       )}
+
+      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Create / Invite User</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Email</Label>
+              <Input value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="user@example.com" className="mt-1 min-h-[44px]" />
+            </div>
+            <div>
+              <Label>Role</Label>
+              <Select value={newRole} onValueChange={setNewRole}>
+                <SelectTrigger className="mt-1 min-h-[44px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="driver">Driver</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Organisation</Label>
+              <Select value={newOrgId} onValueChange={setNewOrgId}>
+                <SelectTrigger className="mt-1 min-h-[44px]"><SelectValue placeholder="Select org" /></SelectTrigger>
+                <SelectContent>
+                  {orgs.map(o => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
+            <Button onClick={handleCreate} disabled={creating || !newEmail.trim() || !newOrgId}>
+              {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -301,36 +433,24 @@ function SuperUsersTab() {
 
 function JobsMonitorTab() {
   const navigate = useNavigate();
-  const { authEnabled } = useAuth();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      if (!authEnabled) {
-        setJobs([]);
-        return;
-      }
-      const { data, error: err } = await supabase
-        .from("jobs")
-        .select("*")
-        .eq("is_hidden", false)
-        .order("updated_at", { ascending: false })
-        .limit(200);
+      const { data, error: err } = await supabase.from("jobs").select("*").eq("is_hidden", false).order("updated_at", { ascending: false }).limit(200);
       if (err) throw err;
       setJobs((data ?? []) as Job[]);
     } catch (e: any) {
       setError(e.message);
-      logClientEvent("superadmin_jobs_error", "error", { message: e.message });
     } finally {
       setLoading(false);
     }
-  }, [authEnabled]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
@@ -339,26 +459,14 @@ function JobsMonitorTab() {
 
   const filtered = jobs.filter(j => {
     const q = search.toLowerCase();
-    const matchSearch = !q || [j.vehicle_reg, j.external_job_number, j.client_name, j.driver_name, j.pickup_city, j.delivery_city]
-      .some(v => v?.toLowerCase().includes(q));
-    const matchStatus = statusFilter === "all" || j.status === statusFilter;
-    return matchSearch && matchStatus;
+    return !q || [j.vehicle_reg, j.external_job_number, j.client_name, j.driver_name].some(v => v?.toLowerCase().includes(q));
   });
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap gap-2">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input placeholder="Search by reg, ref, client, driver…" className="pl-9 min-h-[44px]" value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-        <div className="flex gap-1 flex-wrap">
-          {["all", ...ACTIVE_STATUSES.slice(0, 4)].map(s => (
-            <Button key={s} size="sm" variant={statusFilter === s ? "default" : "outline"} onClick={() => setStatusFilter(s)} className="min-h-[44px] text-xs capitalize">
-              {s === "all" ? "All" : getStatusStyle(s).label}
-            </Button>
-          ))}
-        </div>
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input placeholder="Search…" className="pl-9 min-h-[44px]" value={search} onChange={e => setSearch(e.target.value)} />
       </div>
       {!filtered.length ? <EmptyState message="No jobs found." /> : (
         <div className="rounded-xl border border-border overflow-x-auto">
@@ -369,8 +477,7 @@ function JobsMonitorTab() {
                 <TableHead className="text-xs">Reg</TableHead>
                 <TableHead className="text-xs">Driver</TableHead>
                 <TableHead className="text-xs">Status</TableHead>
-                <TableHead className="text-xs">Updated</TableHead>
-                <TableHead className="text-xs text-right">Actions</TableHead>
+                <TableHead className="text-xs text-right">View</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -382,11 +489,8 @@ function JobsMonitorTab() {
                     <TableCell><UKPlate reg={job.vehicle_reg} /></TableCell>
                     <TableCell className="text-xs text-muted-foreground">{job.driver_name ?? "—"}</TableCell>
                     <TableCell>
-                      <span style={{ backgroundColor: s.backgroundColor, color: s.color }} className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold uppercase">
-                        {s.label}
-                      </span>
+                      <span style={{ backgroundColor: s.backgroundColor, color: s.color }} className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold uppercase">{s.label}</span>
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{new Date(job.updated_at).toLocaleDateString()}</TableCell>
                     <TableCell className="text-right">
                       <Button size="icon" variant="ghost" onClick={() => navigate(`/jobs/${job.id}`)} className="min-h-[44px] min-w-[44px]">
                         <Eye className="w-4 h-4" />
@@ -407,25 +511,21 @@ function JobsMonitorTab() {
 
 function SystemHealthTab() {
   const services = [
-    { name: "DVLA Lookup", key: "vehicle-lookup", status: "Healthy" as const },
-    { name: "Company Search", key: "business-search", status: "Healthy" as const },
-    { name: "Google Sheets Sync", key: "google-sheets-sync", status: "Healthy" as const },
-    { name: "Photo Uploads", key: "gcs-upload", status: "Healthy" as const },
+    { name: "DVLA Lookup", status: "Healthy" },
+    { name: "Company Search", status: "Healthy" },
+    { name: "Google Sheets Sync", status: "Healthy" },
+    { name: "Photo Uploads", status: "Healthy" },
   ];
-
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
       {services.map(svc => (
-        <Card key={svc.key}>
+        <Card key={svc.name}>
           <CardHeader className="flex flex-row items-center justify-between pb-1 pt-3 px-4">
             <CardTitle className="text-sm font-medium">{svc.name}</CardTitle>
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent className="px-4 pb-3">
-            <Badge variant="secondary" className="bg-success/10 text-success border-success/20">
-              {svc.status}
-            </Badge>
-            <p className="text-xs text-muted-foreground mt-1">Last check: live</p>
+            <Badge variant="secondary" className="bg-success/10 text-success border-success/20">{svc.status}</Badge>
           </CardContent>
         </Card>
       ))}
@@ -436,7 +536,6 @@ function SystemHealthTab() {
 /* ── Error Log Tab ───────────────────────────────────────────────── */
 
 function ErrorLogTab() {
-  const { authEnabled } = useAuth();
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -445,16 +544,7 @@ function ErrorLogTab() {
     setLoading(true);
     setError(null);
     try {
-      if (!authEnabled) {
-        setLogs([]);
-        return;
-      }
-      const { data, error: err } = await supabase
-        .from("client_logs")
-        .select("*")
-        .in("severity", ["error", "warn"])
-        .order("created_at", { ascending: false })
-        .limit(100);
+      const { data, error: err } = await supabase.from("client_logs").select("*").in("severity", ["error", "warn"]).order("created_at", { ascending: false }).limit(100);
       if (err) throw err;
       setLogs(data ?? []);
     } catch (e: any) {
@@ -462,7 +552,7 @@ function ErrorLogTab() {
     } finally {
       setLoading(false);
     }
-  }, [authEnabled]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
@@ -486,9 +576,7 @@ function ErrorLogTab() {
             <TableRow key={log.id}>
               <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</TableCell>
               <TableCell>
-                <Badge variant={log.severity === "error" ? "destructive" : "secondary"} className="text-xs">
-                  {log.severity}
-                </Badge>
+                <Badge variant={log.severity === "error" ? "destructive" : "secondary"} className="text-xs">{log.severity}</Badge>
               </TableCell>
               <TableCell className="text-xs font-mono">{log.event}</TableCell>
               <TableCell className="text-xs text-muted-foreground max-w-[300px] truncate">{log.message ?? "—"}</TableCell>
@@ -503,36 +591,20 @@ function ErrorLogTab() {
 /* ── Settings Tab ────────────────────────────────────────────────── */
 
 function SuperSettingsTab() {
-  const SUPERADMIN_EMAILS_RAW = import.meta.env.VITE_SUPERADMIN_EMAILS as string | undefined;
   const hardcoded = ["axentravehiclelogistics@gmail.com", "info@axentravehicles.com"];
-  const envEmails = (SUPERADMIN_EMAILS_RAW ?? "").split(",").map(e => e.trim().toLowerCase()).filter(Boolean);
+  const envEmails = ((import.meta.env.VITE_SUPERADMIN_EMAILS as string | undefined) ?? "").split(",").map(e => e.trim().toLowerCase()).filter(Boolean);
   const allEmails = Array.from(new Set([...envEmails, ...hardcoded]));
 
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <Shield className="w-4 h-4" /> Recognised Super Admin Emails
-          </CardTitle>
+          <CardTitle className="text-sm font-medium flex items-center gap-2"><Shield className="w-4 h-4" /> Super Admin Emails</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-2">
-            {allEmails.map(e => (
-              <Badge key={e} variant="outline" className="text-xs font-mono">{e}</Badge>
-            ))}
+            {allEmails.map(e => <Badge key={e} variant="outline" className="text-xs font-mono">{e}</Badge>)}
           </div>
-          <p className="text-xs text-muted-foreground mt-2">
-            Controlled by <code className="bg-muted px-1 rounded">VITE_SUPERADMIN_EMAILS</code> env var + hardcoded defaults.
-          </p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Feature Toggles</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-xs text-muted-foreground">No toggleable features yet. Future toggles will appear here.</p>
         </CardContent>
       </Card>
     </div>

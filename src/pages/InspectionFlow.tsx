@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { VehicleDiagram } from "@/components/VehicleDiagram";
 import { VehicleDamageModal } from "@/components/VehicleDamageModal";
 import { PhotoLabelModal } from "@/components/PhotoLabelModal";
+import { SignaturePad, type SignaturePadRef } from "@/components/SignaturePad";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft,
@@ -127,11 +128,9 @@ export const InspectionFlow = () => {
   const [pendingPhotoPreview, setPendingPhotoPreview] = useState<string | null>(null);
   const [showPhotoLabelModal, setShowPhotoLabelModal] = useState(false);
 
-  // Signature refs and state
-  const driverCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const customerCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const driverCanvasInitialized = useRef(false);
-  const customerCanvasInitialized = useRef(false);
+  // Signature refs (new DPR-aware SignaturePad)
+  const driverSigRef = useRef<SignaturePadRef>(null);
+  const customerSigRef = useRef<SignaturePadRef>(null);
   const [driverSigned, setDriverSigned] = useState(false);
   const [customerSigned, setCustomerSigned] = useState(false);
 
@@ -333,98 +332,18 @@ export const InspectionFlow = () => {
     }));
   };
 
-  // ───────────────── SIGNATURE DRAWING ─────────────────
-  // Setup canvas ONCE via a ref callback that checks an initialized flag.
-  // This prevents re-attaching listeners and clearing the canvas on re-render.
-
-  const initCanvas = useCallback(
-    (canvas: HTMLCanvasElement | null, isDriver: boolean) => {
-      if (!canvas) return;
-      const flag = isDriver ? driverCanvasInitialized : customerCanvasInitialized;
-      if (flag.current) return;
-      flag.current = true;
-
-      if (isDriver) driverCanvasRef.current = canvas;
-      else customerCanvasRef.current = canvas;
-
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-
-      let drawing = false;
-
-      const getPos = (e: MouseEvent | TouchEvent) => {
-        const rect = canvas.getBoundingClientRect();
-        const clientX =
-          "touches" in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
-        const clientY =
-          "touches" in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
-        return { x: clientX - rect.left, y: clientY - rect.top };
-      };
-
-      const start = (e: MouseEvent | TouchEvent) => {
-        e.preventDefault();
-        drawing = true;
-        const pos = getPos(e);
-        ctx.beginPath();
-        ctx.moveTo(pos.x, pos.y);
-      };
-
-      const move = (e: MouseEvent | TouchEvent) => {
-        if (!drawing) return;
-        e.preventDefault();
-        const pos = getPos(e);
-        ctx.lineTo(pos.x, pos.y);
-        ctx.strokeStyle = "hsl(215 28% 17%)";
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      };
-
-      const end = () => {
-        if (!drawing) return;
-        drawing = false;
-        if (isDriver) setDriverSigned(true);
-        else setCustomerSigned(true);
-      };
-
-      canvas.addEventListener("mousedown", start);
-      canvas.addEventListener("mousemove", move);
-      canvas.addEventListener("mouseup", end);
-      canvas.addEventListener("mouseleave", end);
-      canvas.addEventListener("touchstart", start, { passive: false });
-      canvas.addEventListener("touchmove", move, { passive: false });
-      canvas.addEventListener("touchend", end);
-    },
-    []
-  );
+  // ───────────────── SIGNATURE HELPERS (using SignaturePad refs) ─────────────────
 
   const clearDriverSignature = useCallback(() => {
-    const canvas = driverCanvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext("2d");
-      ctx?.clearRect(0, 0, canvas.width, canvas.height);
-    }
+    driverSigRef.current?.clear();
     setDriverSigned(false);
   }, []);
 
   const clearCustomerSignature = useCallback(() => {
-    const canvas = customerCanvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext("2d");
-      ctx?.clearRect(0, 0, canvas.width, canvas.height);
-    }
+    customerSigRef.current?.clear();
     setCustomerSigned(false);
   }, []);
 
-  const canvasToFile = async (
-    canvas: HTMLCanvasElement,
-    name: string
-  ): Promise<File> => {
-    return new Promise((resolve) => {
-      canvas.toBlob((blob) => {
-        resolve(new File([blob!], name, { type: "image/png" }));
-      }, "image/png");
-    });
-  };
 
   // tryUploadPhoto removed — all photos now go through background queue
 
@@ -511,8 +430,8 @@ export const InspectionFlow = () => {
       let driverSigUrl: string | null = null;
       let customerSigUrl: string | null = null;
 
-      if (driverCanvasRef.current && driverSigned) {
-        const file = await canvasToFile(driverCanvasRef.current, "driver.png");
+      if (driverSigRef.current && driverSigned) {
+        const file = await driverSigRef.current.toFile("driver.png");
         const result = await storageService.uploadImage(
           file,
           `jobs/${jobId}/signatures/${type}/driver`
@@ -520,11 +439,8 @@ export const InspectionFlow = () => {
         driverSigUrl = result.url;
       }
 
-      if (customerCanvasRef.current && customerSigned) {
-        const file = await canvasToFile(
-          customerCanvasRef.current,
-          "customer.png"
-        );
+      if (customerSigRef.current && customerSigned) {
+        const file = await customerSigRef.current.toFile("customer.png");
         const result = await storageService.uploadImage(
           file,
           `jobs/${jobId}/signatures/${type}/customer`
@@ -925,11 +841,10 @@ export const InspectionFlow = () => {
             className="mt-1"
           />
         </div>
-        <canvas
-          ref={(el) => initCanvas(el, true)}
-          width={320}
-          height={120}
-          className="w-full border-2 border-dashed border-muted-foreground/25 rounded-lg bg-white touch-none"
+        <SignaturePad
+          ref={driverSigRef}
+          onSignStart={() => setDriverSigned(true)}
+          className="w-full"
         />
         <div className="flex items-center justify-between">
           {driverSigned && <p className="text-xs text-success">Signed ✓</p>}
@@ -958,11 +873,10 @@ export const InspectionFlow = () => {
             className="mt-1"
           />
         </div>
-        <canvas
-          ref={(el) => initCanvas(el, false)}
-          width={320}
-          height={120}
-          className="w-full border-2 border-dashed border-muted-foreground/25 rounded-lg bg-white touch-none"
+        <SignaturePad
+          ref={customerSigRef}
+          onSignStart={() => setCustomerSigned(true)}
+          className="w-full"
         />
         <div className="flex items-center justify-between">
           {customerSigned && <p className="text-xs text-success">Signed ✓</p>}
