@@ -112,7 +112,7 @@ serve(async (req) => {
       const { data: userData } = await adminClient.auth.admin.getUserById(user_id);
       if (!userData?.user) return jsonRes({ error: "USER_NOT_FOUND" }, 404);
 
-      const meta = { ...userData.user.user_metadata, role };
+      const meta: Record<string, unknown> = { ...userData.user.user_metadata, role };
       if (org_id !== undefined) meta.org_id = org_id;
       const { error } = await adminClient.auth.admin.updateUserById(user_id, { user_metadata: meta });
       if (error) return jsonRes({ error: error.message }, 500);
