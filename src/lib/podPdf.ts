@@ -247,4 +247,4 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
         doc.setFontSize(8);
         doc.setFont("helvetica", "italic");
         doc.setTextColor(100, 100, 100);
-        doc.text(`Notes: ${​​​​​​​​​​​​​​​​
+        doc.text(`Notes: ${pickup.notes}`, MARGIN, y);
