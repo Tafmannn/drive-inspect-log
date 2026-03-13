@@ -8,7 +8,7 @@ import { PhotoViewer } from "@/components/PhotoViewer";
 import { useJob } from "@/hooks/useJobs";
 import { useJobExpenses } from "@/hooks/useExpenses";
 import { useNavigate, useParams } from "react-router-dom";
-import { Loader2, Mail, Share2, FileDown, ImageOff, PenLine } from "lucide-react";
+import { Loader2, Mail, Share2, FileDown, ImageOff, PenLine, Images, Receipt } from "lucide-react";
 import { openPodEmail, generatePodEmailBody } from "@/lib/podEmail";
 import { sharePodPdf, emailPodPdf } from "@/lib/podPdf";
 import { FUEL_PERCENT_TO_LABEL } from "@/lib/types";
@@ -16,7 +16,8 @@ import { toast } from "@/hooks/use-toast";
 import { getStatusStyle } from "@/lib/statusConfig";
 import { UKPlate } from "@/components/UKPlate";
 import { CHECKLIST_FIELDS, getChecklistItems } from "@/lib/inspectionFields";
-import type { Inspection } from "@/lib/types";
+import { useAuth } from "@/context/AuthContext";
+import type { Inspection, Photo } from "@/lib/types";
 
 const fuelLabel = (pct: number | null | undefined): string => {
   if (pct == null) return "N/A";
@@ -38,10 +39,8 @@ const yesNo = (val: string | null | undefined): string => {
   return val;
 };
 
-/** Signature card with graceful fallback */
 const SignatureCard = ({ label, name, url }: { label: string; name: string | null | undefined; url: string | null }) => {
   const [failed, setFailed] = useState(false);
-
   return (
     <div className="space-y-1">
       <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{label}</div>
@@ -78,19 +77,52 @@ export const PodReport = () => {
   const { jobId } = useParams<{ jobId: string }>();
   const { data: job, isLoading } = useJob(jobId ?? "");
   const { data: jobExpenses } = useJobExpenses(jobId ?? "");
+  const { isAdmin, isSuperAdmin } = useAuth();
   const [pdfLoading, setPdfLoading] = useState(false);
   const [tokenReady, setTokenReady] = useState(false);
+  const [downloadingPhotos, setDownloadingPhotos] = useState(false);
 
-  // Warm the auth token cache before rendering images
   useEffect(() => {
     preloadAuthToken().then(() => setTokenReady(true));
   }, []);
+
+  const handleDownloadPhotos = async (photos: Photo[], label: string) => {
+    if (!photos.length) {
+      toast({ title: `No ${label} photos to download` });
+      return;
+    }
+    setDownloadingPhotos(true);
+    try {
+      let downloaded = 0;
+      for (const photo of photos) {
+        const url = resolveImageUrl(photo.url) || photo.url;
+        try {
+          const res = await fetch(url);
+          if (!res.ok) continue;
+          const blob = await res.blob();
+          const objUrl = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = objUrl;
+          const ext = blob.type.includes("png") ? "png" : "jpg";
+          a.download = `${label}_${photo.label || photo.type}_${downloaded + 1}.${ext}`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(objUrl);
+          downloaded++;
+          await new Promise(r => setTimeout(r, 300));
+        } catch { /* skip individual failures */ }
+      }
+      toast({ title: `Downloaded ${downloaded}/${photos.length} ${label} photos` });
+    } finally {
+      setDownloadingPhotos(false);
+    }
+  };
 
   const handleShare = async () => {
     if (!job) return;
     const { subject, body } = generatePodEmailBody(job);
     const shareText = `${subject}\n\n${body}`;
-
     if (navigator.share) {
       try {
         await navigator.share({ title: subject, text: shareText });
@@ -142,6 +174,12 @@ export const PodReport = () => {
         billable_on_pod: (e as any).billable_on_pod ?? true,
       }));
       await emailPodPdf(job, billable);
+      if (!navigator.share) {
+        toast({
+          title: "PDF downloaded — attach it to your email",
+          description: "Your email app should have opened with a pre-filled message. Attach the downloaded PDF before sending.",
+        });
+      }
     } catch (e: unknown) {
       if (e instanceof Error && e.name !== "AbortError") {
         toast({ title: "Email failed. Please try again.", variant: "destructive" });
@@ -187,6 +225,12 @@ export const PodReport = () => {
       <div className="print:hidden">
         <AppHeader title="POD Report" showBack>
           <div className="flex gap-1">
+            {(isAdmin || isSuperAdmin) && (
+              <Button size="sm" variant="ghost" className="gap-1" onClick={() => navigate(`/invoice/new?jobId=${jobId}`)}>
+                <Receipt className="h-4 w-4" />
+                Invoice
+              </Button>
+            )}
             <Button size="sm" variant="ghost" className="gap-1" onClick={handleSharePdf} disabled={pdfLoading}>
               {pdfLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
               PDF
@@ -206,7 +250,6 @@ export const PodReport = () => {
       <main className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto py-6 px-3 sm:px-6 space-y-4 print:py-0 print:px-0">
           <Card className="border border-border shadow-sm print:shadow-none print:border-none">
-            {/* Header Banner */}
             <div className="flex items-center justify-between px-6 py-4 bg-foreground text-background rounded-t-lg print:rounded-none">
               <div className="flex flex-col">
                 <span className="text-xs tracking-[0.15em] uppercase opacity-70">Axentra Vehicle Logistics</span>
@@ -220,7 +263,6 @@ export const PodReport = () => {
             </div>
 
             <div className="p-6 space-y-6 print:p-4 print:space-y-4">
-              {/* Vehicle Summary */}
               <Card className="p-4 space-y-1">
                 <div className="flex items-center justify-between mb-2">
                   <UKPlate reg={job.vehicle_reg} variant="rear" />
@@ -241,7 +283,6 @@ export const PodReport = () => {
 
               <Separator className="print:hidden" />
 
-              {/* Pickup Details */}
               <Card className="p-4 space-y-1">
                 <h3 className="text-sm font-semibold mb-2">Pickup Details</h3>
                 <DetailRow label="Contact" value={`${job.pickup_contact_name} (${job.pickup_contact_phone})`} />
@@ -256,7 +297,6 @@ export const PodReport = () => {
                 <DetailRow label="Photos" value={String(pickupPhotos.length)} />
               </Card>
 
-              {/* Pickup Checklist */}
               {pickup && pickupChecklistItems.length > 0 && (
                 <Card className="p-4 space-y-2">
                   <h3 className="text-sm font-semibold">Pickup Checklist</h3>
@@ -274,7 +314,6 @@ export const PodReport = () => {
                 </Card>
               )}
 
-              {/* Delivery Details */}
               <Card className="p-4 space-y-1">
                 <h3 className="text-sm font-semibold mb-2">Delivery Details</h3>
                 <DetailRow label="Contact" value={`${job.delivery_contact_name} (${job.delivery_contact_phone})`} />
@@ -289,7 +328,6 @@ export const PodReport = () => {
                 <DetailRow label="Photos" value={String(deliveryPhotos.length)} />
               </Card>
 
-              {/* Delivery Checklist */}
               {delivery && deliveryChecklistItems.length > 0 && (
                 <Card className="p-4 space-y-2">
                   <h3 className="text-sm font-semibold">Delivery Checklist</h3>
@@ -307,7 +345,6 @@ export const PodReport = () => {
                 </Card>
               )}
 
-              {/* Damage Summary */}
               {(pickupDamages.length > 0 || deliveryDamages.length > 0) && (
                 <Card className="p-4 space-y-2">
                   <h3 className="text-sm font-semibold">Damage Summary</h3>
@@ -320,16 +357,38 @@ export const PodReport = () => {
                 </Card>
               )}
 
-              {/* Photos */}
               <Card className="p-4 space-y-4">
-                <h3 className="text-sm font-semibold">Photos</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold">Photos</h3>
+                  {(isAdmin || isSuperAdmin) && (
+                    <div className="flex gap-1.5">
+                      <Button
+                        size="sm" variant="outline"
+                        className="h-8 text-xs gap-1"
+                        disabled={downloadingPhotos || pickupPhotos.length === 0}
+                        onClick={() => handleDownloadPhotos(pickupPhotos, `${ref}_Collection`)}
+                      >
+                        <Images className="w-3 h-3" />
+                        Collection
+                      </Button>
+                      <Button
+                        size="sm" variant="outline"
+                        className="h-8 text-xs gap-1"
+                        disabled={downloadingPhotos || deliveryPhotos.length === 0}
+                        onClick={() => handleDownloadPhotos(deliveryPhotos, `${ref}_Delivery`)}
+                      >
+                        <Images className="w-3 h-3" />
+                        Delivery
+                      </Button>
+                    </div>
+                  )}
+                </div>
                 <PhotoViewer title="Collection Photos" photos={pickupPhotos.map(p => ({ url: resolveImageUrl(p.url) || p.url, label: p.label || p.type.replace("pickup_", "").replace(/_/g, " ") }))} />
                 <PhotoViewer title="Delivery Photos" photos={deliveryPhotos.map(p => ({ url: resolveImageUrl(p.url) || p.url, label: p.label || p.type.replace("delivery_", "").replace(/_/g, " ") }))} />
                 <PhotoViewer title="Damage Close-ups" photos={damagePhotos.map(p => ({ url: resolveImageUrl(p.url) || p.url, label: p.label || "Damage" }))} />
                 <p className="text-[11px] text-muted-foreground pt-1">Full-resolution images are stored securely within Axentra and can be supplied on request.</p>
               </Card>
 
-              {/* Signatures */}
               <Card className="p-4 space-y-3">
                 <h3 className="text-sm font-semibold">Signatures</h3>
                 <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
@@ -340,7 +399,6 @@ export const PodReport = () => {
                 </div>
               </Card>
 
-              {/* Expenses */}
               {(() => {
                 const billableExpenses = (jobExpenses ?? []).filter((e: any) => e.billable_on_pod !== false);
                 return (
@@ -367,7 +425,6 @@ export const PodReport = () => {
                 );
               })()}
 
-              {/* Footer */}
               <Card className="p-4 space-y-2 text-xs text-muted-foreground">
                 <p>This Proof of Delivery report was generated by the Axentra Vehicle Logistics system.</p>
                 <p>Report reference: <span className="font-mono">{ref}</span> • Generated: {safeDate(new Date().toISOString())}</p>

@@ -46,9 +46,7 @@ function addSectionTitle(doc: jsPDF, title: string, y: number): number {
 
 async function loadImageAsBase64(url: string): Promise<string | null> {
   try {
-    // Resolve GCS URLs through authenticated proxy
     const resolvedUrl = await resolveImageUrlAsync(url) ?? url;
-    
     const response = await fetch(resolvedUrl, { mode: 'cors' });
     if (!response.ok) return null;
     const blob = await response.blob();
@@ -59,7 +57,6 @@ async function loadImageAsBase64(url: string): Promise<string | null> {
       reader.readAsDataURL(blob);
     });
   } catch {
-    // Fallback: try original URL directly
     try {
       const response = await fetch(url);
       if (!response.ok) return null;
@@ -105,7 +102,6 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
   const pickupPhotos = job.photos.filter(p => p.type.startsWith("pickup_"));
   const deliveryPhotos = job.photos.filter(p => p.type.startsWith("delivery_"));
 
-  // ── Pre-load all images in parallel ──
   const allPhotoUrls = [...pickupPhotos, ...deliveryPhotos].map(p => p.url);
   const sigUrls = [
     pickup?.driver_signature_url,
@@ -113,26 +109,23 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
     delivery?.driver_signature_url,
     delivery?.customer_signature_url,
   ].filter(Boolean) as string[];
-  
+
   const allUrls = [...allPhotoUrls, ...sigUrls];
   const imageCache = new Map<string, string | null>();
-  
-  const loadResults = await Promise.allSettled(
+
+  await Promise.allSettled(
     allUrls.map(async (url) => {
       const data = await loadImageAsBase64(url);
       imageCache.set(url, data);
     })
   );
 
-  // ── Header banner ──
   doc.setFillColor(33, 37, 41);
   doc.rect(0, 0, pageWidth, 30, "F");
 
   const logoData = await loadLogo();
   if (logoData) {
-    try {
-      doc.addImage(logoData, "PNG", MARGIN, 4, 36, 22);
-    } catch { /* logo load failed, skip */ }
+    try { doc.addImage(logoData, "PNG", MARGIN, 4, 36, 22); } catch { /* skip */ }
   }
 
   doc.setTextColor(255, 255, 255);
@@ -142,14 +135,12 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   doc.text("Proof of Delivery", pageWidth / 2, 19, { align: "center" });
-
   doc.setFontSize(8);
   doc.text(`Job ${ref}`, pageWidth - MARGIN, 12, { align: "right" });
   doc.text(safeDate(job.completed_at || new Date().toISOString()), pageWidth - MARGIN, 18, { align: "right" });
 
   let y = 38;
 
-  // ── Vehicle Details ──
   y = addSectionTitle(doc, "Vehicle Details", y);
   autoTable(doc, {
     startY: y,
@@ -173,7 +164,6 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
   });
   y = (doc as any).lastAutoTable.finalY + 8;
 
-  // ── Billable Expenses ──
   const billableExpenses = (expenses ?? []).filter(e => e.billable_on_pod !== false);
   if (billableExpenses.length > 0) {
     y = addSectionTitle(doc, `Billable Expenses (${billableExpenses.length} items)`, y);
@@ -185,15 +175,11 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
       styles: { fontSize: 8, cellPadding: { top: 1.5, bottom: 1.5, left: 3, right: 3 } },
       headStyles: { fillColor: [33, 37, 41], textColor: [255, 255, 255] },
       head: [["Category", "Label"]],
-      body: billableExpenses.map(e => [
-        e.category,
-        e.label || "—",
-      ]),
+      body: billableExpenses.map(e => [e.category, e.label || "—"]),
     });
     y = (doc as any).lastAutoTable.finalY + 8;
   }
 
-  // ── Pickup Details ──
   y = addSectionTitle(doc, "Pickup Details", y);
   autoTable(doc, {
     startY: y,
@@ -219,12 +205,10 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
   });
   y = (doc as any).lastAutoTable.finalY + 8;
 
-  // ── Pickup Checklist ──
   if (pickup) {
     const items = CHECKLIST_FIELDS
       .filter(f => { const v = pickup[f.key]; return v != null && v !== ""; })
       .map(f => [f.label, String(pickup[f.key])]);
-
     if (items.length > 0) {
       y = addSectionTitle(doc, "Pickup Checklist", y);
       y = ensureSpace(doc, y, 20);
@@ -250,7 +234,6 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
     }
   }
 
-  // ── Delivery Details ──
   y = addSectionTitle(doc, "Delivery Details", y);
   autoTable(doc, {
     startY: y,
@@ -276,12 +259,10 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
   });
   y = (doc as any).lastAutoTable.finalY + 8;
 
-  // ── Delivery Checklist ──
   if (delivery) {
     const items = CHECKLIST_FIELDS
       .filter(f => { const v = delivery[f.key]; return v != null && v !== ""; })
       .map(f => [f.label, String(delivery[f.key])]);
-
     if (items.length > 0) {
       y = addSectionTitle(doc, "Delivery Checklist", y);
       y = ensureSpace(doc, y, 20);
@@ -307,7 +288,6 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
     }
   }
 
-  // ── Damage Summary ──
   const allDamages = [...pickupDamages, ...deliveryDamages];
   if (allDamages.length > 0) {
     y = addSectionTitle(doc, "Damage Summary", y);
@@ -320,24 +300,48 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
       headStyles: { fillColor: [33, 37, 41], textColor: [255, 255, 255] },
       head: [["Area", "Item", "Type", "Notes"]],
       body: allDamages.map(d => [
-        d.area || "—",
-        d.item || "—",
-        d.damage_types?.join(", ") || "—",
-        d.notes || "—",
+        d.area || "—", d.item || "—",
+        d.damage_types?.join(", ") || "—", d.notes || "—",
       ]),
     });
     y = (doc as any).lastAutoTable.finalY + 8;
   }
 
-  // ── Photos (from pre-loaded cache) ──
   const allPhotos = [...pickupPhotos, ...deliveryPhotos];
   if (allPhotos.length > 0) {
     y = addSectionTitle(doc, "Photos", y);
+    y = ensureSpace(doc, y, 12);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(80, 80, 80);
+    doc.text(`${pickupPhotos.length} collection photo(s) · ${deliveryPhotos.length} delivery photo(s) embedded below.`, MARGIN, y);
+    y += 5;
+    doc.setFontSize(7.5);
+    doc.setTextColor(59, 130, 246);
+    const downloadNote = "To download individual images, view this job in the Axentra app and use the Collection / Delivery download buttons on the POD page.";
+    const noteLines = doc.splitTextToSize(downloadNote, contentWidth);
+    doc.text(noteLines, MARGIN, y);
+    doc.setTextColor(80, 80, 80);
+    y += noteLines.length * 4 + 4;
+
     const photoWidth = (contentWidth - 6) / 3;
     const photoHeight = photoWidth * 0.75;
     let col = 0;
-    
-    for (const photo of allPhotos) {
+
+    for (let photoIdx = 0; photoIdx < allPhotos.length; photoIdx++) {
+      const photo = allPhotos[photoIdx];
+      if (photoIdx === 0 || (photoIdx === pickupPhotos.length && deliveryPhotos.length > 0)) {
+        if (col > 0) { y += photoHeight + 8; col = 0; }
+        y = ensureSpace(doc, y, 14);
+        const sectionLabel = photoIdx === 0
+          ? `Collection Photos (${pickupPhotos.length})`
+          : `Delivery Photos (${deliveryPhotos.length})`;
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(33, 37, 41);
+        doc.text(sectionLabel, MARGIN, y);
+        y += 6;
+      }
       y = ensureSpace(doc, y, photoHeight + 10);
       const imgData = imageCache.get(photo.url) ?? null;
       if (imgData) {
@@ -348,13 +352,9 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
           doc.setTextColor(100, 100, 100);
           doc.text(photo.label || photo.type, x, y + photoHeight + 3);
           col++;
-          if (col >= 3) {
-            col = 0;
-            y += photoHeight + 8;
-          }
-        } catch { /* skip failed photo */ }
+          if (col >= 3) { col = 0; y += photoHeight + 8; }
+        } catch { /* skip */ }
       } else {
-        // Draw placeholder for unavailable photo
         const x = MARGIN + col * (photoWidth + 3);
         doc.setDrawColor(200, 200, 200);
         doc.setFillColor(245, 245, 245);
@@ -365,16 +365,12 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
         doc.setFontSize(6);
         doc.text(photo.label || photo.type, x, y + photoHeight + 3);
         col++;
-        if (col >= 3) {
-          col = 0;
-          y += photoHeight + 8;
-        }
+        if (col >= 3) { col = 0; y += photoHeight + 8; }
       }
     }
     if (col > 0) y += photoHeight + 8;
   }
 
-  // ── Signatures (from pre-loaded cache) ──
   y = addSectionTitle(doc, "Signatures", y);
   y = ensureSpace(doc, y, 40);
 
@@ -389,8 +385,7 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
   let sigX = MARGIN;
   const sigStartY = y;
 
-  for (let i = 0; i < sigs.length; i++) {
-    const sig = sigs[i];
+  for (const sig of sigs) {
     doc.setFontSize(7);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(80, 80, 80);
@@ -398,7 +393,6 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7);
     doc.text(sig.name, sigX, sigStartY + 4);
-
     if (sig.url) {
       const imgData = imageCache.get(sig.url) ?? null;
       if (imgData) {
@@ -424,12 +418,10 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
       doc.setTextColor(180, 180, 180);
       doc.text("Not signed", sigX + sigWidth / 2, sigStartY + 16, { align: "center" });
     }
-
     sigX += sigWidth + 3;
   }
   y = sigStartY + 30;
 
-  // ── Declaration ──
   y = ensureSpace(doc, y, 25);
   y += 4;
   doc.setFontSize(9);
@@ -445,7 +437,6 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
   doc.text(lines, MARGIN, y);
   y += lines.length * 4 + 8;
 
-  // ── Footer on every page ──
   const totalPages = doc.getNumberOfPages();
   for (let p = 1; p <= totalPages; p++) {
     doc.setPage(p);
@@ -494,15 +485,24 @@ export async function emailPodPdf(job: JobWithRelations, expenses?: PodExpense[]
   const file = new File([blob], fileName, { type: "application/pdf" });
 
   const subject = `Axentra POD – ${ref} – ${job.vehicle_reg}`;
-  const body = `Dear Customer,\n\nPlease find attached the Proof of Delivery for job ${ref} (${job.vehicle_reg}).\n\nRoute: ${job.pickup_city || "—"} → ${job.delivery_city || "—"}\nDate: ${dateStr}\n\nIf you have any queries, please do not hesitate to contact us.\n\nKind regards,\nAxentra Vehicle Logistics`;
+  const body = [
+    `Dear Customer,`,
+    ``,
+    `Please find attached the Proof of Delivery for job ${ref} (${job.vehicle_reg}).`,
+    ``,
+    `Route: ${job.pickup_city || "—"} → ${job.delivery_city || "—"}`,
+    `Date: ${dateStr}`,
+    ``,
+    `If you have any queries, please do not hesitate to contact us.`,
+    ``,
+    `Kind regards,`,
+    `Axentra Vehicle Logistics`,
+    `info@axentravehicles.com`,
+  ].join("\n");
 
   if (navigator.share && navigator.canShare?.({ files: [file] })) {
     try {
-      await navigator.share({
-        title: subject,
-        text: body,
-        files: [file],
-      });
+      await navigator.share({ title: subject, text: body, files: [file] });
       return;
     } catch (e: unknown) {
       if (e instanceof Error && e.name === "AbortError") return;
@@ -513,6 +513,13 @@ export async function emailPodPdf(job: JobWithRelations, expenses?: PodExpense[]
   const a = document.createElement("a");
   a.href = url;
   a.download = fileName;
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
   URL.revokeObjectURL(url);
+
+  await new Promise(r => setTimeout(r, 400));
+
+  const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.open(mailto, "_blank");
 }

@@ -23,6 +23,7 @@ import { Timesheets } from "./pages/Timesheets";
 import { AdminUsers } from "./pages/AdminUsers";
 import { OrgAdminDashboard } from "./pages/OrgAdminDashboard";
 import { SuperAdminDashboard } from "./pages/SuperAdminDashboard";
+import { InvoiceGenerator } from "./pages/InvoiceGenerator";
 import { Profile } from "./pages/Profile";
 import { QrConfirm } from "./pages/QrConfirm";
 import { Login } from "./pages/Login";
@@ -146,6 +147,8 @@ const App = () => {
 
                 {/* ── Super-admin-only route ── */}
                 <Route path="/super-admin" element={<ProtectedRoute><SuperAdminRoute><SuperAdminDashboard /></SuperAdminRoute></ProtectedRoute>} />
+                <Route path="/invoice/new" element={<ProtectedRoute><AdminRoute><InvoiceGenerator /></AdminRoute></ProtectedRoute>} />
+                <Route path="/invoice/new/:jobId" element={<ProtectedRoute><AdminRoute><InvoiceGenerator /></AdminRoute></ProtectedRoute>} />
 
                 {/* ── Catch-all ── */}
                 <Route path="*" element={<NotFound />} />
