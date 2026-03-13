@@ -124,7 +124,7 @@ function OverviewTab() {
 /* ── Organisations Tab ───────────────────────────────────────────── */
 
 function OrganisationsTab() {
-  const [orgs, setOrgs] = useState<any[]>([]);
+  const [orgs, setOrgs] = useState<OrgRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
