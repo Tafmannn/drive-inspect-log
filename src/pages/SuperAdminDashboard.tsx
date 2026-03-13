@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   listAllUsers, createOrganisation, createUser, setUserRole,
   deactivateUser, reactivateUser,
+  type OrgUser, type OrgRecord,
 } from "@/lib/adminApi";
 import { logClientEvent } from "@/lib/logger";
 import { AppHeader } from "@/components/AppHeader";
@@ -123,7 +124,7 @@ function OverviewTab() {
 /* ── Organisations Tab ───────────────────────────────────────────── */
 
 function OrganisationsTab() {
-  const [orgs, setOrgs] = useState<any[]>([]);
+  const [orgs, setOrgs] = useState<OrgRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -227,8 +228,8 @@ function OrganisationsTab() {
 /* ── Users Tab ───────────────────────────────────────────────────── */
 
 function SuperUsersTab() {
-  const [users, setUsers] = useState<any[]>([]);
-  const [orgs, setOrgs] = useState<any[]>([]);
+  const [users, setUsers] = useState<OrgUser[]>([]);
+  const [orgs, setOrgs] = useState<OrgRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");

@@ -11,10 +11,12 @@ const KNOWN_FLAGS = [
 type FeatureFlagKey = (typeof KNOWN_FLAGS)[number];
 
 const cache: Record<string, boolean> = {};
-let loaded = false;
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+let loadedAt: number | null = null;
 
 async function loadFlags(): Promise<void> {
-  if (loaded) return;
+  if (loadedAt && Date.now() - loadedAt < CACHE_TTL_MS) return;
+
   const { data } = await supabase
     .from("app_settings")
     .select("key, value")
@@ -23,7 +25,7 @@ async function loadFlags(): Promise<void> {
   for (const row of data ?? []) {
     cache[row.key] = row.value === true || row.value === "true";
   }
-  loaded = true;
+  loadedAt = Date.now();
 }
 
 export async function isFeatureEnabled(flag: FeatureFlagKey | string): Promise<boolean> {

@@ -1,37 +1,43 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as api from "@/lib/api";
 import { getPendingJobCount } from "@/lib/pendingUploads";
-import { safePushToSheet } from "@/lib/safePushToSheet";
+import { supabase } from "@/integrations/supabase/client";
+import { ACTIVE_STATUSES } from "@/lib/statusConfig";
 import type { Job, JobWithRelations, InspectionType, Inspection, DamageItem } from "@/lib/types";
 
 // ─── Dashboard ───────────────────────────────────────────────────────
 
 export interface DashboardCounts {
-  /** Count of jobs shown in the "My Jobs" list */
   myJobs: number;
-  /** Completed jobs within the last 14 days */
   completedLast14Days: number;
-  /** Jobs completed but with pending/failed uploads */
   pendingUploads: number;
 }
 
-/**
- * Dashboard counts – each counter is derived from the exact same query
- * used by the corresponding list page, ensuring counters always match.
- */
 export function useDashboardCounts() {
   return useQuery({
     queryKey: ["dashboard-counts"],
     queryFn: async () => {
-      const [active, completed] = await Promise.all([
-        api.listActiveJobs(),
-        api.listCompletedJobs(),
+      const fourteenDaysAgo = new Date();
+      fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+
+      const [activeRes, completedRes] = await Promise.all([
+        supabase
+          .from("jobs")
+          .select("id", { count: "exact", head: true })
+          .eq("is_hidden", false)
+          .in("status", ACTIVE_STATUSES as string[]),
+        supabase
+          .from("jobs")
+          .select("id", { count: "exact", head: true })
+          .eq("is_hidden", false)
+          .not("completed_at", "is", null)
+          .gte("completed_at", fourteenDaysAgo.toISOString()),
       ]);
-      const pendingUploads = getPendingJobCount();
+
       return {
-        myJobs: active.length,
-        completedLast14Days: completed.length,
-        pendingUploads,
+        myJobs: activeRes.count ?? 0,
+        completedLast14Days: completedRes.count ?? 0,
+        pendingUploads: getPendingJobCount(),
       } satisfies DashboardCounts;
     },
     staleTime: 60_000,
@@ -77,11 +83,9 @@ export function useCreateJob() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: Parameters<typeof api.createJob>[0]) => api.createJob(input),
-    onSuccess: (_data) => {
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
-      // Auto-push new job to Google Sheet (fire-and-forget)
-      if (_data?.id) safePushToSheet([_data.id]);
     },
   });
 }
@@ -95,7 +99,6 @@ export function useUpdateJob() {
       qc.invalidateQueries({ queryKey: ["job", vars.jobId] });
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
-      safePushToSheet([vars.jobId]);
     },
   });
 }
@@ -118,7 +121,6 @@ export function useSubmitInspection() {
       qc.invalidateQueries({ queryKey: ["job", vars.jobId] });
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
-      safePushToSheet([vars.jobId]);
     },
   });
 }
