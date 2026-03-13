@@ -482,16 +482,42 @@ export async function emailPodPdf(job: JobWithRelations, expenses?: PodExpense[]
     ? new Date(job.completed_at).toISOString().slice(0, 10)
     : new Date().toISOString().slice(0, 10);
   const fileName = `AXENTRA_POD_${ref}_${sanitizedReg}_${dateStr}.pdf`;
-  const file = new File([blob], fileName, { type: "application/pdf" });
 
   const subject = `Axentra POD – ${ref} – ${job.vehicle_reg}`;
+
+  // ── Upload to Supabase Storage and get a 30-day signed link ──
+  let downloadLink = "";
+  try {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const { data: { session } } = await supabase.auth.getSession();
+    const orgId = session?.user?.user_metadata?.org_id ?? "shared";
+    const path = `${orgId}/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("pod-pdfs")
+      .upload(path, blob, { contentType: "application/pdf", upsert: true });
+
+    if (!uploadError) {
+      const { data: signed } = await supabase.storage
+        .from("pod-pdfs")
+        .createSignedUrl(path, 60 * 60 * 24 * 30);
+      if (signed?.signedUrl) downloadLink = signed.signedUrl;
+    }
+  } catch { /* fall through — link will be empty */ }
+
   const body = [
     `Dear Customer,`,
     ``,
-    `Please find attached the Proof of Delivery for job ${ref} (${job.vehicle_reg}).`,
+    `Please find your Proof of Delivery for job ${ref} (${job.vehicle_reg}) at the link below.`,
     ``,
     `Route: ${job.pickup_city || "—"} → ${job.delivery_city || "—"}`,
     `Date: ${dateStr}`,
+    ``,
+    downloadLink
+      ? `Download POD: ${downloadLink}`
+      : `(PDF will be attached separately)`,
+    ``,
+    `Link expires in 30 days.`,
     ``,
     `If you have any queries, please do not hesitate to contact us.`,
     ``,
@@ -500,26 +526,17 @@ export async function emailPodPdf(job: JobWithRelations, expenses?: PodExpense[]
     `info@axentravehicles.com`,
   ].join("\n");
 
-  if (navigator.share && navigator.canShare?.({ files: [file] })) {
+  // ── Mobile: Web Share API (text + link) ──
+  if (navigator.share) {
     try {
-      await navigator.share({ title: subject, text: body, files: [file] });
+      await navigator.share({ title: subject, text: body });
       return;
     } catch (e: unknown) {
       if (e instanceof Error && e.name === "AbortError") return;
     }
   }
 
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-
-  await new Promise(r => setTimeout(r, 400));
-
+  // ── Desktop/fallback: open mailto with link in body ──
   const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   window.open(mailto, "_blank");
 }
