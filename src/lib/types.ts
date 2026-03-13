@@ -32,7 +32,7 @@ export type PhotoType =
   | 'delivery_other'
   | 'damage_close_up';
 
-export type StorageBackend = 'internal' | 'googleDrive' | 'googleCloud';
+export type StorageBackend = 'internal' | 'googleCloud';
 
 export interface Job {
   id: string;

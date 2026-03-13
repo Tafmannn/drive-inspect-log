@@ -8,7 +8,7 @@ export interface OrgUser {
   is_active?: boolean;
 }
 
-interface OrgRecord {
+export interface OrgRecord {
   id: string;
   name: string;
   created_at: string;

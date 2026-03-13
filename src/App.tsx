@@ -50,28 +50,9 @@ function BackgroundUploader() {
   return null;
 }
 
-/* ── Admin-only route guard ───────────────────────────────────────── */
+/* ── Protected route wrapper (replaces nested Routes inside AuthGate) */
 
-function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { isAdmin } = useAuth();
-  if (!isAdmin) return <Navigate to="/" replace />;
-  return <>{children}</>;
-}
-
-/* ── Super-admin-only route guard ─────────────────────────────────── */
-
-function SuperAdminRoute({ children }: { children: React.ReactNode }) {
-  const { isSuperAdmin, isAdmin } = useAuth();
-  if (!isSuperAdmin) {
-    // Redirect admins to /admin, others to /
-    return <Navigate to={isAdmin ? "/admin" : "/"} replace />;
-  }
-  return <>{children}</>;
-}
-
-/* ── Auth gate (only active when authEnabled) ─────────────────────── */
-
-function AuthGate({ children }: { children: React.ReactNode }) {
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { authEnabled, authLoading, user } = useAuth();
 
   if (!authEnabled) return <>{children}</>;
@@ -86,6 +67,24 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (!user) return <Navigate to="/login" replace />;
 
+  return <>{children}</>;
+}
+
+/* ── Admin-only route guard ───────────────────────────────────────── */
+
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { isAdmin } = useAuth();
+  if (!isAdmin) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
+/* ── Super-admin-only route guard ─────────────────────────────────── */
+
+function SuperAdminRoute({ children }: { children: React.ReactNode }) {
+  const { isSuperAdmin, isAdmin } = useAuth();
+  if (!isSuperAdmin) {
+    return <Navigate to={isAdmin ? "/admin" : "/"} replace />;
+  }
   return <>{children}</>;
 }
 
@@ -115,94 +114,41 @@ const App = () => {
             <DevRoleBanner />
             <BrowserRouter>
               <Routes>
-                {/* ── Public routes (outside AuthGate) ── */}
+                {/* ── Public routes ── */}
                 <Route path="/login" element={<Login />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/confirm" element={<QrConfirm />} />
 
-                {/* ── Protected routes ── */}
-                <Route
-                  path="*"
-                  element={
-                    <AuthGate>
-                      <Routes>
-                        <Route path="/" element={<Dashboard />} />
-                        <Route path="/jobs" element={<JobList />} />
-                        <Route path="/jobs/master" element={<JobMasterList />} />
-                        <Route path="/jobs/new" element={<JobForm />} />
-                        <Route path="/jobs/completed" element={<CompletedJobs />} />
-                        <Route path="/jobs/pending" element={<PendingJobs />} />
-                        <Route path="/jobs/:jobId" element={<JobDetail />} />
-                        <Route path="/jobs/:jobId/edit" element={<JobForm />} />
-                        <Route path="/jobs/:jobId/pod" element={<PodReport />} />
-                        <Route
-                          path="/inspection/:jobId/:inspectionType"
-                          element={<InspectionFlow />}
-                        />
-                        <Route path="/pending-uploads" element={<PendingUploads />} />
-                        <Route path="/profile" element={<Profile />} />
-                        <Route path="/expenses" element={<Expenses />} />
-                        <Route path="/expenses/new" element={<ExpenseForm />} />
-                        <Route
-                          path="/expenses/:expenseId/edit"
-                          element={<ExpenseForm />}
-                        />
-                        {/* Admin-only routes */}
-                        <Route
-                          path="/admin"
-                          element={
-                            <AdminRoute>
-                              <AdminDashboard />
-                            </AdminRoute>
-                          }
-                        />
-                        <Route
-                          path="/admin/timesheets"
-                          element={
-                            <AdminRoute>
-                              <Timesheets />
-                            </AdminRoute>
-                          }
-                        />
-                        <Route
-                          path="/admin/sync-errors"
-                          element={
-                            <AdminRoute>
-                              <SyncErrors />
-                            </AdminRoute>
-                          }
-                        />
-                        <Route
-                          path="/admin/users"
-                          element={
-                            <AdminRoute>
-                              <AdminUsers />
-                            </AdminRoute>
-                          }
-                        />
-                        <Route
-                          path="/admin/dashboard"
-                          element={
-                            <AdminRoute>
-                              <OrgAdminDashboard />
-                            </AdminRoute>
-                          }
-                        />
-                        {/* Super-admin-only route */}
-                        <Route
-                          path="/super-admin"
-                          element={
-                            <SuperAdminRoute>
-                              <SuperAdminDashboard />
-                            </SuperAdminRoute>
-                          }
-                        />
-                        <Route path="*" element={<NotFound />} />
-                      </Routes>
-                    </AuthGate>
-                  }
-                />
+                {/* ── Protected routes (flat) ── */}
+                <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                <Route path="/jobs" element={<ProtectedRoute><JobList /></ProtectedRoute>} />
+                <Route path="/jobs/master" element={<ProtectedRoute><JobMasterList /></ProtectedRoute>} />
+                <Route path="/jobs/new" element={<ProtectedRoute><JobForm /></ProtectedRoute>} />
+                <Route path="/jobs/completed" element={<ProtectedRoute><CompletedJobs /></ProtectedRoute>} />
+                <Route path="/jobs/pending" element={<ProtectedRoute><PendingJobs /></ProtectedRoute>} />
+                <Route path="/jobs/:jobId" element={<ProtectedRoute><JobDetail /></ProtectedRoute>} />
+                <Route path="/jobs/:jobId/edit" element={<ProtectedRoute><JobForm /></ProtectedRoute>} />
+                <Route path="/jobs/:jobId/pod" element={<ProtectedRoute><PodReport /></ProtectedRoute>} />
+                <Route path="/inspection/:jobId/:inspectionType" element={<ProtectedRoute><InspectionFlow /></ProtectedRoute>} />
+                <Route path="/pending-uploads" element={<ProtectedRoute><PendingUploads /></ProtectedRoute>} />
+                <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+                <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
+                <Route path="/expenses/new" element={<ProtectedRoute><ExpenseForm /></ProtectedRoute>} />
+                <Route path="/expenses/:expenseId/edit" element={<ProtectedRoute><ExpenseForm /></ProtectedRoute>} />
+
+                {/* ── Admin-only routes ── */}
+                <Route path="/admin" element={<ProtectedRoute><AdminRoute><AdminDashboard /></AdminRoute></ProtectedRoute>} />
+                <Route path="/admin/timesheets" element={<ProtectedRoute><AdminRoute><Timesheets /></AdminRoute></ProtectedRoute>} />
+                <Route path="/admin/sync-errors" element={<ProtectedRoute><AdminRoute><SyncErrors /></AdminRoute></ProtectedRoute>} />
+                <Route path="/admin/users" element={<ProtectedRoute><AdminRoute><AdminUsers /></AdminRoute></ProtectedRoute>} />
+                <Route path="/admin/dashboard" element={<ProtectedRoute><AdminRoute><OrgAdminDashboard /></AdminRoute></ProtectedRoute>} />
+
+                {/* ── Super-admin-only route ── */}
+                <Route path="/super-admin" element={<ProtectedRoute><SuperAdminRoute><SuperAdminDashboard /></SuperAdminRoute></ProtectedRoute>} />
+
+                {/* ── Catch-all ── */}
+                <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>
           </AuthProvider>

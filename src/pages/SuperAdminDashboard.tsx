@@ -228,8 +228,8 @@ function OrganisationsTab() {
 /* ── Users Tab ───────────────────────────────────────────────────── */
 
 function SuperUsersTab() {
-  const [users, setUsers] = useState<any[]>([]);
-  const [orgs, setOrgs] = useState<any[]>([]);
+  const [users, setUsers] = useState<OrgUser[]>([]);
+  const [orgs, setOrgs] = useState<OrgRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
