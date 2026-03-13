@@ -1,6 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import type { JobWithRelations, Inspection } from "./types";
+import type { JobWithRelations } from "./types";
 import { FUEL_PERCENT_TO_LABEL } from "./types";
 import { CHECKLIST_FIELDS } from "./inspectionFields";
 import { resolveImageUrlAsync } from "./gcsProxyUrl";
@@ -9,7 +9,7 @@ const MARGIN = 20;
 
 function fuelLabel(pct: number | null | undefined): string {
   if (pct == null) return "N/A";
-  return FUEL_PERCENT_TO_LABEL[pct] ?? `${pct}%`;
+  return FUEL_PERCENT_TO_LABEL[pct] ?? (pct + "%");
 }
 
 function safeDate(iso: string | null | undefined): string {
@@ -47,7 +47,7 @@ function addSectionTitle(doc: jsPDF, title: string, y: number): number {
 async function loadImageAsBase64(url: string): Promise<string | null> {
   try {
     const resolvedUrl = await resolveImageUrlAsync(url) ?? url;
-    const response = await fetch(resolvedUrl, { mode: 'cors' });
+    const response = await fetch(resolvedUrl, { mode: "cors" });
     if (!response.ok) return null;
     const blob = await response.blob();
     return new Promise((resolve) => {
@@ -74,11 +74,8 @@ async function loadImageAsBase64(url: string): Promise<string | null> {
 }
 
 async function loadLogo(): Promise<string | null> {
-  try {
-    return await loadImageAsBase64("/axentra-logo.png");
-  } catch {
-    return null;
-  }
+  try { return await loadImageAsBase64("/axentra-logo.png"); }
+  catch { return null; }
 }
 
 export interface PodExpense {
@@ -110,24 +107,20 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
     delivery?.customer_signature_url,
   ].filter(Boolean) as string[];
 
-  const allUrls = [...allPhotoUrls, ...sigUrls];
   const imageCache = new Map<string, string | null>();
-
   await Promise.allSettled(
-    allUrls.map(async (url) => {
-      const data = await loadImageAsBase64(url);
-      imageCache.set(url, data);
+    [...allPhotoUrls, ...sigUrls].map(async (url) => {
+      imageCache.set(url, await loadImageAsBase64(url));
     })
   );
 
+  // Header
   doc.setFillColor(33, 37, 41);
   doc.rect(0, 0, pageWidth, 30, "F");
-
   const logoData = await loadLogo();
   if (logoData) {
     try { doc.addImage(logoData, "PNG", MARGIN, 4, 36, 22); } catch { /* skip */ }
   }
-
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(13);
   doc.setFont("helvetica", "bold");
@@ -136,75 +129,67 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
   doc.setFont("helvetica", "normal");
   doc.text("Proof of Delivery", pageWidth / 2, 19, { align: "center" });
   doc.setFontSize(8);
-  doc.text(`Job ${ref}`, pageWidth - MARGIN, 12, { align: "right" });
+  doc.text("Job " + ref, pageWidth - MARGIN, 12, { align: "right" });
   doc.text(safeDate(job.completed_at || new Date().toISOString()), pageWidth - MARGIN, 18, { align: "right" });
 
   let y = 38;
 
+  // Vehicle Details
   y = addSectionTitle(doc, "Vehicle Details", y);
   autoTable(doc, {
-    startY: y,
-    margin: { left: MARGIN, right: MARGIN },
-    theme: "plain",
+    startY: y, margin: { left: MARGIN, right: MARGIN }, theme: "plain",
     styles: { fontSize: 9, cellPadding: { top: 1.5, bottom: 1.5, left: 2, right: 2 } },
-    columnStyles: {
-      0: { fontStyle: "bold", cellWidth: 48, textColor: [80, 80, 80] },
-      1: { cellWidth: contentWidth - 48 },
-    },
+    columnStyles: { 0: { fontStyle: "bold", cellWidth: 48, textColor: [80, 80, 80] }, 1: { cellWidth: contentWidth - 48 } },
     body: [
       ["Registration", job.vehicle_reg],
-      ["Make / Model", `${job.vehicle_make} ${job.vehicle_model}`],
+      ["Make / Model", job.vehicle_make + " " + job.vehicle_model],
       ["Colour", job.vehicle_colour],
       ...(job.vehicle_year ? [["Year", job.vehicle_year]] : []),
-      ["Job ID", `Job ${ref}`],
-      ["Route", `${job.pickup_city || "—"} \u2192 ${job.delivery_city || "—"}`],
+      ["Job ID", "Job " + ref],
+      ["Route", (job.pickup_city || "-") + " \u2192 " + (job.delivery_city || "-")],
       ["Collection Status", pickup ? "\u2713 Collected" : "Not collected"],
       ["Delivery Status", delivery ? "\u2713 Delivered" : "Not delivered"],
     ],
   });
   y = (doc as any).lastAutoTable.finalY + 8;
 
+  // Billable Expenses
   const billableExpenses = (expenses ?? []).filter(e => e.billable_on_pod !== false);
   if (billableExpenses.length > 0) {
-    y = addSectionTitle(doc, `Billable Expenses (${billableExpenses.length} items)`, y);
+    y = addSectionTitle(doc, "Billable Expenses (" + billableExpenses.length + " items)", y);
     y = ensureSpace(doc, y, 20);
     autoTable(doc, {
-      startY: y,
-      margin: { left: MARGIN, right: MARGIN },
-      theme: "striped",
+      startY: y, margin: { left: MARGIN, right: MARGIN }, theme: "striped",
       styles: { fontSize: 8, cellPadding: { top: 1.5, bottom: 1.5, left: 3, right: 3 } },
       headStyles: { fillColor: [33, 37, 41], textColor: [255, 255, 255] },
       head: [["Category", "Label"]],
-      body: billableExpenses.map(e => [e.category, e.label || "—"]),
+      body: billableExpenses.map(e => [e.category, e.label || "-"]),
     });
     y = (doc as any).lastAutoTable.finalY + 8;
   }
 
+  // Pickup Details
   y = addSectionTitle(doc, "Pickup Details", y);
   autoTable(doc, {
-    startY: y,
-    margin: { left: MARGIN, right: MARGIN },
-    theme: "plain",
+    startY: y, margin: { left: MARGIN, right: MARGIN }, theme: "plain",
     styles: { fontSize: 9, cellPadding: { top: 1.5, bottom: 1.5, left: 2, right: 2 } },
-    columnStyles: {
-      0: { fontStyle: "bold", cellWidth: 48, textColor: [80, 80, 80] },
-      1: { cellWidth: contentWidth - 48 },
-    },
+    columnStyles: { 0: { fontStyle: "bold", cellWidth: 48, textColor: [80, 80, 80] }, 1: { cellWidth: contentWidth - 48 } },
     body: [
-      ["Contact", `${job.pickup_contact_name} (${job.pickup_contact_phone})`],
-      ["Address", `${job.pickup_address_line1}, ${job.pickup_city}, ${job.pickup_postcode}`],
+      ["Contact", job.pickup_contact_name + " (" + job.pickup_contact_phone + ")"],
+      ["Address", job.pickup_address_line1 + ", " + job.pickup_city + ", " + job.pickup_postcode],
       ...(job.pickup_company ? [["Company", job.pickup_company]] : []),
-      ["Date / Time", pickup ? safeDate(pickup.inspected_at) : "—"],
-      ["Odometer", pickup?.odometer != null ? pickup.odometer.toLocaleString("en-GB") : "—"],
+      ["Date / Time", pickup ? safeDate(pickup.inspected_at) : "-"],
+      ["Odometer", pickup?.odometer != null ? pickup.odometer.toLocaleString("en-GB") : "-"],
       ["Fuel", fuelLabel(pickup?.fuel_level_percent ?? null)],
-      ["Driver", pickup?.inspected_by_name || "—"],
-      ["Customer", pickup?.customer_name || "—"],
+      ["Driver", pickup?.inspected_by_name || "-"],
+      ["Customer", pickup?.customer_name || "-"],
       ["Damages", String(pickupDamages.length)],
       ["Photos", String(pickupPhotos.length)],
     ],
   });
   y = (doc as any).lastAutoTable.finalY + 8;
 
+  // Pickup Checklist
   if (pickup) {
     const items = CHECKLIST_FIELDS
       .filter(f => { const v = pickup[f.key]; return v != null && v !== ""; })
@@ -213,52 +198,46 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
       y = addSectionTitle(doc, "Pickup Checklist", y);
       y = ensureSpace(doc, y, 20);
       autoTable(doc, {
-        startY: y,
-        margin: { left: MARGIN, right: MARGIN },
-        theme: "striped",
+        startY: y, margin: { left: MARGIN, right: MARGIN }, theme: "striped",
         styles: { fontSize: 8, cellPadding: { top: 1.5, bottom: 1.5, left: 3, right: 3 } },
         headStyles: { fillColor: [33, 37, 41], textColor: [255, 255, 255] },
         columnStyles: { 0: { cellWidth: 60 }, 1: { cellWidth: contentWidth - 60 } },
-        head: [["Item", "Value"]],
-        body: items,
+        head: [["Item", "Value"]], body: items,
       });
       y = (doc as any).lastAutoTable.finalY + 4;
       if (pickup.notes) {
         doc.setFontSize(8);
         doc.setFont("helvetica", "italic");
         doc.setTextColor(100, 100, 100);
-        doc.text(`Notes: ${pickup.notes}`, MARGIN, y);
+        doc.text("Notes: " + pickup.notes, MARGIN, y);
         y += 6;
       }
       y += 4;
     }
   }
 
+  // Delivery Details
   y = addSectionTitle(doc, "Delivery Details", y);
   autoTable(doc, {
-    startY: y,
-    margin: { left: MARGIN, right: MARGIN },
-    theme: "plain",
+    startY: y, margin: { left: MARGIN, right: MARGIN }, theme: "plain",
     styles: { fontSize: 9, cellPadding: { top: 1.5, bottom: 1.5, left: 2, right: 2 } },
-    columnStyles: {
-      0: { fontStyle: "bold", cellWidth: 48, textColor: [80, 80, 80] },
-      1: { cellWidth: contentWidth - 48 },
-    },
+    columnStyles: { 0: { fontStyle: "bold", cellWidth: 48, textColor: [80, 80, 80] }, 1: { cellWidth: contentWidth - 48 } },
     body: [
-      ["Contact", `${job.delivery_contact_name} (${job.delivery_contact_phone})`],
-      ["Address", `${job.delivery_address_line1}, ${job.delivery_city}, ${job.delivery_postcode}`],
+      ["Contact", job.delivery_contact_name + " (" + job.delivery_contact_phone + ")"],
+      ["Address", job.delivery_address_line1 + ", " + job.delivery_city + ", " + job.delivery_postcode],
       ...(job.delivery_company ? [["Company", job.delivery_company]] : []),
-      ["Date / Time", delivery ? safeDate(delivery.inspected_at) : "—"],
-      ["Odometer", delivery?.odometer != null ? delivery.odometer.toLocaleString("en-GB") : "—"],
+      ["Date / Time", delivery ? safeDate(delivery.inspected_at) : "-"],
+      ["Odometer", delivery?.odometer != null ? delivery.odometer.toLocaleString("en-GB") : "-"],
       ["Fuel", fuelLabel(delivery?.fuel_level_percent ?? null)],
-      ["Driver", delivery?.inspected_by_name || "—"],
-      ["Customer", delivery?.customer_name || "—"],
+      ["Driver", delivery?.inspected_by_name || "-"],
+      ["Customer", delivery?.customer_name || "-"],
       ["Damages", String(deliveryDamages.length)],
       ["Photos", String(deliveryPhotos.length)],
     ],
   });
   y = (doc as any).lastAutoTable.finalY + 8;
 
+  // Delivery Checklist
   if (delivery) {
     const items = CHECKLIST_FIELDS
       .filter(f => { const v = delivery[f.key]; return v != null && v !== ""; })
@@ -267,46 +246,40 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
       y = addSectionTitle(doc, "Delivery Checklist", y);
       y = ensureSpace(doc, y, 20);
       autoTable(doc, {
-        startY: y,
-        margin: { left: MARGIN, right: MARGIN },
-        theme: "striped",
+        startY: y, margin: { left: MARGIN, right: MARGIN }, theme: "striped",
         styles: { fontSize: 8, cellPadding: { top: 1.5, bottom: 1.5, left: 3, right: 3 } },
         headStyles: { fillColor: [33, 37, 41], textColor: [255, 255, 255] },
         columnStyles: { 0: { cellWidth: 60 }, 1: { cellWidth: contentWidth - 60 } },
-        head: [["Item", "Value"]],
-        body: items,
+        head: [["Item", "Value"]], body: items,
       });
       y = (doc as any).lastAutoTable.finalY + 4;
       if (delivery.notes) {
         doc.setFontSize(8);
         doc.setFont("helvetica", "italic");
         doc.setTextColor(100, 100, 100);
-        doc.text(`Notes: ${delivery.notes}`, MARGIN, y);
+        doc.text("Notes: " + delivery.notes, MARGIN, y);
         y += 6;
       }
       y += 4;
     }
   }
 
+  // Damage Summary
   const allDamages = [...pickupDamages, ...deliveryDamages];
   if (allDamages.length > 0) {
     y = addSectionTitle(doc, "Damage Summary", y);
     y = ensureSpace(doc, y, 20);
     autoTable(doc, {
-      startY: y,
-      margin: { left: MARGIN, right: MARGIN },
-      theme: "striped",
+      startY: y, margin: { left: MARGIN, right: MARGIN }, theme: "striped",
       styles: { fontSize: 8, cellPadding: { top: 1.5, bottom: 1.5, left: 3, right: 3 } },
       headStyles: { fillColor: [33, 37, 41], textColor: [255, 255, 255] },
       head: [["Area", "Item", "Type", "Notes"]],
-      body: allDamages.map(d => [
-        d.area || "—", d.item || "—",
-        d.damage_types?.join(", ") || "—", d.notes || "—",
-      ]),
+      body: allDamages.map(d => [d.area || "-", d.item || "-", d.damage_types?.join(", ") || "-", d.notes || "-"]),
     });
     y = (doc as any).lastAutoTable.finalY + 8;
   }
 
+  // Photos
   const allPhotos = [...pickupPhotos, ...deliveryPhotos];
   if (allPhotos.length > 0) {
     y = addSectionTitle(doc, "Photos", y);
@@ -314,15 +287,8 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(80, 80, 80);
-    doc.text(`${pickupPhotos.length} collection photo(s) · ${deliveryPhotos.length} delivery photo(s) embedded below.`, MARGIN, y);
-    y += 5;
-    doc.setFontSize(7.5);
-    doc.setTextColor(59, 130, 246);
-    const downloadNote = "To download individual images, view this job in the Axentra app and use the Collection / Delivery download buttons on the POD page.";
-    const noteLines = doc.splitTextToSize(downloadNote, contentWidth);
-    doc.text(noteLines, MARGIN, y);
-    doc.setTextColor(80, 80, 80);
-    y += noteLines.length * 4 + 4;
+    doc.text(pickupPhotos.length + " collection photo(s) - " + deliveryPhotos.length + " delivery photo(s) embedded below.", MARGIN, y);
+    y += 8;
 
     const photoWidth = (contentWidth - 6) / 3;
     const photoHeight = photoWidth * 0.75;
@@ -331,11 +297,11 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
     for (let photoIdx = 0; photoIdx < allPhotos.length; photoIdx++) {
       const photo = allPhotos[photoIdx];
       if (photoIdx === 0 || (photoIdx === pickupPhotos.length && deliveryPhotos.length > 0)) {
-        if (col > 0) { y += photoHeight + 8; col = 0; }
+        if (col > 0) { y += photoHeight + 10; col = 0; }
         y = ensureSpace(doc, y, 14);
         const sectionLabel = photoIdx === 0
-          ? `Collection Photos (${pickupPhotos.length})`
-          : `Delivery Photos (${deliveryPhotos.length})`;
+          ? "Collection Photos (" + pickupPhotos.length + ")"
+          : "Delivery Photos (" + deliveryPhotos.length + ")";
         doc.setFontSize(9);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(33, 37, 41);
@@ -343,42 +309,41 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
         y += 6;
       }
       y = ensureSpace(doc, y, photoHeight + 10);
+      const x = MARGIN + col * (photoWidth + 3);
       const imgData = imageCache.get(photo.url) ?? null;
+      const photoLabel = photo.label || photo.type;
+
       if (imgData) {
-        try {
-          const x = MARGIN + col * (photoWidth + 3);
-          doc.addImage(imgData, "JPEG", x, y, photoWidth, photoHeight);
-          doc.setFontSize(6);
-          doc.setTextColor(100, 100, 100);
-          doc.text(photo.label || photo.type, x, y + photoHeight + 3);
-          col++;
-          if (col >= 3) { col = 0; y += photoHeight + 8; }
-        } catch { /* skip */ }
+        try { doc.addImage(imgData, "JPEG", x, y, photoWidth, photoHeight); } catch { /* skip */ }
       } else {
-        const x = MARGIN + col * (photoWidth + 3);
         doc.setDrawColor(200, 200, 200);
         doc.setFillColor(245, 245, 245);
         doc.rect(x, y, photoWidth, photoHeight, "FD");
         doc.setFontSize(7);
         doc.setTextColor(160, 160, 160);
         doc.text("Photo unavailable", x + photoWidth / 2, y + photoHeight / 2, { align: "center" });
-        doc.setFontSize(6);
-        doc.text(photo.label || photo.type, x, y + photoHeight + 3);
-        col++;
-        if (col >= 3) { col = 0; y += photoHeight + 8; }
       }
+      doc.setFontSize(6);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(100, 100, 100);
+      doc.text(photoLabel, x, y + photoHeight + 3);
+
+      col++;
+      if (col >= 3) { col = 0; y += photoHeight + 10; }
     }
-    if (col > 0) y += photoHeight + 8;
+    if (col > 0) y += photoHeight + 10;
+    y += 4;
   }
 
+  // Signatures
   y = addSectionTitle(doc, "Signatures", y);
   y = ensureSpace(doc, y, 40);
 
   const sigs = [
-    { label: "Pickup Driver", name: pickup?.inspected_by_name || "—", url: pickup?.driver_signature_url },
-    { label: "Pickup Customer", name: pickup?.customer_name || "—", url: pickup?.customer_signature_url },
-    { label: "Delivery Driver", name: delivery?.inspected_by_name || "—", url: delivery?.driver_signature_url },
-    { label: "Delivery Customer", name: delivery?.customer_name || "—", url: delivery?.customer_signature_url },
+    { label: "Pickup Driver",     name: pickup?.inspected_by_name || "-",   url: pickup?.driver_signature_url },
+    { label: "Pickup Customer",   name: pickup?.customer_name || "-",        url: pickup?.customer_signature_url },
+    { label: "Delivery Driver",   name: delivery?.inspected_by_name || "-",  url: delivery?.driver_signature_url },
+    { label: "Delivery Customer", name: delivery?.customer_name || "-",      url: delivery?.customer_signature_url },
   ];
 
   const sigWidth = (contentWidth - 9) / 4;
@@ -391,29 +356,21 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
     doc.setTextColor(80, 80, 80);
     doc.text(sig.label, sigX, sigStartY);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
+    doc.setTextColor(33, 37, 41);
     doc.text(sig.name, sigX, sigStartY + 4);
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.rect(sigX, sigStartY + 6, sigWidth, 18);
     if (sig.url) {
       const imgData = imageCache.get(sig.url) ?? null;
       if (imgData) {
-        try {
-          doc.setDrawColor(200, 200, 200);
-          doc.setLineWidth(0.3);
-          doc.rect(sigX, sigStartY + 6, sigWidth, 18);
-          doc.addImage(imgData, "PNG", sigX + 1, sigStartY + 7, sigWidth - 2, 16);
-        } catch { /* skip */ }
+        try { doc.addImage(imgData, "PNG", sigX + 1, sigStartY + 7, sigWidth - 2, 16); } catch { /* skip */ }
       } else {
-        doc.setDrawColor(200, 200, 200);
-        doc.setLineWidth(0.3);
-        doc.rect(sigX, sigStartY + 6, sigWidth, 18);
         doc.setFontSize(7);
         doc.setTextColor(180, 180, 180);
         doc.text("Image unavailable", sigX + sigWidth / 2, sigStartY + 16, { align: "center" });
       }
     } else {
-      doc.setDrawColor(200, 200, 200);
-      doc.setLineWidth(0.3);
-      doc.rect(sigX, sigStartY + 6, sigWidth, 18);
       doc.setFontSize(7);
       doc.setTextColor(180, 180, 180);
       doc.text("Not signed", sigX + sigWidth / 2, sigStartY + 16, { align: "center" });
@@ -422,6 +379,7 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
   }
   y = sigStartY + 30;
 
+  // Declaration
   y = ensureSpace(doc, y, 25);
   y += 4;
   doc.setFontSize(9);
@@ -435,15 +393,15 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
   const decl = "The customer confirms that the above vehicle has been inspected at the point of delivery and any noted damage or exceptions have been recorded on this POD and accompanying imagery.";
   const lines = doc.splitTextToSize(decl, contentWidth);
   doc.text(lines, MARGIN, y);
-  y += lines.length * 4 + 8;
 
+  // Footer
   const totalPages = doc.getNumberOfPages();
   for (let p = 1; p <= totalPages; p++) {
     doc.setPage(p);
     doc.setFontSize(7);
     doc.setTextColor(150, 150, 150);
     doc.text("Generated by Axentra Vehicle Logistics", MARGIN, 290);
-    doc.text(`Job ${ref} \u2022 ${new Date().toLocaleString("en-GB")} \u2022 Page ${p}/${totalPages}`, pageWidth - MARGIN, 290, { align: "right" });
+    doc.text("Job " + ref + " \u2022 " + new Date().toLocaleString("en-GB") + " \u2022 Page " + p + "/" + totalPages, pageWidth - MARGIN, 290, { align: "right" });
   }
 
   return doc.output("blob");
@@ -456,14 +414,11 @@ export async function sharePodPdf(job: JobWithRelations, expenses?: PodExpense[]
   const dateStr = job.completed_at
     ? new Date(job.completed_at).toISOString().slice(0, 10)
     : new Date().toISOString().slice(0, 10);
-  const fileName = `AXENTRA_POD_${ref}_${sanitizedReg}_${dateStr}.pdf`;
+  const fileName = "AXENTRA_POD_" + ref + "_" + sanitizedReg + "_" + dateStr + ".pdf";
   const file = new File([blob], fileName, { type: "application/pdf" });
 
   if (navigator.share && navigator.canShare?.({ files: [file] })) {
-    await navigator.share({
-      title: `AXENTRA POD – ${ref} – ${job.vehicle_reg}`,
-      files: [file],
-    });
+    await navigator.share({ title: "AXENTRA POD - " + ref + " - " + job.vehicle_reg, files: [file] });
   } else {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -481,52 +436,64 @@ export async function emailPodPdf(job: JobWithRelations, expenses?: PodExpense[]
   const dateStr = job.completed_at
     ? new Date(job.completed_at).toISOString().slice(0, 10)
     : new Date().toISOString().slice(0, 10);
-  const fileName = `AXENTRA_POD_${ref}_${sanitizedReg}_${dateStr}.pdf`;
+  const fileName = "AXENTRA_POD_" + ref + "_" + sanitizedReg + "_" + dateStr + ".pdf";
+  const subject = "Axentra POD - " + ref + " - " + job.vehicle_reg;
 
-  const subject = `Axentra POD – ${ref} – ${job.vehicle_reg}`;
-
-  // ── Upload to Supabase Storage and get a 30-day signed link ──
+  // Upload to Supabase Storage
   let downloadLink = "";
   try {
     const { supabase } = await import("@/integrations/supabase/client");
     const { data: { session } } = await supabase.auth.getSession();
     const orgId = session?.user?.user_metadata?.org_id ?? "shared";
-    const path = `${orgId}/${fileName}`;
-
+    const path = orgId + "/" + fileName;
     const { error: uploadError } = await supabase.storage
       .from("pod-pdfs")
       .upload(path, blob, { contentType: "application/pdf", upsert: true });
-
     if (!uploadError) {
       const { data: signed } = await supabase.storage
         .from("pod-pdfs")
         .createSignedUrl(path, 60 * 60 * 24 * 30);
       if (signed?.signedUrl) downloadLink = signed.signedUrl;
     }
-  } catch { /* fall through — link will be empty */ }
+  } catch { /* fall through */ }
 
-  const body = [
-    `Dear Customer,`,
-    ``,
-    `Please find your Proof of Delivery for job ${ref} (${job.vehicle_reg}) at the link below.`,
-    ``,
-    `Route: ${job.pickup_city || "—"} → ${job.delivery_city || "—"}`,
-    `Date: ${dateStr}`,
-    ``,
-    downloadLink
-      ? `Download POD: ${downloadLink}`
-      : `(PDF will be attached separately)`,
-    ``,
-    `Link expires in 30 days.`,
-    ``,
-    `If you have any queries, please do not hesitate to contact us.`,
-    ``,
-    `Kind regards,`,
-    `Axentra Vehicle Logistics`,
-    `info@axentravehicles.com`,
-  ].join("\n");
+  // Try sending branded HTML email via edge function
+  const customerEmail = (job as any).delivery_contact_email || (job as any).client_email || "";
+  if (customerEmail && downloadLink) {
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { error } = await supabase.functions.invoke("send-pod-email", {
+        body: {
+          to: customerEmail,
+          subject: subject,
+          jobRef: ref,
+          vehicleReg: job.vehicle_reg,
+          route: (job.pickup_city || "-") + " to " + (job.delivery_city || "-"),
+          date: dateStr,
+          downloadUrl: downloadLink,
+        },
+      });
+      if (!error) return;
+    } catch { /* fall through */ }
+  }
 
-  // ── Mobile: Web Share API (text + link) ──
+  // Fallback: share sheet or mailto
+  const bodyLines = [
+    "Dear Customer,",
+    "",
+    "Your Proof of Delivery for job " + ref + " (" + job.vehicle_reg + ") is ready.",
+    "",
+    "Route: " + (job.pickup_city || "-") + " to " + (job.delivery_city || "-"),
+    "Date: " + dateStr,
+    "",
+    downloadLink ? "Download your POD PDF (expires in 30 days):\n" + downloadLink : "(Please contact us for a copy)",
+    "",
+    "Kind regards,",
+    "Axentra Vehicle Logistics",
+    "info@axentravehicles.com",
+  ];
+  const body = bodyLines.join("\n");
+
   if (navigator.share) {
     try {
       await navigator.share({ title: subject, text: body });
@@ -536,7 +503,5 @@ export async function emailPodPdf(job: JobWithRelations, expenses?: PodExpense[]
     }
   }
 
-  // ── Desktop/fallback: open mailto with link in body ──
-  const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  window.open(mailto, "_blank");
+  window.open("mailto:?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body), "_blank");
 }
