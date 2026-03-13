@@ -125,6 +125,92 @@ export type Database = {
           },
         ]
       }
+      driver_profiles: {
+        Row: {
+          address_line1: string | null
+          address_line2: string | null
+          city: string | null
+          created_at: string
+          date_of_birth: string | null
+          display_name: string | null
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          employment_type: string | null
+          full_name: string
+          id: string
+          is_active: boolean
+          licence_categories: string[] | null
+          licence_expiry: string | null
+          licence_number: string | null
+          notes: string | null
+          org_id: string
+          phone: string | null
+          postcode: string | null
+          start_date: string | null
+          trade_plate_number: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address_line1?: string | null
+          address_line2?: string | null
+          city?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          display_name?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          employment_type?: string | null
+          full_name?: string
+          id?: string
+          is_active?: boolean
+          licence_categories?: string[] | null
+          licence_expiry?: string | null
+          licence_number?: string | null
+          notes?: string | null
+          org_id: string
+          phone?: string | null
+          postcode?: string | null
+          start_date?: string | null
+          trade_plate_number?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address_line1?: string | null
+          address_line2?: string | null
+          city?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          display_name?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          employment_type?: string | null
+          full_name?: string
+          id?: string
+          is_active?: boolean
+          licence_categories?: string[] | null
+          licence_expiry?: string | null
+          licence_number?: string | null
+          notes?: string | null
+          org_id?: string
+          phone?: string | null
+          postcode?: string | null
+          start_date?: string | null
+          trade_plate_number?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_profiles_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expense_receipts: {
         Row: {
           backend: string
@@ -360,6 +446,93 @@ export type Database = {
           },
           {
             foreignKeyName: "inspections_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          client_address: string | null
+          client_company: string | null
+          client_email: string | null
+          client_name: string
+          created_at: string
+          due_date: string | null
+          id: string
+          invoice_number: string
+          issue_date: string
+          job_id: string | null
+          line_items: Json
+          notes: string | null
+          org_id: string
+          payment_terms: string | null
+          pdf_url: string | null
+          status: string
+          subtotal: number
+          total: number
+          updated_at: string
+          vat_amount: number | null
+          vat_rate: number | null
+        }
+        Insert: {
+          client_address?: string | null
+          client_company?: string | null
+          client_email?: string | null
+          client_name: string
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          invoice_number: string
+          issue_date?: string
+          job_id?: string | null
+          line_items?: Json
+          notes?: string | null
+          org_id: string
+          payment_terms?: string | null
+          pdf_url?: string | null
+          status?: string
+          subtotal?: number
+          total?: number
+          updated_at?: string
+          vat_amount?: number | null
+          vat_rate?: number | null
+        }
+        Update: {
+          client_address?: string | null
+          client_company?: string | null
+          client_email?: string | null
+          client_name?: string
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          invoice_number?: string
+          issue_date?: string
+          job_id?: string | null
+          line_items?: Json
+          notes?: string | null
+          org_id?: string
+          payment_terms?: string | null
+          pdf_url?: string | null
+          status?: string
+          subtotal?: number
+          total?: number
+          updated_at?: string
+          vat_amount?: number | null
+          vat_rate?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organisations"
