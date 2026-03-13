@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   listAllUsers, createOrganisation, createUser, setUserRole,
   deactivateUser, reactivateUser,
+  type OrgUser, type OrgRecord,
 } from "@/lib/adminApi";
 import { logClientEvent } from "@/lib/logger";
 import { AppHeader } from "@/components/AppHeader";
