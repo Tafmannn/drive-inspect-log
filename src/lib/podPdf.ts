@@ -233,18 +233,20 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
       y = addSectionTitle(doc, "Pickup Checklist", y);
       y = ensureSpace(doc, y, 20);
       autoTable(doc, {
-        startY: y,
-        margin: { left: MARGIN, right: MARGIN },
-        theme: "striped",
-        styles: { fontSize: 8, cellPadding: { top: 1.5, bottom: 1.5, left: 3, right: 3 } },
-        headStyles: { fillColor: [33, 37, 41], textColor: [255, 255, 255] },
-        columnStyles: { 0: { cellWidth: 60 }, 1: { cellWidth: contentWidth - 60 } },
-        head: [["Item", "Value"]],
-        body: items,
-      });
-      y = (doc as any).lastAutoTable.finalY + 4;
-      if (pickup.notes) {
-        doc.setFontSize(8);
-        doc.setFont("helvetica", "italic");
-        doc.setTextColor(100, 100, 100);
-        doc.text(`Notes: ${pickup.notes}`, MARGIN, y);
+  startY: y,
+  margin: { left: MARGIN, right: MARGIN },
+  theme: "striped",
+  styles: { fontSize: 8, cellPadding: { top: 1.5, bottom: 1.5, left: 3, right: 3 } },
+  headStyles: { fillColor: [33, 37, 41], textColor: [255, 255, 255] },
+  columnStyles: { 0: { cellWidth: 60 }, 1: { cellWidth: contentWidth - 60 } },
+  head: [["Item", "Value"]],
+  body: items,
+});
+y = (doc as any).lastAutoTable.finalY + 4;
+
+if (pickup.notes) {
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "italic");
+  doc.setTextColor(100, 100, 100);
+  doc.text(`Notes: ${pickup.notes}`, MARGIN, y);
+}
