@@ -1,6 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import type { JobWithRelations, Inspection } from "./types";
+import type { JobWithRelations } from "./types";
 import { FUEL_PERCENT_TO_LABEL } from "./types";
 import { CHECKLIST_FIELDS } from "./inspectionFields";
 import { resolveImageUrlAsync } from "./gcsProxyUrl";
@@ -47,7 +47,7 @@ function addSectionTitle(doc: jsPDF, title: string, y: number): number {
 async function loadImageAsBase64(url: string): Promise<string | null> {
   try {
     const resolvedUrl = await resolveImageUrlAsync(url) ?? url;
-    const response = await fetch(resolvedUrl, { mode: 'cors' });
+    const response = await fetch(resolvedUrl, { mode: "cors" });
     if (!response.ok) return null;
     const blob = await response.blob();
     return new Promise((resolve) => {
@@ -74,8 +74,21 @@ async function loadImageAsBase64(url: string): Promise<string | null> {
 }
 
 async function loadLogo(): Promise<string | null> {
+  try { return await loadImageAsBase64("/axentra-logo.png"); }
+  catch { return null; }
+}
+
+// Generate a 30-day signed URL for a Supabase storage photo
+async function getPhotoSignedUrl(url: string): Promise<string | null> {
   try {
-    return await loadImageAsBase64("/axentra-logo.png");
+    const match = url.match(/\/storage\/v1\/object\/(?:public|authenticated|sign)\/([^/?]+)\/(.+?)(\?|$)/);
+    if (!match) return null;
+    const [, bucket, path] = match;
+    const { supabase } = await import("@/integrations/supabase/client");
+    const { data } = await supabase.storage
+      .from(bucket)
+      .createSignedUrl(decodeURIComponent(path), 60 * 60 * 24 * 30);
+    return data?.signedUrl ?? null;
   } catch {
     return null;
   }
@@ -102,6 +115,7 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
   const pickupPhotos = job.photos.filter(p => p.type.startsWith("pickup_"));
   const deliveryPhotos = job.photos.filter(p => p.type.startsWith("delivery_"));
 
+  // Pre-load images + signed URLs in parallel
   const allPhotoUrls = [...pickupPhotos, ...deliveryPhotos].map(p => p.url);
   const sigUrls = [
     pickup?.driver_signature_url,
@@ -112,14 +126,20 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
 
   const allUrls = [...allPhotoUrls, ...sigUrls];
   const imageCache = new Map<string, string | null>();
+  const signedUrlCache = new Map<string, string | null>();
 
-  await Promise.allSettled(
-    allUrls.map(async (url) => {
+  await Promise.allSettled([
+    ...allUrls.map(async (url) => {
       const data = await loadImageAsBase64(url);
       imageCache.set(url, data);
-    })
-  );
+    }),
+    ...allPhotoUrls.map(async (url) => {
+      const signed = await getPhotoSignedUrl(url);
+      signedUrlCache.set(url, signed);
+    }),
+  ]);
 
+  // Header banner
   doc.setFillColor(33, 37, 41);
   doc.rect(0, 0, pageWidth, 30, "F");
 
@@ -141,6 +161,7 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
 
   let y = 38;
 
+  // Vehicle Details
   y = addSectionTitle(doc, "Vehicle Details", y);
   autoTable(doc, {
     startY: y,
@@ -164,6 +185,7 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
   });
   y = (doc as any).lastAutoTable.finalY + 8;
 
+  // Billable Expenses
   const billableExpenses = (expenses ?? []).filter(e => e.billable_on_pod !== false);
   if (billableExpenses.length > 0) {
     y = addSectionTitle(doc, `Billable Expenses (${billableExpenses.length} items)`, y);
@@ -180,6 +202,7 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
     y = (doc as any).lastAutoTable.finalY + 8;
   }
 
+  // Pickup Details
   y = addSectionTitle(doc, "Pickup Details", y);
   autoTable(doc, {
     startY: y,
@@ -205,6 +228,7 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
   });
   y = (doc as any).lastAutoTable.finalY + 8;
 
+  // Pickup Checklist
   if (pickup) {
     const items = CHECKLIST_FIELDS
       .filter(f => { const v = pickup[f.key]; return v != null && v !== ""; })
@@ -234,6 +258,7 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
     }
   }
 
+  // Delivery Details
   y = addSectionTitle(doc, "Delivery Details", y);
   autoTable(doc, {
     startY: y,
@@ -259,6 +284,7 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
   });
   y = (doc as any).lastAutoTable.finalY + 8;
 
+  // Delivery Checklist
   if (delivery) {
     const items = CHECKLIST_FIELDS
       .filter(f => { const v = delivery[f.key]; return v != null && v !== ""; })
@@ -288,6 +314,7 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
     }
   }
 
+  // Damage Summary
   const allDamages = [...pickupDamages, ...deliveryDamages];
   if (allDamages.length > 0) {
     y = addSectionTitle(doc, "Damage Summary", y);
@@ -307,6 +334,7 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
     y = (doc as any).lastAutoTable.finalY + 8;
   }
 
+  // Photos
   const allPhotos = [...pickupPhotos, ...deliveryPhotos];
   if (allPhotos.length > 0) {
     y = addSectionTitle(doc, "Photos", y);
@@ -314,15 +342,11 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(80, 80, 80);
-    doc.text(`${pickupPhotos.length} collection photo(s) · ${deliveryPhotos.length} delivery photo(s) embedded below.`, MARGIN, y);
-    y += 5;
-    doc.setFontSize(7.5);
-    doc.setTextColor(59, 130, 246);
-    const downloadNote = "To download individual images, view this job in the Axentra app and use the Collection / Delivery download buttons on the POD page.";
-    const noteLines = doc.splitTextToSize(downloadNote, contentWidth);
-    doc.text(noteLines, MARGIN, y);
-    doc.setTextColor(80, 80, 80);
-    y += noteLines.length * 4 + 4;
+    doc.text(
+      `${pickupPhotos.length} collection photo(s) · ${deliveryPhotos.length} delivery photo(s) embedded below.`,
+      MARGIN, y
+    );
+    y += 8;
 
     const photoWidth = (contentWidth - 6) / 3;
     const photoHeight = photoWidth * 0.75;
@@ -330,8 +354,10 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
 
     for (let photoIdx = 0; photoIdx < allPhotos.length; photoIdx++) {
       const photo = allPhotos[photoIdx];
+
+      // Sub-header when switching collection → delivery
       if (photoIdx === 0 || (photoIdx === pickupPhotos.length && deliveryPhotos.length > 0)) {
-        if (col > 0) { y += photoHeight + 8; col = 0; }
+        if (col > 0) { y += photoHeight + 14; col = 0; }
         y = ensureSpace(doc, y, 14);
         const sectionLabel = photoIdx === 0
           ? `Collection Photos (${pickupPhotos.length})`
@@ -342,43 +368,58 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
         doc.text(sectionLabel, MARGIN, y);
         y += 6;
       }
-      y = ensureSpace(doc, y, photoHeight + 10);
+
+      y = ensureSpace(doc, y, photoHeight + 14);
       const imgData = imageCache.get(photo.url) ?? null;
+      const x = MARGIN + col * (photoWidth + 3);
+      const photoLabel = photo.label || photo.type.replace(/pickup_|delivery_/g, "").replace(/_/g, " ");
+      const signedUrl = signedUrlCache.get(photo.url) ?? null;
+
       if (imgData) {
         try {
-          const x = MARGIN + col * (photoWidth + 3);
           doc.addImage(imgData, "JPEG", x, y, photoWidth, photoHeight);
-          doc.setFontSize(6);
-          doc.setTextColor(100, 100, 100);
-          doc.text(photo.label || photo.type, x, y + photoHeight + 3);
-          col++;
-          if (col >= 3) { col = 0; y += photoHeight + 8; }
-        } catch { /* skip */ }
+        } catch { /* skip broken image */ }
       } else {
-        const x = MARGIN + col * (photoWidth + 3);
         doc.setDrawColor(200, 200, 200);
         doc.setFillColor(245, 245, 245);
         doc.rect(x, y, photoWidth, photoHeight, "FD");
         doc.setFontSize(7);
         doc.setTextColor(160, 160, 160);
         doc.text("Photo unavailable", x + photoWidth / 2, y + photoHeight / 2, { align: "center" });
-        doc.setFontSize(6);
-        doc.text(photo.label || photo.type, x, y + photoHeight + 3);
-        col++;
-        if (col >= 3) { col = 0; y += photoHeight + 8; }
+      }
+
+      // Label under photo
+      doc.setFontSize(6);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(100, 100, 100);
+      doc.text(photoLabel, x, y + photoHeight + 3);
+
+      // Download link under photo
+      if (signedUrl) {
+        doc.setFontSize(6.5);
+        doc.setTextColor(37, 99, 235); // blue
+        doc.textWithLink("⬇ Download photo", x, y + photoHeight + 7, { url: signedUrl });
+      }
+
+      col++;
+      if (col >= 3) {
+        col = 0;
+        y += photoHeight + 14;
       }
     }
-    if (col > 0) y += photoHeight + 8;
+    if (col > 0) y += photoHeight + 14;
+    y += 4;
   }
 
+  // Signatures
   y = addSectionTitle(doc, "Signatures", y);
   y = ensureSpace(doc, y, 40);
 
   const sigs = [
-    { label: "Pickup Driver", name: pickup?.inspected_by_name || "—", url: pickup?.driver_signature_url },
-    { label: "Pickup Customer", name: pickup?.customer_name || "—", url: pickup?.customer_signature_url },
-    { label: "Delivery Driver", name: delivery?.inspected_by_name || "—", url: delivery?.driver_signature_url },
-    { label: "Delivery Customer", name: delivery?.customer_name || "—", url: delivery?.customer_signature_url },
+    { label: "Pickup Driver",    name: pickup?.inspected_by_name || "—",  url: pickup?.driver_signature_url },
+    { label: "Pickup Customer",  name: pickup?.customer_name || "—",       url: pickup?.customer_signature_url },
+    { label: "Delivery Driver",  name: delivery?.inspected_by_name || "—", url: delivery?.driver_signature_url },
+    { label: "Delivery Customer",name: delivery?.customer_name || "—",     url: delivery?.customer_signature_url },
   ];
 
   const sigWidth = (contentWidth - 9) / 4;
@@ -392,28 +433,25 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
     doc.text(sig.label, sigX, sigStartY);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7);
+    doc.setTextColor(33, 37, 41);
     doc.text(sig.name, sigX, sigStartY + 4);
+
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.rect(sigX, sigStartY + 6, sigWidth, 18);
+
     if (sig.url) {
       const imgData = imageCache.get(sig.url) ?? null;
       if (imgData) {
         try {
-          doc.setDrawColor(200, 200, 200);
-          doc.setLineWidth(0.3);
-          doc.rect(sigX, sigStartY + 6, sigWidth, 18);
           doc.addImage(imgData, "PNG", sigX + 1, sigStartY + 7, sigWidth - 2, 16);
         } catch { /* skip */ }
       } else {
-        doc.setDrawColor(200, 200, 200);
-        doc.setLineWidth(0.3);
-        doc.rect(sigX, sigStartY + 6, sigWidth, 18);
         doc.setFontSize(7);
         doc.setTextColor(180, 180, 180);
         doc.text("Image unavailable", sigX + sigWidth / 2, sigStartY + 16, { align: "center" });
       }
     } else {
-      doc.setDrawColor(200, 200, 200);
-      doc.setLineWidth(0.3);
-      doc.rect(sigX, sigStartY + 6, sigWidth, 18);
       doc.setFontSize(7);
       doc.setTextColor(180, 180, 180);
       doc.text("Not signed", sigX + sigWidth / 2, sigStartY + 16, { align: "center" });
@@ -422,6 +460,7 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
   }
   y = sigStartY + 30;
 
+  // Declaration
   y = ensureSpace(doc, y, 25);
   y += 4;
   doc.setFontSize(9);
@@ -435,15 +474,18 @@ export async function generatePodPdf(job: JobWithRelations, expenses?: PodExpens
   const decl = "The customer confirms that the above vehicle has been inspected at the point of delivery and any noted damage or exceptions have been recorded on this POD and accompanying imagery.";
   const lines = doc.splitTextToSize(decl, contentWidth);
   doc.text(lines, MARGIN, y);
-  y += lines.length * 4 + 8;
 
+  // Footer on every page
   const totalPages = doc.getNumberOfPages();
   for (let p = 1; p <= totalPages; p++) {
     doc.setPage(p);
     doc.setFontSize(7);
     doc.setTextColor(150, 150, 150);
     doc.text("Generated by Axentra Vehicle Logistics", MARGIN, 290);
-    doc.text(`Job ${ref} \u2022 ${new Date().toLocaleString("en-GB")} \u2022 Page ${p}/${totalPages}`, pageWidth - MARGIN, 290, { align: "right" });
+    doc.text(
+      `Job ${ref} \u2022 ${new Date().toLocaleString("en-GB")} \u2022 Page ${p}/${totalPages}`,
+      pageWidth - MARGIN, 290, { align: "right" }
+    );
   }
 
   return doc.output("blob");
@@ -482,10 +524,9 @@ export async function emailPodPdf(job: JobWithRelations, expenses?: PodExpense[]
     ? new Date(job.completed_at).toISOString().slice(0, 10)
     : new Date().toISOString().slice(0, 10);
   const fileName = `AXENTRA_POD_${ref}_${sanitizedReg}_${dateStr}.pdf`;
-
   const subject = `Axentra POD – ${ref} – ${job.vehicle_reg}`;
 
-  // ── Upload to Supabase Storage and get a 30-day signed link ──
+  // Upload to Supabase Storage and get a 30-day signed link
   let downloadLink = "";
   try {
     const { supabase } = await import("@/integrations/supabase/client");
@@ -503,21 +544,19 @@ export async function emailPodPdf(job: JobWithRelations, expenses?: PodExpense[]
         .createSignedUrl(path, 60 * 60 * 24 * 30);
       if (signed?.signedUrl) downloadLink = signed.signedUrl;
     }
-  } catch { /* fall through — link will be empty */ }
+  } catch { /* fall through */ }
 
   const body = [
     `Dear Customer,`,
     ``,
-    `Please find your Proof of Delivery for job ${ref} (${job.vehicle_reg}) at the link below.`,
+    `Please find your Proof of Delivery for job ${ref} (${job.vehicle_reg}) below.`,
     ``,
     `Route: ${job.pickup_city || "—"} → ${job.delivery_city || "—"}`,
     `Date: ${dateStr}`,
     ``,
     downloadLink
-      ? `Download POD: ${downloadLink}`
-      : `(PDF will be attached separately)`,
-    ``,
-    `Link expires in 30 days.`,
+      ? `Tap here to download your POD PDF (link expires in 30 days):\n${downloadLink}`
+      : `(PDF could not be attached — please contact us if you need a copy)`,
     ``,
     `If you have any queries, please do not hesitate to contact us.`,
     ``,
@@ -526,7 +565,7 @@ export async function emailPodPdf(job: JobWithRelations, expenses?: PodExpense[]
     `info@axentravehicles.com`,
   ].join("\n");
 
-  // ── Mobile: Web Share API (text + link) ──
+  // Mobile: Web Share API
   if (navigator.share) {
     try {
       await navigator.share({ title: subject, text: body });
@@ -536,7 +575,7 @@ export async function emailPodPdf(job: JobWithRelations, expenses?: PodExpense[]
     }
   }
 
-  // ── Desktop/fallback: open mailto with link in body ──
+  // Desktop/fallback: mailto
   const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   window.open(mailto, "_blank");
 }
