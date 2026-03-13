@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 
-interface OrgUser {
+export interface OrgUser {
   id: string;
   email: string;
   role: string;
