@@ -27,15 +27,12 @@ export const SignaturePad = forwardRef<SignaturePadRef, SignaturePadProps>(
     const [signed, setSigned] = useState(false);
 
     // ── Canvas initialisation ──────────────────────────────────────────
-    // Called by ResizeObserver with the canvas's real CSS dimensions.
-    // Never called with 0×0 — observer only fires once the element is laid out.
     const initCanvas = useCallback((cssW: number, cssH: number) => {
       const canvas = canvasRef.current;
       if (!canvas || cssW === 0 || cssH === 0) return;
 
       const dpr = window.devicePixelRatio || 1;
 
-      // Capture existing drawing before resizing backing store
       let imageData: ImageData | null = null;
       const prevCtx = canvas.getContext("2d");
       if (hasStrokes.current && prevCtx && canvas.width > 0 && canvas.height > 0) {
@@ -53,13 +50,12 @@ export const SignaturePad = forwardRef<SignaturePadRef, SignaturePadProps>(
       ctx.strokeStyle = "hsl(215 28% 17%)";
       ctx.lineWidth = 2;
 
-      // Restore drawing after resize (best-effort)
       if (imageData && hasStrokes.current) {
         ctx.putImageData(imageData, 0, 0);
       }
     }, []);
 
-    // ── ResizeObserver fires once with real size, then on every resize ──
+    // ── ResizeObserver ──────────────────────────────────────────────────
     useEffect(() => {
       const canvas = canvasRef.current;
       if (!canvas) return;
@@ -75,4 +71,101 @@ export const SignaturePad = forwardRef<SignaturePadRef, SignaturePadProps>(
 
     // ── Coordinate helper ──────────────────────────────────────────────
     const getPos = useCallback((e: PointerEvent) => {
-      const canvas = canvasRef.current!​​​​​​​​​​​​​​​​
+      const canvas = canvasRef.current!;
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      };
+    }, []);
+
+    // ── Pointer handlers ───────────────────────────────────────────────
+    useEffect(() => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      const onDown = (e: PointerEvent) => {
+        e.preventDefault();
+        canvas.setPointerCapture(e.pointerId);
+        drawing.current = true;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        const pos = getPos(e);
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y);
+        if (!hasStrokes.current) {
+          hasStrokes.current = true;
+          setSigned(true);
+          onSignStart?.();
+        }
+      };
+
+      const onMove = (e: PointerEvent) => {
+        if (!drawing.current) return;
+        e.preventDefault();
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        const pos = getPos(e);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+      };
+
+      const onUp = (e: PointerEvent) => {
+        if (!drawing.current) return;
+        drawing.current = false;
+        try { canvas.releasePointerCapture(e.pointerId); } catch { /* ok */ }
+      };
+
+      canvas.addEventListener("pointerdown", onDown, { passive: false });
+      canvas.addEventListener("pointermove", onMove, { passive: false });
+      canvas.addEventListener("pointerup", onUp);
+      canvas.addEventListener("pointercancel", onUp);
+
+      return () => {
+        canvas.removeEventListener("pointerdown", onDown);
+        canvas.removeEventListener("pointermove", onMove);
+        canvas.removeEventListener("pointerup", onUp);
+        canvas.removeEventListener("pointercancel", onUp);
+      };
+    }, [getPos, onSignStart]);
+
+    // ── Imperative API ─────────────────────────────────────────────────
+    useImperativeHandle(ref, () => ({
+      clear() {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        hasStrokes.current = false;
+        setSigned(false);
+      },
+      async toFile(name: string): Promise<File> {
+        const canvas = canvasRef.current;
+        if (!canvas) throw new Error("Canvas not available");
+        return new Promise((resolve, reject) => {
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) return reject(new Error("Canvas toBlob failed"));
+              resolve(new File([blob], name, { type: "image/png" }));
+            },
+            "image/png"
+          );
+        });
+      },
+      isEmpty() {
+        return !hasStrokes.current;
+      },
+    }), []);
+
+    return (
+      <canvas
+        ref={canvasRef}
+        className={`w-full border rounded-md bg-white touch-none ${className}`}
+        style={{ height }}
+      />
+    );
+  }
+);
+
+SignaturePad.displayName = "SignaturePad";
