@@ -777,7 +777,7 @@ export async function generatePodPdf(
     ["Photos", String(deliveryPhotos.length)],
   ]);
 
-  y = renderChecklistSection(doc, y, "Delivery Checklist", delivery, delivery?.notes);
+  y = renderChecklistSection(doc, y, "Delivery Checklist", delivery as unknown as Record<string, unknown> | undefined, delivery?.notes);
 
   const allDamages = [...pickupDamages, ...deliveryDamages];
   if (allDamages.length > 0) {
