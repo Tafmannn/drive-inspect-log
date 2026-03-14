@@ -761,7 +761,7 @@ export async function generatePodPdf(
     ["Photos", String(pickupPhotos.length)],
   ]);
 
-  y = renderChecklistSection(doc, y, "Pickup Checklist", pickup, pickup?.notes);
+  y = renderChecklistSection(doc, y, "Pickup Checklist", pickup as unknown as Record<string, unknown> | undefined, pickup?.notes);
 
   y = addSectionTitle(doc, "Delivery Details", y);
   y = addPlainKeyValueTable(doc, y, [
