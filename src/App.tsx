@@ -35,6 +35,17 @@ import { useEffect } from "react";
 import { retryAllPending } from "@/lib/pendingUploads";
 import { Loader2 } from "lucide-react";
 
+/* ── Command Center imports ── */
+import { ControlLayout } from "@/features/control/layouts/ControlLayout";
+import { ControlRoute } from "@/features/control/guards/ControlRoute";
+import { ControlOverview } from "@/features/control/pages/ControlOverview";
+import { ControlJobs } from "@/features/control/pages/ControlJobs";
+import { ControlDrivers } from "@/features/control/pages/ControlDrivers";
+import { ControlCompliance } from "@/features/control/pages/ControlCompliance";
+import { ControlFinance } from "@/features/control/pages/ControlFinance";
+import { ControlAdmin } from "@/features/control/pages/ControlAdmin";
+import { ControlSuperAdmin } from "@/features/control/pages/ControlSuperAdmin";
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -51,7 +62,7 @@ function BackgroundUploader() {
   return null;
 }
 
-/* ── Protected route wrapper (replaces nested Routes inside AuthGate) */
+/* ── Protected route wrapper ── */
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { authEnabled, authLoading, user } = useAuth();
@@ -71,7 +82,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-/* ── Admin-only route guard ───────────────────────────────────────── */
+/* ── Admin-only route guard ── */
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { isAdmin } = useAuth();
@@ -79,7 +90,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-/* ── Super-admin-only route guard ─────────────────────────────────── */
+/* ── Super-admin-only route guard ── */
 
 function SuperAdminRoute({ children }: { children: React.ReactNode }) {
   const { isSuperAdmin, isAdmin } = useAuth();
@@ -89,7 +100,7 @@ function SuperAdminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-/* ── Dev override roles ───────────────────────────────────────────── */
+/* ── Dev override roles ── */
 
 function getDevOverrideRoles(): import("@/context/AuthContext").AppRole[] {
   if (typeof window === "undefined") return ["DRIVER"];
@@ -99,7 +110,7 @@ function getDevOverrideRoles(): import("@/context/AuthContext").AppRole[] {
   return ["DRIVER"];
 }
 
-/* ── App ──────────────────────────────────────────────────────────── */
+/* ── App ── */
 
 const App = () => {
   const overrideRoles = getDevOverrideRoles();
@@ -149,6 +160,31 @@ const App = () => {
                 <Route path="/super-admin" element={<ProtectedRoute><SuperAdminRoute><SuperAdminDashboard /></SuperAdminRoute></ProtectedRoute>} />
                 <Route path="/invoice/new" element={<ProtectedRoute><AdminRoute><InvoiceGenerator /></AdminRoute></ProtectedRoute>} />
                 <Route path="/invoice/new/:jobId" element={<ProtectedRoute><AdminRoute><InvoiceGenerator /></AdminRoute></ProtectedRoute>} />
+
+                {/* ── Command Center (desktop-first) ── */}
+                <Route
+                  path="/control"
+                  element={
+                    <ControlRoute>
+                      <ControlLayout />
+                    </ControlRoute>
+                  }
+                >
+                  <Route index element={<ControlOverview />} />
+                  <Route path="jobs" element={<ControlJobs />} />
+                  <Route path="drivers" element={<ControlDrivers />} />
+                  <Route path="compliance" element={<ControlCompliance />} />
+                  <Route path="finance" element={<ControlFinance />} />
+                  <Route path="admin" element={<ControlAdmin />} />
+                  <Route
+                    path="super-admin"
+                    element={
+                      <ControlRoute requiredRole="SUPERADMIN">
+                        <ControlSuperAdmin />
+                      </ControlRoute>
+                    }
+                  />
+                </Route>
 
                 {/* ── Catch-all ── */}
                 <Route path="*" element={<NotFound />} />
