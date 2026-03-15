@@ -492,6 +492,7 @@ async function handlePull(
   supabase: any,
   token: string,
   spreadsheetId: string,
+  orgId: string,
 ) {
   const log = { rows_processed: 0, rows_created: 0, rows_updated: 0, rows_skipped: 0, errors: [] as any[] };
 
