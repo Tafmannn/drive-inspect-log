@@ -93,19 +93,9 @@ export async function getJobWithRelations(jobId: string): Promise<JobWithRelatio
 }
 
 async function generateJobNumber(): Promise<string> {
-  const { data } = await supabase
-    .from('jobs')
-    .select('external_job_number')
-    .like('external_job_number', 'AX%')
-    .order('external_job_number', { ascending: false })
-    .limit(1);
-
-  let next = 1;
-  if (data && data.length > 0 && data[0].external_job_number) {
-    const match = data[0].external_job_number.match(/^AX(\d+)$/);
-    if (match) next = parseInt(match[1], 10) + 1;
-  }
-  return `AX${String(next).padStart(4, '0')}`;
+  const { data, error } = await supabase.rpc('next_job_number');
+  if (error) throw error;
+  return data as string;
 }
 
 export async function createJob(input: Partial<Omit<Job, 'id' | 'status' | 'has_pickup_inspection' | 'has_delivery_inspection' | 'completed_at' | 'created_at' | 'updated_at'>> & Pick<Job, 'vehicle_reg' | 'vehicle_make' | 'vehicle_model' | 'vehicle_colour' | 'pickup_contact_name' | 'pickup_contact_phone' | 'pickup_address_line1' | 'pickup_city' | 'pickup_postcode' | 'delivery_contact_name' | 'delivery_contact_phone' | 'delivery_address_line1' | 'delivery_city' | 'delivery_postcode'>): Promise<Job> {
