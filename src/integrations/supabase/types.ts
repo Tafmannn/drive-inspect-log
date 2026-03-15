@@ -1058,6 +1058,7 @@ export type Database = {
     }
     Functions: {
       is_super_admin: { Args: never; Returns: boolean }
+      next_job_number: { Args: never; Returns: string }
       user_org_id: { Args: never; Returns: string }
       user_role: { Args: never; Returns: string }
     }

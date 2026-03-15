@@ -14,10 +14,23 @@ class InternalStorageService implements StorageService {
 
     if (error) throw new Error(`Upload failed: ${error.message}`);
 
-    const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path);
+    let url: string;
+    if (isSignature) {
+      // G: Private bucket — use signed URL (7 days expiry)
+      const { data: signedData, error: signErr } = await supabase.storage
+        .from(bucket)
+        .createSignedUrl(path, 60 * 60 * 24 * 7);
+      if (signErr || !signedData?.signedUrl) {
+        throw new Error(`Failed to create signed URL: ${signErr?.message ?? 'unknown'}`);
+      }
+      url = signedData.signedUrl;
+    } else {
+      const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path);
+      url = urlData.publicUrl;
+    }
 
     return {
-      url: urlData.publicUrl,
+      url,
       backend: 'internal',
       backendRef: path,
     };

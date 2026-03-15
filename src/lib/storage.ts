@@ -2,6 +2,7 @@ import type { StorageService, StoredFileInfo } from './types';
 import { internalStorageService } from './internalStorageService';
 import { gcsStorageService } from './gcsStorageService';
 import { isFeatureEnabled } from './featureFlags';
+import { logClientEvent } from './logger';
 
 // Default to internal; dynamically resolved at runtime
 let resolvedService: StorageService | null = null;
@@ -34,6 +35,12 @@ export const storageService: StorageService = {
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         console.warn(`[Storage] GCS upload failed, falling back to internal storage: ${msg}`);
+        void logClientEvent('gcs_fallback_to_internal', 'warn', {
+          message: msg,
+          source: 'storage',
+          type: 'upload',
+          context: { pathHint: pathHint },
+        });
         return await internalStorageService.uploadImage(file, pathHint);
       }
     }

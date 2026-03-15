@@ -447,7 +447,18 @@ Deno.serve(async (req) => {
         job_master_tab: jobMasterTab,
       });
     } else if (action === "pull") {
-      return await handlePull(supabase, token, spreadsheet_id);
+      // B: Pass trusted org_id from authenticated user into pull
+      if (!userOrgId && !isSuperAdmin) {
+        return respond({ error: "Cannot pull jobs: no org_id available for this user." }, 403);
+      }
+      // For super admins without org_id, resolve from first org
+      let pullOrgId = userOrgId;
+      if (!pullOrgId && isSuperAdmin) {
+        const { data: firstOrg } = await supabase.from("organisations").select("id").order("created_at", { ascending: true }).limit(1).single();
+        if (!firstOrg) return respond({ error: "No organisation found in system." }, 500);
+        pullOrgId = firstOrg.id;
+      }
+      return await handlePull(supabase, token, spreadsheet_id, pullOrgId);
     } else if (action === "push") {
       const { jobIds } = body;
       return await handlePush(supabase, token, spreadsheet_id, sheetName, jobIds);
@@ -481,6 +492,7 @@ async function handlePull(
   supabase: any,
   token: string,
   spreadsheetId: string,
+  orgId: string,
 ) {
   const log = { rows_processed: 0, rows_created: 0, rows_updated: 0, rows_skipped: 0, errors: [] as any[] };
 
@@ -552,8 +564,8 @@ async function handlePull(
       h === "Import?" || h === "Sync to App?" || h === "Import"
     );
 
-    // Clear unresolved sync errors before processing
-    await supabase.from("sync_errors").delete().eq("resolved", false);
+    // I: Do NOT delete unresolved sync errors — preserve them for admin review
+    // Old errors remain; new errors from this run will be added alongside
 
     // 3. Read Job Master to find existing rows for upsert
     let masterRows: string[][] = [];
@@ -660,6 +672,7 @@ async function handlePull(
 
       // Build the job insert payload
       const jobPayload: Record<string, any> = {
+        org_id: orgId, // B: stamp org_id from authenticated user
         status: appStatus,
         // Required fields with defaults
         vehicle_reg: fieldValues["vehicle_reg"] || "UNKNOWN",
@@ -778,24 +791,17 @@ async function handlePull(
 
       console.log(`Job created: ${newJob.id} from row ${sheetRowIndex}`);
 
-      // 5b. Auto-generate external_job_number if missing
+      // 5b. Auto-generate external_job_number if missing — use DB sequence
       if (!newJob.external_job_number) {
-        const { data: maxRow } = await supabase
-          .from("jobs")
-          .select("external_job_number")
-          .like("external_job_number", "AX%")
-          .order("external_job_number", { ascending: false })
-          .limit(1);
-        let nextNum = 1;
-        if (maxRow && maxRow.length > 0 && maxRow[0].external_job_number) {
-          const m = maxRow[0].external_job_number.match(/^AX(\d+)$/);
-          if (m) nextNum = parseInt(m[1], 10) + 1;
+        const { data: genNumber, error: seqErr } = await supabase.rpc('next_job_number');
+        if (!seqErr && genNumber) {
+          await supabase.from("jobs").update({ external_job_number: genNumber }).eq("id", newJob.id);
+          newJob.external_job_number = genNumber;
+          jobPayload.external_job_number = genNumber;
+          console.log(`Auto-generated job number: ${genNumber} for ${newJob.id}`);
+        } else {
+          console.error(`Failed to generate job number for ${newJob.id}:`, seqErr);
         }
-        const genNumber = `AX${String(nextNum).padStart(4, "0")}`;
-        await supabase.from("jobs").update({ external_job_number: genNumber }).eq("id", newJob.id);
-        newJob.external_job_number = genNumber;
-        jobPayload.external_job_number = genNumber;
-        console.log(`Auto-generated job number: ${genNumber} for ${newJob.id}`);
       }
 
       // 6. Write back to Job Entry: App Job ID + Imported At
