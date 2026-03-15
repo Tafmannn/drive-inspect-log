@@ -200,7 +200,7 @@ export async function addPendingUpload(
     vehicleReg?: string | null;
   },
 ): Promise<PendingUpload> {
-  const fileDataUrl = await fileToDataUrl(file);
+  const fileDataUrl = await compressAndConvertToDataUrl(file);
   const id =
     "pu_" +
     (crypto.randomUUID
