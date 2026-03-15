@@ -175,6 +175,16 @@ export async function submitInspection(
   inspectionPayload: Partial<Inspection>,
   damageItems: Array<Omit<DamageItem, 'id' | 'inspection_id' | 'created_at'>>,
 ): Promise<void> {
+  // J: Guard against accidental resubmission overwriting existing inspection
+  const existingInspection = await getInspection(jobId, type);
+  if (existingInspection?.inspected_at) {
+    const job = await getJob(jobId);
+    const terminalStatuses = [JOB_STATUS.COMPLETED, JOB_STATUS.POD_READY, JOB_STATUS.DELIVERY_COMPLETE];
+    if (terminalStatuses.includes(job.status as any)) {
+      throw new Error(`${type} inspection already submitted for this job. Cannot overwrite completed inspection.`);
+    }
+  }
+
   const inspection = await upsertInspection(jobId, type, {
     ...inspectionPayload,
     inspected_at: new Date().toISOString(),

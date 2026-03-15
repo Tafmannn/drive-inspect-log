@@ -276,9 +276,16 @@ async function compressImageDataUrl(
   }
 }
 
+const FETCH_TIMEOUT_MS = 15_000; // 15 second timeout per image
+
 async function fetchImageAsDataUrl(url: string): Promise<string | null> {
   try {
-    const response = await fetch(url, { mode: "cors" });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+    const response = await fetch(url, { mode: "cors", signal: controller.signal });
+    clearTimeout(timer);
+
     if (!response.ok) {
       debugLog("Image fetch failed", { url, status: response.status });
       return null;
@@ -286,7 +293,8 @@ async function fetchImageAsDataUrl(url: string): Promise<string | null> {
     const blob = await response.blob();
     return await blobToDataUrl(blob);
   } catch (error) {
-    debugLog("Image fetch error", { url, error });
+    const isTimeout = error instanceof DOMException && error.name === 'AbortError';
+    debugLog(isTimeout ? "Image fetch timeout" : "Image fetch error", { url, error });
     return null;
   }
 }

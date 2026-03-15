@@ -672,6 +672,7 @@ async function handlePull(
 
       // Build the job insert payload
       const jobPayload: Record<string, any> = {
+        org_id: orgId, // B: stamp org_id from authenticated user
         status: appStatus,
         // Required fields with defaults
         vehicle_reg: fieldValues["vehicle_reg"] || "UNKNOWN",
