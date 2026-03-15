@@ -564,8 +564,8 @@ async function handlePull(
       h === "Import?" || h === "Sync to App?" || h === "Import"
     );
 
-    // Clear unresolved sync errors before processing
-    await supabase.from("sync_errors").delete().eq("resolved", false);
+    // I: Do NOT delete unresolved sync errors — preserve them for admin review
+    // Old errors remain; new errors from this run will be added alongside
 
     // 3. Read Job Master to find existing rows for upsert
     let masterRows: string[][] = [];
