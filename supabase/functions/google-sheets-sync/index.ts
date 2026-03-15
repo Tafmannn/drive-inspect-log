@@ -447,7 +447,18 @@ Deno.serve(async (req) => {
         job_master_tab: jobMasterTab,
       });
     } else if (action === "pull") {
-      return await handlePull(supabase, token, spreadsheet_id);
+      // B: Pass trusted org_id from authenticated user into pull
+      if (!userOrgId && !isSuperAdmin) {
+        return respond({ error: "Cannot pull jobs: no org_id available for this user." }, 403);
+      }
+      // For super admins without org_id, resolve from first org
+      let pullOrgId = userOrgId;
+      if (!pullOrgId && isSuperAdmin) {
+        const { data: firstOrg } = await supabase.from("organisations").select("id").order("created_at", { ascending: true }).limit(1).single();
+        if (!firstOrg) return respond({ error: "No organisation found in system." }, 500);
+        pullOrgId = firstOrg.id;
+      }
+      return await handlePull(supabase, token, spreadsheet_id, pullOrgId);
     } else if (action === "push") {
       const { jobIds } = body;
       return await handlePush(supabase, token, spreadsheet_id, sheetName, jobIds);
