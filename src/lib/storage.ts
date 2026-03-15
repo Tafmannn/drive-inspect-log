@@ -2,6 +2,7 @@ import type { StorageService, StoredFileInfo } from './types';
 import { internalStorageService } from './internalStorageService';
 import { gcsStorageService } from './gcsStorageService';
 import { isFeatureEnabled } from './featureFlags';
+import { logClientEvent } from './logger';
 
 // Default to internal; dynamically resolved at runtime
 let resolvedService: StorageService | null = null;
