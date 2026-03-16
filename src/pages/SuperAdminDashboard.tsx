@@ -396,7 +396,7 @@ function SuperUsersTab() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {u.id === user?.id ? (
+                      {u.id === currentUser?.id ? (
                         <span className="text-[10px] text-muted-foreground px-2">You</span>
                       ) : (
                         <Button
