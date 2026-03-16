@@ -61,7 +61,7 @@ export function ControlOverview() {
     { label: "New Job", icon: FileText, onClick: () => navigate("/jobs/new") },
     { label: "View All Jobs", icon: Eye, onClick: () => navigate("/control/jobs") },
     { label: "Drivers", icon: UserPlus, onClick: () => navigate("/control/drivers") },
-    { label: "Expenses", icon: Receipt, onClick: () => navigate("/expenses") },
+    { label: "Expenses", icon: Receipt, onClick: () => navigate("/control/finance") },
   ];
 
   type DispatchRow = NonNullable<typeof dispatch>[number];

@@ -218,23 +218,25 @@ export function ControlPodReview() {
             variant="ghost"
             size="sm"
             className="h-6 text-[10px] px-2"
-            onClick={(e) => { e.stopPropagation(); navigate(`/jobs/${r.id}/pod`); }}
+            onClick={(e) => { e.stopPropagation(); navigate(`/jobs/${r.id}/pod?from=pod-review`); }}
           >
             <FileText className="h-3 w-3 mr-0.5" /> POD
           </Button>
+          {!r.has_delivery_inspection && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 text-[10px] px-2 text-warning"
+              onClick={(e) => { e.stopPropagation(); navigate(`/inspection/${r.id}/delivery`); }}
+            >
+              <ClipboardList className="h-3 w-3 mr-0.5" /> Inspect
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
             className="h-6 text-[10px] px-2"
-            onClick={(e) => { e.stopPropagation(); navigate(`/inspection/${r.id}/delivery`); }}
-          >
-            <ClipboardList className="h-3 w-3 mr-0.5" /> Inspect
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 text-[10px] px-2"
-            onClick={(e) => { e.stopPropagation(); navigate(`/jobs/${r.id}`); }}
+            onClick={(e) => { e.stopPropagation(); navigate(`/jobs/${r.id}?from=pod-review`); }}
           >
             <Eye className="h-3 w-3 mr-0.5" /> View
           </Button>
@@ -242,7 +244,7 @@ export function ControlPodReview() {
             variant="ghost"
             size="sm"
             className="h-6 text-[10px] px-2"
-            onClick={(e) => { e.stopPropagation(); navigate(`/expenses/new?jobId=${r.id}`); }}
+            onClick={(e) => { e.stopPropagation(); navigate(`/expenses/new?jobId=${r.id}&from=pod-review`); }}
           >
             <Receipt className="h-3 w-3 mr-0.5" /> Expense
           </Button>

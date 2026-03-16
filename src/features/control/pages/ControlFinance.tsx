@@ -152,7 +152,7 @@ export function ControlFinance() {
             variant="ghost"
             size="sm"
             className="h-6 text-[10px] px-2"
-            onClick={(e) => { e.stopPropagation(); navigate(`/expenses/${r.id}/edit`); }}
+            onClick={(e) => { e.stopPropagation(); navigate(`/expenses/${r.id}/edit?from=control-finance`); }}
           >
             <Eye className="h-3 w-3 mr-0.5" /> View
           </Button>
@@ -161,7 +161,7 @@ export function ControlFinance() {
               variant="ghost"
               size="sm"
               className="h-6 text-[10px] px-2"
-              onClick={(e) => { e.stopPropagation(); navigate(`/jobs/${r.job_id}`); }}
+              onClick={(e) => { e.stopPropagation(); navigate(`/jobs/${r.job_id}?from=control-finance`); }}
             >
               <ExternalLink className="h-3 w-3 mr-0.5" /> Job
             </Button>
@@ -187,7 +187,7 @@ export function ControlFinance() {
             >
               <Download className="h-3.5 w-3.5" /> Export CSV
             </Button>
-            <Button size="sm" className="gap-1.5" onClick={() => navigate("/expenses/new")}>
+            <Button size="sm" className="gap-1.5" onClick={() => navigate("/expenses/new?from=control-finance")}>
               <Plus className="h-3.5 w-3.5" /> New Expense
             </Button>
           </div>
@@ -229,7 +229,7 @@ export function ControlFinance() {
           data={rows ?? []}
           loading={isLoading}
           emptyMessage="No expenses found."
-          onRowClick={(row) => navigate(`/expenses/${row.id}/edit`)}
+          onRowClick={(row) => navigate(`/expenses/${row.id}/edit?from=control-finance`)}
         />
       </ControlSection>
     </ControlShell>

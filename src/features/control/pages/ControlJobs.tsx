@@ -2,8 +2,8 @@
  * Jobs Control Page — /control/jobs
  * Primary dispatch workspace with search, filters, and inline actions.
  */
-import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useMemo, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ControlShell, ControlHeader, ControlSection } from "../components/shared/ControlShell";
 import { KpiStrip } from "../components/shared/KpiStrip";
 import { CompactTable, type CompactColumn } from "../components/shared/CompactTable";
@@ -40,7 +40,8 @@ function humanAge(iso: string): string {
 
 export function ControlJobs() {
   const navigate = useNavigate();
-  const [search, setSearch] = useState("");
+  const [searchParams] = useSearchParams();
+  const [search, setSearch] = useState(searchParams.get("search") ?? "");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   const filter: JobsFilter = useMemo(() => ({ search, status: statusFilter }), [search, statusFilter]);
