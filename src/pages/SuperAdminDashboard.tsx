@@ -229,6 +229,7 @@ function OrganisationsTab() {
 /* ── Users Tab (with role change confirmation) ───────────────────── */
 
 function SuperUsersTab() {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<OrgUser[]>([]);
   const [orgs, setOrgs] = useState<OrgRecord[]>([]);
   const [loading, setLoading] = useState(true);
