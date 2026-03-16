@@ -331,10 +331,12 @@ export async function retryUpload(
       errorMessage: msg,
     }));
 
-    // Log failure to client_logs
+    // Log failure to client_logs (orgId auto-resolved from session by logger)
     const item = loadAll().find((u) => u.id === id);
     void logClientEvent("photo_upload_failed", "error", {
       jobId: item?.jobId,
+      source: "storage",
+      type: "upload",
       context: { pendingId: id, error: msg },
     });
 
