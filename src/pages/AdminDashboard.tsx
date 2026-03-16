@@ -12,11 +12,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Loader2, Truck, CheckCircle, AlertTriangle, Receipt, Clock, FileDown,
-  Eye, Edit, Archive, RotateCcw, Settings, Users, BarChart3, Sheet, Search, HardDrive
+  Eye, Edit, Archive, RotateCcw, Settings, Users, BarChart3, Sheet, Search, HardDrive, Bell
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { GoogleSheetsPanel } from "@/components/GoogleSheetsPanel";
 import { AdminPendingUploads } from "@/components/AdminPendingUploads";
+import { AttentionCenter } from "@/features/attention/components/AttentionCenter";
 import { exportJobsCsv, exportInspectionsCsv } from "@/lib/export";
 import { exportExpensesCsv } from "@/lib/expenseApi";
 import { toast } from "@/hooks/use-toast";
