@@ -139,7 +139,7 @@ export function ControlDrivers() {
             variant="ghost"
             size="sm"
             className="h-6 text-[10px] px-2"
-            onClick={(e) => { e.stopPropagation(); navigate(`/jobs?driver=${encodeURIComponent(r.display_name || r.full_name)}`); }}
+            onClick={(e) => { e.stopPropagation(); navigate(`/control/jobs?search=${encodeURIComponent(r.display_name || r.full_name)}`); }}
           >
             <Truck className="h-3 w-3 mr-0.5" /> Jobs
           </Button>

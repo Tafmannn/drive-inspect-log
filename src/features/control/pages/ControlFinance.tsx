@@ -187,7 +187,7 @@ export function ControlFinance() {
             >
               <Download className="h-3.5 w-3.5" /> Export CSV
             </Button>
-            <Button size="sm" className="gap-1.5" onClick={() => navigate("/expenses/new")}>
+            <Button size="sm" className="gap-1.5" onClick={() => navigate("/expenses/new?from=control-finance")}>
               <Plus className="h-3.5 w-3.5" /> New Expense
             </Button>
           </div>
