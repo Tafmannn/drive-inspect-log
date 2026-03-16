@@ -91,7 +91,7 @@ interface InspectionRow {
 }
 
 export function deriveEvidenceExceptions(
-  completedJobs: Job[],
+  completedJobs: JobRow[],
   inspections: InspectionRow[],
   logEntries: { event: string; job_id: string | null; created_at: string; context: any }[],
   orgLookup?: Map<string, string>,
