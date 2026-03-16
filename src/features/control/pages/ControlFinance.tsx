@@ -152,7 +152,7 @@ export function ControlFinance() {
             variant="ghost"
             size="sm"
             className="h-6 text-[10px] px-2"
-            onClick={(e) => { e.stopPropagation(); navigate(`/expenses/${r.id}/edit`); }}
+            onClick={(e) => { e.stopPropagation(); navigate(`/expenses/${r.id}/edit?from=control-finance`); }}
           >
             <Eye className="h-3 w-3 mr-0.5" /> View
           </Button>
