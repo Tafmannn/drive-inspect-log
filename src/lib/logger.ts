@@ -58,6 +58,7 @@ export async function logClientEvent(
     }
 
     // Always persist to client_logs (best-effort)
+    // IMPORTANT: use null (not undefined) so org_id survives JSON serialisation
     await supabase.from("client_logs").insert({
       event,
       severity,
@@ -68,7 +69,7 @@ export async function logClientEvent(
         ...((context as Record<string, unknown>) ?? {}),
         source: source ?? "unknown",
         type: type ?? "unknown",
-        org_id: orgId ?? undefined,
+        org_id: orgId ?? null,
       },
     } as any);
   } catch {
