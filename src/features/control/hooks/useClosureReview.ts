@@ -86,7 +86,7 @@ export interface ClosureKpis {
   podReady: number;
   deliveryComplete: number;
   completedRecent: number;
-  missingEvidence: number;
+  missingDeliveryInspection: number;
 }
 
 const SELECT_FIELDS = [
@@ -164,7 +164,7 @@ export function useClosureKpis() {
         supabase.from("jobs").select("id", { count: "exact", head: true })
           .eq("is_hidden", false).eq("status", RECENTLY_COMPLETED_STATUS)
           .gte("completed_at", reviewCutoff.toISOString()),
-        // Missing evidence = closure-stage jobs without delivery inspection
+        // Missing delivery inspection on closure-stage jobs
         supabase.from("jobs").select("id", { count: "exact", head: true })
           .eq("is_hidden", false)
           .in("status", CLOSURE_REVIEW_STATUSES as unknown as string[])
@@ -179,7 +179,7 @@ export function useClosureKpis() {
         podReady,
         deliveryComplete,
         completedRecent: completedRes.count ?? 0,
-        missingEvidence: missingEvidenceRes.count ?? 0,
+        missingDeliveryInspection: missingEvidenceRes.count ?? 0,
       } satisfies ClosureKpis;
     },
     staleTime: 30_000,
