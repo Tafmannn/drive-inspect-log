@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_audit_log: {
+        Row: {
+          action: string
+          after_state: Json | null
+          before_state: Json | null
+          created_at: string
+          id: string
+          ip_address: string | null
+          performed_by: string
+          performed_by_email: string
+          target_org_id: string | null
+          target_user_id: string | null
+        }
+        Insert: {
+          action: string
+          after_state?: Json | null
+          before_state?: Json | null
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          performed_by: string
+          performed_by_email: string
+          target_org_id?: string | null
+          target_user_id?: string | null
+        }
+        Update: {
+          action?: string
+          after_state?: Json | null
+          before_state?: Json | null
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          performed_by?: string
+          performed_by_email?: string
+          target_org_id?: string | null
+          target_user_id?: string | null
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           key: string
@@ -29,6 +68,36 @@ export type Database = {
           key?: string
           updated_at?: string
           value?: Json
+        }
+        Relationships: []
+      }
+      attention_acknowledgements: {
+        Row: {
+          acknowledged_by: string
+          created_at: string
+          exception_id: string
+          id: string
+          job_id: string | null
+          note: string | null
+          snoozed_until: string | null
+        }
+        Insert: {
+          acknowledged_by: string
+          created_at?: string
+          exception_id: string
+          id?: string
+          job_id?: string | null
+          note?: string | null
+          snoozed_until?: string | null
+        }
+        Update: {
+          acknowledged_by?: string
+          created_at?: string
+          exception_id?: string
+          id?: string
+          job_id?: string | null
+          note?: string | null
+          snoozed_until?: string | null
         }
         Relationships: []
       }
