@@ -216,13 +216,17 @@ export async function deleteReceipt(id: string): Promise<void> {
 
 export async function uploadReceipt(expenseId: string, file: File): Promise<void> {
   const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-  const path = `receipts/${expenseId}/${crypto.randomUUID()}.${ext}`;
+  const path = `${expenseId}/${crypto.randomUUID()}.${ext}`;
 
-  const { error: uploadErr } = await supabase.storage.from('job-photos').upload(path, file);
-  if (uploadErr) throw uploadErr;
+  const { error: uploadErr } = await supabase.storage.from('expense-receipts').upload(path, file);
+  if (uploadErr) throw new Error(`Receipt upload failed: ${uploadErr.message}`);
 
-  const { data: publicUrlData } = supabase.storage.from('job-photos').getPublicUrl(path);
-  const url = publicUrlData?.publicUrl;
+  // Bucket is private — build a signed or authenticated URL
+  const { data: signedData, error: signErr } = await supabase.storage
+    .from('expense-receipts')
+    .createSignedUrl(path, 60 * 60 * 24 * 365); // 1 year
+  const url = signedData?.signedUrl;
+  if (signErr || !url) throw new Error('Failed to generate receipt URL');
 
   const { error: insertErr } = await supabase.from('expense_receipts').insert({
     expense_id: expenseId,
@@ -230,7 +234,7 @@ export async function uploadReceipt(expenseId: string, file: File): Promise<void
     backend: 'supabase',
     backend_ref: path,
   });
-  if (insertErr) throw insertErr;
+  if (insertErr) throw new Error(`Receipt record failed: ${insertErr.message}`);
 }
 
 // ─── Totals ──────────────────────────────────────────────────────────

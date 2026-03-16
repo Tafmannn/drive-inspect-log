@@ -257,8 +257,9 @@ export const ExpenseForm = () => {
       toast({ title: "Saved", description: "Expense has been saved successfully." });
       clearDraftAndNavigateBack();
     } catch (err) {
-      console.error("Failed to save expense", err);
-      toast({ title: "Save failed", description: "We couldn't save this expense. Please try again.", variant: "destructive" });
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      console.error("Failed to save expense", msg, err);
+      toast({ title: "Save failed", description: msg || "We couldn't save this expense. Please try again.", variant: "destructive" });
       setSaving(false);
     }
   };
