@@ -12,11 +12,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Loader2, Truck, CheckCircle, AlertTriangle, Receipt, Clock, FileDown,
-  Eye, Edit, Archive, RotateCcw, Settings, Users, BarChart3, Sheet, Search, HardDrive
+  Eye, Edit, Archive, RotateCcw, Settings, Users, BarChart3, Sheet, Search, HardDrive, Bell
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { GoogleSheetsPanel } from "@/components/GoogleSheetsPanel";
 import { AdminPendingUploads } from "@/components/AdminPendingUploads";
+import { AttentionCenter } from "@/features/attention/components/AttentionCenter";
 import { exportJobsCsv, exportInspectionsCsv } from "@/lib/export";
 import { exportExpensesCsv } from "@/lib/expenseApi";
 import { toast } from "@/hooks/use-toast";
@@ -409,8 +410,9 @@ export const AdminDashboard = () => {
           />
         </div>
         <Tabs defaultValue="overview">
-          <TabsList className="w-full grid grid-cols-4 lg:grid-cols-9 mb-4">
+          <TabsList className="w-full grid grid-cols-4 lg:grid-cols-10 mb-4">
             <TabsTrigger value="overview"><BarChart3 className="w-4 h-4 mr-1 hidden sm:inline" />Overview</TabsTrigger>
+            <TabsTrigger value="attention"><Bell className="w-4 h-4 mr-1 hidden sm:inline" />Attention</TabsTrigger>
             <TabsTrigger value="jobs">Jobs</TabsTrigger>
             <TabsTrigger value="archived-jobs">Archived</TabsTrigger>
             <TabsTrigger value="expenses">Expenses</TabsTrigger>
@@ -423,6 +425,7 @@ export const AdminDashboard = () => {
           </TabsList>
 
           <TabsContent value="overview"><OverviewTab /></TabsContent>
+          <TabsContent value="attention"><AttentionCenter scope="org" /></TabsContent>
           <TabsContent value="jobs"><JobsTab /></TabsContent>
           <TabsContent value="archived-jobs"><JobsTab archived /></TabsContent>
           <TabsContent value="expenses"><ExpensesTab /></TabsContent>
