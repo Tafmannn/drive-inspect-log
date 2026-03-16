@@ -229,7 +229,7 @@ export function ControlFinance() {
           data={rows ?? []}
           loading={isLoading}
           emptyMessage="No expenses found."
-          onRowClick={(row) => navigate(`/expenses/${row.id}/edit`)}
+          onRowClick={(row) => navigate(`/expenses/${row.id}/edit?from=control-finance`)}
         />
       </ControlSection>
     </ControlShell>
