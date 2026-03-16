@@ -185,6 +185,7 @@ serve(async (req) => {
     if (action === "deactivate" || action === "reactivate") {
       const { user_id } = body;
       if (!user_id) return jsonRes({ error: "USER_ID_REQUIRED" }, 400);
+      if (user_id === caller.id) return jsonRes({ error: "CANNOT_MODIFY_SELF" }, 400);
       const { data: userData } = await adminClient.auth.admin.getUserById(user_id);
       if (!userData?.user) return jsonRes({ error: "USER_NOT_FOUND" }, 404);
 
