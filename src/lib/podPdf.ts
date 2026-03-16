@@ -705,7 +705,8 @@ async function buildImageCache(
   pickupPhotos: PhotoLike[],
   deliveryPhotos: PhotoLike[],
   pickup: JobWithRelations["inspections"][number] | undefined,
-  delivery: JobWithRelations["inspections"][number] | undefined
+  delivery: JobWithRelations["inspections"][number] | undefined,
+  meta?: { jobId?: string; orgId?: string }
 ): Promise<Map<string, CachedImage | null>> {
   const imageCache = new Map<string, CachedImage | null>();
 
@@ -723,7 +724,7 @@ async function buildImageCache(
   const sigUrlMap = new Map<string, string>(); // original → resolved
   await Promise.allSettled(
     rawSignatureUrls.map(async (origUrl) => {
-      const resolved = await resolveSignatureForPdf(origUrl);
+      const resolved = await resolveSignatureForPdf(origUrl, meta);
       sigUrlMap.set(origUrl, resolved);
     })
   );
