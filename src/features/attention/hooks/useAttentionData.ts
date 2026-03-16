@@ -30,11 +30,10 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
     queryFn: async () => {
       const todayStart = new Date().toISOString().slice(0, 10) + "T00:00:00";
 
-      // Parallel data fetch
+      // Step 1: Fetch active jobs, recently completed jobs, sync errors, log entries, orgs in parallel
       const [
         activeJobsRes,
         completedJobsRes,
-        inspectionsRes,
         syncErrorsRes,
         logEntriesRes,
         orgsRes,
@@ -52,11 +51,6 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
           .in("status", ["completed", "delivery_complete", "pod_ready"])
           .gte("updated_at", new Date(Date.now() - 7 * 86400_000).toISOString())
           .limit(500),
-
-        // Inspections for completed jobs
-        supabase.from("inspections").select("id, job_id, org_id, driver_signature_url, customer_signature_url")
-          .gte("created_at", new Date(Date.now() - 7 * 86400_000).toISOString())
-          .limit(1000),
 
         // Unresolved sync errors
         supabase.from("sync_errors").select("*")
@@ -86,10 +80,31 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
 
       const activeJobs = (activeJobsRes.data ?? []) as JobRow[];
       const completedJobs = (completedJobsRes.data ?? []) as JobRow[];
-      const inspections = inspectionsRes.data ?? [];
       const syncErrors = (syncErrorsRes.data ?? []) as any[];
       const logEntries = (logEntriesRes.data ?? []) as any[];
       const orgs = (orgsRes as any).data ?? [];
+
+      // Issue #6: Fetch inspections scoped to completed job IDs only,
+      // not by time window alone.
+      const completedJobIds = completedJobs.map(j => j.id);
+      let inspections: any[] = [];
+      if (completedJobIds.length > 0) {
+        // Supabase .in() has a practical limit; batch in chunks of 100
+        const chunks: string[][] = [];
+        for (let i = 0; i < completedJobIds.length; i += 100) {
+          chunks.push(completedJobIds.slice(i, i + 100));
+        }
+        const results = await Promise.all(
+          chunks.map(chunk =>
+            supabase.from("inspections")
+              .select("id, job_id, org_id, driver_signature_url, customer_signature_url")
+              .in("job_id", chunk)
+          )
+        );
+        for (const r of results) {
+          if (r.data) inspections.push(...r.data);
+        }
+      }
 
       const orgLookup = new Map<string, string>();
       for (const o of orgs) orgLookup.set(o.id, o.name);
