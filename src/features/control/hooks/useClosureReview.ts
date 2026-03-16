@@ -179,7 +179,7 @@ export function useClosureKpis() {
         podReady,
         deliveryComplete,
         completedRecent: completedRes.count ?? 0,
-        missingEvidence: missingEvidenceRes.count ?? 0,
+        missingDeliveryInspection: missingEvidenceRes.count ?? 0,
       } satisfies ClosureKpis;
     },
     staleTime: 30_000,
