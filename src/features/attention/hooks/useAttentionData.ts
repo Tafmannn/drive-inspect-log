@@ -14,7 +14,9 @@ import {
 } from "../engine/exceptionEngine";
 import type { AttentionException, AttentionKpiData, AttentionFiltersState } from "../types/exceptionTypes";
 import { ACTIVE_STATUSES } from "@/lib/statusConfig";
-import type { Job } from "@/lib/types";
+import type { Tables } from "@/integrations/supabase/types";
+
+type JobRow = Tables<"jobs">;
 
 interface UseAttentionDataOpts {
   /** "all" for super admin, or org-scoped automatically via RLS */
