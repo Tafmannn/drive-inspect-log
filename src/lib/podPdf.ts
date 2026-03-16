@@ -682,6 +682,15 @@ async function resolveSignatureForPdf(url: string): Promise<string> {
   try {
     const { internalStorageService } = await import('./internalStorageService');
     const resolved = await internalStorageService.resolveSignatureUrl(url);
+    if (!resolved) {
+      const { logClientEvent } = await import('./logger');
+      void logClientEvent('signature_resolve_failed', 'warn', {
+        message: `Could not resolve signature URL`,
+        source: 'storage',
+        type: 'upload',
+        context: { originalUrl: url.slice(0, 120) },
+      });
+    }
     return resolved ?? url;
   } catch {
     return url;
