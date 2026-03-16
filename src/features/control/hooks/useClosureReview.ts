@@ -164,7 +164,7 @@ export function useClosureKpis() {
         supabase.from("jobs").select("id", { count: "exact", head: true })
           .eq("is_hidden", false).eq("status", RECENTLY_COMPLETED_STATUS)
           .gte("completed_at", reviewCutoff.toISOString()),
-        // Missing evidence = closure-stage jobs without delivery inspection
+        // Missing delivery inspection on closure-stage jobs
         supabase.from("jobs").select("id", { count: "exact", head: true })
           .eq("is_hidden", false)
           .in("status", CLOSURE_REVIEW_STATUSES as unknown as string[])
