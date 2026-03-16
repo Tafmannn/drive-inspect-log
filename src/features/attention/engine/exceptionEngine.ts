@@ -25,7 +25,7 @@ function exc(
 /* ── Timing exceptions ─────────────────────────────────────────── */
 
 export function deriveTimingExceptions(
-  jobs: Job[],
+  jobs: JobRow[],
   orgLookup?: Map<string, string>,
 ): AttentionException[] {
   const out: AttentionException[] = [];
