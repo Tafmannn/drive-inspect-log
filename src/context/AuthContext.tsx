@@ -57,12 +57,6 @@ function deriveAppUser(supaUser: SupaUser): AppUser {
   const email = (supaUser.email ?? "").toLowerCase();
   const roles: AppRole[] = ["DRIVER"];
 
-  // Superadmin by email
-  if (email && SUPERADMIN_EMAILS.includes(email)) {
-    if (!roles.includes("ADMIN")) roles.push("ADMIN");
-    roles.push("SUPERADMIN");
-  }
-
   // Merge any metadata roles
   const metaRoles = [
     ...((supaUser.user_metadata?.roles ?? []) as string[]),
