@@ -395,14 +395,18 @@ function SuperUsersTab() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Button
-                        size="sm" variant="ghost"
-                        onClick={() => handleToggleActive(u.id, isActive)}
-                        disabled={actionLoading === u.id}
-                        className="min-h-[36px]"
-                      >
-                        {actionLoading === u.id ? <Loader2 className="w-3 h-3 animate-spin" /> : isActive ? <PowerOff className="w-3 h-3" /> : <Power className="w-3 h-3" />}
-                      </Button>
+                      {u.id === user?.id ? (
+                        <span className="text-[10px] text-muted-foreground px-2">You</span>
+                      ) : (
+                        <Button
+                          size="sm" variant="ghost"
+                          onClick={() => handleToggleActive(u.id, isActive)}
+                          disabled={actionLoading === u.id}
+                          className="min-h-[36px]"
+                        >
+                          {actionLoading === u.id ? <Loader2 className="w-3 h-3 animate-spin" /> : isActive ? <PowerOff className="w-3 h-3" /> : <Power className="w-3 h-3" />}
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 );
