@@ -320,7 +320,10 @@ function SuperUsersTab() {
       }
       load();
     } catch (e: any) {
-      toast({ title: "Failed", description: e.message, variant: "destructive" });
+      const msg = e.message?.includes("CANNOT_MODIFY_SELF")
+        ? "You cannot deactivate your own account."
+        : e.message;
+      toast({ title: "Failed", description: msg, variant: "destructive" });
     } finally {
       setActionLoading(null);
     }
