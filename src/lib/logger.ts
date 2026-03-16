@@ -33,7 +33,22 @@ export async function logClientEvent(
   options: LogOptions = {},
 ): Promise<void> {
   try {
-    const { jobId, userId, message, context, source, type } = options;
+    const { jobId, message, context, source, type } = options;
+
+    // Auto-resolve userId from session if not provided
+    let userId = options.userId ?? null;
+    let orgId = options.orgId ?? null;
+    if (!userId || !orgId) {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (data?.session?.user) {
+          userId = userId ?? data.session.user.id;
+          orgId = orgId ?? data.session.user.app_metadata?.org_id ?? data.session.user.user_metadata?.org_id ?? null;
+        }
+      } catch {
+        // best-effort
+      }
+    }
 
     // Always log to console in dev or test mode
     if (import.meta.env.DEV || E2E_TEST_MODE) {
