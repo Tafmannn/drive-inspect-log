@@ -410,8 +410,9 @@ export const AdminDashboard = () => {
           />
         </div>
         <Tabs defaultValue="overview">
-          <TabsList className="w-full grid grid-cols-4 lg:grid-cols-9 mb-4">
+          <TabsList className="w-full grid grid-cols-4 lg:grid-cols-10 mb-4">
             <TabsTrigger value="overview"><BarChart3 className="w-4 h-4 mr-1 hidden sm:inline" />Overview</TabsTrigger>
+            <TabsTrigger value="attention"><Bell className="w-4 h-4 mr-1 hidden sm:inline" />Attention</TabsTrigger>
             <TabsTrigger value="jobs">Jobs</TabsTrigger>
             <TabsTrigger value="archived-jobs">Archived</TabsTrigger>
             <TabsTrigger value="expenses">Expenses</TabsTrigger>
@@ -424,6 +425,7 @@ export const AdminDashboard = () => {
           </TabsList>
 
           <TabsContent value="overview"><OverviewTab /></TabsContent>
+          <TabsContent value="attention"><AttentionCenter scope="org" /></TabsContent>
           <TabsContent value="jobs"><JobsTab /></TabsContent>
           <TabsContent value="archived-jobs"><JobsTab archived /></TabsContent>
           <TabsContent value="expenses"><ExpensesTab /></TabsContent>
