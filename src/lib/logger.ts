@@ -68,6 +68,7 @@ export async function logClientEvent(
         ...((context as Record<string, unknown>) ?? {}),
         source: source ?? "unknown",
         type: type ?? "unknown",
+        org_id: orgId ?? undefined,
       },
     } as any);
   } catch {
