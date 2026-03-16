@@ -229,6 +229,7 @@ function OrganisationsTab() {
 /* ── Users Tab (with role change confirmation) ───────────────────── */
 
 function SuperUsersTab() {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<OrgUser[]>([]);
   const [orgs, setOrgs] = useState<OrgRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -320,7 +321,10 @@ function SuperUsersTab() {
       }
       load();
     } catch (e: any) {
-      toast({ title: "Failed", description: e.message, variant: "destructive" });
+      const msg = e.message?.includes("CANNOT_MODIFY_SELF")
+        ? "You cannot deactivate your own account."
+        : e.message;
+      toast({ title: "Failed", description: msg, variant: "destructive" });
     } finally {
       setActionLoading(null);
     }
@@ -392,14 +396,18 @@ function SuperUsersTab() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Button
-                        size="sm" variant="ghost"
-                        onClick={() => handleToggleActive(u.id, isActive)}
-                        disabled={actionLoading === u.id}
-                        className="min-h-[36px]"
-                      >
-                        {actionLoading === u.id ? <Loader2 className="w-3 h-3 animate-spin" /> : isActive ? <PowerOff className="w-3 h-3" /> : <Power className="w-3 h-3" />}
-                      </Button>
+                      {u.id === currentUser?.id ? (
+                        <span className="text-[10px] text-muted-foreground px-2">You</span>
+                      ) : (
+                        <Button
+                          size="sm" variant="ghost"
+                          onClick={() => handleToggleActive(u.id, isActive)}
+                          disabled={actionLoading === u.id}
+                          className="min-h-[36px]"
+                        >
+                          {actionLoading === u.id ? <Loader2 className="w-3 h-3 animate-spin" /> : isActive ? <PowerOff className="w-3 h-3" /> : <Power className="w-3 h-3" />}
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 );
