@@ -26,12 +26,13 @@ import {
 import {
   Loader2, Building2, Users, Briefcase, Activity, AlertCircle,
   Settings, Eye, Search, RefreshCw, Shield, UserPlus,
-  BarChart3, ClipboardCheck, Car, Sheet, Power, PowerOff,
+  BarChart3, ClipboardCheck, Car, Sheet, Power, PowerOff, Bell,
 } from "lucide-react";
 import { getStatusStyle, ACTIVE_STATUSES } from "@/lib/statusConfig";
 import { UKPlate } from "@/components/UKPlate";
 import { toast } from "@/hooks/use-toast";
 import type { Job } from "@/lib/types";
+import { AttentionCenter } from "@/features/attention/components/AttentionCenter";
 
 /* ── Shared helpers ──────────────────────────────────────────────── */
 
