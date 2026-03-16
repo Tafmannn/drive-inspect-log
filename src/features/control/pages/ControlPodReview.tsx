@@ -99,10 +99,10 @@ export function ControlPodReview() {
     { label: "Delivery Complete", value: kpis?.deliveryComplete, icon: Truck, variant: "default" as const, loading: kpisLoading },
     { label: "Completed (7d)", value: kpis?.completedRecent, icon: ClipboardList, variant: "success" as const, loading: kpisLoading },
     {
-      label: "Missing Evidence",
-      value: kpis?.missingEvidence,
+      label: "No Delivery Insp.",
+      value: kpis?.missingDeliveryInspection,
       icon: AlertTriangle,
-      variant: kpis?.missingEvidence ? "destructive" as const : "default" as const,
+      variant: kpis?.missingDeliveryInspection ? "destructive" as const : "default" as const,
       loading: kpisLoading,
     },
   ];
