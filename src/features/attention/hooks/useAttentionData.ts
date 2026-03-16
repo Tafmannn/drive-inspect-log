@@ -84,8 +84,8 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
           : Promise.resolve({ data: [] as { id: string; name: string }[] }),
       ]);
 
-      const activeJobs = (activeJobsRes.data ?? []) as Job[];
-      const completedJobs = (completedJobsRes.data ?? []) as Job[];
+      const activeJobs = (activeJobsRes.data ?? []) as JobRow[];
+      const completedJobs = (completedJobsRes.data ?? []) as JobRow[];
       const inspections = inspectionsRes.data ?? [];
       const syncErrors = (syncErrorsRes.data ?? []) as any[];
       const logEntries = (logEntriesRes.data ?? []) as any[];
