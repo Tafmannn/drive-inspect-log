@@ -674,6 +674,20 @@ function renderSignatures(
   return sigStartY + 30;
 }
 
+/**
+ * Resolve a signature URL to a fresh signed URL if it uses the
+ * supabase-sig:// scheme or is an expired Supabase signed URL.
+ */
+async function resolveSignatureForPdf(url: string): Promise<string> {
+  try {
+    const { internalStorageService } = await import('./internalStorageService');
+    const resolved = await internalStorageService.resolveSignatureUrl(url);
+    return resolved ?? url;
+  } catch {
+    return url;
+  }
+}
+
 async function buildImageCache(
   pickupPhotos: PhotoLike[],
   deliveryPhotos: PhotoLike[],
@@ -683,7 +697,7 @@ async function buildImageCache(
   const imageCache = new Map<string, CachedImage | null>();
 
   const photoUrls = [...pickupPhotos, ...deliveryPhotos].map((p) => p.url);
-  const signatureUrls = [
+  const rawSignatureUrls = [
     pickup?.driver_signature_url,
     pickup?.customer_signature_url,
     delivery?.driver_signature_url,
@@ -691,16 +705,24 @@ async function buildImageCache(
   ].filter(Boolean) as string[];
 
   const uniquePhotoUrls = [...new Set(photoUrls)];
-  const uniqueSignatureUrls = [...new Set(signatureUrls)];
+
+  // Re-sign signature URLs so they aren't expired
+  const sigUrlMap = new Map<string, string>(); // original → resolved
+  await Promise.allSettled(
+    rawSignatureUrls.map(async (origUrl) => {
+      const resolved = await resolveSignatureForPdf(origUrl);
+      sigUrlMap.set(origUrl, resolved);
+    })
+  );
 
   await Promise.allSettled([
     ...uniquePhotoUrls.map(async (url) => {
       const image = await loadImage(url, { isSignature: false });
       imageCache.set(url, image);
     }),
-    ...uniqueSignatureUrls.map(async (url) => {
-      const image = await loadImage(url, { isSignature: true });
-      imageCache.set(url, image);
+    ...Array.from(sigUrlMap.entries()).map(async ([origUrl, resolvedUrl]) => {
+      const image = await loadImage(resolvedUrl, { isSignature: true });
+      imageCache.set(origUrl, image); // cache under original URL for lookup
     }),
   ]);
 

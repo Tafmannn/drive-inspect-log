@@ -243,22 +243,27 @@ export const InspectionFlow = () => {
   const statusMarked = useRef(false);
   const markInProgress = useCallback(async () => {
     if (statusMarked.current || !jobId || !job) return;
-    // K: Never overwrite terminal/completed statuses
-    const terminalStatuses: string[] = [
-      JOB_STATUS.COMPLETED, JOB_STATUS.POD_READY,
-      JOB_STATUS.DELIVERY_COMPLETE, JOB_STATUS.CANCELLED,
-      JOB_STATUS.FAILED, JOB_STATUS.ARCHIVED,
-    ];
-    if (terminalStatuses.includes(job.status)) return;
+    statusMarked.current = true; // prevent double-fire regardless of outcome
 
-    const targetStatus = type === "pickup" ? JOB_STATUS.PICKUP_IN_PROGRESS : JOB_STATUS.DELIVERY_IN_PROGRESS;
-    const earlyStatuses: string[] = [JOB_STATUS.READY_FOR_PICKUP, JOB_STATUS.PICKUP_COMPLETE, JOB_STATUS.IN_TRANSIT];
-    if (type === "pickup" && earlyStatuses.includes(job.status)) {
-      statusMarked.current = true;
-      api.updateJob(jobId, { status: targetStatus } as Partial<Job>).catch(() => {});
-    } else if (type === "delivery" && [JOB_STATUS.PICKUP_COMPLETE, JOB_STATUS.IN_TRANSIT].includes(job.status as any)) {
-      statusMarked.current = true;
-      api.updateJob(jobId, { status: targetStatus } as Partial<Job>).catch(() => {});
+    // K: Re-fetch current status from DB to avoid stale-closure race condition
+    try {
+      const freshJob = await api.getJob(jobId);
+      const terminalStatuses: string[] = [
+        JOB_STATUS.COMPLETED, JOB_STATUS.POD_READY,
+        JOB_STATUS.DELIVERY_COMPLETE, JOB_STATUS.CANCELLED,
+        JOB_STATUS.FAILED, JOB_STATUS.ARCHIVED,
+      ];
+      if (terminalStatuses.includes(freshJob.status)) return;
+
+      const targetStatus = type === "pickup" ? JOB_STATUS.PICKUP_IN_PROGRESS : JOB_STATUS.DELIVERY_IN_PROGRESS;
+      const earlyStatuses: string[] = [JOB_STATUS.READY_FOR_PICKUP, JOB_STATUS.PICKUP_COMPLETE, JOB_STATUS.IN_TRANSIT];
+      if (type === "pickup" && earlyStatuses.includes(freshJob.status)) {
+        api.updateJob(jobId, { status: targetStatus } as Partial<Job>).catch(() => {});
+      } else if (type === "delivery" && [JOB_STATUS.PICKUP_COMPLETE, JOB_STATUS.IN_TRANSIT].includes(freshJob.status as any)) {
+        api.updateJob(jobId, { status: targetStatus } as Partial<Job>).catch(() => {});
+      }
+    } catch {
+      // Non-critical — status update is best-effort
     }
   }, [jobId, job, type]);
 

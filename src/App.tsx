@@ -56,9 +56,13 @@ const queryClient = new QueryClient({
 });
 
 function BackgroundUploader() {
+  const { authLoading, user } = useAuth();
   useEffect(() => {
+    // Only retry uploads after auth is resolved and user is available
+    // (getOrgId requires an active session)
+    if (authLoading || !user) return;
     retryAllPending().catch(() => {});
-  }, []);
+  }, [authLoading, user]);
   return null;
 }
 
@@ -121,8 +125,8 @@ const App = () => {
         <Toaster />
         <Sonner />
         <AppErrorBoundary>
-          <BackgroundUploader />
           <AuthProvider overrideRoles={overrideRoles}>
+            <BackgroundUploader />
             <DevRoleBanner />
             <BrowserRouter>
               <Routes>
