@@ -678,17 +678,21 @@ function renderSignatures(
  * Resolve a signature URL to a fresh signed URL if it uses the
  * supabase-sig:// scheme or is an expired Supabase signed URL.
  */
-async function resolveSignatureForPdf(url: string): Promise<string> {
+async function resolveSignatureForPdf(
+  url: string,
+  meta?: { jobId?: string; orgId?: string }
+): Promise<string> {
   try {
     const { internalStorageService } = await import('./internalStorageService');
     const resolved = await internalStorageService.resolveSignatureUrl(url);
     if (!resolved) {
       const { logClientEvent } = await import('./logger');
       void logClientEvent('signature_resolve_failed', 'warn', {
+        jobId: meta?.jobId,
         message: `Could not resolve signature URL`,
         source: 'storage',
         type: 'upload',
-        context: { originalUrl: url.slice(0, 120) },
+        context: { originalUrl: url.slice(0, 120), orgId: meta?.orgId },
       });
     }
     return resolved ?? url;
