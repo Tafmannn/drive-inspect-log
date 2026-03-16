@@ -5,7 +5,10 @@
 
 import { ATTENTION_THRESHOLDS as T } from "../config/thresholds";
 import type { AttentionException, ExceptionSeverity } from "../types/exceptionTypes";
-import type { Job } from "@/lib/types";
+import type { Tables } from "@/integrations/supabase/types";
+
+/** Use the DB row type which includes org_id and all status values */
+type JobRow = Tables<"jobs">;
 
 /* ── helpers ────────────────────────────────────────────────────── */
 
