@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -26,7 +26,7 @@ import {
 import {
   Loader2, Building2, Users, Briefcase, Activity, AlertCircle,
   Settings, Eye, Search, RefreshCw, Shield, UserPlus,
-  BarChart3, ClipboardCheck, Car, Sheet, Power, PowerOff, Bell,
+  BarChart3, ClipboardCheck, Car, Sheet, Power, PowerOff, Bell, ScrollText,
 } from "lucide-react";
 import { getStatusStyle, ACTIVE_STATUSES } from "@/lib/statusConfig";
 import { UKPlate } from "@/components/UKPlate";
@@ -226,7 +226,7 @@ function OrganisationsTab() {
   );
 }
 
-/* ── Users Tab ───────────────────────────────────────────────────── */
+/* ── Users Tab (with role change confirmation) ───────────────────── */
 
 function SuperUsersTab() {
   const [users, setUsers] = useState<OrgUser[]>([]);
@@ -241,6 +241,10 @@ function SuperUsersTab() {
   const [newOrgId, setNewOrgId] = useState("");
   const [creating, setCreating] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Role change confirmation
+  const [pendingRoleChange, setPendingRoleChange] = useState<{ userId: string; email: string; fromRole: string; toRole: string } | null>(null);
+  const [confirmText, setConfirmText] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -277,11 +281,25 @@ function SuperUsersTab() {
     }
   };
 
-  const handleRoleChange = async (userId: string, role: string) => {
-    setActionLoading(userId);
+  const requestRoleChange = (userId: string, newRole: string) => {
+    const user = users.find(u => u.id === userId);
+    if (!user) return;
+    // If downgrading or same, skip confirm for non-super-admin targets
+    if (newRole === user.role) return;
+    setPendingRoleChange({ userId, email: user.email, fromRole: user.role, toRole: newRole });
+    setConfirmText("");
+  };
+
+  const executeRoleChange = async () => {
+    if (!pendingRoleChange) return;
+    const isSuperPromotion = pendingRoleChange.toRole === "super_admin";
+    if (isSuperPromotion && confirmText !== "CONFIRM") return;
+
+    setActionLoading(pendingRoleChange.userId);
+    setPendingRoleChange(null);
     try {
-      await setUserRole(userId, role);
-      toast({ title: `Role updated to ${role}` });
+      await setUserRole(pendingRoleChange.userId, pendingRoleChange.toRole);
+      toast({ title: `Role updated to ${pendingRoleChange.toRole}` });
       load();
     } catch (e: any) {
       toast({ title: "Failed", description: e.message, variant: "destructive" });
@@ -319,22 +337,22 @@ function SuperUsersTab() {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 items-center">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input placeholder="Search by email…" className="pl-9 min-h-[44px]" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <div className="flex gap-1">
-          {["all", "driver", "admin", "super_admin"].map(r => (
-            <Button key={r} size="sm" variant={roleFilter === r ? "default" : "outline"} onClick={() => setRoleFilter(r)} className="min-h-[44px] capitalize">
-              {r === "all" ? "All" : r.replace("_", " ")}
-            </Button>
-          ))}
-        </div>
+        <Button variant="outline" className="min-h-[44px]" onClick={() => setShowCreate(true)}>
+          <UserPlus className="w-4 h-4 mr-1" /> Create User
+        </Button>
       </div>
-      <Button variant="outline" className="min-h-[44px]" onClick={() => setShowCreate(true)}>
-        <UserPlus className="w-4 h-4 mr-1" /> Create User
-      </Button>
+      <div className="flex gap-1 flex-wrap">
+        {["all", "driver", "admin", "super_admin"].map(r => (
+          <Button key={r} size="sm" variant={roleFilter === r ? "default" : "outline"} onClick={() => setRoleFilter(r)} className="min-h-[44px] capitalize text-xs">
+            {r === "all" ? "All" : r === "super_admin" ? "S.Admin" : r.replace("_", " ")}
+          </Button>
+        ))}
+      </div>
 
       {!filtered.length ? <EmptyState message="No users found." /> : (
         <div className="rounded-xl border border-border overflow-x-auto">
@@ -356,7 +374,7 @@ function SuperUsersTab() {
                   <TableRow key={u.id} className={!isActive ? "opacity-50" : ""}>
                     <TableCell className="text-sm">{u.email}</TableCell>
                     <TableCell>
-                      <Select defaultValue={u.role} onValueChange={v => handleRoleChange(u.id, v)} disabled={actionLoading === u.id}>
+                      <Select defaultValue={u.role} onValueChange={v => requestRoleChange(u.id, v)} disabled={actionLoading === u.id}>
                         <SelectTrigger className="w-[110px] h-8 text-xs">
                           <SelectValue />
                         </SelectTrigger>
@@ -391,6 +409,43 @@ function SuperUsersTab() {
         </div>
       )}
 
+      {/* Role change confirmation */}
+      <Dialog open={!!pendingRoleChange} onOpenChange={(open) => { if (!open) setPendingRoleChange(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Confirm Role Change</DialogTitle>
+            <DialogDescription>
+              You are about to change <strong>{pendingRoleChange?.email}</strong>'s role from{" "}
+              <strong>{pendingRoleChange?.fromRole}</strong> to <strong>{pendingRoleChange?.toRole}</strong>.
+              {pendingRoleChange?.toRole === "super_admin" && (
+                <span className="block mt-2 text-destructive font-medium">
+                  ⚠️ This grants God-mode access to all organisations. Type CONFIRM to proceed.
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          {pendingRoleChange?.toRole === "super_admin" && (
+            <Input
+              placeholder="Type CONFIRM"
+              value={confirmText}
+              onChange={e => setConfirmText(e.target.value)}
+              className="min-h-[44px]"
+            />
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingRoleChange(null)}>Cancel</Button>
+            <Button
+              onClick={executeRoleChange}
+              disabled={pendingRoleChange?.toRole === "super_admin" && confirmText !== "CONFIRM"}
+              variant={pendingRoleChange?.toRole === "super_admin" ? "destructive" : "default"}
+            >
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create user dialog */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Create / Invite User</DialogTitle></DialogHeader>
@@ -431,7 +486,7 @@ function SuperUsersTab() {
   );
 }
 
-/* ── Jobs Monitor Tab ────────────────────────────────────────────── */
+/* ── Jobs Monitor Tab (fixed: limit 100) ─────────────────────────── */
 
 function JobsMonitorTab() {
   const navigate = useNavigate();
@@ -444,7 +499,7 @@ function JobsMonitorTab() {
     setLoading(true);
     setError(null);
     try {
-      const { data, error: err } = await supabase.from("jobs").select("*").eq("is_hidden", false).order("updated_at", { ascending: false }).limit(200);
+      const { data, error: err } = await supabase.from("jobs").select("*").eq("is_hidden", false).order("updated_at", { ascending: false }).limit(100);
       if (err) throw err;
       setJobs((data ?? []) as Job[]);
     } catch (e: any) {
@@ -478,20 +533,22 @@ function JobsMonitorTab() {
                 <TableHead className="text-xs">Ref</TableHead>
                 <TableHead className="text-xs">Reg</TableHead>
                 <TableHead className="text-xs">Driver</TableHead>
-                <TableHead className="text-xs">Status</TableHead>
+                <TableHead className="text-xs min-w-[100px]">Status</TableHead>
                 <TableHead className="text-xs text-right">View</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.slice(0, 100).map(job => {
+              {filtered.map(job => {
                 const s = getStatusStyle(job.status);
                 return (
                   <TableRow key={job.id}>
                     <TableCell className="text-sm font-medium">{job.external_job_number || job.id.slice(0, 8)}</TableCell>
                     <TableCell><UKPlate reg={job.vehicle_reg} /></TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{job.driver_name ?? "—"}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {job.driver_name ? job.driver_name : <span className="text-amber-500">Unassigned</span>}
+                    </TableCell>
                     <TableCell>
-                      <span style={{ backgroundColor: s.backgroundColor, color: s.color }} className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold uppercase">{s.label}</span>
+                      <span style={{ backgroundColor: s.backgroundColor, color: s.color }} className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase whitespace-nowrap">{s.label}</span>
                     </TableCell>
                     <TableCell className="text-right">
                       <Button size="icon" variant="ghost" onClick={() => navigate(`/jobs/${job.id}`)} className="min-h-[44px] min-w-[44px]">
@@ -509,28 +566,67 @@ function JobsMonitorTab() {
   );
 }
 
-/* ── System Health Tab ───────────────────────────────────────────── */
+/* ── Audit Log Tab (NEW) ──────────────────────────────────────────── */
 
-function SystemHealthTab() {
-  const services = [
-    { name: "DVLA Lookup", status: "Healthy" },
-    { name: "Company Search", status: "Healthy" },
-    { name: "Google Sheets Sync", status: "Healthy" },
-    { name: "Photo Uploads", status: "Healthy" },
-  ];
+function AuditLogTab() {
+  const [logs, setLogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error: err } = await supabase
+        .from("admin_audit_log")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (err) throw err;
+      setLogs(data ?? []);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <LoadingSpinner />;
+  if (error) return <ErrorPanel message={error} onRetry={load} />;
+  if (!logs.length) return <EmptyState message="No audit entries yet. Actions will appear here as they happen." />;
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      {services.map(svc => (
-        <Card key={svc.name}>
-          <CardHeader className="flex flex-row items-center justify-between pb-1 pt-3 px-4">
-            <CardTitle className="text-sm font-medium">{svc.name}</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="px-4 pb-3">
-            <Badge variant="secondary" className="bg-success/10 text-success border-success/20">{svc.status}</Badge>
-          </CardContent>
-        </Card>
-      ))}
+    <div className="rounded-xl border border-border overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="text-xs">Time</TableHead>
+            <TableHead className="text-xs">Admin</TableHead>
+            <TableHead className="text-xs">Action</TableHead>
+            <TableHead className="text-xs">Before</TableHead>
+            <TableHead className="text-xs">After</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {logs.map(log => (
+            <TableRow key={log.id}>
+              <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</TableCell>
+              <TableCell className="text-xs">{log.performed_by_email}</TableCell>
+              <TableCell>
+                <Badge variant="outline" className="text-xs font-mono uppercase">{log.action}</Badge>
+              </TableCell>
+              <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
+                {log.before_state ? JSON.stringify(log.before_state) : "—"}
+              </TableCell>
+              <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
+                {log.after_state ? JSON.stringify(log.after_state) : "—"}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }
@@ -590,23 +686,34 @@ function ErrorLogTab() {
   );
 }
 
-/* ── Settings Tab ────────────────────────────────────────────────── */
+/* ── Settings Tab (replaced: no more hardcoded emails) ───────────── */
 
 function SuperSettingsTab() {
-  const hardcoded = ["axentravehiclelogistics@gmail.com", "info@axentravehicles.com"];
-  const envEmails = ((import.meta.env.VITE_SUPERADMIN_EMAILS as string | undefined) ?? "").split(",").map(e => e.trim().toLowerCase()).filter(Boolean);
-  const allEmails = Array.from(new Set([...envEmails, ...hardcoded]));
-
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium flex items-center gap-2"><Shield className="w-4 h-4" /> Super Admin Emails</CardTitle>
+          <CardTitle className="text-sm font-medium flex items-center gap-2"><Shield className="w-4 h-4" /> Super Admin Identity</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <p className="text-xs text-muted-foreground">
+            Super Admin access is governed by <code className="bg-muted px-1 rounded">app_metadata.role</code> in Supabase Auth.
+            To grant or revoke Super Admin, use the Users tab role selector.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Hardcoded email allow-lists have been removed. All identity checks now use database-driven roles.
+          </p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">Feature Flags</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {allEmails.map(e => <Badge key={e} variant="outline" className="text-xs font-mono">{e}</Badge>)}
-          </div>
+          <p className="text-xs text-muted-foreground">
+            Feature flags are managed in <code className="bg-muted px-1 rounded">app_settings</code>.
+            A dedicated flags management UI is planned for a future release.
+          </p>
         </CardContent>
       </Card>
     </div>
@@ -629,7 +736,7 @@ export function SuperAdminDashboard() {
             <TabsTrigger value="orgs">Orgs</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="jobs">Jobs</TabsTrigger>
-            <TabsTrigger value="health" className="hidden lg:flex"><Activity className="w-4 h-4 mr-1" />Health</TabsTrigger>
+            <TabsTrigger value="audit" className="hidden lg:flex"><ScrollText className="w-4 h-4 mr-1" />Audit</TabsTrigger>
             <TabsTrigger value="errors" className="hidden lg:flex"><AlertCircle className="w-4 h-4 mr-1" />Errors</TabsTrigger>
             <TabsTrigger value="settings"><Settings className="w-4 h-4" /></TabsTrigger>
           </TabsList>
@@ -639,7 +746,7 @@ export function SuperAdminDashboard() {
           <TabsContent value="orgs"><OrganisationsTab /></TabsContent>
           <TabsContent value="users"><SuperUsersTab /></TabsContent>
           <TabsContent value="jobs"><JobsMonitorTab /></TabsContent>
-          <TabsContent value="health"><SystemHealthTab /></TabsContent>
+          <TabsContent value="audit"><AuditLogTab /></TabsContent>
           <TabsContent value="errors"><ErrorLogTab /></TabsContent>
           <TabsContent value="settings"><SuperSettingsTab /></TabsContent>
         </Tabs>
