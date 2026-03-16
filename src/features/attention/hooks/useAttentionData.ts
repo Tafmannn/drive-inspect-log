@@ -85,7 +85,8 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
 
         // Fetch acknowledgements
         supabase.from("attention_acknowledgements").select("*")
-          .order("created_at", { ascending: false }),
+          .order("created_at", { ascending: false })
+          .limit(1000),
       ]);
 
       const activeJobs = (activeJobsRes.data ?? []) as JobRow[];
