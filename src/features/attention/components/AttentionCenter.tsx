@@ -11,6 +11,8 @@ import { AttentionQueue } from "./AttentionQueue";
 import { useAttentionData } from "../hooks/useAttentionData";
 import type { AttentionFiltersState } from "../types/exceptionTypes";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 interface Props {
   scope: "org" | "all";
@@ -27,6 +29,7 @@ const DEFAULT_FILTERS: AttentionFiltersState = {
 export function AttentionCenter({ scope }: Props) {
   const [filters, setFilters] = useState<AttentionFiltersState>(DEFAULT_FILTERS);
   const { data, isLoading, isFetching, refetch } = useAttentionData({ scope, filters });
+  const [showAcknowledged, setShowAcknowledged] = useState(false);
 
   return (
     <div className="space-y-4">
@@ -48,6 +51,30 @@ export function AttentionCenter({ scope }: Props) {
         showOrg={scope === "all"}
         loading={isLoading}
       />
+
+      {(data?.acknowledgedCount ?? 0) > 0 && (
+        <div className="space-y-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-xs text-muted-foreground"
+            onClick={() => setShowAcknowledged(!showAcknowledged)}
+          >
+            {showAcknowledged ? <ChevronUp className="w-3 h-3 mr-1" /> : <ChevronDown className="w-3 h-3 mr-1" />}
+            {data?.acknowledgedCount} acknowledged
+          </Button>
+          {showAcknowledged && (
+            <div className="opacity-60">
+              <AttentionQueue
+                exceptions={data?.acknowledgedExceptions ?? []}
+                showOrg={scope === "all"}
+                loading={false}
+                acknowledged
+              />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

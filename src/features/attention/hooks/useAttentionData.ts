@@ -1,6 +1,7 @@
 /**
  * Attention Center – data fetching hook.
  * Accepts `scope` to filter by org or show all.
+ * Fetches acknowledgements to filter dismissed/snoozed exceptions.
  */
 
 import { useQuery } from "@tanstack/react-query";
@@ -18,8 +19,17 @@ import type { Tables } from "@/integrations/supabase/types";
 
 type JobRow = Tables<"jobs">;
 
+export interface AcknowledgementRow {
+  id: string;
+  exception_id: string;
+  job_id: string | null;
+  acknowledged_by: string;
+  note: string | null;
+  snoozed_until: string | null;
+  created_at: string;
+}
+
 interface UseAttentionDataOpts {
-  /** "all" for super admin, or org-scoped automatically via RLS */
   scope: "org" | "all";
   filters: AttentionFiltersState;
 }
@@ -29,36 +39,33 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
     queryKey: ["attention-center", scope, filters],
     queryFn: async () => {
       const todayStart = new Date().toISOString().slice(0, 10) + "T00:00:00";
+      const now = new Date().toISOString();
 
-      // Step 1: Fetch active jobs, recently completed jobs, sync errors, log entries, orgs in parallel
       const [
         activeJobsRes,
         completedJobsRes,
         syncErrorsRes,
         logEntriesRes,
         orgsRes,
+        acksRes,
       ] = await Promise.all([
-        // Active jobs for timing exceptions
         supabase.from("jobs").select("*")
           .eq("is_hidden", false)
           .in("status", ["ready_for_pickup", "assigned", "pickup_in_progress", "delivery_in_progress", "pod_ready"])
           .order("updated_at", { ascending: false })
           .limit(500),
 
-        // Recently completed jobs for evidence exceptions (last 7 days)
         supabase.from("jobs").select("*")
           .eq("is_hidden", false)
           .in("status", ["completed", "delivery_complete", "pod_ready"])
           .gte("updated_at", new Date(Date.now() - 7 * 86400_000).toISOString())
           .limit(500),
 
-        // Unresolved sync errors
         supabase.from("sync_errors").select("*")
           .eq("resolved", false)
           .order("created_at", { ascending: false })
           .limit(200),
 
-        // Recent client log events (today's logs for state/evidence)
         supabase.from("client_logs").select("event, job_id, created_at, context, severity")
           .in("event", [
             "signature_resolve_failed",
@@ -72,10 +79,13 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
           .order("created_at", { ascending: false })
           .limit(500),
 
-        // Orgs for super admin scope
         scope === "all"
           ? supabase.from("organisations").select("id, name")
           : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+
+        // Fetch acknowledgements
+        supabase.from("attention_acknowledgements").select("*")
+          .order("created_at", { ascending: false }),
       ]);
 
       const activeJobs = (activeJobsRes.data ?? []) as JobRow[];
@@ -83,13 +93,20 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
       const syncErrors = (syncErrorsRes.data ?? []) as any[];
       const logEntries = (logEntriesRes.data ?? []) as any[];
       const orgs = (orgsRes as any).data ?? [];
+      const acknowledgements = (acksRes.data ?? []) as AcknowledgementRow[];
 
-      // Issue #6: Fetch inspections scoped to completed job IDs only,
-      // not by time window alone.
+      // Build ack lookup: exception_id -> ack row (most recent)
+      const ackMap = new Map<string, AcknowledgementRow>();
+      for (const ack of acknowledgements) {
+        if (!ackMap.has(ack.exception_id)) {
+          ackMap.set(ack.exception_id, ack);
+        }
+      }
+
+      // Fetch inspections scoped to completed job IDs
       const completedJobIds = completedJobs.map(j => j.id);
       let inspections: any[] = [];
       if (completedJobIds.length > 0) {
-        // Supabase .in() has a practical limit; batch in chunks of 100
         const chunks: string[][] = [];
         for (let i = 0; i < completedJobIds.length; i += 100) {
           chunks.push(completedJobIds.slice(i, i + 100));
@@ -110,12 +127,36 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
       for (const o of orgs) orgLookup.set(o.id, o.name);
 
       // Derive all exceptions
-      let exceptions: AttentionException[] = sortExceptions([
+      let allExceptions: AttentionException[] = sortExceptions([
         ...deriveTimingExceptions(activeJobs, orgLookup),
         ...deriveEvidenceExceptions(completedJobs, inspections, logEntries, orgLookup),
         ...deriveSyncExceptions(syncErrors, logEntries),
         ...deriveStateExceptions(logEntries),
       ]);
+
+      // Separate acknowledged vs active
+      const activeExceptions: AttentionException[] = [];
+      const acknowledgedExceptions: AttentionException[] = [];
+
+      for (const ex of allExceptions) {
+        const ack = ackMap.get(ex.id);
+        if (ack) {
+          // If snoozed and snooze hasn't expired, treat as acknowledged
+          if (ack.snoozed_until && ack.snoozed_until > now) {
+            acknowledgedExceptions.push(ex);
+          } else if (!ack.snoozed_until) {
+            // Permanently acknowledged
+            acknowledgedExceptions.push(ex);
+          } else {
+            // Snooze expired — back to active
+            activeExceptions.push(ex);
+          }
+        } else {
+          activeExceptions.push(ex);
+        }
+      }
+
+      let exceptions = activeExceptions;
 
       // Apply filters
       if (filters.severity !== "all") {
@@ -134,7 +175,7 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
         exceptions = exceptions.filter(e => e.createdAt <= filters.dateTo + "T23:59:59");
       }
 
-      // KPIs
+      // KPIs (based on active only)
       const allActiveCount = (await supabase.from("jobs").select("id", { count: "exact", head: true }).eq("is_hidden", false).in("status", ACTIVE_STATUSES as string[])).count ?? 0;
       const uploadFailuresToday = logEntries.filter(l =>
         (l.event === "photo_upload_failed" || l.event === "upload_failed") && l.created_at >= todayStart
@@ -149,7 +190,14 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
         syncErrorsToday,
       };
 
-      return { exceptions, kpis, orgs };
+      return {
+        exceptions,
+        acknowledgedExceptions,
+        acknowledgedCount: acknowledgedExceptions.length,
+        kpis,
+        orgs,
+        ackMap,
+      };
     },
     staleTime: 30_000,
     refetchOnWindowFocus: false,
