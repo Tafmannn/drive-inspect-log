@@ -77,5 +77,3 @@ class InternalStorageService implements StorageService {
 }
 
 export const internalStorageService = new InternalStorageService();
-
-export const internalStorageService = new InternalStorageService();
