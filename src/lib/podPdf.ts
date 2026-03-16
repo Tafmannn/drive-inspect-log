@@ -760,7 +760,7 @@ export async function generatePodPdf(
   const pickupPhotos = job.photos.filter((p) => p.type.startsWith("pickup_"));
   const deliveryPhotos = job.photos.filter((p) => p.type.startsWith("delivery_"));
 
-  const imageCache = await buildImageCache(pickupPhotos, deliveryPhotos, pickup, delivery);
+  const imageCache = await buildImageCache(pickupPhotos, deliveryPhotos, pickup, delivery, { jobId: job.id, orgId: job.org_id });
   const logo = await loadLogo();
 
   renderHeader(doc, job, ref, logo);
