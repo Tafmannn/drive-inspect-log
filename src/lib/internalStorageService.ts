@@ -51,12 +51,15 @@ class InternalStorageService implements StorageService {
       return data.signedUrl;
     }
 
-    // Legacy: already a full URL (possibly expired signed URL)
-    // Try to extract path from Supabase signed URL and re-sign
-    if (url.includes('/vehicle-signatures/') && url.includes('token=')) {
-      const pathMatch = url.match(/\/object\/sign\/vehicle-signatures\/(.+?)\?/);
-      if (pathMatch) {
-        const path = decodeURIComponent(pathMatch[1]);
+    // Legacy: public URL (bucket is now private — these will 403)
+    // Extract path from /object/public/vehicle-signatures/... and re-sign
+    if (url.includes('/vehicle-signatures/')) {
+      // Match both public URLs and expired signed URLs
+      const publicMatch = url.match(/\/object\/public\/vehicle-signatures\/(.+?)(?:\?|$)/);
+      const signedMatch = url.match(/\/object\/sign\/vehicle-signatures\/(.+?)\?/);
+      const extractedPath = publicMatch?.[1] ?? signedMatch?.[1];
+      if (extractedPath) {
+        const path = decodeURIComponent(extractedPath);
         const { data, error } = await supabase.storage
           .from('vehicle-signatures')
           .createSignedUrl(path, 60 * 60);
