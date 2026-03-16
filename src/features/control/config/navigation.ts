@@ -38,7 +38,7 @@ export const CONTROL_NAV: NavGroup[] = [
     ],
   },
   {
-    label: "Super Admin",
+    label: "Platform",
     requiredRoles: ["SUPERADMIN"],
     items: [
       { label: "Super Admin", path: "/control/super-admin", icon: "Crown" },
