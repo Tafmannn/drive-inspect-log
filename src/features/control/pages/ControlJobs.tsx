@@ -39,6 +39,7 @@ function humanAge(iso: string): string {
 }
 
 export function ControlJobs() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
