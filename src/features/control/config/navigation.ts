@@ -11,6 +11,7 @@ export const CONTROL_NAV: NavGroup[] = [
     label: "Operations",
     items: [
       { label: "Jobs", path: "/control/jobs", icon: "Truck" },
+      { label: "POD Review", path: "/control/pod-review", icon: "ClipboardCheck" },
     ],
   },
   {
