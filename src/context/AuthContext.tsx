@@ -16,23 +16,6 @@ const AUTH_ENABLED =
   typeof import.meta !== "undefined" &&
   (import.meta.env.VITE_ENABLE_AUTH as string | undefined) !== "false";
 
-const DEFAULT_SUPERADMIN_EMAILS = [
-  "axentravehiclelogistics@gmail.com",
-  "info@axentravehicles.com",
-];
-
-const SUPERADMIN_EMAILS: string[] = Array.from(
-  new Set([
-    ...(((typeof import.meta !== "undefined"
-      ? (import.meta.env.VITE_SUPERADMIN_EMAILS as string | undefined)
-      : undefined) ?? "")
-      .split(",")
-      .map((e) => e.trim().toLowerCase())
-      .filter(Boolean)),
-    ...DEFAULT_SUPERADMIN_EMAILS,
-  ])
-);
-
 /* ── Public types ──────────────────────────────────────────────────── */
 
 export type AppRole = "DRIVER" | "ADMIN" | "SUPERADMIN";
