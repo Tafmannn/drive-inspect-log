@@ -125,7 +125,6 @@ const App = () => {
         <Toaster />
         <Sonner />
         <AppErrorBoundary>
-          <BackgroundUploader />
           <AuthProvider overrideRoles={overrideRoles}>
             <DevRoleBanner />
             <BrowserRouter>
