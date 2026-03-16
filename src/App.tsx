@@ -176,6 +176,7 @@ const App = () => {
                 >
                   <Route index element={<ControlOverview />} />
                   <Route path="jobs" element={<ControlJobs />} />
+                  <Route path="pod-review" element={<ControlPodReview />} />
                   <Route path="drivers" element={<ControlDrivers />} />
                   <Route path="compliance" element={<ControlCompliance />} />
                   <Route path="finance" element={<ControlFinance />} />
