@@ -678,17 +678,21 @@ function renderSignatures(
  * Resolve a signature URL to a fresh signed URL if it uses the
  * supabase-sig:// scheme or is an expired Supabase signed URL.
  */
-async function resolveSignatureForPdf(url: string): Promise<string> {
+async function resolveSignatureForPdf(
+  url: string,
+  meta?: { jobId?: string; orgId?: string }
+): Promise<string> {
   try {
     const { internalStorageService } = await import('./internalStorageService');
     const resolved = await internalStorageService.resolveSignatureUrl(url);
     if (!resolved) {
       const { logClientEvent } = await import('./logger');
       void logClientEvent('signature_resolve_failed', 'warn', {
+        jobId: meta?.jobId,
         message: `Could not resolve signature URL`,
         source: 'storage',
         type: 'upload',
-        context: { originalUrl: url.slice(0, 120) },
+        context: { originalUrl: url.slice(0, 120), orgId: meta?.orgId },
       });
     }
     return resolved ?? url;
@@ -701,7 +705,8 @@ async function buildImageCache(
   pickupPhotos: PhotoLike[],
   deliveryPhotos: PhotoLike[],
   pickup: JobWithRelations["inspections"][number] | undefined,
-  delivery: JobWithRelations["inspections"][number] | undefined
+  delivery: JobWithRelations["inspections"][number] | undefined,
+  meta?: { jobId?: string; orgId?: string }
 ): Promise<Map<string, CachedImage | null>> {
   const imageCache = new Map<string, CachedImage | null>();
 
@@ -719,7 +724,7 @@ async function buildImageCache(
   const sigUrlMap = new Map<string, string>(); // original → resolved
   await Promise.allSettled(
     rawSignatureUrls.map(async (origUrl) => {
-      const resolved = await resolveSignatureForPdf(origUrl);
+      const resolved = await resolveSignatureForPdf(origUrl, meta);
       sigUrlMap.set(origUrl, resolved);
     })
   );
@@ -755,7 +760,7 @@ export async function generatePodPdf(
   const pickupPhotos = job.photos.filter((p) => p.type.startsWith("pickup_"));
   const deliveryPhotos = job.photos.filter((p) => p.type.startsWith("delivery_"));
 
-  const imageCache = await buildImageCache(pickupPhotos, deliveryPhotos, pickup, delivery);
+  const imageCache = await buildImageCache(pickupPhotos, deliveryPhotos, pickup, delivery, { jobId: job.id });
   const logo = await loadLogo();
 
   renderHeader(doc, job, ref, logo);
