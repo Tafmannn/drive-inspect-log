@@ -226,6 +226,14 @@ export function ControlPodReview() {
             variant="ghost"
             size="sm"
             className="h-6 text-[10px] px-2"
+            onClick={(e) => { e.stopPropagation(); navigate(`/inspection/${r.id}/delivery`); }}
+          >
+            <ClipboardList className="h-3 w-3 mr-0.5" /> Inspect
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 text-[10px] px-2"
             onClick={(e) => { e.stopPropagation(); navigate(`/jobs/${r.id}`); }}
           >
             <Eye className="h-3 w-3 mr-0.5" /> View
@@ -234,7 +242,7 @@ export function ControlPodReview() {
             variant="ghost"
             size="sm"
             className="h-6 text-[10px] px-2"
-            onClick={(e) => { e.stopPropagation(); navigate(`/expenses/new`); }}
+            onClick={(e) => { e.stopPropagation(); navigate(`/expenses/new?jobId=${r.id}`); }}
           >
             <Receipt className="h-3 w-3 mr-0.5" /> Expense
           </Button>

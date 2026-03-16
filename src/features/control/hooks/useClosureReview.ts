@@ -86,7 +86,7 @@ export interface ClosureKpis {
   podReady: number;
   deliveryComplete: number;
   completedRecent: number;
-  missingEvidence: number;
+  missingDeliveryInspection: number;
 }
 
 const SELECT_FIELDS = [
