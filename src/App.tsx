@@ -21,7 +21,7 @@ import { ExpenseForm } from "./pages/ExpenseForm";
 import { AdminDashboard } from "./pages/AdminDashboard";
 import { Timesheets } from "./pages/Timesheets";
 import { AdminUsers } from "./pages/AdminUsers";
-import { OrgAdminDashboard } from "./pages/OrgAdminDashboard";
+
 import { SuperAdminDashboard } from "./pages/SuperAdminDashboard";
 import { InvoiceGenerator } from "./pages/InvoiceGenerator";
 import { Profile } from "./pages/Profile";
@@ -158,7 +158,7 @@ const App = () => {
                 <Route path="/admin/timesheets" element={<ProtectedRoute><AdminRoute><Timesheets /></AdminRoute></ProtectedRoute>} />
                 <Route path="/admin/sync-errors" element={<ProtectedRoute><AdminRoute><SyncErrors /></AdminRoute></ProtectedRoute>} />
                 <Route path="/admin/users" element={<ProtectedRoute><AdminRoute><AdminUsers /></AdminRoute></ProtectedRoute>} />
-                <Route path="/admin/dashboard" element={<ProtectedRoute><AdminRoute><OrgAdminDashboard /></AdminRoute></ProtectedRoute>} />
+                
 
                 {/* ── Super-admin-only route ── */}
                 <Route path="/super-admin" element={<ProtectedRoute><SuperAdminRoute><SuperAdminDashboard /></SuperAdminRoute></ProtectedRoute>} />
