@@ -1,50 +1,78 @@
 
-Do I know what the issue is? Yes.
 
-Root cause (proven):
-- Failing layer: signature resolver routing in `src/lib/mediaResolver.ts`.
-- Error category: **B (bucket mismatch)** causing **D (object not found)**.
-- Scope: affects a **subset** — newer signatures stored as bare paths in GCS (`jobs/.../signatures/.../<uuid>-<ts>.png`), not legacy Supabase `vehicle-signatures` objects.
-- Why: current logic treats bare `jobs/.../signatures/...` as Supabase bucket paths and calls `createSignedUrl` on `vehicle-signatures`, which logs `Object not found`.
+## End-to-End Fix Plan: Broken Integrations
 
-Evidence already captured:
-- Console: `[SignatureResolve] createSignedUrl failed ... bucket: vehicle-signatures ... error: Object not found`.
-- DB: failing inspection stores bare paths for signatures; those exact paths do **not** exist in `storage.objects`.
-- Storage truth: legacy signatures exist in `vehicle-signatures` as `jobs/{jobId}/signatures/{type}/driver.png|customer.png`; newer rows use randomized filenames consistent with `gcs-upload`.
-- Feature flag: `CLOUD_STORAGE_ENABLED=true`, so recent signature uploads are going to GCS.
+### Root Causes Identified
 
-Smallest correct fix (no UI redesign):
-1) `src/lib/internalStorageService.ts`
-- Add a diagnostic resolver result shape (format, bucket, path, errorCode).
-- Keep normalization for `supabase-sig://`, legacy Supabase URLs, and bare paths.
-- Return explicit error codes (`OBJECT_NOT_FOUND`, `PERMISSION`, `MALFORMED_INPUT`) instead of silent null context.
+**Issue 1 — CORS blocks all edge function calls from the preview domain**
 
-2) `src/lib/mediaResolver.ts`
-- For bare signature-like paths:
-  - Try Supabase signature signing first.
-  - If and only if error is `OBJECT_NOT_FOUND`, fallback to GCS proxy resolution.
-  - If both fail, return null with explicit logged reason.
-- Keep legacy/current formats supported consistently.
+Every single edge function (11 functions) uses a hardcoded `ALLOWED_ORIGINS` list containing only `localhost:5173`, `*.lovable.app`, and `axentra.lovable.app`. The actual preview runs on `*.lovableproject.com`, which is NOT in this list. When the origin doesn't match, the function returns `Access-Control-Allow-Origin: http://localhost:5173`, which the browser rejects. This silently breaks DVLA lookup, company search, postcode lookup, maps directions, GCS upload/proxy, vision OCR, sheet sync, and all admin functions.
 
-3) `src/pages/PodReport.tsx`
-- Instrument raw signature inputs by slot (`pickup_driver`, `pickup_customer`, `delivery_driver`, `delivery_customer`) with job id.
-- Log resolved URL per slot and explicit failure reason when null.
-- In `SignatureCard`, add `onLoad` and `onError` logs with final `img src`.
-- Distinguish “not signed” (raw null) vs “failed to resolve/load” (raw present, resolved null/error) so no silent failure.
+**Issue 2 — Client APIs send anon key instead of user session token**
 
-Validation plan:
-- Verify all 4 slots render for a current GCS-path job and a legacy Supabase-path job.
-- Verify no raw `supabase-sig://` or bare unresolved paths are sent to `<img src>`.
-- Confirm failure classification in logs:
-  - current records: resolved via GCS fallback after Supabase `OBJECT_NOT_FOUND`.
-  - legacy records: resolved via Supabase signed URL.
-- Smoke check with super admin + admin (driver if available) to confirm no role-specific regression.
+Four client-side API modules (`businessSearchApi.ts`, `postcodeApi.ts`, `mapsApi.ts`, `sheetSyncApi.ts`) use raw `fetch()` with `Authorization: Bearer ${ANON_KEY}`. The edge functions then call `supabase.auth.getUser()` which returns null for anon keys, causing a 401 UNAUTHENTICATED response. Only `vehicleLookupApi.ts`, `adminApi.ts`, `visionApi.ts`, and `gcsStorageService.ts` correctly use `supabase.functions.invoke()` which sends the real user token.
 
-Files to change:
-- `src/lib/internalStorageService.ts`
-- `src/lib/mediaResolver.ts`
-- `src/pages/PodReport.tsx`
+---
 
-Architecture decision:
-- **Client-side signing retained**.
-- No new Edge Function needed; the issue is resolver backend-detection/fallback, not a structural auth limitation.
+### Fix Plan
+
+#### Part 1: Fix CORS in all 11 edge functions
+
+Replace the restrictive `ALLOWED_ORIGINS` + `cors()` function in every edge function with the standard Lovable CORS pattern:
+
+```javascript
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+```
+
+**Files to update (CORS block, lines 4-16 in each):**
+- `supabase/functions/vehicle-lookup/index.ts`
+- `supabase/functions/business-search/index.ts`
+- `supabase/functions/place-details/index.ts`
+- `supabase/functions/postcode-lookup/index.ts`
+- `supabase/functions/maps-directions/index.ts`
+- `supabase/functions/gcs-upload/index.ts`
+- `supabase/functions/gcs-proxy/index.ts`
+- `supabase/functions/gcs-fix-acl/index.ts`
+- `supabase/functions/vision-ocr/index.ts`
+- `supabase/functions/promote-admin/index.ts`
+- `supabase/functions/assign-driver/index.ts`
+- `supabase/functions/get-org-users/index.ts`
+- `supabase/functions/google-sheets-sync/index.ts` (same pattern, slightly different location)
+
+Also replace `cors(req.headers.get("Origin"))` in catch blocks with just `corsHeaders`.
+
+#### Part 2: Switch client APIs to use `supabase.functions.invoke()`
+
+**`src/lib/businessSearchApi.ts`** — Replace raw fetch calls with `supabase.functions.invoke('business-search', ...)` and `supabase.functions.invoke('place-details', ...)`. This sends the user's real auth token.
+
+**`src/lib/postcodeApi.ts`** — Replace raw fetch with `supabase.functions.invoke('postcode-lookup', ...)`.
+
+**`src/lib/mapsApi.ts`** — Replace raw fetch with `supabase.functions.invoke('maps-directions', ...)`.
+
+**`src/lib/sheetSyncApi.ts`** — Replace raw fetch `callSync` function with `supabase.functions.invoke('google-sheets-sync', ...)`.
+
+#### Part 3: Deploy all edge functions
+
+All 13 edge functions must be redeployed after CORS fixes.
+
+---
+
+### Summary of what this fixes
+
+| Feature | Broken because | Fix |
+|---|---|---|
+| DVLA Lookup | CORS block | Fix CORS headers |
+| Company Search | CORS + anon key auth | Fix CORS + use `supabase.functions.invoke` |
+| Postcode Lookup | CORS + anon key auth | Fix CORS + use `supabase.functions.invoke` |
+| Maps/Route Calc | CORS + anon key auth | Fix CORS + use `supabase.functions.invoke` |
+| Google Sheets Sync | CORS + anon key auth | Fix CORS + use `supabase.functions.invoke` |
+| GCS Photo Upload | CORS block | Fix CORS headers |
+| GCS Photo Proxy | CORS block | Fix CORS headers |
+| Vision OCR | CORS block | Fix CORS headers |
+| Admin user mgmt | CORS block | Fix CORS headers |
+
+No database, RLS, routing, or business logic changes needed.
+

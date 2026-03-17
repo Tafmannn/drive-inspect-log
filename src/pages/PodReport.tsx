@@ -56,10 +56,12 @@ const SignatureCard = ({
   label,
   name,
   url,
+  slot,
 }: {
   label: string;
   name: string | null | undefined;
   url: string | null;
+  slot?: string;
 }) => {
   const [failed, setFailed] = useState(false);
 
@@ -79,7 +81,11 @@ const SignatureCard = ({
           alt={`${label} signature`}
           className="h-16 border rounded-md bg-white p-1.5 w-full object-contain"
           crossOrigin="anonymous"
-          onError={() => setFailed(true)}
+          onLoad={() => console.info(`[SigImg] loaded ${slot}`, { src: url.slice(0, 80) })}
+          onError={() => {
+            console.error(`[SigImg] failed ${slot}`, { src: url.slice(0, 80) });
+            setFailed(true);
+          }}
         />
       ) : (
         <div className="h-16 border border-dashed rounded-md bg-muted/50 flex flex-col items-center justify-center gap-0.5">
@@ -133,18 +139,28 @@ export const PodReport = () => {
       const nextSignatures: Record<string, string | null> = {};
       const nextPhotos: Record<string, string> = {};
 
-      nextSignatures["pickup_driver"] = await resolveMediaUrlAsync(
-        pickup?.driver_signature_url
-      );
-      nextSignatures["pickup_customer"] = await resolveMediaUrlAsync(
-        pickup?.customer_signature_url
-      );
-      nextSignatures["delivery_driver"] = await resolveMediaUrlAsync(
-        delivery?.driver_signature_url
-      );
-      nextSignatures["delivery_customer"] = await resolveMediaUrlAsync(
-        delivery?.customer_signature_url
-      );
+      const sigSlots = {
+        pickup_driver: pickup?.driver_signature_url ?? null,
+        pickup_customer: pickup?.customer_signature_url ?? null,
+        delivery_driver: delivery?.driver_signature_url ?? null,
+        delivery_customer: delivery?.customer_signature_url ?? null,
+      };
+
+      console.info('[POD-Sig] raw inputs', { jobId: job.id, ...sigSlots });
+
+      for (const [slot, raw] of Object.entries(sigSlots)) {
+        if (!raw) {
+          nextSignatures[slot] = null;
+          continue;
+        }
+        const resolved = await resolveMediaUrlAsync(raw);
+        nextSignatures[slot] = resolved;
+        if (!resolved) {
+          console.error(`[POD-Sig] ${slot} FAILED — raw present but resolved null`, { raw: raw.slice(0, 80) });
+        } else {
+          console.info(`[POD-Sig] ${slot} OK`, { resolved: resolved.slice(0, 80) });
+        }
+      }
 
       await Promise.all(
         (job.photos ?? []).map(async (photo) => {
@@ -658,21 +674,25 @@ export const PodReport = () => {
                     label="Pickup Driver"
                     name={pickup?.inspected_by_name}
                     url={resolvedSignatures["pickup_driver"] ?? null}
+                    slot="pickup_driver"
                   />
                   <SignatureCard
                     label="Pickup Customer"
                     name={pickup?.customer_name}
                     url={resolvedSignatures["pickup_customer"] ?? null}
+                    slot="pickup_customer"
                   />
                   <SignatureCard
                     label="Delivery Driver"
                     name={delivery?.inspected_by_name}
                     url={resolvedSignatures["delivery_driver"] ?? null}
+                    slot="delivery_driver"
                   />
                   <SignatureCard
                     label="Delivery Customer"
                     name={delivery?.customer_name}
                     url={resolvedSignatures["delivery_customer"] ?? null}
+                    slot="delivery_customer"
                   />
                 </div>
               </Card>
