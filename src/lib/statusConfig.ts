@@ -23,6 +23,7 @@ export type JobStatusValue = (typeof JOB_STATUS)[keyof typeof JOB_STATUS];
 
 // Helper groupings
 export const ACTIVE_STATUSES: JobStatusValue[] = [
+  JOB_STATUS.ASSIGNED,
   JOB_STATUS.READY_FOR_PICKUP,
   JOB_STATUS.PICKUP_IN_PROGRESS,
   JOB_STATUS.PICKUP_COMPLETE,
