@@ -41,14 +41,11 @@ serve(async (req) => {
         ...((caller.app_metadata?.roles ?? []) as string[]),
       ].map((r) => String(r).toUpperCase().replace(/-/g, "_"))
     );
-    const callerEmail = (caller.email ?? "").toLowerCase();
     const isSuperAdmin =
       directRole === "super_admin" ||
       directRole === "superadmin" ||
       roleSet.has("SUPERADMIN") ||
-      roleSet.has("SUPER_ADMIN") ||
-      callerEmail === "axentravehiclelogistics@gmail.com" ||
-      callerEmail === "info@axentravehicles.com";
+      roleSet.has("SUPER_ADMIN");
     const isAdmin = isSuperAdmin || directRole === "admin" || roleSet.has("ADMIN");
 
     if (!isAdmin) {

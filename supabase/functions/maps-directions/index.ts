@@ -6,12 +6,35 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
+// ─── Rate limiter: 30 req/IP/min ───
+const ipHits = new Map<string, { count: number; resetAt: number }>();
+function rateLimit(req: Request): Response | null {
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const now = Date.now();
+  const entry = ipHits.get(ip);
+  if (!entry || now > entry.resetAt) {
+    ipHits.set(ip, { count: 1, resetAt: now + 60_000 });
+    return null;
+  }
+  entry.count++;
+  if (entry.count > 30) {
+    return new Response(JSON.stringify({ error: "RATE_LIMITED" }), {
+      status: 429,
+      headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "60" },
+    });
+  }
+  return null;
+}
+
 const UK_POSTCODE_RE = /^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const limited = rateLimit(req);
+  if (limited) return limited;
 
   try {
     // ─── Auth ───

@@ -1,57 +1,53 @@
 /**
- * Rewrites direct GCS URLs to go through the gcs-proxy edge function,
- * which authenticates via the service account. This is required because
- * the axentra_db bucket uses Uniform bucket-level access (no public reads).
+ * Resolves image URLs through the gcs-proxy edge function which returns
+ * a 302 redirect to a short-lived GCS signed URL.
  *
- * Supabase internal storage URLs are returned as-is (already public).
+ * Handles three URL patterns:
+ * 1. Legacy full GCS URLs (https://storage.googleapis.com/axentra_db/...)
+ * 2. Bare GCS object paths (jobs/xxx/photo.jpg) — from new uploads
+ * 3. Other URLs (Supabase, data URIs, http) — pass through unchanged
  *
- * The current Supabase session JWT is appended as a query param so that
- * <img src="…"> tags (which cannot send Authorization headers) still
- * authenticate successfully with the proxy.
+ * No JWT tokens are placed in URLs. The proxy authenticates via the
+ * Authorization header (called from supabase.functions.invoke or fetch).
+ * For <img> tags, the proxy URL itself is used and the browser follows
+ * the 302 redirect to the signed URL.
  */
-
-import { supabase } from '@/integrations/supabase/client';
 
 const GCS_PUBLIC_PREFIX = 'https://storage.googleapis.com/axentra_db/';
 const SUPABASE_FUNCTIONS_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gcs-proxy`;
 
-// Cache the token so we don't call getSession() on every single image
-let cachedToken: string | null = null;
-let tokenExpiresAt = 0;
-
-async function getSessionToken(): Promise<string | null> {
-  const now = Date.now();
-  if (cachedToken && now < tokenExpiresAt) return cachedToken;
-
-  const { data } = await supabase.auth.getSession();
-  const session = data?.session;
-  if (!session?.access_token) return null;
-
-  cachedToken = session.access_token;
-  // Refresh 60s before expiry
-  tokenExpiresAt = (session.expires_at ?? 0) * 1000 - 60_000;
-  return cachedToken;
-}
-
-// Synchronous version using last-known token (best-effort for JSX rendering)
-function getLastKnownToken(): string | null {
-  return cachedToken;
+/**
+ * Determine if a string looks like a bare GCS object path
+ * (not a full URL, not a data URI, not empty).
+ */
+function isBareObjectPath(url: string): boolean {
+  return (
+    !url.startsWith('http://') &&
+    !url.startsWith('https://') &&
+    !url.startsWith('data:') &&
+    !url.startsWith('blob:') &&
+    !url.startsWith('supabase-sig://') &&
+    url.length > 0
+  );
 }
 
 /**
  * Synchronous URL resolver for use in JSX (img src, etc.)
- * Uses the last-known cached token. Call `preloadAuthToken()` once
- * on mount to ensure the cache is warm.
+ * The proxy returns a 302 redirect to a signed URL, so <img> tags
+ * follow the redirect automatically.
  */
 export function resolveImageUrl(url: string | null | undefined): string | null {
   if (!url) return null;
 
-  // Direct GCS URL → proxy through edge function with token
+  // Legacy full GCS URL → proxy
   if (url.startsWith(GCS_PUBLIC_PREFIX)) {
     const objectPath = url.slice(GCS_PUBLIC_PREFIX.length);
-    const token = getLastKnownToken();
-    const tokenParam = token ? `&token=${encodeURIComponent(token)}` : '';
-    return `${SUPABASE_FUNCTIONS_BASE}?path=${encodeURIComponent(objectPath)}${tokenParam}`;
+    return `${SUPABASE_FUNCTIONS_BASE}?path=${encodeURIComponent(objectPath)}`;
+  }
+
+  // Bare object path from new uploads → proxy
+  if (isBareObjectPath(url)) {
+    return `${SUPABASE_FUNCTIONS_BASE}?path=${encodeURIComponent(url)}`;
   }
 
   // Everything else (Supabase public URLs, data URIs, etc.) — pass through
@@ -59,26 +55,18 @@ export function resolveImageUrl(url: string | null | undefined): string | null {
 }
 
 /**
- * Async URL resolver — guarantees fresh token. Use in non-JSX contexts
- * like PDF generation where you can await.
+ * Async URL resolver — identical logic but available for contexts
+ * that need an async interface (e.g., PDF generation).
  */
 export async function resolveImageUrlAsync(url: string | null | undefined): Promise<string | null> {
-  if (!url) return null;
-
-  if (url.startsWith(GCS_PUBLIC_PREFIX)) {
-    const objectPath = url.slice(GCS_PUBLIC_PREFIX.length);
-    const token = await getSessionToken();
-    const tokenParam = token ? `&token=${encodeURIComponent(token)}` : '';
-    return `${SUPABASE_FUNCTIONS_BASE}?path=${encodeURIComponent(objectPath)}${tokenParam}`;
-  }
-
-  return url;
+  return resolveImageUrl(url);
 }
 
 /**
- * Call once on component mount to warm the token cache so that
- * synchronous resolveImageUrl() calls have a token available.
+ * No-op kept for backward compatibility — token caching is no longer needed
+ * since JWTs are no longer placed in URLs.
  */
 export async function preloadAuthToken(): Promise<void> {
-  await getSessionToken();
+  // Intentionally empty — auth is handled by Authorization header on fetch,
+  // and <img> tags use the proxy redirect (no token needed in URL).
 }
