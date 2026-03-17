@@ -105,8 +105,14 @@ const SELECT_FIELDS = [
 
 function deriveRow(job: any, band: ClosureReviewRow["band"]): ClosureReviewRow {
   const hoursInState = (Date.now() - new Date(job.updated_at).getTime()) / 3_600_000;
+  const profile = job.driver_profiles;
+  const resolvedDriverName = profile
+    ? (profile.display_name || profile.full_name || job.driver_name)
+    : (job.driver_name || null);
   return {
     ...job,
+    driver_profiles: undefined, // strip join artifact
+    resolvedDriverName,
     band,
     missingPickupInspection: !job.has_pickup_inspection,
     missingDeliveryInspection: !job.has_delivery_inspection,

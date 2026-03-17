@@ -137,8 +137,8 @@ export function ControlPodReview() {
       header: "Driver",
       className: "w-[110px]",
       render: (r) =>
-        r.driver_name ? (
-          <span className="text-xs text-foreground">{r.driver_name}</span>
+        r.resolvedDriverName ? (
+          <span className="text-xs text-foreground">{r.resolvedDriverName}</span>
         ) : (
           <span className="text-xs font-medium text-warning">Unassigned</span>
         ),

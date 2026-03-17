@@ -64,9 +64,7 @@ export function ControlOverview() {
     { label: "Expenses", icon: Receipt, onClick: () => navigate("/control/finance") },
   ];
 
-  type DispatchRow = NonNullable<typeof dispatch>[number];
-
-  const dispatchColumns: CompactColumn<DispatchRow>[] = [
+  const dispatchColumns: CompactColumn<DispatchBoardRow>[] = [
     {
       key: "ref",
       header: "Ref",
@@ -83,8 +81,8 @@ export function ControlOverview() {
       key: "driver",
       header: "Driver",
       className: "w-[120px]",
-      render: (r) => r.driver_name
-        ? <span className="text-xs">{r.driver_name}</span>
+      render: (r) => r.resolvedDriverName
+        ? <span className="text-xs">{r.resolvedDriverName}</span>
         : <span className="text-xs font-medium text-warning">Unassigned</span>,
     },
     {

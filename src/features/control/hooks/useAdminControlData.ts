@@ -58,19 +58,30 @@ export function useAdminKpis() {
   });
 }
 
+export interface DispatchBoardRow extends Pick<Job, "id" | "external_job_number" | "vehicle_reg" | "vehicle_make" | "vehicle_model" | "status" | "driver_name" | "pickup_city" | "pickup_postcode" | "delivery_city" | "delivery_postcode" | "job_date" | "updated_at" | "priority"> {
+  driver_id: string | null;
+  resolvedDriverName: string | null;
+}
+
 export function useDispatchBoard() {
   return useQuery({
     queryKey: ["control-dispatch-board"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("jobs")
-        .select("id, external_job_number, vehicle_reg, vehicle_make, vehicle_model, status, driver_name, pickup_city, pickup_postcode, delivery_city, delivery_postcode, job_date, updated_at, priority")
+        .select("id, external_job_number, vehicle_reg, vehicle_make, vehicle_model, status, driver_id, driver_name, pickup_city, pickup_postcode, delivery_city, delivery_postcode, job_date, updated_at, priority, driver_profiles(display_name, full_name)")
         .eq("is_hidden", false)
         .in("status", [...(ACTIVE_STATUSES as string[]), ...(PENDING_STATUSES as string[])])
         .order("updated_at", { ascending: false })
         .limit(50);
       if (error) throw error;
-      return (data ?? []) as (Pick<Job, "id" | "external_job_number" | "vehicle_reg" | "vehicle_make" | "vehicle_model" | "status" | "driver_name" | "pickup_city" | "pickup_postcode" | "delivery_city" | "delivery_postcode" | "job_date" | "updated_at" | "priority">)[];
+      return (data ?? []).map((r: any) => {
+        const profile = r.driver_profiles;
+        const resolvedDriverName = profile
+          ? (profile.display_name || profile.full_name || r.driver_name)
+          : (r.driver_name || null);
+        return { ...r, driver_profiles: undefined, resolvedDriverName } as DispatchBoardRow;
+      });
     },
     staleTime: 30_000,
   });
