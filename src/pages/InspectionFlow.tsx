@@ -1421,10 +1421,23 @@ export const InspectionFlow = () => {
     }
   };
 
-  const renderCurrentStep = () =>
-    type === "pickup"
-      ? renderPickupStep(currentStep)
-      : renderDeliveryStep(currentStep);
+  // Per-step error state for recoverable rendering failures
+  const [stepError, setStepError] = useState<string | null>(null);
+
+  const renderCurrentStep = () => {
+    // Clear previous step error on re-render attempt
+    try {
+      setStepError(null);
+      return type === "pickup"
+        ? renderPickupStep(currentStep)
+        : renderDeliveryStep(currentStep);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      console.error("InspectionFlow step render error:", e);
+      setStepError(msg);
+      return null;
+    }
+  };
 
   // ───────────────── SHELL ─────────────────
 
