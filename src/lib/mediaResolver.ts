@@ -15,14 +15,19 @@ function isBareObjectPath(url: string): boolean {
   );
 }
 
+/**
+ * Detect bare paths that belong to Supabase vehicle-signatures bucket
+ * rather than GCS. These follow the pattern: jobs/{id}/signatures/...
+ */
+function isSupabaseSignaturePath(url: string): boolean {
+  return /^jobs\/[^/]+\/signatures\//.test(url);
+}
+
 async function resolveGcsViaAuthenticatedFetch(objectPath: string): Promise<string | null> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   if (!token) return null;
 
-  // Use redirect: "manual" to extract the signed URL from the 302 Location header.
-  // redirect: "follow" fails because the browser follows the redirect to GCS which
-  // may not return proper CORS headers, causing an opaque redirect error.
   const res = await fetch(`${GCS_PROXY_ENDPOINT}?path=${encodeURIComponent(objectPath)}`, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -30,13 +35,10 @@ async function resolveGcsViaAuthenticatedFetch(objectPath: string): Promise<stri
     redirect: "manual",
   });
 
-  // 302 redirect — extract Location header containing the signed GCS URL
   if (res.status === 302 || res.status === 301) {
     return res.headers.get("Location") || null;
   }
 
-  // Fallback: if proxy returned the data directly (200), build a token-authenticated URL
-  // that <img> tags can use
   if (res.ok) {
     return `${GCS_PROXY_ENDPOINT}?path=${encodeURIComponent(objectPath)}&token=${encodeURIComponent(token)}`;
   }
@@ -51,10 +53,12 @@ export async function resolveMediaUrlAsync(
 
   if (url.startsWith("data:") || url.startsWith("blob:")) return url;
 
+  // supabase-sig:// scheme — current canonical format
   if (url.startsWith("supabase-sig://")) {
     return await internalStorageService.resolveSignatureUrl(url);
   }
 
+  // Supabase URLs containing vehicle-signatures (legacy public/signed URLs)
   if (
     url.includes("/vehicle-signatures/") ||
     url.includes("/object/sign/vehicle-signatures/") ||
@@ -63,12 +67,19 @@ export async function resolveMediaUrlAsync(
     return await internalStorageService.resolveSignatureUrl(url);
   }
 
+  // GCS full URLs — route through authenticated proxy
   if (url.startsWith(GCS_PUBLIC_PREFIX)) {
     const objectPath = url.slice(GCS_PUBLIC_PREFIX.length);
     return await resolveGcsViaAuthenticatedFetch(objectPath);
   }
 
+  // Bare paths: distinguish Supabase signatures from GCS objects
   if (isBareObjectPath(url)) {
+    if (isSupabaseSignaturePath(url)) {
+      // This is a Supabase Storage path in vehicle-signatures bucket
+      return await internalStorageService.resolveSignatureUrl(url);
+    }
+    // Otherwise treat as GCS object path
     return await resolveGcsViaAuthenticatedFetch(url);
   }
 
