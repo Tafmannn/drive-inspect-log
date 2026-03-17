@@ -127,7 +127,7 @@ function InterventionKpis() {
         icon={ImageOff}
         variant={(missingEvidence ?? 0) > 0 ? "destructive" : "default"}
         loading={evidenceLoading}
-        onClick={() => navigate("/admin/jobs?filter=review")}
+        onClick={() => navigate("/admin/jobs?filter=evidence")}
       />
     </div>
   );
