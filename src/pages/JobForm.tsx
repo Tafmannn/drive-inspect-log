@@ -350,7 +350,7 @@ export const JobForm = () => {
     saveDraftFromForm();
   }, [triggerRouteCalc, saveDraftFromForm]);
 
-  // Sync make/model when editing once job is loaded
+  // Sync make/model + driver when editing once job is loaded
   useEffect(() => {
     if (isEdit && existingJob && !editHydrated.current) {
       editHydrated.current = true;
@@ -371,6 +371,12 @@ export const JobForm = () => {
       }
       if (!modelKnown) {
         setCustomModelValue(existingJob.vehicle_model);
+      }
+
+      // Hydrate driver assignment
+      if (existingJob.driver_id) {
+        setSelectedDriverId(existingJob.driver_id);
+        setSelectedDriverName(existingJob.driver_name ?? null);
       }
     }
   }, [isEdit, existingJob]);
