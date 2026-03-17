@@ -144,6 +144,17 @@ export function AdminJobsQueue() {
               />
             )}
 
+            {filter === "stale" && (
+              <QueueSection
+                title="Stale Jobs"
+                icon={Clock}
+                iconClass="text-warning"
+                jobs={filterJobs(queues.needsAttention.filter(j => isJobStale(j)))}
+                emptyText="No stale jobs."
+                actions={actions}
+              />
+            )}
+
             {(filter === "all" || filter === "unassigned") && (
               <QueueSection
                 title="Unassigned"
