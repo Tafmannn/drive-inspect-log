@@ -345,7 +345,7 @@ export function ControlOverview() {
           data={dispatch ?? []}
           loading={dispatchLoading}
           emptyMessage="No active jobs in pipeline."
-          onRowClick={(row) => navigate(`/jobs/${row.id}`)}
+            onRowClick={(row) => navigate(`/jobs/${row.id}?from=/control`)}
           maxRows={15}
         />
       </ControlSection>
