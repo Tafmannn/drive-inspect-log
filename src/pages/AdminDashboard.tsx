@@ -593,6 +593,9 @@ export const AdminDashboard = () => {
         {/* Tier 1 — Intervention KPIs */}
         <InterventionKpis />
 
+        {/* Compliance intervention strip */}
+        <ComplianceStrip />
+
         {/* Tier 2 — Ranked Needs Action (primary section) */}
         <NeedsActionQueue />
 
