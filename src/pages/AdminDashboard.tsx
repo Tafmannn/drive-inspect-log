@@ -36,6 +36,7 @@ import {
 interface NeedsActionItem {
   key: string;
   priority: number; // lower = more urgent
+  updatedAtMs: number; // raw timestamp for sorting (older = smaller = more urgent)
   queueType: "unassigned" | "stale" | "evidence" | "pod_review";
   queueLabel: string;
   jobId?: string;
