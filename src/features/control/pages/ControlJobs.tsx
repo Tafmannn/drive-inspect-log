@@ -48,13 +48,13 @@ export function ControlJobs() {
 
   // Column action callbacks — stable references
   const columnActions: JobsColumnActions = useMemo(() => ({
-    onView: (r) => navigate(`/jobs/${r.id}`),
+    onView: (r) => navigate(`/jobs/${r.id}?from=/control/jobs`),
     onAssign: (r) => setAssignTarget({
       jobId: r.id,
       jobRef: r.external_job_number || r.id.slice(0, 8),
       driverId: r.driver_id ?? null,
     }),
-    onReviewPod: (r) => navigate(`/jobs/${r.id}/pod`),
+    onReviewPod: (r) => navigate(`/jobs/${r.id}/pod?from=/control/jobs`),
     onAddExpense: (r) => navigate(`/expenses/new?jobId=${r.id}&from=/control/jobs`),
   }), [navigate]);
 
