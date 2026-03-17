@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useExpenses, useExpenseTotals, useJobExpenses } from "@/hooks/useExpenses";
 import { useJob } from "@/hooks/useJobs";
+import { useDriverGate } from "@/hooks/useDriverGate";
+import { useAuth } from "@/context/AuthContext";
 import { EXPENSE_CATEGORIES } from "@/lib/expenseApi";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { Plus, Receipt, Filter, ArrowLeft, ExternalLink, Paperclip } from "lucide-react";
@@ -32,6 +34,8 @@ export const Expenses = () => {
   const [searchParams] = useSearchParams();
   const scopedJobId = searchParams.get("jobId") || "";
   const isScoped = Boolean(scopedJobId);
+  const { isAdmin, isSuperAdmin } = useAuth();
+  const gate = useDriverGate();
 
   const [dateRange, setDateRange] = useState("30");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -49,7 +53,10 @@ export const Expenses = () => {
   );
   const { data: totals } = useExpenseTotals();
 
-  const expenses = isScoped ? scopedExpenses : globalExpenses;
+  // For driver-only users in global mode, filter to only their assigned jobs' expenses
+  const isDriverOnly = gate.isDriverOnly;
+  let expenses = isScoped ? scopedExpenses : globalExpenses;
+
   const isLoading = isScoped ? scopedLoading : globalLoading;
 
   const fmt = (n: number) => `£${n.toFixed(2)}`;
@@ -86,14 +93,16 @@ export const Expenses = () => {
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-[12px] h-7 px-2 text-muted-foreground"
-                onClick={() => navigate("/expenses")}
-              >
-                <ExternalLink className="h-3 w-3 mr-1" /> View all expenses
-              </Button>
+              {!isDriverOnly && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-[12px] h-7 px-2 text-muted-foreground"
+                  onClick={() => navigate("/expenses")}
+                >
+                  <ExternalLink className="h-3 w-3 mr-1" /> View all expenses
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="sm"
@@ -106,8 +115,8 @@ export const Expenses = () => {
           </div>
         )}
 
-        {/* Totals — global mode only */}
-        {!isScoped && (
+        {/* Totals — global mode, admin only */}
+        {!isScoped && !isDriverOnly && (
           <div className="grid grid-cols-3 gap-3">
             {[
               { label: "Today", value: totals?.today ?? 0 },
@@ -122,8 +131,8 @@ export const Expenses = () => {
           </div>
         )}
 
-        {/* Filters — global mode only */}
-        {!isScoped && (
+        {/* Filters — global mode, admin only */}
+        {!isScoped && !isDriverOnly && (
           <>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => setShowFilters(f => !f)} className="min-h-[44px] rounded-lg">
@@ -160,65 +169,93 @@ export const Expenses = () => {
           </>
         )}
 
-        {/* List */}
-        {isLoading && <DashboardSkeleton />}
-
-        {!isLoading && (!expenses || expenses.length === 0) && (
-          <div className="text-center py-12">
-            <Receipt className="w-12 h-12 mx-auto text-muted-foreground mb-3 stroke-[2]" />
-            <p className="text-[14px] text-muted-foreground">
-              {isScoped ? "No expenses logged for this job yet" : "No expenses found"}
-            </p>
+        {/* Driver-only global mode: redirect message */}
+        {!isScoped && isDriverOnly && (
+          <div className="text-center py-12 space-y-3">
+            <Receipt className="w-12 h-12 mx-auto text-muted-foreground stroke-[1.5]" />
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-foreground">No expenses to show</p>
+              <p className="text-[13px] text-muted-foreground">
+                Your expenses are linked to your assigned jobs. Open a job to view or add expenses.
+              </p>
+            </div>
           </div>
         )}
 
-        {/* Expense rows — ledger semantics: amount, receipt, category, date */}
-        {expenses?.map(e => {
-          const hasReceipts = e.receipts.length > 0;
-          return (
-            <div
-              key={e.id}
-              className="p-3 rounded-xl bg-card border border-border shadow-sm space-y-1.5 cursor-pointer active:bg-muted/50 transition-colors"
-              onClick={() => navigate(`/expenses/${e.id}/edit${isScoped ? `?jobId=${scopedJobId}` : ""}`)}
-            >
-              {/* Row 1: Amount + receipt indicator */}
-              <div className="flex items-center justify-between">
-                <span className="text-[16px] font-semibold text-foreground tabular-nums">{fmt(Number(e.amount))}</span>
-                <div className="flex items-center gap-1.5">
-                  {hasReceipts ? (
-                    <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
-                      <Paperclip className="h-3 w-3" /> {e.receipts.length}
-                    </span>
-                  ) : (
-                    <Badge variant="outline" className="text-[10px] text-warning border-warning/30 px-1.5 py-0">
-                      No receipt
-                    </Badge>
+        {/* List — only show for scoped or admin global */}
+        {(!isDriverOnly || isScoped) && (
+          <>
+            {isLoading && <DashboardSkeleton />}
+
+            {!isLoading && (!expenses || expenses.length === 0) && (
+              <div className="text-center py-12">
+                <Receipt className="w-12 h-12 mx-auto text-muted-foreground mb-3 stroke-[2]" />
+                <p className="text-[14px] text-muted-foreground">
+                  {isScoped ? "No expenses logged for this job yet" : "No expenses found"}
+                </p>
+              </div>
+            )}
+
+            {expenses?.map(e => {
+              const hasReceipts = e.receipts.length > 0;
+              return (
+                <div
+                  key={e.id}
+                  className="p-3 rounded-xl bg-card border border-border shadow-sm space-y-1.5 cursor-pointer active:bg-muted/50 transition-colors"
+                  onClick={() => navigate(`/expenses/${e.id}/edit${isScoped ? `?jobId=${scopedJobId}` : ""}`)}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[16px] font-semibold text-foreground tabular-nums">{fmt(Number(e.amount))}</span>
+                    <div className="flex items-center gap-1.5">
+                      {hasReceipts ? (
+                        <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                          <Paperclip className="h-3 w-3" /> {e.receipts.length}
+                        </span>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] text-warning border-warning/30 px-1.5 py-0">
+                          No receipt
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Badge variant="secondary" className="text-[11px]">{e.category}</Badge>
+                    <span className="text-[12px] text-muted-foreground">{new Date(e.date).toLocaleDateString("en-GB")}</span>
+                  </div>
+                  {e.label && (
+                    <p className="text-[11px] text-muted-foreground truncate">{e.label}</p>
                   )}
                 </div>
-              </div>
-              {/* Row 2: Category + date */}
-              <div className="flex items-center justify-between">
-                <Badge variant="secondary" className="text-[11px]">{e.category}</Badge>
-                <span className="text-[12px] text-muted-foreground">{new Date(e.date).toLocaleDateString("en-GB")}</span>
-              </div>
-              {/* Row 3: Label if present (no internal IDs) */}
-              {e.label && (
-                <p className="text-[11px] text-muted-foreground truncate">{e.label}</p>
-              )}
-            </div>
-          );
-        })}
+              );
+            })}
 
-        {/* FAB */}
-        <div className="fixed bottom-20 right-4 z-40">
-          <Button
-            size="lg"
-            className="rounded-full shadow-lg h-14 w-14 p-0 min-h-[44px] min-w-[44px]"
-            onClick={() => navigate(isScoped ? `/expenses/new?jobId=${scopedJobId}` : "/expenses/new")}
-          >
-            <Plus className="w-6 h-6 stroke-[2]" />
-          </Button>
-        </div>
+            {/* FAB */}
+            {isScoped && (
+              <div className="fixed bottom-20 right-4 z-40">
+                <Button
+                  size="lg"
+                  className="rounded-full shadow-lg h-14 w-14 p-0 min-h-[44px] min-w-[44px]"
+                  onClick={() => navigate(`/expenses/new?jobId=${scopedJobId}`)}
+                >
+                  <Plus className="w-6 h-6 stroke-[2]" />
+                </Button>
+              </div>
+            )}
+
+            {/* Admin FAB for global mode */}
+            {!isScoped && !isDriverOnly && (
+              <div className="fixed bottom-20 right-4 z-40">
+                <Button
+                  size="lg"
+                  className="rounded-full shadow-lg h-14 w-14 p-0 min-h-[44px] min-w-[44px]"
+                  onClick={() => navigate("/expenses/new")}
+                >
+                  <Plus className="w-6 h-6 stroke-[2]" />
+                </Button>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       <BottomNav />

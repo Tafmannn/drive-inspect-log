@@ -1,12 +1,14 @@
 /**
  * Phase 5 — Driver Dashboard
  * Execution launcher: Workflow → Utilities → Management → Exports
+ * Driver-gated: shows holding screen if onboarding not approved.
  */
 
 import { AppHeader } from "@/components/AppHeader";
 import { DashboardCard } from "@/components/DashboardCard";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { BottomNav } from "@/components/BottomNav";
+import { DriverGateScreen } from "@/components/DriverGateScreen";
 import { Button } from "@/components/ui/button";
 import {
   Truck, Clock, AlertTriangle, Download, FileDown,
@@ -14,6 +16,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useDashboardCounts } from "@/hooks/useJobs";
+import { useDriverGate } from "@/hooks/useDriverGate";
 import { toast } from "@/hooks/use-toast";
 import { exportJobsCsv, exportInspectionsCsv } from "@/lib/export";
 import { exportExpensesCsv } from "@/lib/expenseApi";
@@ -26,9 +29,22 @@ export const Dashboard = () => {
   const navigate = useNavigate();
   const { data: counts, isLoading } = useDashboardCounts();
   const { isAdmin, isSuperAdmin } = useAuth();
+  const gate = useDriverGate();
   const [exporting, setExporting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const qc = useQueryClient();
+
+  // Driver gate: show holding screen for non-active drivers
+  if (gate.isDriverOnly && gate.status === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+  if (gate.isDriverOnly && gate.status !== "active") {
+    return <DriverGateScreen gateStatus={gate.status as any} />;
+  }
 
   const handleExport = async (type: "jobs" | "inspections" | "expenses") => {
     setExporting(true);
@@ -143,21 +159,23 @@ export const Dashboard = () => {
           </section>
         )}
 
-        {/* ── Exports ─────────────────────────────────────── */}
-        <section>
-          <h2 className="text-[14px] font-semibold text-muted-foreground mb-3">Exports</h2>
-          <div className="grid grid-cols-3 gap-3">
-            <Button variant="outline" onClick={() => handleExport("jobs")} disabled={exporting} className="min-h-[44px] rounded-lg">
-              <FileDown className="w-4 h-4 mr-1" /> Jobs
-            </Button>
-            <Button variant="outline" onClick={() => handleExport("inspections")} disabled={exporting} className="min-h-[44px] rounded-lg">
-              <FileDown className="w-4 h-4 mr-1" /> Inspections
-            </Button>
-            <Button variant="outline" onClick={() => handleExport("expenses")} disabled={exporting} className="min-h-[44px] rounded-lg">
-              <FileDown className="w-4 h-4 mr-1" /> Expenses
-            </Button>
-          </div>
-        </section>
+        {/* ── Exports (admin only) ─────────────────────────── */}
+        {(isAdmin || isSuperAdmin) && (
+          <section>
+            <h2 className="text-[14px] font-semibold text-muted-foreground mb-3">Exports</h2>
+            <div className="grid grid-cols-3 gap-3">
+              <Button variant="outline" onClick={() => handleExport("jobs")} disabled={exporting} className="min-h-[44px] rounded-lg">
+                <FileDown className="w-4 h-4 mr-1" /> Jobs
+              </Button>
+              <Button variant="outline" onClick={() => handleExport("inspections")} disabled={exporting} className="min-h-[44px] rounded-lg">
+                <FileDown className="w-4 h-4 mr-1" /> Inspections
+              </Button>
+              <Button variant="outline" onClick={() => handleExport("expenses")} disabled={exporting} className="min-h-[44px] rounded-lg">
+                <FileDown className="w-4 h-4 mr-1" /> Expenses
+              </Button>
+            </div>
+          </section>
+        )}
       </div>
 
       <BottomNav />
