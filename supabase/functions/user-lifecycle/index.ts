@@ -115,6 +115,9 @@ serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization") ?? "";
+    if (!authHeader.startsWith("Bearer ")) {
+      return json({ error: "UNAUTHENTICATED" }, 401);
+    }
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -123,6 +126,13 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsErr } = await userClient.auth.getClaims(token);
+    if (claimsErr || !claimsData?.claims) {
+      return json({ error: "UNAUTHENTICATED" }, 401);
+    }
+
+    // Fetch full user for role metadata
     const { data: authData, error: authErr } = await userClient.auth.getUser();
     if (authErr || !authData?.user) {
       return json({ error: "UNAUTHENTICATED" }, 401);
