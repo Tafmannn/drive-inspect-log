@@ -259,12 +259,12 @@ export const JobDetail = () => {
           <SectionLabel>Deliver To</SectionLabel>
           <ContactRow icon={Building} text={job.delivery_contact_name} />
           {job.delivery_company && (
-            <span className="text-xs text-muted-foreground pl-6">{job.delivery_company}</span>
+            <span className="text-xs text-foreground/70 pl-6 font-medium">{job.delivery_company}</span>
           )}
           <ContactRow icon={Phone} text={job.delivery_contact_phone} href={`tel:${job.delivery_contact_phone}`} />
           <ContactRow icon={MapPin} text={deliveryAddr} href={mapsUrl(deliveryAddr)} external />
           {job.delivery_time_from && (
-            <p className="text-xs text-muted-foreground pl-6">
+            <p className="text-xs text-foreground/70 pl-6">
               Time: {job.delivery_time_from}{job.delivery_time_to ? ` – ${job.delivery_time_to}` : ""}
             </p>
           )}
