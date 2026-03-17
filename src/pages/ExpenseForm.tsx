@@ -95,7 +95,7 @@ export const ExpenseForm = () => {
 
   const clearDraftAndNavigateBack = () => {
     if (!isEdit) clearDraft(DRAFT_KEY);
-    navigate(jobId ? `/jobs/${jobId}` : "/expenses");
+    navigate(jobId ? `/expenses?jobId=${jobId}` : "/expenses");
   };
 
   // ─── Load Job & Existing Expense ──────────────────────
