@@ -221,6 +221,17 @@ export function ControlJobs() {
           onRowClick={(row) => navigate(`/jobs/${row.id}`)}
         />
       </ControlSection>
+
+      {/* Assign Driver Modal */}
+      {assignTarget && (
+        <AssignDriverModal
+          open={!!assignTarget}
+          onOpenChange={(open) => { if (!open) setAssignTarget(null); }}
+          jobId={assignTarget.jobId}
+          jobRef={assignTarget.jobRef}
+          currentDriverId={assignTarget.driverId}
+        />
+      )}
     </ControlShell>
   );
 }
