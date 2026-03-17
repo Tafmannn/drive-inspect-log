@@ -19,7 +19,7 @@
  */
 
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { resolveBackTarget, withFrom } from "@/lib/navigationUtils";
+import { withFrom } from "@/lib/navigationUtils";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
@@ -28,7 +28,7 @@ import { useJobExpenses } from "@/hooks/useExpenses";
 import { evaluateExecutableState, type ExecutableState } from "@/lib/executionRanking";
 import {
   Phone, MapPin, Building, Edit, ClipboardCheck, Truck,
-  FileText, Receipt, QrCode, Navigation, AlertTriangle, ChevronRight, Lock,
+  FileText, Receipt, QrCode, Navigation, AlertTriangle, ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
@@ -108,7 +108,6 @@ export const JobDetail = () => {
   const navigate = useNavigate();
   const { jobId } = useParams<{ jobId: string }>();
   const [searchParams] = useSearchParams();
-  const backTarget = resolveBackTarget(searchParams, "/jobs");
   const { data: job, isLoading } = useJob(jobId ?? "");
   const { data: jobExpenses } = useJobExpenses(jobId ?? "");
   const { isAdmin } = useAuth();
@@ -140,7 +139,7 @@ export const JobDetail = () => {
   if (isLoading || !job) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <AppHeader title="Job Detail" showBack onBack={() => navigate(backTarget)} />
+        <AppHeader title="Job Detail" showBack onBack={() => navigate(-1)} />
         <div className="p-4"><DashboardSkeleton /></div>
         <BottomNav />
       </div>
@@ -167,12 +166,12 @@ export const JobDetail = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <AppHeader title={`Job ${jobRef}`} showBack onBack={() => navigate(backTarget)} />
+      <AppHeader title={`Job ${jobRef}`} showBack onBack={() => navigate(-1)} />
 
       <div className="p-4 space-y-3 max-w-lg mx-auto">
         {/* ── 1. HEADER ── */}
         <Section>
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-3">
             <span
               style={{ backgroundColor: statusStyle.backgroundColor, color: statusStyle.color }}
               className="inline-flex items-center rounded-full px-3 py-1 text-[13px] font-semibold uppercase leading-none"
@@ -181,10 +180,12 @@ export const JobDetail = () => {
             </span>
             <UKPlate reg={job.vehicle_reg} />
           </div>
-          <p className="text-sm font-medium text-primary">Job {jobRef}</p>
-          <p className="text-xs text-muted-foreground">
-            {job.vehicle_make} {job.vehicle_model} — {job.vehicle_colour}
-            {job.vehicle_year && ` (${job.vehicle_year})`}
+          <p className="text-sm font-semibold text-foreground">Job {jobRef}</p>
+          <p className="text-sm text-foreground mt-0.5">
+            {job.vehicle_make} {job.vehicle_model}
+            <span className="text-muted-foreground"> — </span>
+            <span className="text-foreground">{job.vehicle_colour}</span>
+            {job.vehicle_year && <span className="text-muted-foreground"> ({job.vehicle_year})</span>}
           </p>
 
           {/* Workflow progress */}
@@ -231,12 +232,12 @@ export const JobDetail = () => {
           <SectionLabel>Collect From</SectionLabel>
           <ContactRow icon={Building} text={job.pickup_contact_name} />
           {job.pickup_company && (
-            <span className="text-xs text-muted-foreground pl-6">{job.pickup_company}</span>
+            <span className="text-xs text-foreground/70 pl-6 font-medium">{job.pickup_company}</span>
           )}
           <ContactRow icon={Phone} text={job.pickup_contact_phone} href={`tel:${job.pickup_contact_phone}`} />
           <ContactRow icon={MapPin} text={pickupAddr} href={mapsUrl(pickupAddr)} external />
           {job.pickup_time_from && (
-            <p className="text-xs text-muted-foreground pl-6">
+            <p className="text-xs text-foreground/70 pl-6">
               Time: {job.pickup_time_from}{job.pickup_time_to ? ` – ${job.pickup_time_to}` : ""}
             </p>
           )}
@@ -258,12 +259,12 @@ export const JobDetail = () => {
           <SectionLabel>Deliver To</SectionLabel>
           <ContactRow icon={Building} text={job.delivery_contact_name} />
           {job.delivery_company && (
-            <span className="text-xs text-muted-foreground pl-6">{job.delivery_company}</span>
+            <span className="text-xs text-foreground/70 pl-6 font-medium">{job.delivery_company}</span>
           )}
           <ContactRow icon={Phone} text={job.delivery_contact_phone} href={`tel:${job.delivery_contact_phone}`} />
           <ContactRow icon={MapPin} text={deliveryAddr} href={mapsUrl(deliveryAddr)} external />
           {job.delivery_time_from && (
-            <p className="text-xs text-muted-foreground pl-6">
+            <p className="text-xs text-foreground/70 pl-6">
               Time: {job.delivery_time_from}{job.delivery_time_to ? ` – ${job.delivery_time_to}` : ""}
             </p>
           )}
@@ -285,14 +286,16 @@ export const JobDetail = () => {
           <InspectionRow
             label="Pickup Inspection"
             done={!!pickupInspection}
-            onAction={isBlocked ? undefined : () => navigate(withFrom(`/inspection/${job.id}/pickup`, searchParams))}
+            onAction={() => navigate(withFrom(`/inspection/${job.id}/pickup`, searchParams))}
             actionIcon={ClipboardCheck}
+            warning={isBlocked ? execEval.reason : undefined}
           />
           <InspectionRow
             label="Delivery Inspection"
             done={!!deliveryInspection}
-            onAction={(isBlocked || isReviewOnly) ? undefined : () => navigate(withFrom(`/inspection/${job.id}/delivery`, searchParams))}
+            onAction={() => navigate(withFrom(`/inspection/${job.id}/delivery`, searchParams))}
             actionIcon={Truck}
+            warning={isBlocked || isReviewOnly ? (execEval.reason || "Awaiting review") : undefined}
           />
         </Section>
 
@@ -340,7 +343,7 @@ export const JobDetail = () => {
           {/* Executable state banner */}
           {(isBlocked || isReviewOnly) && (
             <div className="flex items-center gap-2 p-3 rounded-xl bg-muted/60 border border-border">
-              <Lock className="h-4 w-4 text-muted-foreground shrink-0" />
+              <AlertTriangle className="h-4 w-4 text-muted-foreground shrink-0" />
               <span className="text-xs text-muted-foreground font-medium">
                 {isBlocked ? `Blocked: ${execEval.reason}` : execEval.reason}
               </span>
@@ -458,28 +461,44 @@ function InspectionRow({
   done,
   onAction,
   actionIcon: ActionIcon,
+  warning,
 }: {
   label: string;
   done: boolean;
   onAction?: () => void;
   actionIcon: React.ComponentType<{ className?: string }>;
+  warning?: string;
 }) {
+  const [dismissed, setDismissed] = useState(false);
+
+  const handleAction = () => {
+    if (warning && !dismissed) {
+      setDismissed(true);
+      toast({ title: `⚠️ ${warning}`, description: "Tap again to proceed anyway." });
+      return;
+    }
+    onAction?.();
+  };
+
   return (
     <div className="flex items-center justify-between min-h-[44px]">
-      <span className="text-sm text-foreground">{label}</span>
+      <div className="flex flex-col">
+        <span className="text-sm text-foreground">{label}</span>
+        {warning && !dismissed && (
+          <span className="text-[10px] text-warning font-medium flex items-center gap-0.5">
+            <AlertTriangle className="h-2.5 w-2.5" /> {warning}
+          </span>
+        )}
+      </div>
       {done ? (
         <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase leading-none bg-success text-success-foreground">
           Complete
         </span>
       ) : onAction ? (
-        <Button size="sm" onClick={onAction} className="min-h-[44px] rounded-lg">
-          <ActionIcon className="w-4 h-4 mr-1" /> Start
+        <Button size="sm" onClick={handleAction} variant={warning && !dismissed ? "outline" : "default"} className="min-h-[44px] rounded-lg">
+          <ActionIcon className="w-4 h-4 mr-1" /> {warning && !dismissed ? "Override" : "Start"}
         </Button>
-      ) : (
-        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-          <Lock className="h-3 w-3" /> Blocked
-        </span>
-      )}
+      ) : null}
     </div>
   );
 }
