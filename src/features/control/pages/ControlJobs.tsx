@@ -1,178 +1,82 @@
 /**
  * Jobs Control Page — /control/jobs
- * Primary dispatch workspace with search, filters, and inline actions.
+ * Primary dispatch workspace with search, filters, sort, and contextual actions.
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ControlShell, ControlHeader, ControlSection } from "../components/shared/ControlShell";
 import { KpiStrip } from "../components/shared/KpiStrip";
-import { CompactTable, type CompactColumn } from "../components/shared/CompactTable";
+import { CompactTable } from "../components/shared/CompactTable";
 import { FilterBar } from "../components/shared/FilterBar";
-import { useControlJobs, useJobsKpis, type JobControlRow, type JobsFilter } from "../hooks/useControlJobsData";
+import { useControlJobs, useJobsKpis, type JobsFilter } from "../hooks/useControlJobsData";
 import { AssignDriverModal } from "../components/AssignDriverModal";
-import { UKPlate } from "@/components/UKPlate";
+import { buildJobColumns, type JobsColumnActions } from "./jobs/JobsColumns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getStatusStyle } from "@/lib/statusConfig";
 import {
-  Search, Plus, Truck, ClipboardCheck, UserX, LayoutList,
-  Eye, UserPlus,
+  Search, Plus, Truck, ClipboardCheck, UserX, LayoutList, Clock, ArrowUpDown,
 } from "lucide-react";
 
 type StatusFilter = JobsFilter["status"];
+type SortMode = NonNullable<JobsFilter["sort"]>;
 
-const STATUS_OPTIONS: { label: string; value: StatusFilter }[] = [
+const STATUS_OPTIONS: { label: string; value: StatusFilter; icon?: React.ComponentType<{ className?: string }> }[] = [
   { label: "All", value: "all" },
   { label: "Active", value: "active" },
   { label: "POD Review", value: "pod_review" },
   { label: "Unassigned", value: "unassigned" },
+  { label: "Stale", value: "stale" },
   { label: "Completed", value: "completed" },
 ];
-
-function humanAge(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(ms / 60000);
-  if (mins < 60) return `${mins}m`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h`;
-  return `${Math.floor(hrs / 24)}d`;
-}
 
 export function ControlJobs() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(
+    (searchParams.get("status") as StatusFilter) || "all"
+  );
+  const [sortMode, setSortMode] = useState<SortMode>("updated");
   const [assignTarget, setAssignTarget] = useState<{ jobId: string; jobRef: string; driverId: string | null } | null>(null);
 
-  const filter: JobsFilter = useMemo(() => ({ search, status: statusFilter }), [search, statusFilter]);
-  const { data: jobs, isLoading } = useControlJobs(filter);
+  const filter: JobsFilter = useMemo(
+    () => ({ search, status: statusFilter, sort: sortMode }),
+    [search, statusFilter, sortMode]
+  );
+  const { data: jobs, isLoading, error } = useControlJobs(filter);
   const { data: kpis, isLoading: kpisLoading } = useJobsKpis();
+
+  // Column action callbacks — stable references
+  const columnActions: JobsColumnActions = useMemo(() => ({
+    onView: (r) => navigate(`/jobs/${r.id}`),
+    onAssign: (r) => setAssignTarget({
+      jobId: r.id,
+      jobRef: r.external_job_number || r.id.slice(0, 8),
+      driverId: r.driver_id ?? null,
+    }),
+    onReviewPod: (r) => navigate(`/jobs/${r.id}/pod`),
+    onAddExpense: (r) => navigate(`/expenses/new?jobId=${r.id}&from=/control/jobs`),
+  }), [navigate]);
+
+  const columns = useMemo(() => buildJobColumns(columnActions), [columnActions]);
+
+  const toggleSort = useCallback(() => {
+    setSortMode((prev) => (prev === "updated" ? "date" : "updated"));
+  }, []);
 
   const kpiItems = [
     { label: "Total Jobs", value: kpis?.total, icon: LayoutList, variant: "default" as const, loading: kpisLoading },
     { label: "Active", value: kpis?.active, icon: Truck, variant: "info" as const, loading: kpisLoading },
     { label: "POD Review", value: kpis?.podReview, icon: ClipboardCheck, variant: "warning" as const, loading: kpisLoading },
     { label: "Unassigned", value: kpis?.unassigned, icon: UserX, variant: kpis?.unassigned ? "destructive" as const : "default" as const, loading: kpisLoading },
-  ];
-
-  const columns: CompactColumn<JobControlRow>[] = [
-    {
-      key: "ref",
-      header: "Ref",
-      className: "w-[100px]",
-      render: (r) => (
-        <span className="text-xs font-semibold text-foreground">
-          {r.external_job_number || r.id.slice(0, 8)}
-        </span>
-      ),
-    },
-    {
-      key: "vehicle",
-      header: "Vehicle",
-      className: "w-[130px]",
-      render: (r) => (
-        <div className="flex flex-col gap-0.5">
-          <UKPlate reg={r.vehicle_reg} />
-          <span className="text-[10px] text-muted-foreground truncate">
-            {r.vehicle_make} {r.vehicle_model}
-          </span>
-        </div>
-      ),
-    },
-    {
-      key: "client",
-      header: "Client",
-      className: "w-[120px]",
-      render: (r) => (
-        <span className="text-xs text-foreground truncate block max-w-[120px]">
-          {r.client_company || r.client_name || "—"}
-        </span>
-      ),
-    },
-    {
-      key: "driver",
-      header: "Driver",
-      className: "w-[110px]",
-      render: (r) =>
-        r.resolvedDriverName ? (
-          <span className="text-xs text-foreground">{r.resolvedDriverName}</span>
-        ) : (
-          <span className="text-xs font-medium text-warning">Unassigned</span>
-        ),
-    },
-    {
-      key: "route",
-      header: "Route",
-      render: (r) => (
-        <span className="text-xs text-muted-foreground whitespace-nowrap">
-          {r.pickup_postcode} → {r.delivery_postcode}
-        </span>
-      ),
-    },
-    {
-      key: "status",
-      header: "Status",
-      className: "w-[100px]",
-      render: (r) => {
-        const s = getStatusStyle(r.status);
-        return (
-          <span
-            style={{ backgroundColor: s.backgroundColor, color: s.color }}
-            className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase whitespace-nowrap"
-          >
-            {s.label}
-          </span>
-        );
-      },
-    },
-    {
-      key: "age",
-      header: "Updated",
-      className: "w-[65px] text-right",
-      render: (r) => (
-        <span className="text-[11px] text-muted-foreground">{humanAge(r.updated_at)}</span>
-      ),
-    },
-    {
-      key: "actions",
-      header: "",
-      className: "w-[160px] text-right",
-      render: (r) => (
-        <div className="flex items-center justify-end gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 text-[10px] px-2"
-            onClick={(e) => { e.stopPropagation(); navigate(`/jobs/${r.id}`); }}
-          >
-            <Eye className="h-3 w-3 mr-0.5" /> View
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className={`h-6 text-[10px] px-2 ${!r.resolvedDriverName ? "text-warning" : ""}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              setAssignTarget({
-                jobId: r.id,
-                jobRef: r.external_job_number || r.id.slice(0, 8),
-                driverId: r.driver_id ?? null,
-              });
-            }}
-          >
-            <UserPlus className="h-3 w-3 mr-0.5" /> {r.resolvedDriverName ? "Reassign" : "Assign"}
-          </Button>
-        </div>
-      ),
-    },
+    { label: "Stale (>24h)", value: kpis?.stale, icon: Clock, variant: kpis?.stale ? "warning" as const : "default" as const, loading: kpisLoading },
   ];
 
   return (
     <ControlShell>
       <ControlHeader
         title="Jobs"
-        subtitle="Manage, monitor, and control all vehicle movement jobs"
+        subtitle="Dispatch workspace — filter, prioritise, and progress jobs"
         actions={
           <Button size="sm" className="gap-1.5" onClick={() => navigate("/jobs/new")}>
             <Plus className="h-3.5 w-3.5" /> New Job
@@ -181,7 +85,7 @@ export function ControlJobs() {
       />
 
       {/* KPI Strip */}
-      <KpiStrip items={kpiItems} className="grid-cols-2 lg:grid-cols-4" />
+      <KpiStrip items={kpiItems} className="grid-cols-2 lg:grid-cols-5" />
 
       {/* Filter Bar */}
       <FilterBar>
@@ -194,6 +98,8 @@ export function ControlJobs() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+
+        {/* Status quick-filters */}
         {STATUS_OPTIONS.map((opt) => (
           <Button
             key={opt.value}
@@ -205,21 +111,47 @@ export function ControlJobs() {
             {opt.label}
           </Button>
         ))}
+
+        {/* Sort toggle */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-xs h-8 gap-1 ml-auto"
+          onClick={toggleSort}
+        >
+          <ArrowUpDown className="h-3 w-3" />
+          {sortMode === "updated" ? "By updated" : "By job date"}
+        </Button>
       </FilterBar>
 
       {/* Jobs Table */}
       <ControlSection
         title="Jobs"
-        description={`${jobs?.length ?? 0} jobs matching current filters`}
+        description={
+          error
+            ? "Failed to load jobs — check your connection and try again."
+            : `${jobs?.length ?? 0} jobs matching current filters`
+        }
         flush
       >
-        <CompactTable
-          columns={columns}
-          data={jobs ?? []}
-          loading={isLoading}
-          emptyMessage="No jobs match your filters."
-          onRowClick={(row) => navigate(`/jobs/${row.id}`)}
-        />
+        {error ? (
+          <div className="px-4 py-8 text-center">
+            <p className="text-sm text-destructive mb-2">
+              {error instanceof Error ? error.message : "Unknown error loading jobs."}
+            </p>
+            <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+              Retry
+            </Button>
+          </div>
+        ) : (
+          <CompactTable
+            columns={columns}
+            data={jobs ?? []}
+            loading={isLoading}
+            emptyMessage="No jobs match your filters."
+            onRowClick={(row) => navigate(`/jobs/${row.id}`)}
+          />
+        )}
       </ControlSection>
 
       {/* Assign Driver Modal */}
