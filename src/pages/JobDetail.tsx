@@ -340,7 +340,7 @@ export const JobDetail = () => {
 
           {/* Secondary: Expenses */}
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="flex-1 min-h-[44px] rounded-lg" onClick={() => navigate(`/expenses?jobId=${job.id}`)}>
+            <Button variant="outline" size="sm" className="flex-1 min-h-[44px] rounded-lg" onClick={() => navigate(withFrom(`/expenses?jobId=${job.id}`, searchParams))}>
               <Receipt className="h-4 w-4 mr-1.5" />
               Expenses{jobExpenses?.length ? ` (${jobExpenses.length})` : ""}
             </Button>
