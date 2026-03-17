@@ -36,6 +36,7 @@ import {
 interface NeedsActionItem {
   key: string;
   priority: number; // lower = more urgent
+  updatedAtMs: number; // raw timestamp for sorting (older = smaller = more urgent)
   queueType: "unassigned" | "stale" | "evidence" | "pod_review";
   queueLabel: string;
   jobId?: string;
@@ -102,7 +103,7 @@ function InterventionKpis() {
         icon={UserX}
         variant={(kpis?.unassigned ?? 0) > 0 ? "destructive" : "default"}
         loading={isLoading}
-        onClick={() => navigate("/admin/jobs")}
+        onClick={() => navigate("/admin/jobs?filter=unassigned")}
       />
       <KpiPill
         label="Stale"
@@ -110,7 +111,7 @@ function InterventionKpis() {
         icon={Clock}
         variant={(kpis?.stale ?? 0) > 0 ? "warning" : "default"}
         loading={isLoading}
-        onClick={() => navigate("/control/jobs?status=stale")}
+        onClick={() => navigate("/admin/jobs?filter=attention")}
       />
       <KpiPill
         label="POD Review"
@@ -118,7 +119,7 @@ function InterventionKpis() {
         icon={FileSearch}
         variant={(kpis?.podReview ?? 0) > 0 ? "warning" : "default"}
         loading={isLoading}
-        onClick={() => navigate("/control/pod-review")}
+        onClick={() => navigate("/admin/jobs?filter=review")}
       />
       <KpiPill
         label="Evidence"
@@ -126,7 +127,7 @@ function InterventionKpis() {
         icon={ImageOff}
         variant={(missingEvidence ?? 0) > 0 ? "destructive" : "default"}
         loading={evidenceLoading}
-        onClick={() => navigate("/super-admin/attention?category=evidence")}
+        onClick={() => navigate("/admin/jobs?filter=attention")}
       />
     </div>
   );
@@ -151,6 +152,7 @@ function NeedsActionQueue() {
       result.push({
         key: `unassigned-${job.id}`,
         priority: 1,
+        updatedAtMs: new Date(job.updated_at).getTime(),
         queueType: "unassigned",
         queueLabel: "Unassigned",
         jobId: job.id,
@@ -174,6 +176,7 @@ function NeedsActionQueue() {
       result.push({
         key: `stale-${job.id}`,
         priority: 2,
+        updatedAtMs: new Date(job.updated_at).getTime(),
         queueType: "stale",
         queueLabel: "Stale",
         jobId: job.id,
@@ -197,6 +200,7 @@ function NeedsActionQueue() {
       result.push({
         key: `evidence-${ex.id}`,
         priority: 3,
+        updatedAtMs: new Date(ex.createdAt).getTime(),
         queueType: "evidence",
         queueLabel: "Evidence",
         jobRef: ex.jobNumber ?? undefined,
@@ -211,6 +215,7 @@ function NeedsActionQueue() {
       result.push({
         key: `pod-${job.id}`,
         priority: 4,
+        updatedAtMs: new Date(job.updated_at).getTime(),
         queueType: "pod_review",
         queueLabel: "POD Review",
         jobId: job.id,
@@ -226,8 +231,11 @@ function NeedsActionQueue() {
       });
     }
 
-    // Sort by priority, then by age (older first within same priority)
-    result.sort((a, b) => a.priority - b.priority);
+    // Sort: priority band first, then oldest-first within same band (deterministic)
+    result.sort((a, b) => {
+      if (a.priority !== b.priority) return a.priority - b.priority;
+      return a.updatedAtMs - b.updatedAtMs; // older items surface first
+    });
 
     return result;
   }, [queues, attentionData]);
@@ -533,10 +541,10 @@ function ManagementRoutes() {
   const navigate = useNavigate();
 
   const routes = [
-    { label: "Jobs Queue", icon: Truck, path: "/admin/jobs" },
-    { label: "Drivers", icon: Users, path: "/control/drivers" },
-    { label: "POD Review", icon: ClipboardCheck, path: "/control/pod-review" },
-    { label: "Finance", icon: Receipt, path: "/control/finance" },
+    { label: "Full Jobs Queue", icon: Truck, path: "/admin/jobs" },
+    { label: "Fleet & Drivers", icon: Users, path: "/control/drivers" },
+    { label: "POD Closure", icon: ClipboardCheck, path: "/control/pod-review" },
+    { label: "Expenses & Finance", icon: Receipt, path: "/control/finance" },
   ];
 
   return (
@@ -587,31 +595,23 @@ export const AdminDashboard = () => {
         {/* Tier 2 — Ranked Needs Action (primary section) */}
         <NeedsActionQueue />
 
-        {/* Tier 3 — Live Queue Previews */}
+        {/* Tier 3 — Queue Snapshots (broader view, not top interventions) */}
         <div className="space-y-3">
           <QueuePreviewSection
-            title="Unassigned"
-            count={queues?.unassigned?.length}
-            items={queues?.unassigned ?? []}
+            title="Stale Active"
+            count={(queues?.needsAttention ?? []).filter(j => isJobStale(j)).length}
+            items={(queues?.needsAttention ?? []).filter(j => isJobStale(j))}
             loading={isLoading}
-            emptyText="All jobs assigned."
-            onViewAll={() => navigate("/admin/jobs")}
+            emptyText="No stale jobs."
+            onViewAll={() => navigate("/admin/jobs?filter=attention")}
           />
           <QueuePreviewSection
-            title="In Progress"
-            count={queues?.inProgress?.length}
-            items={queues?.inProgress ?? []}
-            loading={isLoading}
-            emptyText="No active jobs."
-            onViewAll={() => navigate("/control/jobs?status=active")}
-          />
-          <QueuePreviewSection
-            title="POD Review"
+            title="Awaiting Review"
             count={queues?.review?.length}
             items={queues?.review ?? []}
             loading={isLoading}
             emptyText="No PODs pending."
-            onViewAll={() => navigate("/control/pod-review")}
+            onViewAll={() => navigate("/admin/jobs?filter=review")}
           />
         </div>
 

@@ -11,8 +11,8 @@
  *   4. Completed — recent terminal jobs
  */
 
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
@@ -26,11 +26,12 @@ import {
   UserX, Clock,
 } from "lucide-react";
 
-type QueueFilter = "all" | "attention" | "in_progress" | "review" | "completed";
+type QueueFilter = "all" | "attention" | "unassigned" | "in_progress" | "review" | "completed";
 
 const FILTERS: { value: QueueFilter; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { value: "all", label: "All", icon: Truck },
   { value: "attention", label: "Attention", icon: AlertTriangle },
+  { value: "unassigned", label: "Unassigned", icon: UserX },
   { value: "in_progress", label: "Active", icon: Truck },
   { value: "review", label: "Review", icon: ClipboardCheck },
   { value: "completed", label: "Done", icon: CheckCircle },
@@ -38,9 +39,13 @@ const FILTERS: { value: QueueFilter; label: string; icon: React.ComponentType<{ 
 
 export function AdminJobsQueue() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { data: queues, isLoading, error } = useAdminJobQueues();
   const { data: kpis } = useAdminJobQueueKpis();
-  const [filter, setFilter] = useState<QueueFilter>("all");
+  const initialFilter = (searchParams.get("filter") as QueueFilter) || "all";
+  const [filter, setFilter] = useState<QueueFilter>(
+    ["all", "attention", "in_progress", "review", "completed", "unassigned"].includes(initialFilter) ? initialFilter : "all"
+  );
   const [search, setSearch] = useState("");
   const [assignTarget, setAssignTarget] = useState<{
     jobId: string; jobRef: string; driverId: string | null;
@@ -133,6 +138,17 @@ export function AdminJobsQueue() {
                 iconClass="text-warning"
                 jobs={filterJobs(queues.needsAttention)}
                 emptyText="No jobs need attention."
+                actions={actions}
+              />
+            )}
+
+            {(filter === "all" || filter === "unassigned") && (
+              <QueueSection
+                title="Unassigned"
+                icon={UserX}
+                iconClass="text-destructive"
+                jobs={filterJobs(queues.unassigned)}
+                emptyText="All jobs are assigned."
                 actions={actions}
               />
             )}
