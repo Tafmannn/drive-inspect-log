@@ -137,7 +137,7 @@ export function ControlJobs() {
     {
       key: "actions",
       header: "",
-      className: "w-[140px] text-right",
+      className: "w-[160px] text-right",
       render: (r) => (
         <div className="flex items-center justify-end gap-1">
           <Button
@@ -148,16 +148,21 @@ export function ControlJobs() {
           >
             <Eye className="h-3 w-3 mr-0.5" /> View
           </Button>
-          {!r.resolvedDriverName && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 text-[10px] px-2 text-warning"
-              onClick={(e) => { e.stopPropagation(); navigate(`/jobs/${r.id}/edit`); }}
-            >
-              <UserPlus className="h-3 w-3 mr-0.5" /> Assign
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`h-6 text-[10px] px-2 ${!r.resolvedDriverName ? "text-warning" : ""}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              setAssignTarget({
+                jobId: r.id,
+                jobRef: r.external_job_number || r.id.slice(0, 8),
+                driverId: r.driver_id ?? null,
+              });
+            }}
+          >
+            <UserPlus className="h-3 w-3 mr-0.5" /> {r.resolvedDriverName ? "Reassign" : "Assign"}
+          </Button>
         </div>
       ),
     },
