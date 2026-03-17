@@ -29,11 +29,13 @@ import {
 import {
   Loader2, Building2, UserPlus, Search, Eye, Power, PowerOff,
   AlertCircle, RefreshCw, Shield, ScrollText, Settings,
+  UserX, ChevronRight, Clock,
 } from "lucide-react";
 import { getStatusStyle } from "@/lib/statusConfig";
 import { UKPlate } from "@/components/UKPlate";
 import { toast } from "@/hooks/use-toast";
 import { AttentionCenter } from "@/features/attention/components/AttentionCenter";
+import { isJobStale, isUnassigned, humanAge } from "@/features/control/pages/jobs/jobsUtils";
 import type { Job } from "@/lib/types";
 
 /* ─── Shared ─────────────────────────────────────────────────── */
@@ -110,7 +112,7 @@ export function SuperAdminOrgs() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input placeholder="Search…" className="pl-9 min-h-[44px]" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <Button variant="outline" className="min-h-[44px]" onClick={() => setShowCreate(true)}>
+        <Button className="min-h-[44px]" onClick={() => setShowCreate(true)}>
           <Building2 className="w-4 h-4 mr-1" /> Create
         </Button>
       </div>
@@ -236,7 +238,7 @@ export function SuperAdminUsers() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input placeholder="Search by email…" className="pl-9 min-h-[44px]" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <Button variant="outline" className="min-h-[44px]" onClick={() => setShowCreate(true)}>
+        <Button className="min-h-[44px]" onClick={() => setShowCreate(true)}>
           <UserPlus className="w-4 h-4 mr-1" /> Create
         </Button>
       </div>
@@ -350,21 +352,27 @@ export function SuperAdminUsers() {
   );
 }
 
-/* ─── Jobs Monitor ─────────────────────────────────────────────── */
+/* ─── Jobs Monitor (with inline actions) ───────────────────────── */
 
 export function SuperAdminJobs() {
   const navigate = useNavigate();
-  const [jobs, setJobs] = useState<Job[]>([]);
+  const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const { data, error: err } = await supabase.from("jobs").select("*").eq("is_hidden", false).order("updated_at", { ascending: false }).limit(100);
+      const { data, error: err } = await supabase
+        .from("jobs")
+        .select("id, external_job_number, vehicle_reg, status, driver_name, driver_id, pickup_postcode, delivery_postcode, updated_at, has_pickup_inspection, has_delivery_inspection")
+        .eq("is_hidden", false)
+        .order("updated_at", { ascending: false })
+        .limit(200);
       if (err) throw err;
-      setJobs((data ?? []) as Job[]);
+      setJobs(data ?? []);
     } catch (e: any) { setError(e.message); } finally { setLoading(false); }
   }, []);
 
@@ -372,48 +380,102 @@ export function SuperAdminJobs() {
 
   const filtered = jobs.filter(j => {
     const q = search.toLowerCase();
-    return !q || [j.vehicle_reg, j.external_job_number, j.client_name, j.driver_name].some(v => v?.toLowerCase().includes(q));
+    const matchSearch = !q || [j.vehicle_reg, j.external_job_number, j.driver_name].some(v => v?.toLowerCase().includes(q));
+    const matchStatus = statusFilter === "all" ||
+      (statusFilter === "unassigned" && !j.driver_name && !j.driver_id) ||
+      (statusFilter === "stale" && isJobStale({ status: j.status, updated_at: j.updated_at })) ||
+      (statusFilter === "active" && ["ready_for_pickup", "assigned", "pickup_in_progress", "delivery_in_progress"].includes(j.status));
+    return matchSearch && matchStatus;
   });
 
   return (
     <PageShell title="Jobs Monitor">
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input placeholder="Search…" className="pl-9 min-h-[44px]" value={search} onChange={e => setSearch(e.target.value)} />
+        <Input placeholder="Search reg, ref, driver…" className="pl-9 min-h-[44px]" value={search} onChange={e => setSearch(e.target.value)} />
+      </div>
+
+      {/* Status filter chips */}
+      <div className="flex gap-1 flex-wrap">
+        {[
+          { label: "All", value: "all" },
+          { label: "Active", value: "active" },
+          { label: "Unassigned", value: "unassigned" },
+          { label: "Stale", value: "stale" },
+        ].map(opt => (
+          <Button
+            key={opt.value}
+            size="sm"
+            variant={statusFilter === opt.value ? "default" : "outline"}
+            onClick={() => setStatusFilter(opt.value)}
+            className="text-xs h-8"
+          >
+            {opt.label}
+          </Button>
+        ))}
       </div>
 
       {loading ? <LoadingSpinner /> : error ? <ErrorPanel message={error} onRetry={load} /> :
         !filtered.length ? <EmptyState message="No jobs found." /> : (
-          <div className="rounded-xl border border-border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-xs">Ref</TableHead>
-                  <TableHead className="text-xs">Reg</TableHead>
-                  <TableHead className="text-xs">Driver</TableHead>
-                  <TableHead className="text-xs">Status</TableHead>
-                  <TableHead className="text-xs text-right">View</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map(job => {
-                  const s = getStatusStyle(job.status);
-                  return (
-                    <TableRow key={job.id}>
-                      <TableCell className="text-sm font-medium">{job.external_job_number || job.id.slice(0, 8)}</TableCell>
-                      <TableCell><UKPlate reg={job.vehicle_reg} /></TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{job.driver_name || <span className="text-warning">Unassigned</span>}</TableCell>
-                      <TableCell>
-                        <span style={{ backgroundColor: s.backgroundColor, color: s.color }} className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase whitespace-nowrap">{s.label}</span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button size="icon" variant="ghost" onClick={() => navigate(`/jobs/${job.id}`)} className="min-h-[44px] min-w-[44px]"><Eye className="w-4 h-4" /></Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+          <div className="space-y-2">
+            {/* Mobile card view */}
+            {filtered.map(job => {
+              const s = getStatusStyle(job.status);
+              const stale = isJobStale({ status: job.status, updated_at: job.updated_at });
+              const unassigned = !job.driver_name && !job.driver_id;
+
+              return (
+                <div
+                  key={job.id}
+                  className="rounded-xl border border-border bg-card p-3 space-y-2 cursor-pointer active:bg-muted/50"
+                  onClick={() => navigate(`/jobs/${job.id}`)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span
+                        style={{ backgroundColor: s.backgroundColor, color: s.color }}
+                        className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase"
+                      >
+                        {s.label}
+                      </span>
+                      <span className="text-xs font-mono text-muted-foreground">
+                        {job.external_job_number || job.id.slice(0, 8)}
+                      </span>
+                      {stale && (
+                        <span className="inline-flex items-center gap-0.5 text-[9px] text-warning font-medium">
+                          <Clock className="h-2.5 w-2.5" /> Stale
+                        </span>
+                      )}
+                    </div>
+                    <UKPlate reg={job.vehicle_reg} />
+                  </div>
+
+                  {/* Driver + route */}
+                  <div className="flex items-center justify-between text-xs">
+                    {unassigned ? (
+                      <span className="inline-flex items-center gap-1 text-warning font-medium">
+                        <UserX className="h-3 w-3" /> Unassigned
+                      </span>
+                    ) : (
+                      <span className="text-foreground">{job.driver_name}</span>
+                    )}
+                    <span className="text-muted-foreground">{job.pickup_postcode} → {job.delivery_postcode}</span>
+                  </div>
+
+                  {/* Inline actions */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <Button
+                      size="sm"
+                      className="min-h-[36px] text-xs flex-1"
+                      onClick={(e) => { e.stopPropagation(); navigate(`/jobs/${job.id}`); }}
+                    >
+                      <Eye className="h-3 w-3 mr-1" /> View
+                    </Button>
+                    <span className="text-[10px] text-muted-foreground">{humanAge(job.updated_at)}</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
     </PageShell>
@@ -442,27 +504,21 @@ export function SuperAdminAudit() {
     <PageShell title="Audit Log">
       {loading ? <LoadingSpinner /> : error ? <ErrorPanel message={error} onRetry={load} /> :
         !logs.length ? <EmptyState message="No audit entries yet." /> : (
-          <div className="rounded-xl border border-border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-xs">Time</TableHead>
-                  <TableHead className="text-xs">Admin</TableHead>
-                  <TableHead className="text-xs">Action</TableHead>
-                  <TableHead className="text-xs">After</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {logs.map(log => (
-                  <TableRow key={log.id}>
-                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</TableCell>
-                    <TableCell className="text-xs">{log.performed_by_email}</TableCell>
-                    <TableCell><Badge variant="outline" className="text-xs font-mono uppercase">{log.action}</Badge></TableCell>
-                    <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">{log.after_state ? JSON.stringify(log.after_state).slice(0, 60) : "—"}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          <div className="space-y-1.5">
+            {logs.map(log => (
+              <div key={log.id} className="rounded-xl border border-border bg-card px-3 py-2.5">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <Badge variant="outline" className="text-[10px] font-mono uppercase">{log.action}</Badge>
+                  <span className="text-[10px] text-muted-foreground">{new Date(log.created_at).toLocaleString()}</span>
+                </div>
+                <p className="text-xs text-muted-foreground truncate">
+                  {log.performed_by_email}
+                  {log.after_state && (
+                    <> — <span className="text-foreground/70">{JSON.stringify(log.after_state).slice(0, 60)}</span></>
+                  )}
+                </p>
+              </div>
+            ))}
           </div>
         )}
     </PageShell>
@@ -491,27 +547,17 @@ export function SuperAdminErrors() {
     <PageShell title="Error Feed">
       {loading ? <LoadingSpinner /> : error ? <ErrorPanel message={error} onRetry={load} /> :
         !logs.length ? <EmptyState message="No errors logged." /> : (
-          <div className="rounded-xl border border-border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-xs">Time</TableHead>
-                  <TableHead className="text-xs">Level</TableHead>
-                  <TableHead className="text-xs">Event</TableHead>
-                  <TableHead className="text-xs">Message</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {logs.map(log => (
-                  <TableRow key={log.id}>
-                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</TableCell>
-                    <TableCell><Badge variant={log.severity === "error" ? "destructive" : "secondary"} className="text-xs">{log.severity}</Badge></TableCell>
-                    <TableCell className="text-xs font-mono">{log.event}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground max-w-[300px] truncate">{log.message ?? "—"}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          <div className="space-y-1.5">
+            {logs.map(log => (
+              <div key={log.id} className="rounded-xl border border-border bg-card px-3 py-2.5">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <Badge variant={log.severity === "error" ? "destructive" : "secondary"} className="text-xs">{log.severity}</Badge>
+                  <span className="text-xs font-mono text-muted-foreground">{log.event}</span>
+                  <span className="text-[10px] text-muted-foreground ml-auto">{new Date(log.created_at).toLocaleString()}</span>
+                </div>
+                <p className="text-xs text-muted-foreground truncate">{log.message ?? "—"}</p>
+              </div>
+            ))}
           </div>
         )}
     </PageShell>
@@ -528,36 +574,83 @@ export function SuperAdminAttention() {
   );
 }
 
-/* ─── Settings ─────────────────────────────────────────────────── */
+/* ─── Settings (structured) ────────────────────────────────────── */
 
 export function SuperAdminSettings() {
+  const navigate = useNavigate();
+
   return (
     <PageShell title="Settings">
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium flex items-center gap-2"><Shield className="w-4 h-4" /> Super Admin Identity</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <p className="text-xs text-muted-foreground">
-            Super Admin access is governed by <code className="bg-muted px-1 rounded">app_metadata.role</code> in Supabase Auth.
-            To grant or revoke Super Admin, use the Users page role selector.
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Hardcoded email allow-lists have been removed. All identity checks now use database-driven roles.
-          </p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Feature Flags</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-xs text-muted-foreground">
-            Feature flags are managed in <code className="bg-muted px-1 rounded">app_settings</code>.
-            A dedicated flags management UI is planned for a future release.
-          </p>
-        </CardContent>
-      </Card>
+      <div className="space-y-3">
+        {/* Identity & Role Model */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Shield className="w-4 h-4" /> Identity & Role Model
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Auth source</span>
+              <Badge variant="secondary" className="text-[10px]">app_metadata.role</Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Roles</span>
+              <span className="text-xs text-foreground">driver · admin · super_admin</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Tenant isolation</span>
+              <Badge variant="secondary" className="text-[10px]">RLS via org_id</Badge>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs h-7 mt-1 gap-1"
+              onClick={() => navigate("/super-admin/users")}
+            >
+              Manage users <ChevronRight className="h-3 w-3" />
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Feature Flags */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Settings className="w-4 h-4" /> Feature Flags
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Storage</span>
+              <Badge variant="secondary" className="text-[10px]">app_settings table</Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Management UI</span>
+              <Badge variant="outline" className="text-[10px]">Planned</Badge>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Platform Controls */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" /> Platform Controls
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Bulk operations</span>
+              <Badge variant="outline" className="text-[10px]">Not yet available</Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Maintenance mode</span>
+              <Badge variant="outline" className="text-[10px]">Not yet available</Badge>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </PageShell>
   );
 }

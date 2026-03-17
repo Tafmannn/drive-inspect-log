@@ -1,9 +1,6 @@
 /**
- * Phase 8 — Super Admin Overview
- * Platform governance surface: KPI band → Recent Audit → Quick Routes to detail pages.
- *
- * Detail management (Orgs, Users, Jobs, Audit, Errors, Settings) lives
- * in dedicated sub-pages at /super-admin/:tab to keep this overview lean.
+ * Super Admin Dashboard — Platform Control Layer
+ * Actionable KPI band → Recent Audit → Platform Management → Control Actions
  */
 
 import { useNavigate } from "react-router-dom";
@@ -22,10 +19,11 @@ import {
 import {
   Building2, Users, Truck, ScrollText, AlertCircle,
   UserPlus, Settings, ChevronRight, Shield, Briefcase,
+  Plus, Eye,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-/* ─── KPI Pill ─────────────────────────────────────────────────── */
+/* ─── KPI Pill (all tappable, all route) ───────────────────────── */
 
 function KpiPill({
   label, value, icon: Icon, variant = "default", loading, onClick,
@@ -58,8 +56,8 @@ function KpiPill({
       ) : (
         <span className="text-lg font-semibold tabular-nums leading-tight">{value}</span>
       )}
-      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground truncate w-full text-center">
-        {label}
+      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground truncate w-full text-center flex items-center justify-center gap-0.5">
+        {label} <ChevronRight className="h-2.5 w-2.5" />
       </span>
     </button>
   );
@@ -183,9 +181,55 @@ function RecentAuditFeed() {
   );
 }
 
-/* ─── Quick Routes ─────────────────────────────────────────────── */
+/* ─── Control Actions ──────────────────────────────────────────── */
 
-function QuickRoutes() {
+function ControlActions() {
+  const navigate = useNavigate();
+
+  return (
+    <section>
+      <h3 className="text-sm font-semibold text-foreground mb-2">Quick Actions</h3>
+      <div className="grid grid-cols-2 gap-2">
+        <Button
+          variant="outline"
+          className="h-auto py-3 flex-col gap-1 text-xs"
+          onClick={() => navigate("/super-admin/orgs")}
+        >
+          <Plus className="h-4 w-4" />
+          Create Organisation
+        </Button>
+        <Button
+          variant="outline"
+          className="h-auto py-3 flex-col gap-1 text-xs"
+          onClick={() => navigate("/super-admin/users")}
+        >
+          <UserPlus className="h-4 w-4" />
+          Create User
+        </Button>
+        <Button
+          variant="outline"
+          className="h-auto py-3 flex-col gap-1 text-xs"
+          onClick={() => navigate("/super-admin/attention")}
+        >
+          <Eye className="h-4 w-4" />
+          Review Exceptions
+        </Button>
+        <Button
+          variant="outline"
+          className="h-auto py-3 flex-col gap-1 text-xs"
+          onClick={() => navigate("/super-admin/audit")}
+        >
+          <ScrollText className="h-4 w-4" />
+          Inspect Audit Log
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+/* ─── Platform Management ──────────────────────────────────────── */
+
+function PlatformManagement() {
   const navigate = useNavigate();
 
   return (
@@ -225,7 +269,7 @@ function QuickRoutes() {
         <DashboardCard
           icon={<Settings className="w-5 h-5 stroke-[2]" />}
           title="Settings"
-          subtitle="Feature flags & config"
+          subtitle="Identity & flags"
           onClick={() => navigate("/super-admin/settings")}
         />
       </div>
@@ -248,13 +292,18 @@ export function SuperAdminDashboard() {
 
         <Separator />
 
-        {/* 2. Recent Audit Feed */}
+        {/* 2. Control Actions — actual governance affordances */}
+        <ControlActions />
+
+        <Separator />
+
+        {/* 3. Recent Audit Feed */}
         <RecentAuditFeed />
 
         <Separator />
 
-        {/* 3. Quick Routes */}
-        <QuickRoutes />
+        {/* 4. Platform Management Routes */}
+        <PlatformManagement />
       </div>
 
       <BottomNav />
