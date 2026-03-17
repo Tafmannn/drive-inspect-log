@@ -133,6 +133,13 @@ export function AssignDriverModal({
       queryClient.invalidateQueries({ queryKey: ["control-unassigned-queue"] });
       queryClient.invalidateQueries({ queryKey: ["control-overview-pod-queue"] });
       queryClient.invalidateQueries({ queryKey: ["control-recent-completed"] });
+      // Admin mobile + driver surfaces
+      queryClient.invalidateQueries({ queryKey: ["admin-job-queues"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-job-queue-kpis"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-drivers"] });
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["job"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-counts"] });
       toast({ title: `Driver unassigned from ${jobRef}` });
       onOpenChange(false);
     },
