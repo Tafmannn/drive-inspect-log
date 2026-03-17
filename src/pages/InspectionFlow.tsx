@@ -1424,8 +1424,8 @@ export const InspectionFlow = () => {
     }
   };
 
-  // Per-step error state for recoverable rendering failures
-  const [stepError, setStepError] = useState<string | null>(null);
+
+
 
   const renderCurrentStep = () => {
     // Clear previous step error on re-render attempt
