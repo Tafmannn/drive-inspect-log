@@ -138,6 +138,7 @@ export const InspectionFlow = () => {
 
   // Additional photos label (lifted out of PhotosStep to avoid remount)
   const [newPhotoLabel, setNewPhotoLabel] = useState("");
+  const [stepError, setStepError] = useState<string | null>(null);
 
   const [formState, setFormState] = useState<InspectionFormState>({
     odometer: "",
