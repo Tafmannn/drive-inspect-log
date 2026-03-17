@@ -35,47 +35,59 @@ class InternalStorageService implements StorageService {
 
   /**
    * Resolve a signature URL to a fresh signed URL.
-   * Handles both the new `supabase-sig://` scheme and legacy signed URLs.
+   * Handles: supabase-sig://, legacy Supabase URLs, bare storage paths.
    */
   async resolveSignatureUrl(url: string): Promise<string | null> {
     if (!url) return null;
 
+    let bucket: string | null = null;
+    let path: string | null = null;
+    let format = 'unknown';
+
     // New scheme: supabase-sig://bucket/path
     const sigMatch = url.match(/^supabase-sig:\/\/([^/]+)\/(.+)$/);
     if (sigMatch) {
-      const [, bucket, path] = sigMatch;
-      const { data, error } = await supabase.storage
-        .from(bucket)
-        .createSignedUrl(path, 60 * 60); // 1 hour, fresh each time
-      if (error || !data?.signedUrl) return null;
-      return data.signedUrl;
+      format = 'supabase-sig';
+      [, bucket, path] = sigMatch;
     }
 
-    // Legacy: public URL (bucket is now private — these will 403)
-    // Extract path from /object/public/vehicle-signatures/... and re-sign
-    if (url.includes('/vehicle-signatures/')) {
-      // Match both public URLs and expired signed URLs
+    // Legacy: Supabase public URL
+    if (!path && url.includes('/vehicle-signatures/')) {
       const publicMatch = url.match(/\/object\/public\/vehicle-signatures\/(.+?)(?:\?|$)/);
       const signedMatch = url.match(/\/object\/sign\/vehicle-signatures\/(.+?)\?/);
       const extractedPath = publicMatch?.[1] ?? signedMatch?.[1];
       if (extractedPath) {
-        const path = decodeURIComponent(extractedPath);
-        const { data, error } = await supabase.storage
-          .from('vehicle-signatures')
-          .createSignedUrl(path, 60 * 60);
-        if (!error && data?.signedUrl) return data.signedUrl;
+        format = publicMatch ? 'legacy-public-url' : 'legacy-signed-url';
+        bucket = 'vehicle-signatures';
+        path = decodeURIComponent(extractedPath);
       }
     }
 
-    // If it's a backendRef path stored directly
-    if (!url.startsWith('http') && !url.startsWith('data:')) {
-      const { data, error } = await supabase.storage
-        .from('vehicle-signatures')
-        .createSignedUrl(url, 60 * 60);
-      if (!error && data?.signedUrl) return data.signedUrl;
+    // Bare storage path (no http/data prefix)
+    if (!path && !url.startsWith('http') && !url.startsWith('data:')) {
+      format = 'bare-path';
+      bucket = 'vehicle-signatures';
+      path = url;
     }
 
-    return url; // return as-is if we can't re-sign
+    if (!bucket || !path) {
+      console.warn('[SignatureResolve] Could not extract bucket/path', { url, format });
+      return url; // return as-is
+    }
+
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .createSignedUrl(path, 60 * 60);
+
+    if (error || !data?.signedUrl) {
+      console.error('[SignatureResolve] createSignedUrl failed', {
+        format, bucket, path,
+        error: error?.message,
+      });
+      return null;
+    }
+
+    return data.signedUrl;
   }
 }
 
