@@ -624,15 +624,19 @@ export const JobForm = () => {
                             setVehicleMake(result.make);
                             setCustomMake(false);
                             setCustomMakeValue("");
+                            // Keep model dropdown available for known makes
+                            setCustomModel(false);
+                            setVehicleModel("");
+                            setCustomModelValue("");
                           } else {
                             setCustomMake(true);
                             setVehicleMake(result.make);
                             setCustomMakeValue(result.make);
+                            // Unknown make: manual model entry required
+                            setCustomModel(true);
+                            setVehicleModel("");
+                            setCustomModelValue("");
                           }
-                          // DVLA doesn't provide model; switch to manual model entry
-                          setCustomModel(true);
-                          setVehicleModel("");
-                          setCustomModelValue("");
                         }
 
                         if (result.colour) {
