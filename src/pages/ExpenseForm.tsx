@@ -30,10 +30,11 @@ export const ExpenseForm = () => {
   const { canUseGallery } = useAuth();
   const { expenseId } = useParams();
   const [searchParams] = useSearchParams();
-  const jobId = searchParams.get("jobId") || "";
+  const initialJobId = searchParams.get("jobId") || "";
+  const [jobId, setJobId] = useState(initialJobId);
 
   const isEdit = Boolean(expenseId);
-  const DRAFT_KEY = draftKey("expense", jobId);
+  const DRAFT_KEY = draftKey("expense", initialJobId);
 
   const [job, setJob] = useState<Job | null>(null);
   const [category, setCategory] = useState("");
@@ -102,11 +103,12 @@ export const ExpenseForm = () => {
 
   useEffect(() => {
     const loadJobAndExpense = async () => {
-      if (jobId) {
+      // Load job from URL param (create mode or scoped edit)
+      if (initialJobId) {
         const { data } = await supabase
           .from("jobs")
           .select("*")
-          .eq("id", jobId)
+          .eq("id", initialJobId)
           .single();
         setJob(data as Job | null);
       }
@@ -137,6 +139,20 @@ export const ExpenseForm = () => {
         setTime(expense.time || "");
         setLabel(expense.label || "");
         setNotes(expense.notes || "");
+
+        // Hydrate job_id from the persisted record (critical for edit-from-global flow)
+        if (expense.job_id) {
+          setJobId(expense.job_id);
+          // Also load the associated job if not already loaded
+          if (!initialJobId) {
+            const { data: jobData } = await supabase
+              .from("jobs")
+              .select("*")
+              .eq("id", expense.job_id)
+              .single();
+            setJob(jobData as Job | null);
+          }
+        }
       }
 
       // Load existing receipts for this expense
@@ -154,7 +170,7 @@ export const ExpenseForm = () => {
     };
 
     loadJobAndExpense();
-  }, [expenseId, jobId]);
+  }, [expenseId, initialJobId]);
 
   const handleFileSelect = (files: FileList | null) => {
     if (!files) return;
