@@ -282,7 +282,7 @@ export function InvoiceGenerator() {
   if (!isAdmin && !isSuperAdmin) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <AppHeader title="Invoice Generator" showBack onBack={() => navigate(-1)} />
+        <AppHeader title="Invoice Generator" showBack onBack={() => navigate(backTarget)} />
         <div className="flex items-center justify-center h-64">
           <p className="text-muted-foreground">Admin access required.</p>
         </div>
