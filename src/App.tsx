@@ -25,6 +25,10 @@ import { AdminUsers } from "./pages/AdminUsers";
 import { AdminDrivers } from "./pages/AdminDrivers";
 import { AdminPodReview } from "./pages/AdminPodReview";
 import { SuperAdminDashboard } from "./pages/SuperAdminDashboard";
+import {
+  SuperAdminOrgs, SuperAdminUsers, SuperAdminJobs,
+  SuperAdminAudit, SuperAdminErrors, SuperAdminAttention, SuperAdminSettings,
+} from "./pages/SuperAdminPages";
 import { InvoiceGenerator } from "./pages/InvoiceGenerator";
 import { Profile } from "./pages/Profile";
 import { QrConfirm } from "./pages/QrConfirm";
