@@ -1,6 +1,5 @@
 /**
- * Phase 5 — Driver Onboarding admin page.
- * List + detail view with document handling and approval.
+ * Driver Onboarding admin page with typed doc status semantics.
  */
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
@@ -16,14 +15,15 @@ import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { invalidateForEvent } from "@/lib/mutationEvents";
 import {
   listOnboarding, getOnboarding, createOnboarding, updateOnboarding,
-  reviewOnboarding, uploadOnboardingDoc,
-  type OnboardingRecord, type OnboardingStatus,
+  reviewOnboarding, uploadOnboardingDoc, getDocSlots, countMissingDocs,
+  type OnboardingRecord, type OnboardingStatus, type DocStatus,
 } from "@/lib/onboardingApi";
 import {
   Plus, ArrowLeft, Upload, CheckCircle, XCircle, Clock,
-  FileText, User, Camera,
+  FileText, User, Camera, AlertTriangle, ShieldAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +32,14 @@ const STATUS_CONFIG: Record<OnboardingStatus, { label: string; variant: "default
   pending_review: { label: "Pending Review", variant: "outline" },
   approved: { label: "Approved", variant: "default" },
   rejected: { label: "Rejected", variant: "destructive" },
+};
+
+const DOC_STATUS_STYLES: Record<DocStatus, { icon: typeof CheckCircle; className: string; label: string }> = {
+  missing: { icon: XCircle, className: "text-destructive", label: "Missing" },
+  uploaded: { icon: Clock, className: "text-muted-foreground", label: "Uploaded" },
+  approved: { icon: CheckCircle, className: "text-success", label: "Approved" },
+  rejected: { icon: XCircle, className: "text-destructive", label: "Rejected" },
+  expired: { icon: ShieldAlert, className: "text-warning", label: "Expired" },
 };
 
 function StatusBadge({ status }: { status: OnboardingStatus }) {
@@ -55,7 +63,6 @@ function OnboardingList({
 
   return (
     <div className="space-y-4">
-      {/* Filter + Create */}
       <div className="flex items-center gap-2">
         <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
           <SelectTrigger className="w-[140px] h-9 text-xs">
@@ -83,28 +90,43 @@ function OnboardingList({
         </div>
       )}
 
-      {records?.map(r => (
-        <button
-          key={r.id}
-          className="w-full text-left p-4 rounded-xl border border-border bg-card space-y-2 active:bg-muted/50 transition-colors"
-          onClick={() => onSelect(r.id)}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-foreground">{r.full_name}</span>
-            <StatusBadge status={r.status} />
-          </div>
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            {r.phone && <span>{r.phone}</span>}
-            {r.employment_type && <span className="capitalize">{r.employment_type}</span>}
-          </div>
-          <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-            {r.headshot_url ? <CheckCircle className="h-3 w-3 text-success" /> : <XCircle className="h-3 w-3 text-destructive" />}
-            <span>Headshot</span>
-            {r.licence_front_url ? <CheckCircle className="h-3 w-3 text-success" /> : <XCircle className="h-3 w-3 text-destructive" />}
-            <span>Licence</span>
-          </div>
-        </button>
-      ))}
+      {records?.map(r => {
+        const missingCount = countMissingDocs(r);
+        const docSlots = getDocSlots(r);
+        return (
+          <button
+            key={r.id}
+            className="w-full text-left p-4 rounded-xl border border-border bg-card space-y-2 active:bg-muted/50 transition-colors"
+            onClick={() => onSelect(r.id)}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-foreground">{r.full_name}</span>
+              <StatusBadge status={r.status} />
+            </div>
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              {r.phone && <span>{r.phone}</span>}
+              {r.employment_type && <span className="capitalize">{r.employment_type}</span>}
+            </div>
+            {/* Doc status row with typed semantics */}
+            <div className="flex items-center gap-3 text-[10px]">
+              {docSlots.slice(0, 2).map(slot => {
+                const style = DOC_STATUS_STYLES[slot.status];
+                const Icon = style.icon;
+                return (
+                  <span key={slot.type} className={cn("flex items-center gap-0.5", style.className)}>
+                    <Icon className="h-3 w-3" /> {slot.label}
+                  </span>
+                );
+              })}
+              {missingCount > 0 && (
+                <span className="text-destructive font-medium flex items-center gap-0.5">
+                  <AlertTriangle className="h-3 w-3" /> {missingCount} missing
+                </span>
+              )}
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -114,7 +136,7 @@ function OnboardingList({
 function OnboardingDetail({
   recordId, onBack,
 }: {
-  recordId: string | null; // null = create mode
+  recordId: string | null;
   onBack: () => void;
 }) {
   const qc = useQueryClient();
@@ -158,6 +180,8 @@ function OnboardingDetail({
     }
   }, [record]);
 
+  const invalidateOnboarding = () => invalidateForEvent(qc, "onboarding_review_changed");
+
   const handleSave = async () => {
     if (!form.full_name.trim()) {
       toast({ title: "Full name is required", variant: "destructive" });
@@ -172,8 +196,7 @@ function OnboardingDetail({
         await createOnboarding(form);
         toast({ title: "Created" });
       }
-      qc.invalidateQueries({ queryKey: ["admin-onboarding"] });
-      qc.invalidateQueries({ queryKey: ["admin-onboarding-detail"] });
+      invalidateOnboarding();
       onBack();
     } catch (err) {
       toast({ title: "Save failed", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
@@ -187,11 +210,10 @@ function OnboardingDetail({
     setSaving(true);
     try {
       await updateOnboarding(recordId, { status: "pending_review" } as any);
-      qc.invalidateQueries({ queryKey: ["admin-onboarding"] });
-      qc.invalidateQueries({ queryKey: ["admin-onboarding-detail"] });
+      invalidateOnboarding();
       toast({ title: "Submitted for review" });
       onBack();
-    } catch (err) {
+    } catch {
       toast({ title: "Failed", variant: "destructive" });
     } finally {
       setSaving(false);
@@ -203,11 +225,10 @@ function OnboardingDetail({
     setSaving(true);
     try {
       await reviewOnboarding(recordId, decision, reviewNotes);
-      qc.invalidateQueries({ queryKey: ["admin-onboarding"] });
-      qc.invalidateQueries({ queryKey: ["admin-onboarding-detail"] });
+      invalidateOnboarding();
       toast({ title: decision === "approved" ? "Approved" : "Rejected" });
       onBack();
-    } catch (err) {
+    } catch {
       toast({ title: "Review failed", variant: "destructive" });
     } finally {
       setSaving(false);
@@ -219,10 +240,10 @@ function OnboardingDetail({
     setSaving(true);
     try {
       await uploadOnboardingDoc(recordId, docTarget, file);
-      qc.invalidateQueries({ queryKey: ["admin-onboarding"] });
+      invalidateOnboarding();
       qc.invalidateQueries({ queryKey: ["admin-onboarding-detail", recordId] });
       toast({ title: "Document uploaded" });
-    } catch (err) {
+    } catch {
       toast({ title: "Upload failed", variant: "destructive" });
     } finally {
       setSaving(false);
@@ -233,6 +254,7 @@ function OnboardingDetail({
   const isCreate = !recordId;
   const canEdit = isCreate || (record && ["draft", "pending_review"].includes(record.status));
   const canReview = record && record.status === "pending_review";
+  const docSlots = record ? getDocSlots(record) : [];
 
   return (
     <div className="space-y-4">
@@ -300,32 +322,35 @@ function OnboardingDetail({
         </div>
       </div>
 
-      {/* Documents */}
+      {/* Documents with typed status */}
       {recordId && (
         <div className="space-y-2">
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Documents</h3>
           <div className="grid grid-cols-3 gap-2">
-            {(["headshot", "licence_front", "licence_back"] as const).map(docType => {
-              const url = record?.[`${docType}_url` as keyof OnboardingRecord] as string | null;
-              const labels = { headshot: "Headshot / ID", licence_front: "Licence Front", licence_back: "Licence Back" };
+            {docSlots.map(slot => {
+              const style = DOC_STATUS_STYLES[slot.status];
+              const StatusIcon = style.icon;
               return (
-                <div key={docType} className="rounded-lg border border-border p-2 text-center space-y-1">
-                  {url ? (
-                    <img src={url} alt={labels[docType]} className="w-full aspect-square object-cover rounded" />
+                <div key={slot.type} className="rounded-lg border border-border p-2 text-center space-y-1">
+                  {slot.url ? (
+                    <img src={slot.url} alt={slot.label} className="w-full aspect-square object-cover rounded" />
                   ) : (
                     <div className="w-full aspect-square bg-muted rounded flex items-center justify-center">
                       <Camera className="h-5 w-5 text-muted-foreground" />
                     </div>
                   )}
-                  <p className="text-[10px] text-muted-foreground">{labels[docType]}</p>
+                  <p className="text-[10px] text-muted-foreground">{slot.label}</p>
+                  <span className={cn("inline-flex items-center gap-0.5 text-[9px] font-medium", style.className)}>
+                    <StatusIcon className="h-2.5 w-2.5" /> {style.label}
+                  </span>
                   <Button
                     variant="outline"
                     size="sm"
                     className="h-6 text-[10px] w-full"
-                    onClick={() => { setDocTarget(docType); fileRef.current?.click(); }}
+                    onClick={() => { setDocTarget(slot.type); fileRef.current?.click(); }}
                     disabled={saving}
                   >
-                    <Upload className="h-2.5 w-2.5 mr-0.5" /> {url ? "Replace" : "Upload"}
+                    <Upload className="h-2.5 w-2.5 mr-0.5" /> {slot.url ? "Replace" : "Upload"}
                   </Button>
                 </div>
               );
@@ -344,11 +369,11 @@ function OnboardingDetail({
         </div>
       )}
 
-      {/* Actions */}
+      {/* Actions — confirm dominant, cancel secondary */}
       <div className="space-y-2 pt-2">
         {canEdit && (
           <Button className="w-full min-h-[44px]" onClick={handleSave} disabled={saving}>
-            {isCreate ? "Create" : "Save Changes"}
+            {isCreate ? "Create Record" : "Save Changes"}
           </Button>
         )}
         {record && record.status === "draft" && (
@@ -363,10 +388,10 @@ function OnboardingDetail({
               <Textarea className="text-xs" rows={2} value={reviewNotes} onChange={e => setReviewNotes(e.target.value)} placeholder="Optional review notes…" />
             </div>
             <div className="flex gap-2">
-              <Button className="flex-1 min-h-[44px] bg-success hover:bg-success/90" onClick={() => handleReview("approved")} disabled={saving}>
+              <Button className="flex-1 min-h-[44px]" onClick={() => handleReview("approved")} disabled={saving}>
                 <CheckCircle className="h-4 w-4 mr-1" /> Approve
               </Button>
-              <Button variant="destructive" className="flex-1 min-h-[44px]" onClick={() => handleReview("rejected")} disabled={saving}>
+              <Button variant="outline" className="flex-1 min-h-[44px] text-destructive border-destructive/30" onClick={() => handleReview("rejected")} disabled={saving}>
                 <XCircle className="h-4 w-4 mr-1" /> Reject
               </Button>
             </div>
