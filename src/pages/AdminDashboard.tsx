@@ -541,10 +541,10 @@ function ManagementRoutes() {
   const navigate = useNavigate();
 
   const routes = [
-    { label: "Jobs Queue", icon: Truck, path: "/admin/jobs" },
-    { label: "Drivers", icon: Users, path: "/control/drivers" },
-    { label: "POD Review", icon: ClipboardCheck, path: "/control/pod-review" },
-    { label: "Finance", icon: Receipt, path: "/control/finance" },
+    { label: "Full Jobs Queue", icon: Truck, path: "/admin/jobs" },
+    { label: "Fleet & Drivers", icon: Users, path: "/control/drivers" },
+    { label: "POD Closure", icon: ClipboardCheck, path: "/control/pod-review" },
+    { label: "Expenses & Finance", icon: Receipt, path: "/control/finance" },
   ];
 
   return (
