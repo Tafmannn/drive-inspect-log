@@ -12,6 +12,10 @@
  *   7. ACTIONS — primary CTA + secondary (expenses, edit, POD)
  *
  * Does NOT include: financial data, admin rate, activity log for drivers.
+ *
+ * EXECUTABLE-STATE ENFORCEMENT:
+ *   Primary CTA is gated by evaluateExecutableState().
+ *   Blocked → no progression. Review-only → view allowed.
  */
 
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -21,9 +25,10 @@ import { BottomNav } from "@/components/BottomNav";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { useJob } from "@/hooks/useJobs";
 import { useJobExpenses } from "@/hooks/useExpenses";
+import { evaluateExecutableState, type ExecutableState } from "@/lib/executionRanking";
 import {
   Phone, MapPin, Building, Edit, ClipboardCheck, Truck,
-  FileText, Receipt, QrCode, Navigation, AlertTriangle, ChevronRight,
+  FileText, Receipt, QrCode, Navigation, AlertTriangle, ChevronRight, Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
@@ -148,6 +153,9 @@ export const JobDetail = () => {
   const deliveryInspection = job.inspections.find((i) => i.type === "delivery");
   const primaryCta = derivePrimaryCta(job.status, job.has_pickup_inspection, job.has_delivery_inspection);
   const activeStep = deriveActiveStep(job.status);
+  const execEval = evaluateExecutableState(job);
+  const isBlocked = execEval.state === "blocked";
+  const isReviewOnly = execEval.state === "review_only";
 
   const pickupAddr = buildFullAddress([job.pickup_address_line1, job.pickup_address_line2, job.pickup_city, job.pickup_postcode]);
   const deliveryAddr = buildFullAddress([job.delivery_address_line1, job.delivery_address_line2, job.delivery_city, job.delivery_postcode]);
@@ -277,13 +285,13 @@ export const JobDetail = () => {
           <InspectionRow
             label="Pickup Inspection"
             done={!!pickupInspection}
-            onAction={() => navigate(withFrom(`/inspection/${job.id}/pickup`, searchParams))}
+            onAction={isBlocked ? undefined : () => navigate(withFrom(`/inspection/${job.id}/pickup`, searchParams))}
             actionIcon={ClipboardCheck}
           />
           <InspectionRow
             label="Delivery Inspection"
             done={!!deliveryInspection}
-            onAction={() => navigate(withFrom(`/inspection/${job.id}/delivery`, searchParams))}
+            onAction={(isBlocked || isReviewOnly) ? undefined : () => navigate(withFrom(`/inspection/${job.id}/delivery`, searchParams))}
             actionIcon={Truck}
           />
         </Section>
@@ -329,14 +337,31 @@ export const JobDetail = () => {
 
         {/* ── 8. ACTIONS ── */}
         <div className="space-y-2 pb-4">
-          {/* Primary CTA */}
-          <Button
-            className="w-full min-h-[44px] rounded-lg"
-            onClick={() => navigate(primaryCta.route(job.id))}
-          >
-            {primaryCta.label}
-            <ChevronRight className="ml-1 h-4 w-4" />
-          </Button>
+          {/* Executable state banner */}
+          {(isBlocked || isReviewOnly) && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-muted/60 border border-border">
+              <Lock className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-xs text-muted-foreground font-medium">
+                {isBlocked ? `Blocked: ${execEval.reason}` : execEval.reason}
+              </span>
+            </div>
+          )}
+
+          {/* Primary CTA — hidden for blocked, view-only for review */}
+          {!isBlocked && (
+            <Button
+              className="w-full min-h-[44px] rounded-lg"
+              variant={isReviewOnly ? "outline" : "default"}
+              onClick={() => navigate(
+                isReviewOnly
+                  ? withFrom(`/jobs/${job.id}/pod`, searchParams)
+                  : primaryCta.route(job.id)
+              )}
+            >
+              {isReviewOnly ? "View POD" : primaryCta.label}
+              <ChevronRight className="ml-1 h-4 w-4" />
+            </Button>
+          )}
 
           {/* Secondary: Expenses */}
           <div className="flex gap-2">
@@ -436,7 +461,7 @@ function InspectionRow({
 }: {
   label: string;
   done: boolean;
-  onAction: () => void;
+  onAction?: () => void;
   actionIcon: React.ComponentType<{ className?: string }>;
 }) {
   return (
@@ -446,10 +471,14 @@ function InspectionRow({
         <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase leading-none bg-success text-success-foreground">
           Complete
         </span>
-      ) : (
+      ) : onAction ? (
         <Button size="sm" onClick={onAction} className="min-h-[44px] rounded-lg">
           <ActionIcon className="w-4 h-4 mr-1" /> Start
         </Button>
+      ) : (
+        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+          <Lock className="h-3 w-3" /> Blocked
+        </span>
       )}
     </div>
   );

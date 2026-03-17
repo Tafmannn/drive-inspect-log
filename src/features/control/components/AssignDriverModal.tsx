@@ -1,5 +1,6 @@
 /**
  * Assign Driver Modal — compact driver picker for dispatch workflows.
+ * COMPLIANCE ENFORCEMENT: Checks onboarding eligibility before assignment.
  * Uses domain event invalidation for mutation coherence.
  */
 import { useState, useMemo } from "react";
@@ -16,8 +17,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Search, UserCheck, X } from "lucide-react";
+import { Loader2, Search, UserCheck, X, ShieldAlert } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import type { OnboardingRecord } from "@/lib/onboardingApi";
 
 interface AssignDriverModalProps {
   open: boolean;
@@ -35,6 +37,40 @@ interface DriverOption {
   phone: string | null;
   is_active: boolean;
   trade_plate_number: string | null;
+  licence_expiry: string | null;
+}
+
+interface DriverEligibility {
+  eligible: boolean;
+  reason?: string;
+}
+
+function checkDriverEligibility(
+  driver: DriverOption,
+  onboardingMap: Map<string, OnboardingRecord>,
+): DriverEligibility {
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Check licence expiry
+  if (driver.licence_expiry && driver.licence_expiry < today) {
+    return { eligible: false, reason: "Licence expired" };
+  }
+
+  // Check onboarding record if exists
+  const onboarding = onboardingMap.get(driver.user_id);
+  if (onboarding) {
+    if (onboarding.status === "rejected") {
+      return { eligible: false, reason: "Onboarding rejected" };
+    }
+    if (onboarding.status === "pending_review") {
+      return { eligible: false, reason: "Pending review" };
+    }
+    if (onboarding.status === "draft") {
+      return { eligible: false, reason: "Onboarding incomplete" };
+    }
+  }
+
+  return { eligible: true };
 }
 
 export function AssignDriverModal({
@@ -52,7 +88,7 @@ export function AssignDriverModal({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("driver_profiles")
-        .select("id, user_id, full_name, display_name, phone, is_active, trade_plate_number")
+        .select("id, user_id, full_name, display_name, phone, is_active, trade_plate_number, licence_expiry")
         .eq("is_active", true)
         .order("full_name", { ascending: true })
         .limit(100);
@@ -62,6 +98,29 @@ export function AssignDriverModal({
     enabled: open,
     staleTime: 30_000,
   });
+
+  // Load onboarding records for compliance checks
+  const { data: onboardingRecords } = useQuery({
+    queryKey: ["assign-driver-onboarding"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("driver_onboarding")
+        .select("*")
+        .in("status", ["draft", "pending_review", "rejected"]);
+      if (error) throw error;
+      return (data ?? []) as OnboardingRecord[];
+    },
+    enabled: open,
+    staleTime: 30_000,
+  });
+
+  const onboardingMap = useMemo(() => {
+    const map = new Map<string, OnboardingRecord>();
+    for (const r of onboardingRecords ?? []) {
+      if (r.linked_user_id) map.set(r.linked_user_id, r);
+    }
+    return map;
+  }, [onboardingRecords]);
 
   const assignMutation = useMutation({
     mutationFn: async (driver: DriverOption) => {
@@ -136,7 +195,7 @@ export function AssignDriverModal({
         <DialogHeader>
           <DialogTitle className="text-sm">Assign Driver — {jobRef}</DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
-            Select an active driver to assign to this job.
+            Select an active, eligible driver to assign to this job.
           </DialogDescription>
         </DialogHeader>
 
@@ -179,18 +238,23 @@ export function AssignDriverModal({
             filtered.map((driver) => {
               const isCurrentDriver = driver.id === currentDriverId;
               const label = driver.display_name || driver.full_name;
+              const eligibility = checkDriverEligibility(driver, onboardingMap);
               return (
                 <button
                   key={driver.id}
-                  disabled={isMutating}
+                  disabled={isMutating || (!isCurrentDriver && !eligibility.eligible)}
                   className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-md text-left transition-colors
                     ${isCurrentDriver
                       ? "bg-primary/10 border border-primary/20"
-                      : "hover:bg-muted/60 border border-transparent"
+                      : eligibility.eligible
+                        ? "hover:bg-muted/60 border border-transparent"
+                        : "opacity-60 border border-transparent cursor-not-allowed"
                     }
                     disabled:opacity-50`}
                   onClick={() => {
-                    if (!isCurrentDriver) assignMutation.mutate(driver);
+                    if (!isCurrentDriver && eligibility.eligible) {
+                      assignMutation.mutate(driver);
+                    }
                   }}
                 >
                   <div className="flex flex-col min-w-0">
@@ -205,6 +269,11 @@ export function AssignDriverModal({
                     {isCurrentDriver && (
                       <Badge variant="outline" className="text-[9px] px-1.5 py-0 text-primary border-primary/30">
                         <UserCheck className="h-2.5 w-2.5 mr-0.5" /> Current
+                      </Badge>
+                    )}
+                    {!eligibility.eligible && !isCurrentDriver && (
+                      <Badge variant="outline" className="text-[9px] px-1.5 py-0 text-destructive border-destructive/30">
+                        <ShieldAlert className="h-2.5 w-2.5 mr-0.5" /> {eligibility.reason}
                       </Badge>
                     )}
                     {assignMutation.isPending && assignMutation.variables?.id === driver.id && (
