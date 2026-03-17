@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { resolveImageUrl, preloadAuthToken } from "@/lib/gcsProxyUrl";
+import { resolveMediaUrlAsync } from "@/lib/mediaResolver";
 import { AppHeader } from "@/components/AppHeader";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -9,17 +9,25 @@ import { useJob } from "@/hooks/useJobs";
 import { useJobExpenses } from "@/hooks/useExpenses";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { resolveBackTarget } from "@/lib/navigationUtils";
-import { Loader2, Mail, Share2, FileDown, ImageOff, PenLine, Images, Receipt } from "lucide-react";
+import {
+  Loader2,
+  Mail,
+  Share2,
+  FileDown,
+  ImageOff,
+  PenLine,
+  Images,
+  Receipt,
+} from "lucide-react";
 import { openPodEmail, generatePodEmailBody } from "@/lib/podEmail";
 import { sharePodPdf, emailPodPdf } from "@/lib/podPdf";
 import { FUEL_PERCENT_TO_LABEL } from "@/lib/types";
 import { toast } from "@/hooks/use-toast";
 import { getStatusStyle } from "@/lib/statusConfig";
 import { UKPlate } from "@/components/UKPlate";
-import { CHECKLIST_FIELDS, getChecklistItems } from "@/lib/inspectionFields";
+import { getChecklistItems } from "@/lib/inspectionFields";
 import { useAuth } from "@/context/AuthContext";
-import { internalStorageService } from "@/lib/internalStorageService";
-import type { Inspection, Photo } from "@/lib/types";
+import type { Photo } from "@/lib/types";
 
 const fuelLabel = (pct: number | null | undefined): string => {
   if (pct == null) return "N/A";
@@ -31,8 +39,11 @@ const safeDate = (iso: string | null | undefined): string => {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleString("en-GB", {
-    day: "2-digit", month: "2-digit", year: "numeric",
-    hour: "2-digit", minute: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 };
 
@@ -41,11 +52,26 @@ const yesNo = (val: string | null | undefined): string => {
   return val;
 };
 
-const SignatureCard = ({ label, name, url }: { label: string; name: string | null | undefined; url: string | null }) => {
+const SignatureCard = ({
+  label,
+  name,
+  url,
+}: {
+  label: string;
+  name: string | null | undefined;
+  url: string | null;
+}) => {
   const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [url]);
+
   return (
     <div className="space-y-1">
-      <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{label}</div>
+      <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+        {label}
+      </div>
       <div className="text-xs text-foreground font-medium">{name || "—"}</div>
       {url && !failed ? (
         <img
@@ -60,12 +86,16 @@ const SignatureCard = ({ label, name, url }: { label: string; name: string | nul
           {url ? (
             <>
               <ImageOff className="h-4 w-4 text-muted-foreground/50" />
-              <span className="text-[10px] text-muted-foreground">Couldn't load</span>
+              <span className="text-[10px] text-muted-foreground">
+                Couldn't load
+              </span>
             </>
           ) : (
             <>
               <PenLine className="h-4 w-4 text-muted-foreground/50" />
-              <span className="text-[10px] text-muted-foreground">Not signed</span>
+              <span className="text-[10px] text-muted-foreground">
+                Not signed
+              </span>
             </>
           )}
         </div>
@@ -82,52 +112,61 @@ export const PodReport = () => {
   const { data: job, isLoading } = useJob(jobId ?? "");
   const { data: jobExpenses } = useJobExpenses(jobId ?? "");
   const { isAdmin, isSuperAdmin } = useAuth();
+
   const [pdfLoading, setPdfLoading] = useState(false);
-  const [tokenReady, setTokenReady] = useState(false);
   const [downloadingPhotos, setDownloadingPhotos] = useState(false);
-
-  // Resolved signature URLs (async because supabase-sig:// needs re-signing)
-  const [resolvedSignatures, setResolvedSignatures] = useState<Record<string, string | null>>({});
+  const [resolvedSignatures, setResolvedSignatures] = useState<
+    Record<string, string | null>
+  >({});
+  const [resolvedPhotos, setResolvedPhotos] = useState<Record<string, string>>(
+    {}
+  );
 
   useEffect(() => {
-    preloadAuthToken().then(() => setTokenReady(true));
-  }, []);
+    let cancelled = false;
 
-  // Resolve signature URLs asynchronously when job loads
-  useEffect(() => {
-    if (!job) return;
-    const pickup = job.inspections.find((i) => i.type === "pickup");
-    const delivery = job.inspections.find((i) => i.type === "delivery");
+    async function resolveAllMedia() {
+      if (!job) return;
 
-    const sigUrls = [
-      { key: "pickup_driver", url: pickup?.driver_signature_url },
-      { key: "pickup_customer", url: pickup?.customer_signature_url },
-      { key: "delivery_driver", url: delivery?.driver_signature_url },
-      { key: "delivery_customer", url: delivery?.customer_signature_url },
-    ];
+      const pickup = job.inspections.find((i) => i.type === "pickup");
+      const delivery = job.inspections.find((i) => i.type === "delivery");
 
-    const resolveAll = async () => {
-      const result: Record<string, string | null> = {};
-      await Promise.allSettled(
-        sigUrls.map(async ({ key, url }) => {
-          if (!url) {
-            result[key] = null;
-            return;
-          }
-          // supabase-sig:// URLs need async resolution
-          if (url.startsWith("supabase-sig://") || url.includes("/vehicle-signatures/")) {
-            const resolved = await internalStorageService.resolveSignatureUrl(url);
-            result[key] = resolved;
-          } else {
-            // GCS or other URLs go through normal resolver
-            result[key] = resolveImageUrl(url);
+      const nextSignatures: Record<string, string | null> = {};
+      const nextPhotos: Record<string, string> = {};
+
+      nextSignatures["pickup_driver"] = await resolveMediaUrlAsync(
+        pickup?.driver_signature_url
+      );
+      nextSignatures["pickup_customer"] = await resolveMediaUrlAsync(
+        pickup?.customer_signature_url
+      );
+      nextSignatures["delivery_driver"] = await resolveMediaUrlAsync(
+        delivery?.driver_signature_url
+      );
+      nextSignatures["delivery_customer"] = await resolveMediaUrlAsync(
+        delivery?.customer_signature_url
+      );
+
+      await Promise.all(
+        (job.photos ?? []).map(async (photo) => {
+          const resolved = await resolveMediaUrlAsync(photo.url);
+          if (resolved) {
+            nextPhotos[photo.id] = resolved;
           }
         })
       );
-      setResolvedSignatures(result);
-    };
 
-    resolveAll();
+      if (!cancelled) {
+        setResolvedSignatures(nextSignatures);
+        setResolvedPhotos(nextPhotos);
+      }
+    }
+
+    void resolveAllMedia();
+
+    return () => {
+      cancelled = true;
+    };
   }, [job]);
 
   const handleDownloadPhotos = async (photos: Photo[], label: string) => {
@@ -135,14 +174,20 @@ export const PodReport = () => {
       toast({ title: `No ${label} photos to download` });
       return;
     }
+
     setDownloadingPhotos(true);
     try {
       let downloaded = 0;
+
       for (const photo of photos) {
-        const url = resolveImageUrl(photo.url) || photo.url;
+        const url =
+          resolvedPhotos[photo.id] || (await resolveMediaUrlAsync(photo.url));
+        if (!url) continue;
+
         try {
           const res = await fetch(url);
           if (!res.ok) continue;
+
           const blob = await res.blob();
           const objUrl = URL.createObjectURL(blob);
           const a = document.createElement("a");
@@ -154,9 +199,12 @@ export const PodReport = () => {
           document.body.removeChild(a);
           URL.revokeObjectURL(objUrl);
           downloaded++;
-          await new Promise(r => setTimeout(r, 300));
-        } catch { /* skip individual failures */ }
+          await new Promise((r) => setTimeout(r, 300));
+        } catch {
+          // skip individual failures
+        }
       }
+
       toast({ title: `Downloaded ${downloaded}/${photos.length} ${label} photos` });
     } finally {
       setDownloadingPhotos(false);
@@ -165,14 +213,19 @@ export const PodReport = () => {
 
   const handleShare = async () => {
     if (!job) return;
+
     const { subject, body } = generatePodEmailBody(job);
     const shareText = `${subject}\n\n${body}`;
+
     if (navigator.share) {
       try {
         await navigator.share({ title: subject, text: shareText });
       } catch (e: unknown) {
         if (e instanceof Error && e.name !== "AbortError") {
-          toast({ title: "Share failed. Please try again.", variant: "destructive" });
+          toast({
+            title: "Share failed. Please try again.",
+            variant: "destructive",
+          });
         }
       }
     } else {
@@ -187,9 +240,10 @@ export const PodReport = () => {
 
   const handleSharePdf = async () => {
     if (!job) return;
+
     setPdfLoading(true);
     try {
-      const billable = (jobExpenses ?? []).map(e => ({
+      const billable = (jobExpenses ?? []).map((e) => ({
         id: e.id,
         category: e.category,
         label: e.label ?? null,
@@ -199,7 +253,10 @@ export const PodReport = () => {
       await sharePodPdf(job, billable);
     } catch (e: unknown) {
       if (e instanceof Error && e.name !== "AbortError") {
-        toast({ title: "PDF share failed. Please try again.", variant: "destructive" });
+        toast({
+          title: "PDF share failed. Please try again.",
+          variant: "destructive",
+        });
       }
     } finally {
       setPdfLoading(false);
@@ -208,9 +265,10 @@ export const PodReport = () => {
 
   const handleEmailPdf = async () => {
     if (!job) return;
+
     setPdfLoading(true);
     try {
-      const billable = (jobExpenses ?? []).map(e => ({
+      const billable = (jobExpenses ?? []).map((e) => ({
         id: e.id,
         category: e.category,
         label: e.label ?? null,
@@ -218,22 +276,27 @@ export const PodReport = () => {
         billable_on_pod: (e as any).billable_on_pod ?? true,
       }));
       await emailPodPdf(job, billable);
+
       if (!navigator.share) {
         toast({
           title: "PDF downloaded — attach it to your email",
-          description: "Your email app should have opened with a pre-filled message. Attach the downloaded PDF before sending.",
+          description:
+            "Your email app should have opened with a pre-filled message. Attach the downloaded PDF before sending.",
         });
       }
     } catch (e: unknown) {
       if (e instanceof Error && e.name !== "AbortError") {
-        toast({ title: "Email failed. Please try again.", variant: "destructive" });
+        toast({
+          title: "Email failed. Please try again.",
+          variant: "destructive",
+        });
       }
     } finally {
       setPdfLoading(false);
     }
   };
 
-  if (isLoading || !job || !tokenReady) {
+  if (isLoading || !job) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <AppHeader title="POD Report" showBack onBack={() => navigate(backTarget)} />
@@ -248,11 +311,15 @@ export const PodReport = () => {
   const statusStyle = getStatusStyle(job.status);
   const pickup = job.inspections.find((i) => i.type === "pickup");
   const delivery = job.inspections.find((i) => i.type === "delivery");
-  const pickupDamages = job.damage_items.filter(d => pickup && d.inspection_id === pickup.id);
-  const deliveryDamages = job.damage_items.filter(d => delivery && d.inspection_id === delivery.id);
-  const pickupPhotos = job.photos.filter(p => p.type.startsWith("pickup_"));
-  const deliveryPhotos = job.photos.filter(p => p.type.startsWith("delivery_"));
-  const damagePhotos = job.photos.filter(p => p.type === "damage_close_up");
+  const pickupDamages = job.damage_items.filter(
+    (d) => pickup && d.inspection_id === pickup.id
+  );
+  const deliveryDamages = job.damage_items.filter(
+    (d) => delivery && d.inspection_id === delivery.id
+  );
+  const pickupPhotos = job.photos.filter((p) => p.type.startsWith("pickup_"));
+  const deliveryPhotos = job.photos.filter((p) => p.type.startsWith("delivery_"));
+  const damagePhotos = job.photos.filter((p) => p.type === "damage_close_up");
 
   const pickupChecklistItems = getChecklistItems(pickup);
   const deliveryChecklistItems = getChecklistItems(delivery);
@@ -260,7 +327,9 @@ export const PodReport = () => {
   const DetailRow = ({ label, value }: { label: string; value: string }) => (
     <div className="flex justify-between py-1">
       <span className="text-xs text-muted-foreground">{label}</span>
-      <span className="text-xs font-medium text-foreground text-right">{value}</span>
+      <span className="text-xs font-medium text-foreground text-right">
+        {value}
+      </span>
     </div>
   );
 
@@ -270,16 +339,37 @@ export const PodReport = () => {
         <AppHeader title="POD Report" showBack onBack={() => navigate(backTarget)}>
           <div className="flex gap-1">
             {(isAdmin || isSuperAdmin) && (
-              <Button size="sm" variant="ghost" className="gap-1" onClick={() => navigate(`/invoice/new?jobId=${jobId}`)}>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="gap-1"
+                onClick={() => navigate(`/invoice/new?jobId=${jobId}`)}
+              >
                 <Receipt className="h-4 w-4" />
                 Invoice
               </Button>
             )}
-            <Button size="sm" variant="ghost" className="gap-1" onClick={handleSharePdf} disabled={pdfLoading}>
-              {pdfLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+            <Button
+              size="sm"
+              variant="ghost"
+              className="gap-1"
+              onClick={handleSharePdf}
+              disabled={pdfLoading}
+            >
+              {pdfLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileDown className="h-4 w-4" />
+              )}
               PDF
             </Button>
-            <Button size="sm" variant="ghost" className="gap-1" onClick={handleEmailPdf} disabled={pdfLoading}>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="gap-1"
+              onClick={handleEmailPdf}
+              disabled={pdfLoading}
+            >
               <Mail className="h-4 w-4" />
               Email
             </Button>
@@ -296,13 +386,21 @@ export const PodReport = () => {
           <Card className="border border-border shadow-sm print:shadow-none print:border-none">
             <div className="flex items-center justify-between px-6 py-4 bg-foreground text-background rounded-t-lg print:rounded-none">
               <div className="flex flex-col">
-                <span className="text-xs tracking-[0.15em] uppercase opacity-70">Axentra Vehicle Logistics</span>
-                <span className="text-lg font-semibold tracking-wide">Proof of Delivery</span>
+                <span className="text-xs tracking-[0.15em] uppercase opacity-70">
+                  Axentra Vehicle Logistics
+                </span>
+                <span className="text-lg font-semibold tracking-wide">
+                  Proof of Delivery
+                </span>
               </div>
               <div className="text-right text-xs">
                 <div className="font-medium tracking-widest">AXENTRA</div>
-                <div className="opacity-70">Job <span className="font-mono">{ref}</span></div>
-                <div className="opacity-50 text-[10px]">{safeDate(job.completed_at || new Date().toISOString())}</div>
+                <div className="opacity-70">
+                  Job <span className="font-mono">{ref}</span>
+                </div>
+                <div className="opacity-50 text-[10px]">
+                  {safeDate(job.completed_at || new Date().toISOString())}
+                </div>
               </div>
             </div>
 
@@ -310,31 +408,70 @@ export const PodReport = () => {
               <Card className="p-4 space-y-1">
                 <div className="flex items-center justify-between mb-2">
                   <UKPlate reg={job.vehicle_reg} variant="rear" />
-                  <span style={{ backgroundColor: statusStyle.backgroundColor, color: statusStyle.color }} className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold uppercase leading-none">
+                  <span
+                    style={{
+                      backgroundColor: statusStyle.backgroundColor,
+                      color: statusStyle.color,
+                    }}
+                    className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold uppercase leading-none"
+                  >
                     {statusStyle.label}
                   </span>
                 </div>
                 <h3 className="text-sm font-semibold mb-2">Vehicle Details</h3>
                 <DetailRow label="Registration" value={job.vehicle_reg} />
-                <DetailRow label="Make / Model" value={`${job.vehicle_make} ${job.vehicle_model}`} />
+                <DetailRow
+                  label="Make / Model"
+                  value={`${job.vehicle_make} ${job.vehicle_model}`}
+                />
                 <DetailRow label="Colour" value={job.vehicle_colour} />
                 {job.vehicle_year && <DetailRow label="Year" value={job.vehicle_year} />}
                 <DetailRow label="Job ID" value={`Job ${ref}`} />
-                <DetailRow label="Route" value={`${job.pickup_city || "—"} → ${job.delivery_city || "—"}`} />
-                <DetailRow label="Collection Status" value={pickup ? "✓ Collected" : "Not collected"} />
-                <DetailRow label="Delivery Status" value={delivery ? "✓ Delivered" : "Not delivered"} />
+                <DetailRow
+                  label="Route"
+                  value={`${job.pickup_city || "—"} → ${job.delivery_city || "—"}`}
+                />
+                <DetailRow
+                  label="Collection Status"
+                  value={pickup ? "✓ Collected" : "Not collected"}
+                />
+                <DetailRow
+                  label="Delivery Status"
+                  value={delivery ? "✓ Delivered" : "Not delivered"}
+                />
               </Card>
 
               <Separator className="print:hidden" />
 
               <Card className="p-4 space-y-1">
                 <h3 className="text-sm font-semibold mb-2">Pickup Details</h3>
-                <DetailRow label="Contact" value={`${job.pickup_contact_name} (${job.pickup_contact_phone})`} />
-                <DetailRow label="Address" value={`${job.pickup_address_line1}, ${job.pickup_city}, ${job.pickup_postcode}`} />
-                {job.pickup_company && <DetailRow label="Company" value={job.pickup_company} />}
-                <DetailRow label="Date / Time" value={pickup ? safeDate(pickup.inspected_at) : "—"} />
-                <DetailRow label="Odometer" value={pickup?.odometer != null ? pickup.odometer.toLocaleString("en-GB") : "—"} />
-                <DetailRow label="Fuel" value={fuelLabel(pickup?.fuel_level_percent ?? null)} />
+                <DetailRow
+                  label="Contact"
+                  value={`${job.pickup_contact_name} (${job.pickup_contact_phone})`}
+                />
+                <DetailRow
+                  label="Address"
+                  value={`${job.pickup_address_line1}, ${job.pickup_city}, ${job.pickup_postcode}`}
+                />
+                {job.pickup_company && (
+                  <DetailRow label="Company" value={job.pickup_company} />
+                )}
+                <DetailRow
+                  label="Date / Time"
+                  value={pickup ? safeDate(pickup.inspected_at) : "—"}
+                />
+                <DetailRow
+                  label="Odometer"
+                  value={
+                    pickup?.odometer != null
+                      ? pickup.odometer.toLocaleString("en-GB")
+                      : "—"
+                  }
+                />
+                <DetailRow
+                  label="Fuel"
+                  value={fuelLabel(pickup?.fuel_level_percent ?? null)}
+                />
                 <DetailRow label="Driver" value={pickup?.inspected_by_name || "—"} />
                 <DetailRow label="Customer" value={pickup?.customer_name || "—"} />
                 <DetailRow label="Damages" value={String(pickupDamages.length)} />
@@ -347,25 +484,53 @@ export const PodReport = () => {
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-0.5">
                     {pickupChecklistItems.map((item) => (
                       <div key={item.key} className="flex justify-between py-0.5">
-                        <span className="text-xs text-muted-foreground">{item.label}</span>
-                        <span className="text-xs font-medium text-foreground ml-2">{yesNo(pickup[item.key] as string | null)}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {item.label}
+                        </span>
+                        <span className="text-xs font-medium text-foreground ml-2">
+                          {yesNo(pickup[item.key] as string | null)}
+                        </span>
                       </div>
                     ))}
                   </div>
                   {pickup.notes && (
-                    <p className="text-xs mt-2"><span className="font-medium">Notes:</span> <span className="text-muted-foreground">{pickup.notes}</span></p>
+                    <p className="text-xs mt-2">
+                      <span className="font-medium">Notes:</span>{" "}
+                      <span className="text-muted-foreground">{pickup.notes}</span>
+                    </p>
                   )}
                 </Card>
               )}
 
               <Card className="p-4 space-y-1">
                 <h3 className="text-sm font-semibold mb-2">Delivery Details</h3>
-                <DetailRow label="Contact" value={`${job.delivery_contact_name} (${job.delivery_contact_phone})`} />
-                <DetailRow label="Address" value={`${job.delivery_address_line1}, ${job.delivery_city}, ${job.delivery_postcode}`} />
-                {job.delivery_company && <DetailRow label="Company" value={job.delivery_company} />}
-                <DetailRow label="Date / Time" value={delivery ? safeDate(delivery.inspected_at) : "—"} />
-                <DetailRow label="Odometer" value={delivery?.odometer != null ? delivery.odometer.toLocaleString("en-GB") : "—"} />
-                <DetailRow label="Fuel" value={fuelLabel(delivery?.fuel_level_percent ?? null)} />
+                <DetailRow
+                  label="Contact"
+                  value={`${job.delivery_contact_name} (${job.delivery_contact_phone})`}
+                />
+                <DetailRow
+                  label="Address"
+                  value={`${job.delivery_address_line1}, ${job.delivery_city}, ${job.delivery_postcode}`}
+                />
+                {job.delivery_company && (
+                  <DetailRow label="Company" value={job.delivery_company} />
+                )}
+                <DetailRow
+                  label="Date / Time"
+                  value={delivery ? safeDate(delivery.inspected_at) : "—"}
+                />
+                <DetailRow
+                  label="Odometer"
+                  value={
+                    delivery?.odometer != null
+                      ? delivery.odometer.toLocaleString("en-GB")
+                      : "—"
+                  }
+                />
+                <DetailRow
+                  label="Fuel"
+                  value={fuelLabel(delivery?.fuel_level_percent ?? null)}
+                />
                 <DetailRow label="Driver" value={delivery?.inspected_by_name || "—"} />
                 <DetailRow label="Customer" value={delivery?.customer_name || "—"} />
                 <DetailRow label="Damages" value={String(deliveryDamages.length)} />
@@ -378,13 +543,20 @@ export const PodReport = () => {
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-0.5">
                     {deliveryChecklistItems.map((item) => (
                       <div key={item.key} className="flex justify-between py-0.5">
-                        <span className="text-xs text-muted-foreground">{item.label}</span>
-                        <span className="text-xs font-medium text-foreground ml-2">{yesNo(delivery[item.key] as string | null)}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {item.label}
+                        </span>
+                        <span className="text-xs font-medium text-foreground ml-2">
+                          {yesNo(delivery[item.key] as string | null)}
+                        </span>
                       </div>
                     ))}
                   </div>
                   {delivery.notes && (
-                    <p className="text-xs mt-2"><span className="font-medium">Notes:</span> <span className="text-muted-foreground">{delivery.notes}</span></p>
+                    <p className="text-xs mt-2">
+                      <span className="font-medium">Notes:</span>{" "}
+                      <span className="text-muted-foreground">{delivery.notes}</span>
+                    </p>
                   )}
                 </Card>
               )}
@@ -394,8 +566,14 @@ export const PodReport = () => {
                   <h3 className="text-sm font-semibold">Damage Summary</h3>
                   {[...pickupDamages, ...deliveryDamages].map((d) => (
                     <div key={d.id} className="flex justify-between text-xs py-0.5">
-                      <span className="text-muted-foreground">{d.area} – {d.item}: {d.damage_types?.join(", ") || "—"}</span>
-                      {d.notes && <span className="text-muted-foreground ml-2 italic">{d.notes}</span>}
+                      <span className="text-muted-foreground">
+                        {d.area} – {d.item}: {d.damage_types?.join(", ") || "—"}
+                      </span>
+                      {d.notes && (
+                        <span className="text-muted-foreground ml-2 italic">
+                          {d.notes}
+                        </span>
+                      )}
                     </div>
                   ))}
                 </Card>
@@ -407,19 +585,25 @@ export const PodReport = () => {
                   {(isAdmin || isSuperAdmin) && (
                     <div className="flex gap-1.5">
                       <Button
-                        size="sm" variant="outline"
+                        size="sm"
+                        variant="outline"
                         className="h-8 text-xs gap-1"
                         disabled={downloadingPhotos || pickupPhotos.length === 0}
-                        onClick={() => handleDownloadPhotos(pickupPhotos, `${ref}_Collection`)}
+                        onClick={() =>
+                          handleDownloadPhotos(pickupPhotos, `${ref}_Collection`)
+                        }
                       >
                         <Images className="w-3 h-3" />
                         Collection
                       </Button>
                       <Button
-                        size="sm" variant="outline"
+                        size="sm"
+                        variant="outline"
                         className="h-8 text-xs gap-1"
                         disabled={downloadingPhotos || deliveryPhotos.length === 0}
-                        onClick={() => handleDownloadPhotos(deliveryPhotos, `${ref}_Delivery`)}
+                        onClick={() =>
+                          handleDownloadPhotos(deliveryPhotos, `${ref}_Delivery`)
+                        }
                       >
                         <Images className="w-3 h-3" />
                         Delivery
@@ -427,52 +611,128 @@ export const PodReport = () => {
                     </div>
                   )}
                 </div>
-                <PhotoViewer title="Collection Photos" photos={pickupPhotos.map(p => ({ url: resolveImageUrl(p.url) || p.url, label: p.label || p.type.replace("pickup_", "").replace(/_/g, " ") }))} />
-                <PhotoViewer title="Delivery Photos" photos={deliveryPhotos.map(p => ({ url: resolveImageUrl(p.url) || p.url, label: p.label || p.type.replace("delivery_", "").replace(/_/g, " ") }))} />
-                <PhotoViewer title="Damage Close-ups" photos={damagePhotos.map(p => ({ url: resolveImageUrl(p.url) || p.url, label: p.label || "Damage" }))} />
-                <p className="text-[11px] text-muted-foreground pt-1">Full-resolution images are stored securely within Axentra and can be supplied on request.</p>
+
+                <PhotoViewer
+                  title="Collection Photos"
+                  photos={pickupPhotos
+                    .map((p) => ({
+                      url: resolvedPhotos[p.id] || "",
+                      label:
+                        p.label ||
+                        p.type.replace("pickup_", "").replace(/_/g, " "),
+                    }))
+                    .filter((p) => !!p.url)}
+                />
+
+                <PhotoViewer
+                  title="Delivery Photos"
+                  photos={deliveryPhotos
+                    .map((p) => ({
+                      url: resolvedPhotos[p.id] || "",
+                      label:
+                        p.label ||
+                        p.type.replace("delivery_", "").replace(/_/g, " "),
+                    }))
+                    .filter((p) => !!p.url)}
+                />
+
+                <PhotoViewer
+                  title="Damage Close-ups"
+                  photos={damagePhotos
+                    .map((p) => ({
+                      url: resolvedPhotos[p.id] || "",
+                      label: p.label || "Damage",
+                    }))
+                    .filter((p) => !!p.url)}
+                />
+
+                <p className="text-[11px] text-muted-foreground pt-1">
+                  Full-resolution images are stored securely within Axentra and
+                  can be supplied on request.
+                </p>
               </Card>
 
               <Card className="p-4 space-y-3">
                 <h3 className="text-sm font-semibold">Signatures</h3>
                 <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
-                  <SignatureCard label="Pickup Driver" name={pickup?.inspected_by_name} url={resolvedSignatures.pickup_driver ?? null} />
-                  <SignatureCard label="Pickup Customer" name={pickup?.customer_name} url={resolvedSignatures.pickup_customer ?? null} />
-                  <SignatureCard label="Delivery Driver" name={delivery?.inspected_by_name} url={resolvedSignatures.delivery_driver ?? null} />
-                  <SignatureCard label="Delivery Customer" name={delivery?.customer_name} url={resolvedSignatures.delivery_customer ?? null} />
+                  <SignatureCard
+                    label="Pickup Driver"
+                    name={pickup?.inspected_by_name}
+                    url={resolvedSignatures["pickup_driver"] ?? null}
+                  />
+                  <SignatureCard
+                    label="Pickup Customer"
+                    name={pickup?.customer_name}
+                    url={resolvedSignatures["pickup_customer"] ?? null}
+                  />
+                  <SignatureCard
+                    label="Delivery Driver"
+                    name={delivery?.inspected_by_name}
+                    url={resolvedSignatures["delivery_driver"] ?? null}
+                  />
+                  <SignatureCard
+                    label="Delivery Customer"
+                    name={delivery?.customer_name}
+                    url={resolvedSignatures["delivery_customer"] ?? null}
+                  />
                 </div>
               </Card>
 
               {(() => {
-                const billableExpenses = (jobExpenses ?? []).filter((e: any) => e.billable_on_pod !== false);
+                const billableExpenses = (jobExpenses ?? []).filter(
+                  (e: any) => e.billable_on_pod !== false
+                );
+
                 return (
                   <Card className="p-4 space-y-2">
                     <div className="flex items-center justify-between">
                       <h3 className="text-sm font-semibold">Billable Expenses</h3>
-                      <span className="text-xs font-medium text-foreground">{billableExpenses.length} expenses</span>
+                      <span className="text-xs font-medium text-foreground">
+                        {billableExpenses.length} expenses
+                      </span>
                     </div>
                     {billableExpenses.length > 0 ? (
                       <div className="space-y-1">
                         {billableExpenses.map((e: any) => (
                           <div key={e.id} className="flex justify-between text-xs py-0.5">
-                            <span className="text-muted-foreground">{e.category}{e.label ? ` – ${e.label}` : ''}</span>
+                            <span className="text-muted-foreground">
+                              {e.category}
+                              {e.label ? ` – ${e.label}` : ""}
+                            </span>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <p className="text-xs text-muted-foreground">No billable expenses recorded</p>
+                      <p className="text-xs text-muted-foreground">
+                        No billable expenses recorded
+                      </p>
                     )}
                     <div className="print:hidden">
-                      <Button size="sm" variant="outline" onClick={() => navigate(`/expenses/new?jobId=${jobId}`)}>Add Expense</Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => navigate(`/expenses/new?jobId=${jobId}`)}
+                      >
+                        Add Expense
+                      </Button>
                     </div>
                   </Card>
                 );
               })()}
 
               <Card className="p-4 space-y-2 text-xs text-muted-foreground">
-                <p>This Proof of Delivery report was generated by the Axentra Vehicle Logistics system.</p>
-                <p>Report reference: <span className="font-mono">{ref}</span> • Generated: {safeDate(new Date().toISOString())}</p>
-                <p className="text-[10px] opacity-70">All images and data are stored securely. Unauthorised reproduction is prohibited.</p>
+                <p>
+                  This Proof of Delivery report was generated by the Axentra Vehicle
+                  Logistics system.
+                </p>
+                <p>
+                  Report reference: <span className="font-mono">{ref}</span> •
+                  Generated: {safeDate(new Date().toISOString())}
+                </p>
+                <p className="text-[10px] opacity-70">
+                  All images and data are stored securely. Unauthorised reproduction
+                  is prohibited.
+                </p>
               </Card>
             </div>
           </Card>
