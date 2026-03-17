@@ -23,7 +23,8 @@ import { lookupPostcode, type AddressSuggestion } from "@/lib/postcodeApi";
 import { BusinessSearchInput } from "@/components/BusinessSearchInput";
 import { getPlaceDetails, type BusinessResult } from "@/lib/businessSearchApi";
 import { logClientEvent } from "@/lib/logger";
-
+import { supabase } from "@/integrations/supabase/client";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 type ErrorMap = Record<string, string>;
 
 interface JobFormDraft {
