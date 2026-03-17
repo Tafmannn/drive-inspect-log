@@ -71,6 +71,10 @@ export type ClosureReviewRow = Pick<
   | "updated_at" | "completed_at" | "has_pickup_inspection" | "has_delivery_inspection"
   | "client_company" | "client_name" | "pickup_postcode"
 > & {
+  /** FK to driver_profiles if set */
+  driver_id: string | null;
+  /** Resolved driver display name from FK join or legacy driver_name */
+  resolvedDriverName: string | null;
   /** Derived: pickup inspection missing on a closure-stage job */
   missingPickupInspection: boolean;
   /** Derived: delivery inspection missing on a closure-stage job */
