@@ -337,13 +337,31 @@ export const JobDetail = () => {
 
         {/* ── 8. ACTIONS ── */}
         <div className="space-y-2 pb-4">
-          {/* Primary CTA */}
-          <Button
-            className="w-full min-h-[44px] rounded-lg"
-            onClick={() => navigate(primaryCta.route(job.id))}
-          >
-            {primaryCta.label}
-            <ChevronRight className="ml-1 h-4 w-4" />
+          {/* Executable state banner */}
+          {(isBlocked || isReviewOnly) && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-muted/60 border border-border">
+              <Lock className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-xs text-muted-foreground font-medium">
+                {isBlocked ? `Blocked: ${execEval.reason}` : execEval.reason}
+              </span>
+            </div>
+          )}
+
+          {/* Primary CTA — hidden for blocked, view-only for review */}
+          {!isBlocked && (
+            <Button
+              className="w-full min-h-[44px] rounded-lg"
+              variant={isReviewOnly ? "outline" : "default"}
+              onClick={() => navigate(
+                isReviewOnly
+                  ? withFrom(`/jobs/${job.id}/pod`, searchParams)
+                  : primaryCta.route(job.id)
+              )}
+            >
+              {isReviewOnly ? "View POD" : primaryCta.label}
+              <ChevronRight className="ml-1 h-4 w-4" />
+            </Button>
+          )}
           </Button>
 
           {/* Secondary: Expenses */}
