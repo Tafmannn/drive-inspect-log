@@ -111,7 +111,7 @@ function InterventionKpis() {
         icon={Clock}
         variant={(kpis?.stale ?? 0) > 0 ? "warning" : "default"}
         loading={isLoading}
-        onClick={() => navigate("/admin/jobs?filter=attention")}
+        onClick={() => navigate("/admin/jobs?filter=stale")}
       />
       <KpiPill
         label="POD Review"
