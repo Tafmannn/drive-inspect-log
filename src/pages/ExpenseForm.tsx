@@ -103,11 +103,12 @@ export const ExpenseForm = () => {
 
   useEffect(() => {
     const loadJobAndExpense = async () => {
-      if (jobId) {
+      // Load job from URL param (create mode or scoped edit)
+      if (initialJobId) {
         const { data } = await supabase
           .from("jobs")
           .select("*")
-          .eq("id", jobId)
+          .eq("id", initialJobId)
           .single();
         setJob(data as Job | null);
       }
