@@ -102,7 +102,8 @@ function areRouteMetricsReliable(job: Job): boolean {
 function deriveWorkflowState(job: Job): WorkflowState {
   if ((TERMINAL_STATUSES as string[]).includes(job.status)) return "terminal";
 
-  switch (job.status) {
+  const s = job.status as string;
+  switch (s) {
     case "ready_for_pickup":
     case "assigned":
     case "new":
