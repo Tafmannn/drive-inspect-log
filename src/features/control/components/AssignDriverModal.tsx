@@ -88,8 +88,9 @@ export function AssignDriverModal({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("driver_profiles")
-        .select("id, user_id, full_name, display_name, phone, is_active, trade_plate_number, licence_expiry")
+        .select("id, user_id, full_name, display_name, phone, is_active, trade_plate_number, licence_expiry, archived_at")
         .eq("is_active", true)
+        .is("archived_at", null)
         .order("full_name", { ascending: true })
         .limit(100);
       if (error) throw error;
