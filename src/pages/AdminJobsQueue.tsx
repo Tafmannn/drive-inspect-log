@@ -38,9 +38,13 @@ const FILTERS: { value: QueueFilter; label: string; icon: React.ComponentType<{ 
 
 export function AdminJobsQueue() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { data: queues, isLoading, error } = useAdminJobQueues();
   const { data: kpis } = useAdminJobQueueKpis();
-  const [filter, setFilter] = useState<QueueFilter>("all");
+  const initialFilter = (searchParams.get("filter") as QueueFilter) || "all";
+  const [filter, setFilter] = useState<QueueFilter>(
+    ["all", "attention", "in_progress", "review", "completed", "unassigned"].includes(initialFilter) ? initialFilter : "all"
+  );
   const [search, setSearch] = useState("");
   const [assignTarget, setAssignTarget] = useState<{
     jobId: string; jobRef: string; driverId: string | null;
