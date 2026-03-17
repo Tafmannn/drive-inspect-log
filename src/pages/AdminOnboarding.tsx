@@ -17,7 +17,7 @@ import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  listOnboarding, createOnboarding, updateOnboarding,
+  listOnboarding, getOnboarding, createOnboarding, updateOnboarding,
   reviewOnboarding, uploadOnboardingDoc,
   type OnboardingRecord, type OnboardingStatus,
 } from "@/lib/onboardingApi";
@@ -138,7 +138,7 @@ function OnboardingDetail({
     queryKey: ["admin-onboarding-detail", recordId],
     queryFn: () => {
       if (!recordId) return null;
-      return listOnboarding().then(all => all.find(r => r.id === recordId) ?? null);
+      return getOnboarding(recordId);
     },
     enabled: !!recordId,
   });
@@ -173,6 +173,7 @@ function OnboardingDetail({
         toast({ title: "Created" });
       }
       qc.invalidateQueries({ queryKey: ["admin-onboarding"] });
+      qc.invalidateQueries({ queryKey: ["admin-onboarding-detail"] });
       onBack();
     } catch (err) {
       toast({ title: "Save failed", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
@@ -187,6 +188,7 @@ function OnboardingDetail({
     try {
       await updateOnboarding(recordId, { status: "pending_review" } as any);
       qc.invalidateQueries({ queryKey: ["admin-onboarding"] });
+      qc.invalidateQueries({ queryKey: ["admin-onboarding-detail"] });
       toast({ title: "Submitted for review" });
       onBack();
     } catch (err) {
@@ -202,6 +204,7 @@ function OnboardingDetail({
     try {
       await reviewOnboarding(recordId, decision, reviewNotes);
       qc.invalidateQueries({ queryKey: ["admin-onboarding"] });
+      qc.invalidateQueries({ queryKey: ["admin-onboarding-detail"] });
       toast({ title: decision === "approved" ? "Approved" : "Rejected" });
       onBack();
     } catch (err) {
@@ -217,6 +220,7 @@ function OnboardingDetail({
     try {
       await uploadOnboardingDoc(recordId, docTarget, file);
       qc.invalidateQueries({ queryKey: ["admin-onboarding"] });
+      qc.invalidateQueries({ queryKey: ["admin-onboarding-detail", recordId] });
       toast({ title: "Document uploaded" });
     } catch (err) {
       toast({ title: "Upload failed", variant: "destructive" });
