@@ -171,7 +171,7 @@ export const JobDetail = () => {
       <div className="p-4 space-y-3 max-w-lg mx-auto">
         {/* ── 1. HEADER ── */}
         <Section>
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-3">
             <span
               style={{ backgroundColor: statusStyle.backgroundColor, color: statusStyle.color }}
               className="inline-flex items-center rounded-full px-3 py-1 text-[13px] font-semibold uppercase leading-none"
@@ -180,10 +180,12 @@ export const JobDetail = () => {
             </span>
             <UKPlate reg={job.vehicle_reg} />
           </div>
-          <p className="text-sm font-medium text-primary">Job {jobRef}</p>
-          <p className="text-xs text-muted-foreground">
-            {job.vehicle_make} {job.vehicle_model} — {job.vehicle_colour}
-            {job.vehicle_year && ` (${job.vehicle_year})`}
+          <p className="text-sm font-semibold text-foreground">Job {jobRef}</p>
+          <p className="text-sm text-foreground mt-0.5">
+            {job.vehicle_make} {job.vehicle_model}
+            <span className="text-muted-foreground"> — </span>
+            <span className="text-foreground">{job.vehicle_colour}</span>
+            {job.vehicle_year && <span className="text-muted-foreground"> ({job.vehicle_year})</span>}
           </p>
 
           {/* Workflow progress */}
