@@ -8,7 +8,7 @@ import { PhotoViewer } from "@/components/PhotoViewer";
 import { useJob } from "@/hooks/useJobs";
 import { useJobExpenses } from "@/hooks/useExpenses";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { resolveBackTarget } from "@/lib/navigationUtils";
+// resolveBackTarget removed — using navigate(-1) for natural back behavior
 import {
   Loader2,
   Mail,
