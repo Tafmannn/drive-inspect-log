@@ -991,11 +991,14 @@ async function handlePush(
 
     // 2. Fetch expenses aggregated per job
     const jobIdList = jobs.map((j: any) => j.id);
-    const { data: expenses } = await supabase
+    // Defence-in-depth: scope expenses to the same job set (already transitively org-scoped)
+    let expQuery = supabase
       .from("expenses")
       .select("job_id, amount")
       .in("job_id", jobIdList)
       .eq("is_hidden", false);
+    if (userOrgId) expQuery = expQuery.eq("org_id", userOrgId);
+    const { data: expenses } = await expQuery;
     const expensesByJob: Record<string, number> = {};
     for (const e of expenses ?? []) {
       expensesByJob[e.job_id] = (expensesByJob[e.job_id] || 0) + Number(e.amount || 0);
