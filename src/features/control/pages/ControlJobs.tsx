@@ -94,8 +94,8 @@ export function ControlJobs() {
       header: "Driver",
       className: "w-[110px]",
       render: (r) =>
-        r.driver_name ? (
-          <span className="text-xs text-foreground">{r.driver_name}</span>
+        r.resolvedDriverName ? (
+          <span className="text-xs text-foreground">{r.resolvedDriverName}</span>
         ) : (
           <span className="text-xs font-medium text-warning">Unassigned</span>
         ),
@@ -147,7 +147,7 @@ export function ControlJobs() {
           >
             <Eye className="h-3 w-3 mr-0.5" /> View
           </Button>
-          {!r.driver_name && (
+          {!r.resolvedDriverName && (
             <Button
               variant="ghost"
               size="sm"

@@ -1,6 +1,9 @@
 /**
  * Data hooks for the Drivers Control Page.
  * Queries driver_profiles + derives workload from jobs.
+ *
+ * PREFER-READ: Uses jobs.driver_id FK join for workload where available.
+ * FALLBACK-READ: Falls back to driver_name matching for legacy rows with null driver_id.
  */
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,37 +37,55 @@ export function useControlDrivers(search: string) {
         .limit(200);
       if (dErr) throw dErr;
 
-      // Fetch active jobs with driver assignment
+      // Fetch active jobs — include driver_id + driver_name for hybrid matching
       const { data: jobs, error: jErr } = await supabase
         .from("jobs")
-        .select("driver_name, vehicle_reg, updated_at")
+        .select("driver_id, driver_name, vehicle_reg, updated_at")
         .eq("is_hidden", false)
         .in("status", ACTIVE_STATUSES as string[])
-        .not("driver_name", "is", null)
         .order("updated_at", { ascending: false })
         .limit(500);
       if (jErr) throw jErr;
 
-      // Build workload map by driver_name (lowercase)
-      const workload = new Map<string, { count: number; latestReg: string | null }>();
+      // Build workload map keyed by driver_profile.id (preferred) with name fallback
+      const workloadById = new Map<string, { count: number; latestReg: string | null }>();
+      const workloadByName = new Map<string, { count: number; latestReg: string | null }>();
+
       for (const j of jobs ?? []) {
-        const key = (j.driver_name ?? "").toLowerCase().trim();
-        if (!key) continue;
-        const existing = workload.get(key);
-        if (existing) {
-          existing.count++;
-        } else {
-          workload.set(key, { count: 1, latestReg: j.vehicle_reg });
+        // Prefer FK-based linking
+        if (j.driver_id) {
+          const existing = workloadById.get(j.driver_id);
+          if (existing) {
+            existing.count++;
+          } else {
+            workloadById.set(j.driver_id, { count: 1, latestReg: j.vehicle_reg });
+          }
+        } else if (j.driver_name) {
+          // Legacy fallback: name-based matching for rows without driver_id
+          const key = j.driver_name.toLowerCase().trim();
+          if (!key) continue;
+          const existing = workloadByName.get(key);
+          if (existing) {
+            existing.count++;
+          } else {
+            workloadByName.set(key, { count: 1, latestReg: j.vehicle_reg });
+          }
         }
       }
 
       let rows: DriverControlRow[] = (drivers ?? []).map((d) => {
+        // Prefer FK match by driver_profile.id
+        const fkMatch = workloadById.get(d.id);
+        if (fkMatch) {
+          return { ...d, activeJobCount: fkMatch.count, latestJobReg: fkMatch.latestReg };
+        }
+        // Fallback: name-based match for legacy jobs
         const nameKey = (d.display_name || d.full_name || "").toLowerCase().trim();
-        const w = workload.get(nameKey);
+        const nameMatch = workloadByName.get(nameKey);
         return {
           ...d,
-          activeJobCount: w?.count ?? 0,
-          latestJobReg: w?.latestReg ?? null,
+          activeJobCount: nameMatch?.count ?? 0,
+          latestJobReg: nameMatch?.latestReg ?? null,
         };
       });
 

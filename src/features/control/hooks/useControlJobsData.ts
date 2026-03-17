@@ -13,7 +13,12 @@ export type JobControlRow = Pick<
   | "status" | "driver_name" | "pickup_city" | "pickup_postcode"
   | "delivery_city" | "delivery_postcode" | "job_date" | "updated_at"
   | "priority" | "completed_at" | "client_company" | "client_name"
->;
+> & {
+  /** FK to driver_profiles if set */
+  driver_id: string | null;
+  /** Resolved driver display name from FK join or legacy driver_name */
+  resolvedDriverName: string | null;
+};
 
 const ALL_OPERATIONAL = [
   ...ACTIVE_STATUSES,
@@ -34,14 +39,15 @@ export function useControlJobs(filter: JobsFilter) {
   return useQuery({
     queryKey: ["control-jobs", filter],
     queryFn: async () => {
+      // Select with FK join to driver_profiles for resolved name
       let query = supabase
         .from("jobs")
         .select(
-          "id, external_job_number, vehicle_reg, vehicle_make, vehicle_model, status, driver_name, pickup_city, pickup_postcode, delivery_city, delivery_postcode, job_date, updated_at, priority, completed_at, client_company, client_name"
+          "id, external_job_number, vehicle_reg, vehicle_make, vehicle_model, status, driver_id, driver_name, pickup_city, pickup_postcode, delivery_city, delivery_postcode, job_date, updated_at, priority, completed_at, client_company, client_name, driver_profiles(display_name, full_name)"
         )
         .eq("is_hidden", false);
 
-      // Status filtering
+      // Status filtering — prefer driver_id for unassigned, fallback to driver_name
       if (filter.status === "active") {
         query = query.in("status", ACTIVE_STATUSES as string[]);
       } else if (filter.status === "pod_review") {
@@ -49,18 +55,29 @@ export function useControlJobs(filter: JobsFilter) {
       } else if (filter.status === "completed") {
         query = query.in("status", TERMINAL_STATUSES as string[]);
       } else if (filter.status === "unassigned") {
-        query = query.in("status", ACTIVE_STATUSES as string[]).is("driver_name", null);
+        // A job is unassigned only if both driver_id and driver_name are null
+        query = query.in("status", ACTIVE_STATUSES as string[]).is("driver_id", null).is("driver_name", null);
       }
-      // "all" → no status filter
 
       query = query.order("updated_at", { ascending: false }).limit(100);
 
       const { data, error } = await query;
       if (error) throw error;
 
-      let rows = (data ?? []) as JobControlRow[];
+      // Resolve driver display name: prefer FK-joined profile, fallback to legacy driver_name
+      let rows: JobControlRow[] = (data ?? []).map((r: any) => {
+        const profile = r.driver_profiles;
+        const resolvedDriverName = profile
+          ? (profile.display_name || profile.full_name || r.driver_name)
+          : (r.driver_name || null);
+        return {
+          ...r,
+          driver_profiles: undefined, // strip join artifact
+          resolvedDriverName,
+        };
+      });
 
-      // Client-side search
+      // Client-side search — search resolved name too
       if (filter.search.trim()) {
         const s = filter.search.toLowerCase();
         rows = rows.filter(
@@ -69,6 +86,7 @@ export function useControlJobs(filter: JobsFilter) {
             r.external_job_number?.toLowerCase().includes(s) ||
             r.client_company?.toLowerCase().includes(s) ||
             r.client_name?.toLowerCase().includes(s) ||
+            r.resolvedDriverName?.toLowerCase().includes(s) ||
             r.driver_name?.toLowerCase().includes(s) ||
             r.pickup_postcode?.toLowerCase().includes(s) ||
             r.delivery_postcode?.toLowerCase().includes(s) ||
@@ -93,7 +111,7 @@ export function useJobsKpis() {
         supabase.from("jobs").select("id", { count: "exact", head: true })
           .eq("is_hidden", false).in("status", PENDING_STATUSES as string[]),
         supabase.from("jobs").select("id", { count: "exact", head: true })
-          .eq("is_hidden", false).in("status", ACTIVE_STATUSES as string[]).is("driver_name", null),
+          .eq("is_hidden", false).in("status", ACTIVE_STATUSES as string[]).is("driver_id", null).is("driver_name", null),
         supabase.from("jobs").select("id", { count: "exact", head: true })
           .eq("is_hidden", false),
       ]);
