@@ -1,8 +1,8 @@
 /**
  * Holding screens for drivers who aren't yet fully active.
+ * No BottomNav — gated drivers should not navigate freely.
  */
 import { AppHeader } from "@/components/AppHeader";
-import { BottomNav } from "@/components/BottomNav";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,7 +47,7 @@ export function DriverGateScreen({ gateStatus }: { gateStatus: Exclude<DriverGat
   const config = STATUS_CONFIG[gateStatus];
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background pb-6">
       <AppHeader title="Dashboard" />
 
       <div className="p-4 max-w-lg mx-auto space-y-6">
@@ -82,7 +82,6 @@ export function DriverGateScreen({ gateStatus }: { gateStatus: Exclude<DriverGat
         </Button>
       </div>
 
-      <BottomNav />
     </div>
   );
 }

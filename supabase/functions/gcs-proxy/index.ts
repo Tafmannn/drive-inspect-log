@@ -44,8 +44,14 @@ serve(async (req) => {
       );
     }
 
-    // ─── Auth: Authorization header only (no ?token= param) ───
-    const authHeader = req.headers.get("Authorization") ?? "";
+    // ─── Auth: Authorization header OR ?token= query param ───
+    // The token param allows <img> tags and other contexts that
+    // cannot set custom headers to authenticate.
+    let authHeader = req.headers.get("Authorization") ?? "";
+    const tokenParam = url.searchParams.get("token");
+    if (!authHeader && tokenParam) {
+      authHeader = `Bearer ${tokenParam}`;
+    }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;

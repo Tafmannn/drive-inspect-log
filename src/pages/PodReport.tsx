@@ -18,6 +18,7 @@ import { getStatusStyle } from "@/lib/statusConfig";
 import { UKPlate } from "@/components/UKPlate";
 import { CHECKLIST_FIELDS, getChecklistItems } from "@/lib/inspectionFields";
 import { useAuth } from "@/context/AuthContext";
+import { internalStorageService } from "@/lib/internalStorageService";
 import type { Inspection, Photo } from "@/lib/types";
 
 const fuelLabel = (pct: number | null | undefined): string => {
@@ -85,9 +86,49 @@ export const PodReport = () => {
   const [tokenReady, setTokenReady] = useState(false);
   const [downloadingPhotos, setDownloadingPhotos] = useState(false);
 
+  // Resolved signature URLs (async because supabase-sig:// needs re-signing)
+  const [resolvedSignatures, setResolvedSignatures] = useState<Record<string, string | null>>({});
+
   useEffect(() => {
     preloadAuthToken().then(() => setTokenReady(true));
   }, []);
+
+  // Resolve signature URLs asynchronously when job loads
+  useEffect(() => {
+    if (!job) return;
+    const pickup = job.inspections.find((i) => i.type === "pickup");
+    const delivery = job.inspections.find((i) => i.type === "delivery");
+
+    const sigUrls = [
+      { key: "pickup_driver", url: pickup?.driver_signature_url },
+      { key: "pickup_customer", url: pickup?.customer_signature_url },
+      { key: "delivery_driver", url: delivery?.driver_signature_url },
+      { key: "delivery_customer", url: delivery?.customer_signature_url },
+    ];
+
+    const resolveAll = async () => {
+      const result: Record<string, string | null> = {};
+      await Promise.allSettled(
+        sigUrls.map(async ({ key, url }) => {
+          if (!url) {
+            result[key] = null;
+            return;
+          }
+          // supabase-sig:// URLs need async resolution
+          if (url.startsWith("supabase-sig://") || url.includes("/vehicle-signatures/")) {
+            const resolved = await internalStorageService.resolveSignatureUrl(url);
+            result[key] = resolved;
+          } else {
+            // GCS or other URLs go through normal resolver
+            result[key] = resolveImageUrl(url);
+          }
+        })
+      );
+      setResolvedSignatures(result);
+    };
+
+    resolveAll();
+  }, [job]);
 
   const handleDownloadPhotos = async (photos: Photo[], label: string) => {
     if (!photos.length) {
@@ -395,10 +436,10 @@ export const PodReport = () => {
               <Card className="p-4 space-y-3">
                 <h3 className="text-sm font-semibold">Signatures</h3>
                 <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
-                  <SignatureCard label="Pickup Driver" name={pickup?.inspected_by_name} url={resolveImageUrl(pickup?.driver_signature_url)} />
-                  <SignatureCard label="Pickup Customer" name={pickup?.customer_name} url={resolveImageUrl(pickup?.customer_signature_url)} />
-                  <SignatureCard label="Delivery Driver" name={delivery?.inspected_by_name} url={resolveImageUrl(delivery?.driver_signature_url)} />
-                  <SignatureCard label="Delivery Customer" name={delivery?.customer_name} url={resolveImageUrl(delivery?.customer_signature_url)} />
+                  <SignatureCard label="Pickup Driver" name={pickup?.inspected_by_name} url={resolvedSignatures.pickup_driver ?? null} />
+                  <SignatureCard label="Pickup Customer" name={pickup?.customer_name} url={resolvedSignatures.pickup_customer ?? null} />
+                  <SignatureCard label="Delivery Driver" name={delivery?.inspected_by_name} url={resolvedSignatures.delivery_driver ?? null} />
+                  <SignatureCard label="Delivery Customer" name={delivery?.customer_name} url={resolvedSignatures.delivery_customer ?? null} />
                 </div>
               </Card>
 
