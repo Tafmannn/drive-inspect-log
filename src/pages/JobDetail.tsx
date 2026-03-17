@@ -12,6 +12,10 @@
  *   7. ACTIONS — primary CTA + secondary (expenses, edit, POD)
  *
  * Does NOT include: financial data, admin rate, activity log for drivers.
+ *
+ * EXECUTABLE-STATE ENFORCEMENT:
+ *   Primary CTA is gated by evaluateExecutableState().
+ *   Blocked → no progression. Review-only → view allowed.
  */
 
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
