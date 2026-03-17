@@ -1,36 +1,17 @@
-import { useEffect, useState, useCallback } from "react";
+/**
+ * AdminUsers — lifecycle-enforced user management page.
+ * Replaces the legacy flat user list.
+ */
+import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { getOrgUsers } from "@/lib/adminApi";
-import { UserListTable } from "@/components/Admin/UserListTable";
-import { Loader2 } from "lucide-react";
-
-interface UserRow {
-  id: string;
-  email: string;
-  role: string;
-  org_id: string | null;
-}
+import { UserIndex } from "@/features/users/components/UserIndex";
+import { UserDetailEditor } from "@/features/users/components/UserDetailEditor";
+import { CreateUserModal } from "@/features/users/components/CreateUserModal";
 
 export function AdminUsers() {
   const { isSuperAdmin, isAdmin } = useAuth();
-  const [users, setUsers] = useState<UserRow[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const fetchUsers = useCallback(async () => {
-    setLoading(true);
-    try {
-      const result = await getOrgUsers();
-      setUsers(result);
-    } catch {
-      setUsers([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (isSuperAdmin || isAdmin) fetchUsers();
-  }, [isSuperAdmin, isAdmin, fetchUsers]);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
 
   if (!isSuperAdmin && !isAdmin) {
     return (
@@ -41,18 +22,19 @@ export function AdminUsers() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6">
-      <h1 className="text-2xl font-bold">User Management</h1>
+    <div className="max-w-5xl mx-auto p-4 sm:p-6">
+      <h1 className="text-lg font-semibold mb-4">User Management</h1>
 
-      {loading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : users.length === 0 ? (
-        <p className="text-muted-foreground">No users found.</p>
+      {selectedUserId ? (
+        <UserDetailEditor userId={selectedUserId} onBack={() => setSelectedUserId(null)} />
       ) : (
-        <UserListTable users={users} onRefresh={fetchUsers} />
+        <UserIndex
+          onSelectUser={(id) => setSelectedUserId(id)}
+          onCreateUser={() => setCreateOpen(true)}
+        />
       )}
+
+      <CreateUserModal open={createOpen} onOpenChange={setCreateOpen} />
     </div>
   );
 }

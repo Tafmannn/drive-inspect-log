@@ -275,6 +275,9 @@ export type Database = {
         Row: {
           address_line1: string | null
           address_line2: string | null
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
           city: string | null
           created_at: string
           date_of_birth: string | null
@@ -292,6 +295,9 @@ export type Database = {
           org_id: string
           phone: string | null
           postcode: string | null
+          restore_note: string | null
+          restored_at: string | null
+          restored_by: string | null
           start_date: string | null
           trade_plate_number: string | null
           updated_at: string
@@ -300,6 +306,9 @@ export type Database = {
         Insert: {
           address_line1?: string | null
           address_line2?: string | null
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
           city?: string | null
           created_at?: string
           date_of_birth?: string | null
@@ -317,6 +326,9 @@ export type Database = {
           org_id: string
           phone?: string | null
           postcode?: string | null
+          restore_note?: string | null
+          restored_at?: string | null
+          restored_by?: string | null
           start_date?: string | null
           trade_plate_number?: string | null
           updated_at?: string
@@ -325,6 +337,9 @@ export type Database = {
         Update: {
           address_line1?: string | null
           address_line2?: string | null
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
           city?: string | null
           created_at?: string
           date_of_birth?: string | null
@@ -342,6 +357,9 @@ export type Database = {
           org_id?: string
           phone?: string | null
           postcode?: string | null
+          restore_note?: string | null
+          restored_at?: string | null
+          restored_by?: string | null
           start_date?: string | null
           trade_plate_number?: string | null
           updated_at?: string
@@ -1263,6 +1281,86 @@ export type Database = {
         }
         Relationships: []
       }
+      user_profiles: {
+        Row: {
+          account_status: string
+          activated_at: string | null
+          activated_by: string | null
+          auth_user_id: string
+          created_at: string
+          display_name: string | null
+          email: string
+          first_name: string | null
+          id: string
+          internal_notes: string | null
+          is_protected: boolean
+          last_name: string | null
+          org_id: string | null
+          permissions: Json
+          phone: string | null
+          profile_photo_path: string | null
+          role: string
+          suspended_at: string | null
+          suspended_by: string | null
+          suspension_reason: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_status?: string
+          activated_at?: string | null
+          activated_by?: string | null
+          auth_user_id: string
+          created_at?: string
+          display_name?: string | null
+          email: string
+          first_name?: string | null
+          id?: string
+          internal_notes?: string | null
+          is_protected?: boolean
+          last_name?: string | null
+          org_id?: string | null
+          permissions?: Json
+          phone?: string | null
+          profile_photo_path?: string | null
+          role?: string
+          suspended_at?: string | null
+          suspended_by?: string | null
+          suspension_reason?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_status?: string
+          activated_at?: string | null
+          activated_by?: string | null
+          auth_user_id?: string
+          created_at?: string
+          display_name?: string | null
+          email?: string
+          first_name?: string | null
+          id?: string
+          internal_notes?: string | null
+          is_protected?: boolean
+          last_name?: string | null
+          org_id?: string | null
+          permissions?: Json
+          phone?: string | null
+          profile_photo_path?: string | null
+          role?: string
+          suspended_at?: string | null
+          suspended_by?: string | null
+          suspension_reason?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_profiles_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1270,6 +1368,7 @@ export type Database = {
     Functions: {
       is_super_admin: { Args: never; Returns: boolean }
       next_job_number: { Args: never; Returns: string }
+      user_account_status: { Args: never; Returns: string }
       user_org_id: { Args: never; Returns: string }
       user_role: { Args: never; Returns: string }
     }

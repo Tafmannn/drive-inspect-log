@@ -32,6 +32,8 @@ export interface AppUser {
   email: string;
   roles: AppRole[];
   status: "active" | "inactive";
+  /** App-level account status from user_profiles */
+  accountStatus?: "pending_activation" | "active" | "suspended";
 }
 
 interface AuthContextValue {
@@ -170,27 +172,37 @@ function RealAuthProvider({ children }: { children: ReactNode }) {
   const [appUser, setAppUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const handleSession = useCallback((session: Session | null) => {
+  const handleSession = useCallback(async (session: Session | null) => {
     if (session?.user) {
-      setAppUser(deriveAppUser(session.user));
+      const user = deriveAppUser(session.user);
+      // Fetch account_status from user_profiles (non-blocking; defaults to active if no row)
+      try {
+        const { data } = await (supabase as any)
+          .from("user_profiles")
+          .select("account_status")
+          .eq("auth_user_id", session.user.id)
+          .maybeSingle();
+        if (data?.account_status) {
+          user.accountStatus = data.account_status as AppUser["accountStatus"];
+        }
+      } catch {
+        // If fetch fails, allow through (fail-open for now)
+      }
+      setAppUser(user);
     } else {
       setAppUser(null);
     }
   }, []);
 
   useEffect(() => {
-    // Listen first so we don't miss events
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      handleSession(session);
-      setLoading(false);
+      handleSession(session).then(() => setLoading(false));
     });
 
-    // Then get current session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      handleSession(session);
-      setLoading(false);
+      handleSession(session).then(() => setLoading(false));
     });
 
     return () => subscription.unsubscribe();
