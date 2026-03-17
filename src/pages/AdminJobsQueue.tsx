@@ -26,11 +26,12 @@ import {
   UserX, Clock,
 } from "lucide-react";
 
-type QueueFilter = "all" | "attention" | "in_progress" | "review" | "completed";
+type QueueFilter = "all" | "attention" | "unassigned" | "in_progress" | "review" | "completed";
 
 const FILTERS: { value: QueueFilter; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { value: "all", label: "All", icon: Truck },
   { value: "attention", label: "Attention", icon: AlertTriangle },
+  { value: "unassigned", label: "Unassigned", icon: UserX },
   { value: "in_progress", label: "Active", icon: Truck },
   { value: "review", label: "Review", icon: ClipboardCheck },
   { value: "completed", label: "Done", icon: CheckCircle },
