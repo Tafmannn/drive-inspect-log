@@ -17,7 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { UKPlate } from "@/components/UKPlate";
 import { useAuth } from "@/context/AuthContext";
 import { useAdminJobQueues, useAdminJobQueueKpis } from "@/hooks/useAdminJobQueues";
-import { useAdminMissingEvidence } from "@/hooks/useAdminDashboardData";
+import { useAdminMissingEvidence, useAdminComplianceCounts } from "@/hooks/useAdminDashboardData";
 import { useAttentionData } from "@/features/attention/hooks/useAttentionData";
 import { AssignDriverModal } from "@/features/control/components/AssignDriverModal";
 import { getStatusStyle } from "@/lib/statusConfig";
