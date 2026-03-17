@@ -1,14 +1,12 @@
 /**
  * Admin Dashboard – supplemental data hooks.
- * Separated from useAdminJobQueues for single-responsibility.
  */
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getComplianceCounts } from "@/lib/onboardingApi";
 
 /**
- * Count of completed jobs (last 7 days) missing evidence:
- * - no delivery inspection
- * - OR no pickup inspection
+ * Count of completed jobs (last 7 days) missing evidence.
  */
 export function useAdminMissingEvidence() {
   return useQuery({
@@ -28,5 +26,16 @@ export function useAdminMissingEvidence() {
       return count ?? 0;
     },
     staleTime: 30_000,
+  });
+}
+
+/**
+ * Onboarding/compliance counts for admin intervention.
+ */
+export function useAdminComplianceCounts() {
+  return useQuery({
+    queryKey: ["admin-compliance-counts"],
+    queryFn: () => getComplianceCounts(),
+    staleTime: 60_000,
   });
 }

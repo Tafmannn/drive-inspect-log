@@ -3,6 +3,7 @@ import * as api from "@/lib/api";
 import { getPendingJobCount } from "@/lib/pendingUploads";
 import { supabase } from "@/integrations/supabase/client";
 import { ACTIVE_STATUSES } from "@/lib/statusConfig";
+import { invalidateForEvent } from "@/lib/mutationEvents";
 import type { Job, JobWithRelations, InspectionType, Inspection, DamageItem } from "@/lib/types";
 
 // ─── Dashboard ───────────────────────────────────────────────────────
@@ -83,12 +84,7 @@ export function useCreateJob() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: Parameters<typeof api.createJob>[0]) => api.createJob(input),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["jobs"] });
-      qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
-      qc.invalidateQueries({ queryKey: ["admin-job-queues"] });
-      qc.invalidateQueries({ queryKey: ["admin-job-queue-kpis"] });
-    },
+    onSuccess: () => invalidateForEvent(qc, "job_status_changed"),
   });
 }
 
@@ -98,12 +94,7 @@ export function useUpdateJob() {
     mutationFn: ({ jobId, input }: { jobId: string; input: Partial<Job> }) =>
       api.updateJob(jobId, input),
     onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: ["job", vars.jobId] });
-      qc.invalidateQueries({ queryKey: ["jobs"] });
-      qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
-      qc.invalidateQueries({ queryKey: ["admin-job-queues"] });
-      qc.invalidateQueries({ queryKey: ["admin-job-queue-kpis"] });
-      qc.invalidateQueries({ queryKey: ["admin-missing-evidence-count"] });
+      invalidateForEvent(qc, "job_status_changed", [["job", vars.jobId]]);
     },
   });
 }
@@ -123,14 +114,7 @@ export function useSubmitInspection() {
       damageItems: Array<Omit<DamageItem, "id" | "inspection_id" | "created_at">>;
     }) => api.submitInspection(jobId, type, inspectionPayload, damageItems),
     onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: ["job", vars.jobId] });
-      qc.invalidateQueries({ queryKey: ["jobs"] });
-      qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
-      qc.invalidateQueries({ queryKey: ["admin-job-queues"] });
-      qc.invalidateQueries({ queryKey: ["admin-job-queue-kpis"] });
-      qc.invalidateQueries({ queryKey: ["admin-missing-evidence-count"] });
-      qc.invalidateQueries({ queryKey: ["control-jobs"] });
-      qc.invalidateQueries({ queryKey: ["closure-review-queue"] });
+      invalidateForEvent(qc, "inspection_submitted", [["job", vars.jobId]]);
     },
   });
 }

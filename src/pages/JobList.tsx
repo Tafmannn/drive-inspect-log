@@ -1,7 +1,6 @@
 /**
- * Phase 3 + 6 — My Jobs: Ranked execution launcher.
- * Compact cards with recognition/context/action bands.
- * Shows execution_reason for top-ranked job.
+ * My Jobs — Ranked execution launcher.
+ * Two-stage lattice: partition → sort → CTA governed by executable state.
  */
 import { useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
@@ -16,9 +15,16 @@ import { DeviationPrompt } from "@/components/DeviationPrompt";
 import { rankJobs, type RankedJob } from "@/lib/executionRanking";
 import { logDeviation } from "@/lib/deviationApi";
 import { useAuth } from "@/context/AuthContext";
-import { toast } from "@/hooks/use-toast";
 
 function getJobCta(job: RankedJob): { label: string; route: string } {
+  // Blocked/review_only → view only
+  if (job.executable_state === "blocked") {
+    return { label: "View Job", route: `/jobs/${job.id}` };
+  }
+  if (job.executable_state === "review_only") {
+    return { label: "View POD", route: `/jobs/${job.id}/pod` };
+  }
+  // Executable → derive from workflow step
   if (!job.has_pickup_inspection) return { label: "Start Pickup", route: `/inspection/${job.id}/pickup` };
   if (!job.has_delivery_inspection) return { label: "Start Delivery", route: `/inspection/${job.id}/delivery` };
   return { label: "View POD", route: `/jobs/${job.id}/pod` };
@@ -33,22 +39,29 @@ export const JobList = () => {
     recommendedJob: RankedJob;
   } | null>(null);
 
-  const rankedJobs = jobs ? rankJobs(jobs).filter(j => j.execution_rank < 7) : [];
+  // Exclude terminal from driver view
+  const rankedJobs = jobs ? rankJobs(jobs).filter(j => j.execution_class !== "terminal") : [];
 
   const handleJobAction = (job: RankedJob) => {
-    // Check if this is an out-of-sequence action
+    // Blocked jobs → no deviation prompt, just navigate to view
+    if (job.executable_state !== "executable") {
+      navigate(getJobCta(job).route);
+      return;
+    }
+
+    // Check for sequence deviation: only if target is executable and there's a clear recommended
     const recommended = rankedJobs.find(j => j.is_next_recommended);
     if (
       recommended &&
       recommended.id !== job.id &&
-      recommended.execution_rank <= 3 && // only prompt when there's a clear current/recommended
-      job.execution_rank > recommended.execution_rank
+      recommended.executable_state === "executable" &&
+      recommended.execution_rank < job.execution_rank
     ) {
       setDeviation({ targetJob: job, recommendedJob: recommended });
       return;
     }
-    const cta = getJobCta(job);
-    navigate(cta.route);
+
+    navigate(getJobCta(job).route);
   };
 
   const handleDeviationConfirm = async (reason: string, notes: string) => {
@@ -62,7 +75,7 @@ export const JobList = () => {
         driverId: user?.id,
       });
     } catch {
-      // Non-blocking — log failure shouldn't block the action
+      // Non-blocking
     }
     const cta = getJobCta(deviation.targetJob);
     setDeviation(null);
@@ -101,6 +114,7 @@ export const JobList = () => {
               key={job.id}
               job={job}
               ctaLabel={cta.label}
+              ctaVariant={job.executable_state === "executable" ? "default" : "outline"}
               onPrimaryAction={() => handleJobAction(job)}
               onCardClick={() => navigate(`/jobs/${job.id}`)}
             />

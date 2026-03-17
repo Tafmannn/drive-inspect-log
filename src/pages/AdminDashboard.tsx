@@ -17,7 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { UKPlate } from "@/components/UKPlate";
 import { useAuth } from "@/context/AuthContext";
 import { useAdminJobQueues, useAdminJobQueueKpis } from "@/hooks/useAdminJobQueues";
-import { useAdminMissingEvidence } from "@/hooks/useAdminDashboardData";
+import { useAdminMissingEvidence, useAdminComplianceCounts } from "@/hooks/useAdminDashboardData";
 import { useAttentionData } from "@/features/attention/hooks/useAttentionData";
 import { AssignDriverModal } from "@/features/control/components/AssignDriverModal";
 import { getStatusStyle } from "@/lib/statusConfig";
@@ -28,7 +28,7 @@ import { cn } from "@/lib/utils";
 import {
   UserX, Clock, FileSearch, ImageOff, ChevronRight,
   Zap, Eye, UserPlus, MapPin, AlertTriangle, User,
-  Truck, Users, ClipboardCheck, Receipt,
+  Truck, Users, ClipboardCheck, Receipt, ShieldAlert,
 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -129,6 +129,41 @@ function InterventionKpis() {
         loading={evidenceLoading}
         onClick={() => navigate("/admin/jobs?filter=evidence")}
       />
+    </div>
+  );
+}
+
+// ── Compliance Intervention Strip ────────────────────────────────────
+
+function ComplianceStrip() {
+  const navigate = useNavigate();
+  const { data: counts, isLoading } = useAdminComplianceCounts();
+
+  if (isLoading || !counts) return null;
+
+  const total = counts.pendingReview + counts.missingDocs + counts.expiredLicences;
+  if (total === 0) return null;
+
+  return (
+    <div
+      className="flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 cursor-pointer active:bg-warning/10 transition-colors"
+      onClick={() => navigate("/admin/onboarding")}
+    >
+      <ShieldAlert className="h-4 w-4 text-warning shrink-0" />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 text-[11px]">
+          {counts.pendingReview > 0 && (
+            <span className="text-foreground font-medium">{counts.pendingReview} pending review</span>
+          )}
+          {counts.missingDocs > 0 && (
+            <span className="text-destructive font-medium">{counts.missingDocs} missing docs</span>
+          )}
+          {counts.expiredLicences > 0 && (
+            <span className="text-warning font-medium">{counts.expiredLicences} expired</span>
+          )}
+        </div>
+      </div>
+      <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />
     </div>
   );
 }
@@ -592,6 +627,9 @@ export const AdminDashboard = () => {
       <div className="p-3 max-w-lg mx-auto space-y-4">
         {/* Tier 1 — Intervention KPIs */}
         <InterventionKpis />
+
+        {/* Compliance intervention strip */}
+        <ComplianceStrip />
 
         {/* Tier 2 — Ranked Needs Action (primary section) */}
         <NeedsActionQueue />
