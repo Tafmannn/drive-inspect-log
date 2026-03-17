@@ -1038,6 +1038,13 @@ export type Database = {
             foreignKeyName: "jobs_driver_id_fkey"
             columns: ["driver_id"]
             isOneToOne: false
+            referencedRelation: "active_driver_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
             referencedRelation: "driver_profiles"
             referencedColumns: ["id"]
           },
@@ -1363,11 +1370,54 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      active_driver_profiles: {
+        Row: {
+          address_line1: string | null
+          address_line2: string | null
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
+          city: string | null
+          created_at: string | null
+          date_of_birth: string | null
+          display_name: string | null
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          employment_type: string | null
+          full_name: string | null
+          id: string | null
+          is_active: boolean | null
+          licence_categories: string[] | null
+          licence_expiry: string | null
+          licence_number: string | null
+          notes: string | null
+          org_id: string | null
+          phone: string | null
+          postcode: string | null
+          restore_note: string | null
+          restored_at: string | null
+          restored_by: string | null
+          start_date: string | null
+          trade_plate_number: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_profiles_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      is_admin_or_super_admin: { Args: never; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
       next_job_number: { Args: never; Returns: string }
+      same_org_as_target: { Args: { target_org_id: string }; Returns: boolean }
       user_account_status: { Args: never; Returns: string }
       user_org_id: { Args: never; Returns: string }
       user_role: { Args: never; Returns: string }
