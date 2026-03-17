@@ -22,7 +22,7 @@
  *   - status                    → Queue membership
  *   - completed_at              → Recency for recently-closed items
  *   - updated_at                → Staleness / age calculation
- *   - driver_name               → Assignment state
+ *   - driver_id + driver_profiles → Assignment state (FK-preferred, driver_name fallback)
  *   - has_pickup_inspection      → Evidence completeness (canonical)
  *   - has_delivery_inspection    → Evidence completeness (canonical)
  *   - delivery_city, delivery_postcode → Location context
