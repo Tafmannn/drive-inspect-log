@@ -382,10 +382,12 @@ serve(async (req) => {
         "employment_type", "notes", "licence_categories",
       ];
 
+      const dateFields = new Set(["licence_expiry", "date_of_birth", "start_date"]);
       const updates: Record<string, any> = {};
       for (const k of allowed) {
         if (k in fields && k !== "_action" && k !== "user_id") {
-          updates[k] = fields[k];
+          // Convert empty strings to null for date columns
+          updates[k] = dateFields.has(k) && fields[k] === "" ? null : fields[k];
         }
       }
 
