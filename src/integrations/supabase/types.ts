@@ -373,6 +373,27 @@ export type Database = {
             referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "driver_profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_effective_permissions"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "driver_profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_permissions_matrix"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "driver_profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["auth_user_id"]
+          },
         ]
       }
       expense_receipts: {
@@ -1075,6 +1096,129 @@ export type Database = {
         }
         Relationships: []
       }
+      permission_audit_log: {
+        Row: {
+          action: string
+          actor_email: string | null
+          actor_user_id: string | null
+          created_at: string
+          id: string
+          new_grant_type: string | null
+          old_grant_type: string | null
+          permission_key: string
+          reason: string | null
+          target_user_id: string
+        }
+        Insert: {
+          action: string
+          actor_email?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          id?: string
+          new_grant_type?: string | null
+          old_grant_type?: string | null
+          permission_key: string
+          reason?: string | null
+          target_user_id: string
+        }
+        Update: {
+          action?: string
+          actor_email?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          id?: string
+          new_grant_type?: string | null
+          old_grant_type?: string | null
+          permission_key?: string
+          reason?: string | null
+          target_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "permission_audit_log_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "user_effective_permissions"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "permission_audit_log_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "user_permissions_matrix"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "permission_audit_log_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["auth_user_id"]
+          },
+          {
+            foreignKeyName: "permission_audit_log_permission_key_fkey"
+            columns: ["permission_key"]
+            isOneToOne: false
+            referencedRelation: "permissions_catalog"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "permission_audit_log_permission_key_fkey"
+            columns: ["permission_key"]
+            isOneToOne: false
+            referencedRelation: "user_permissions_matrix"
+            referencedColumns: ["permission_key"]
+          },
+          {
+            foreignKeyName: "permission_audit_log_target_user_id_fkey"
+            columns: ["target_user_id"]
+            isOneToOne: false
+            referencedRelation: "user_effective_permissions"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "permission_audit_log_target_user_id_fkey"
+            columns: ["target_user_id"]
+            isOneToOne: false
+            referencedRelation: "user_permissions_matrix"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "permission_audit_log_target_user_id_fkey"
+            columns: ["target_user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["auth_user_id"]
+          },
+        ]
+      }
+      permissions_catalog: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          is_sensitive: boolean
+          key: string
+          label: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description?: string | null
+          is_sensitive?: boolean
+          key: string
+          label: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          is_sensitive?: boolean
+          key?: string
+          label?: string
+        }
+        Relationships: []
+      }
       photos: {
         Row: {
           backend: string
@@ -1183,6 +1327,42 @@ export type Database = {
           },
         ]
       }
+      role_permission_templates: {
+        Row: {
+          created_at: string
+          is_allowed: boolean
+          permission_key: string
+          role: string
+        }
+        Insert: {
+          created_at?: string
+          is_allowed?: boolean
+          permission_key: string
+          role: string
+        }
+        Update: {
+          created_at?: string
+          is_allowed?: boolean
+          permission_key?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_permission_templates_permission_key_fkey"
+            columns: ["permission_key"]
+            isOneToOne: false
+            referencedRelation: "permissions_catalog"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "role_permission_templates_permission_key_fkey"
+            columns: ["permission_key"]
+            isOneToOne: false
+            referencedRelation: "user_permissions_matrix"
+            referencedColumns: ["permission_key"]
+          },
+        ]
+      }
       sheet_sync_config: {
         Row: {
           column_mapping: Json
@@ -1287,6 +1467,96 @@ export type Database = {
           sheet_row_index?: number
         }
         Relationships: []
+      }
+      user_permission_overrides: {
+        Row: {
+          created_at: string
+          grant_type: string
+          granted_by: string | null
+          id: string
+          permission_key: string
+          reason: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          grant_type: string
+          granted_by?: string | null
+          id?: string
+          permission_key: string
+          reason?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          grant_type?: string
+          granted_by?: string | null
+          id?: string
+          permission_key?: string
+          reason?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_permission_overrides_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "user_effective_permissions"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "user_permission_overrides_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "user_permissions_matrix"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "user_permission_overrides_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["auth_user_id"]
+          },
+          {
+            foreignKeyName: "user_permission_overrides_permission_key_fkey"
+            columns: ["permission_key"]
+            isOneToOne: false
+            referencedRelation: "permissions_catalog"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "user_permission_overrides_permission_key_fkey"
+            columns: ["permission_key"]
+            isOneToOne: false
+            referencedRelation: "user_permissions_matrix"
+            referencedColumns: ["permission_key"]
+          },
+          {
+            foreignKeyName: "user_permission_overrides_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_effective_permissions"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "user_permission_overrides_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_permissions_matrix"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "user_permission_overrides_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["auth_user_id"]
+          },
+        ]
       }
       user_profiles: {
         Row: {
@@ -1410,15 +1680,368 @@ export type Database = {
             referencedRelation: "organisations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "driver_profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_effective_permissions"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "driver_profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_permissions_matrix"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "driver_profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["auth_user_id"]
+          },
+        ]
+      }
+      user_effective_permissions: {
+        Row: {
+          is_allowed: boolean | null
+          permission_key: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_permission_templates_permission_key_fkey"
+            columns: ["permission_key"]
+            isOneToOne: false
+            referencedRelation: "permissions_catalog"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "role_permission_templates_permission_key_fkey"
+            columns: ["permission_key"]
+            isOneToOne: false
+            referencedRelation: "user_permissions_matrix"
+            referencedColumns: ["permission_key"]
+          },
+        ]
+      }
+      user_permission_overrides_detailed: {
+        Row: {
+          created_at: string | null
+          grant_type: string | null
+          granted_by: string | null
+          granted_by_email: string | null
+          id: string | null
+          is_sensitive: boolean | null
+          permission_category: string | null
+          permission_description: string | null
+          permission_key: string | null
+          permission_label: string | null
+          reason: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_permission_overrides_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "user_effective_permissions"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "user_permission_overrides_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "user_permissions_matrix"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "user_permission_overrides_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["auth_user_id"]
+          },
+          {
+            foreignKeyName: "user_permission_overrides_permission_key_fkey"
+            columns: ["permission_key"]
+            isOneToOne: false
+            referencedRelation: "permissions_catalog"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "user_permission_overrides_permission_key_fkey"
+            columns: ["permission_key"]
+            isOneToOne: false
+            referencedRelation: "user_permissions_matrix"
+            referencedColumns: ["permission_key"]
+          },
+          {
+            foreignKeyName: "user_permission_overrides_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_effective_permissions"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "user_permission_overrides_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_permissions_matrix"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "user_permission_overrides_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["auth_user_id"]
+          },
+        ]
+      }
+      user_permissions_matrix: {
+        Row: {
+          category: string | null
+          email: string | null
+          is_allowed: boolean | null
+          org_id: string | null
+          permission_key: string | null
+          permission_label: string | null
+          role: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_profiles_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
     Functions: {
+      activate_user_account: {
+        Args: { p_target_user_id: string }
+        Returns: {
+          account_status: string
+          activated_at: string | null
+          activated_by: string | null
+          auth_user_id: string
+          created_at: string
+          display_name: string | null
+          email: string
+          first_name: string | null
+          id: string
+          internal_notes: string | null
+          is_protected: boolean
+          last_name: string | null
+          org_id: string | null
+          permissions: Json
+          phone: string | null
+          profile_photo_path: string | null
+          role: string
+          suspended_at: string | null
+          suspended_by: string | null
+          suspension_reason: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "user_profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      archive_driver_profile: {
+        Args: {
+          p_reason?: string
+          p_suspend_account?: boolean
+          p_target_user_id: string
+        }
+        Returns: {
+          address_line1: string | null
+          address_line2: string | null
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
+          city: string | null
+          created_at: string
+          date_of_birth: string | null
+          display_name: string | null
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          employment_type: string | null
+          full_name: string
+          id: string
+          is_active: boolean
+          licence_categories: string[] | null
+          licence_expiry: string | null
+          licence_number: string | null
+          notes: string | null
+          org_id: string
+          phone: string | null
+          postcode: string | null
+          restore_note: string | null
+          restored_at: string | null
+          restored_by: string | null
+          start_date: string | null
+          trade_plate_number: string | null
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "driver_profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      can_actor_manage_permission: {
+        Args: {
+          p_actor_user_id: string
+          p_grant_type: string
+          p_permission_key: string
+          p_target_user_id: string
+        }
+        Returns: boolean
+      }
+      can_actor_manage_target_user: {
+        Args: { p_actor_user_id: string; p_target_user_id: string }
+        Returns: boolean
+      }
+      current_actor_email: { Args: never; Returns: string }
+      current_user_has_permission: {
+        Args: { p_permission_key: string }
+        Returns: boolean
+      }
+      delete_user_permission_override:
+        | {
+            Args: { p_permission_key: string; p_target_user_id: string }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_permission_key: string
+              p_reason?: string
+              p_target_user_id: string
+            }
+            Returns: undefined
+          }
       is_admin_or_super_admin: { Args: never; Returns: boolean }
+      is_protected_user: { Args: { p_user_id: string }; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
       next_job_number: { Args: never; Returns: string }
+      restore_driver_profile: {
+        Args: {
+          p_reactivate_account?: boolean
+          p_restore_note?: string
+          p_target_user_id: string
+        }
+        Returns: {
+          address_line1: string | null
+          address_line2: string | null
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
+          city: string | null
+          created_at: string
+          date_of_birth: string | null
+          display_name: string | null
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          employment_type: string | null
+          full_name: string
+          id: string
+          is_active: boolean
+          licence_categories: string[] | null
+          licence_expiry: string | null
+          licence_number: string | null
+          notes: string | null
+          org_id: string
+          phone: string | null
+          postcode: string | null
+          restore_note: string | null
+          restored_at: string | null
+          restored_by: string | null
+          start_date: string | null
+          trade_plate_number: string | null
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "driver_profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      role_rank: { Args: { p_role: string }; Returns: number }
       same_org_as_target: { Args: { target_org_id: string }; Returns: boolean }
+      suspend_user_account: {
+        Args: { p_reason?: string; p_target_user_id: string }
+        Returns: {
+          account_status: string
+          activated_at: string | null
+          activated_by: string | null
+          auth_user_id: string
+          created_at: string
+          display_name: string | null
+          email: string
+          first_name: string | null
+          id: string
+          internal_notes: string | null
+          is_protected: boolean
+          last_name: string | null
+          org_id: string | null
+          permissions: Json
+          phone: string | null
+          profile_photo_path: string | null
+          role: string
+          suspended_at: string | null
+          suspended_by: string | null
+          suspension_reason: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "user_profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      upsert_user_permission_override: {
+        Args: {
+          p_grant_type: string
+          p_permission_key: string
+          p_reason?: string
+          p_target_user_id: string
+        }
+        Returns: {
+          created_at: string
+          grant_type: string
+          granted_by: string | null
+          id: string
+          permission_key: string
+          reason: string | null
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "user_permission_overrides"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       user_account_status: { Args: never; Returns: string }
+      user_has_permission: {
+        Args: { p_permission_key: string; p_user_id: string }
+        Returns: boolean
+      }
       user_org_id: { Args: never; Returns: string }
       user_role: { Args: never; Returns: string }
     }
