@@ -194,6 +194,83 @@ export type Database = {
           },
         ]
       }
+      driver_onboarding: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          email: string | null
+          employment_type: string | null
+          full_name: string
+          headshot_url: string | null
+          id: string
+          licence_back_url: string | null
+          licence_expiry: string | null
+          licence_front_url: string | null
+          linked_user_id: string | null
+          notes: string | null
+          org_id: string
+          phone: string | null
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          trade_plate_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          employment_type?: string | null
+          full_name: string
+          headshot_url?: string | null
+          id?: string
+          licence_back_url?: string | null
+          licence_expiry?: string | null
+          licence_front_url?: string | null
+          linked_user_id?: string | null
+          notes?: string | null
+          org_id: string
+          phone?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          trade_plate_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          employment_type?: string | null
+          full_name?: string
+          headshot_url?: string | null
+          id?: string
+          licence_back_url?: string | null
+          licence_expiry?: string | null
+          licence_front_url?: string | null
+          linked_user_id?: string | null
+          notes?: string | null
+          org_id?: string
+          phone?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          trade_plate_number?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_onboarding_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       driver_profiles: {
         Row: {
           address_line1: string | null
@@ -653,6 +730,61 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_deviation_log: {
+        Row: {
+          created_at: string
+          driver_id: string | null
+          id: string
+          job_id: string
+          notes: string | null
+          org_id: string
+          reason: string
+          recommended_job_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          driver_id?: string | null
+          id?: string
+          job_id: string
+          notes?: string | null
+          org_id: string
+          reason: string
+          recommended_job_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          driver_id?: string | null
+          id?: string
+          job_id?: string
+          notes?: string | null
+          org_id?: string
+          reason?: string
+          recommended_job_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_deviation_log_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_deviation_log_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_deviation_log_recommended_job_id_fkey"
+            columns: ["recommended_job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
         ]

@@ -86,6 +86,8 @@ export function useCreateJob() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
+      qc.invalidateQueries({ queryKey: ["admin-job-queues"] });
+      qc.invalidateQueries({ queryKey: ["admin-job-queue-kpis"] });
     },
   });
 }
@@ -99,6 +101,9 @@ export function useUpdateJob() {
       qc.invalidateQueries({ queryKey: ["job", vars.jobId] });
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
+      qc.invalidateQueries({ queryKey: ["admin-job-queues"] });
+      qc.invalidateQueries({ queryKey: ["admin-job-queue-kpis"] });
+      qc.invalidateQueries({ queryKey: ["admin-missing-evidence-count"] });
     },
   });
 }
@@ -121,6 +126,11 @@ export function useSubmitInspection() {
       qc.invalidateQueries({ queryKey: ["job", vars.jobId] });
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
+      qc.invalidateQueries({ queryKey: ["admin-job-queues"] });
+      qc.invalidateQueries({ queryKey: ["admin-job-queue-kpis"] });
+      qc.invalidateQueries({ queryKey: ["admin-missing-evidence-count"] });
+      qc.invalidateQueries({ queryKey: ["control-jobs"] });
+      qc.invalidateQueries({ queryKey: ["closure-review-queue"] });
     },
   });
 }

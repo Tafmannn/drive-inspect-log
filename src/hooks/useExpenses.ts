@@ -37,6 +37,8 @@ export function useCreateExpense() {
       qc.invalidateQueries({ queryKey: ['expenses'] });
       qc.invalidateQueries({ queryKey: ['expense-totals'] });
       qc.invalidateQueries({ queryKey: ['dashboard-counts'] });
+      qc.invalidateQueries({ queryKey: ['admin-job-queues'] });
+      qc.invalidateQueries({ queryKey: ['control-finance'] });
     },
   });
 }

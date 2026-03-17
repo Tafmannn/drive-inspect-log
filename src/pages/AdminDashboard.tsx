@@ -543,6 +543,7 @@ function ManagementRoutes() {
   const routes = [
     { label: "Full Jobs Queue", icon: Truck, path: "/admin/jobs" },
     { label: "Fleet & Drivers", icon: Users, path: "/control/drivers" },
+    { label: "Driver Onboarding", icon: ClipboardCheck, path: "/admin/onboarding" },
     { label: "POD Closure", icon: ClipboardCheck, path: "/control/pod-review" },
     { label: "Expenses & Finance", icon: Receipt, path: "/control/finance" },
   ];

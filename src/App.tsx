@@ -25,6 +25,7 @@ import { AdminUsers } from "./pages/AdminUsers";
 import { AdminDrivers } from "./pages/AdminDrivers";
 import { AdminPodReview } from "./pages/AdminPodReview";
 import { AdminFinance } from "./pages/AdminFinance";
+import { AdminOnboarding } from "./pages/AdminOnboarding";
 import { SuperAdminDashboard } from "./pages/SuperAdminDashboard";
 import {
   SuperAdminOrgs, SuperAdminUsers, SuperAdminJobs,
@@ -177,6 +178,7 @@ const App = () => {
                 <Route path="/admin/drivers" element={<ProtectedRoute><AdminRoute><AdminDrivers /></AdminRoute></ProtectedRoute>} />
                 <Route path="/admin/pod-review" element={<ProtectedRoute><AdminRoute><AdminPodReview /></AdminRoute></ProtectedRoute>} />
                 <Route path="/admin/finance" element={<ProtectedRoute><AdminRoute><AdminFinance /></AdminRoute></ProtectedRoute>} />
+                <Route path="/admin/onboarding" element={<ProtectedRoute><AdminRoute><AdminOnboarding /></AdminRoute></ProtectedRoute>} />
 
                 {/* ── Super-admin-only routes ── */}
                 <Route path="/super-admin" element={<ProtectedRoute><SuperAdminRoute><SuperAdminDashboard /></SuperAdminRoute></ProtectedRoute>} />

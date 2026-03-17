@@ -78,7 +78,7 @@ export function AssignDriverModal({
       return displayName;
     },
     onSuccess: (displayName) => {
-      // Invalidate all control centre queries
+      // Phase 2: Invalidate ALL dependent surfaces
       queryClient.invalidateQueries({ queryKey: ["control-jobs"] });
       queryClient.invalidateQueries({ queryKey: ["control-jobs-kpis"] });
       queryClient.invalidateQueries({ queryKey: ["control-drivers"] });
@@ -90,6 +90,15 @@ export function AssignDriverModal({
       queryClient.invalidateQueries({ queryKey: ["control-recent-completed"] });
       queryClient.invalidateQueries({ queryKey: ["closure-review-queue"] });
       queryClient.invalidateQueries({ queryKey: ["closure-review-kpis"] });
+      // Admin mobile surfaces
+      queryClient.invalidateQueries({ queryKey: ["admin-job-queues"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-job-queue-kpis"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-missing-evidence-count"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-drivers"] });
+      // Driver surfaces
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["job"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-counts"] });
       toast({ title: `${displayName} assigned to ${jobRef}` });
       onOpenChange(false);
     },
@@ -124,6 +133,13 @@ export function AssignDriverModal({
       queryClient.invalidateQueries({ queryKey: ["control-unassigned-queue"] });
       queryClient.invalidateQueries({ queryKey: ["control-overview-pod-queue"] });
       queryClient.invalidateQueries({ queryKey: ["control-recent-completed"] });
+      // Admin mobile + driver surfaces
+      queryClient.invalidateQueries({ queryKey: ["admin-job-queues"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-job-queue-kpis"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-drivers"] });
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["job"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-counts"] });
       toast({ title: `Driver unassigned from ${jobRef}` });
       onOpenChange(false);
     },
