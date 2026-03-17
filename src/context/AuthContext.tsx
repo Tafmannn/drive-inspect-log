@@ -177,8 +177,8 @@ function RealAuthProvider({ children }: { children: ReactNode }) {
       const user = deriveAppUser(session.user);
       // Fetch account_status from user_profiles (non-blocking; defaults to active if no row)
       try {
-        const { data } = await supabase
-          .from("user_profiles" as any)
+        const { data } = await (supabase as any)
+          .from("user_profiles")
           .select("account_status")
           .eq("auth_user_id", session.user.id)
           .maybeSingle();
