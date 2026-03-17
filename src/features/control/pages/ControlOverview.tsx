@@ -10,7 +10,7 @@ import { QuickActionsBar } from "../components/shared/QuickActionsBar";
 import { CompactTable, type CompactColumn } from "../components/shared/CompactTable";
 import { SeverityChip } from "../components/shared/SeverityChip";
 import { StatusChip } from "../components/shared/StatusChip";
-import { useAdminKpis, useDispatchBoard, useRecentCompleted } from "../hooks/useAdminControlData";
+import { useAdminKpis, useDispatchBoard, useRecentCompleted, type DispatchBoardRow } from "../hooks/useAdminControlData";
 import { useAttentionData } from "@/features/attention/hooks/useAttentionData";
 import { AttentionQueue } from "@/features/attention/components/AttentionQueue";
 import { Button } from "@/components/ui/button";
