@@ -102,7 +102,7 @@ function InterventionKpis() {
         icon={UserX}
         variant={(kpis?.unassigned ?? 0) > 0 ? "destructive" : "default"}
         loading={isLoading}
-        onClick={() => navigate("/admin/jobs")}
+        onClick={() => navigate("/admin/jobs?filter=unassigned")}
       />
       <KpiPill
         label="Stale"
@@ -110,7 +110,7 @@ function InterventionKpis() {
         icon={Clock}
         variant={(kpis?.stale ?? 0) > 0 ? "warning" : "default"}
         loading={isLoading}
-        onClick={() => navigate("/control/jobs?status=stale")}
+        onClick={() => navigate("/admin/jobs?filter=attention")}
       />
       <KpiPill
         label="POD Review"
@@ -118,7 +118,7 @@ function InterventionKpis() {
         icon={FileSearch}
         variant={(kpis?.podReview ?? 0) > 0 ? "warning" : "default"}
         loading={isLoading}
-        onClick={() => navigate("/control/pod-review")}
+        onClick={() => navigate("/admin/jobs?filter=review")}
       />
       <KpiPill
         label="Evidence"
@@ -126,7 +126,7 @@ function InterventionKpis() {
         icon={ImageOff}
         variant={(missingEvidence ?? 0) > 0 ? "destructive" : "default"}
         loading={evidenceLoading}
-        onClick={() => navigate("/super-admin/attention?category=evidence")}
+        onClick={() => navigate("/admin/jobs?filter=attention")}
       />
     </div>
   );
