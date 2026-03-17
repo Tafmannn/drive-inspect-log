@@ -95,9 +95,10 @@ export interface ClosureKpis {
 
 const SELECT_FIELDS = [
   "id", "external_job_number", "vehicle_reg", "vehicle_make", "vehicle_model",
-  "status", "driver_name", "delivery_city", "delivery_postcode",
+  "status", "driver_id", "driver_name", "delivery_city", "delivery_postcode",
   "updated_at", "completed_at", "has_pickup_inspection", "has_delivery_inspection",
   "client_company", "client_name", "pickup_postcode",
+  "driver_profiles(display_name, full_name)",
 ].join(", ");
 
 // ── Derivation ───────────────────────────────────────────────────────
