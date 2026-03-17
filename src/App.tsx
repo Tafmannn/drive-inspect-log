@@ -24,6 +24,7 @@ import { Timesheets } from "./pages/Timesheets";
 import { AdminUsers } from "./pages/AdminUsers";
 import { AdminDrivers } from "./pages/AdminDrivers";
 import { AdminPodReview } from "./pages/AdminPodReview";
+import { AdminFinance } from "./pages/AdminFinance";
 import { SuperAdminDashboard } from "./pages/SuperAdminDashboard";
 import {
   SuperAdminOrgs, SuperAdminUsers, SuperAdminJobs,
