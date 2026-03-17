@@ -90,7 +90,7 @@ function InterventionKpis() {
         icon={FileSearch}
         variant={(kpis?.podReview ?? 0) > 0 ? "warning" : "default"}
         loading={isLoading}
-        onClick={() => navigate("/admin/jobs")}
+        onClick={() => navigate("/admin/pod-review")}
       />
       <KpiPill
         label="No Evidence"
