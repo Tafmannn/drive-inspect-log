@@ -142,6 +142,17 @@ export function AdminJobsQueue() {
               />
             )}
 
+            {(filter === "all" || filter === "unassigned") && (
+              <QueueSection
+                title="Unassigned"
+                icon={UserX}
+                iconClass="text-destructive"
+                jobs={filterJobs(queues.unassigned)}
+                emptyText="All jobs are assigned."
+                actions={actions}
+              />
+            )}
+
             {(filter === "all" || filter === "in_progress") && (
               <QueueSection
                 title="In Progress"
