@@ -283,7 +283,7 @@ export const JobDetail = () => {
           <InspectionRow
             label="Delivery Inspection"
             done={!!deliveryInspection}
-            onAction={() => navigate(`/inspection/${job.id}/delivery`)}
+            onAction={() => navigate(withFrom(`/inspection/${job.id}/delivery`, searchParams))}
             actionIcon={Truck}
           />
         </Section>
