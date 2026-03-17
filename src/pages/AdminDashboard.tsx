@@ -1,47 +1,69 @@
 /**
- * Admin Dashboard — Intervention Router
- * Action-first layout: KPI Band → Needs Action → Queue Previews → Quick Routes
- * Every KPI routes to a filtered queue. Every item has a primary action.
+ * Admin Dashboard — Intervention-First Operational Surface
+ *
+ * Tier 1: Intervention KPI Strip (4 pills, all tappable)
+ * Tier 2: Ranked "Needs Action" unified queue (primary section)
+ * Tier 3: Live operational queue previews (secondary)
+ * Tier 4: Management route links (bottom)
  */
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
-import { DashboardCard } from "@/components/DashboardCard";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { useNavigate } from "react-router-dom";
+import { Skeleton } from "@/components/ui/skeleton";
+import { UKPlate } from "@/components/UKPlate";
 import { useAuth } from "@/context/AuthContext";
 import { useAdminJobQueues, useAdminJobQueueKpis } from "@/hooks/useAdminJobQueues";
 import { useAdminMissingEvidence } from "@/hooks/useAdminDashboardData";
 import { useAttentionData } from "@/features/attention/hooks/useAttentionData";
-import { AdminJobCard } from "@/components/AdminJobCard";
 import { AssignDriverModal } from "@/features/control/components/AssignDriverModal";
+import { getStatusStyle } from "@/lib/statusConfig";
+import { humanAge, isJobStale, isUnassigned } from "@/features/control/pages/jobs/jobsUtils";
 import type { AdminJobRow } from "@/components/AdminJobCard";
-import type { AttentionFiltersState, AttentionException } from "@/features/attention/types/exceptionTypes";
-import {
-  AlertTriangle, Users, Truck, Receipt, ClipboardCheck,
-  ChevronRight, UserX, Clock, FileSearch, ImageOff,
-  Eye, UserPlus, Zap,
-} from "lucide-react";
+import type { AttentionFiltersState } from "@/features/attention/types/exceptionTypes";
 import { cn } from "@/lib/utils";
+import {
+  UserX, Clock, FileSearch, ImageOff, ChevronRight,
+  Zap, Eye, UserPlus, MapPin, AlertTriangle, User,
+  Truck, Users, ClipboardCheck, Receipt,
+} from "lucide-react";
 
-/* ─── Intervention KPI Band ─────────────────────────────────────── */
+// ── Types ────────────────────────────────────────────────────────────
 
-interface KpiPillProps {
+interface NeedsActionItem {
+  key: string;
+  priority: number; // lower = more urgent
+  queueType: "unassigned" | "stale" | "evidence" | "pod_review";
+  queueLabel: string;
+  jobId?: string;
+  jobRef?: string;
+  vehicleReg?: string;
+  route?: string; // compressed route
+  age: string;
+  driverId?: string | null;
+  resolvedDriverName?: string | null;
+  status?: string;
+  actionLabel: string;
+  actionRoute: string;
+}
+
+// ── Tier 1: Intervention KPI Strip ───────────────────────────────────
+
+function KpiPill({
+  label, value, icon: Icon, variant = "default", loading, onClick,
+}: {
   label: string;
   value: number;
   icon: React.ComponentType<{ className?: string }>;
   variant?: "default" | "warning" | "destructive";
   loading?: boolean;
-  onClick?: () => void;
-}
-
-function KpiPill({ label, value, icon: Icon, variant = "default", loading, onClick }: KpiPillProps) {
-  const colors = {
-    default: "bg-card border-border text-foreground",
+  onClick: () => void;
+}) {
+  const styles = {
+    default: "bg-card border-border text-muted-foreground",
     warning: "bg-warning/5 border-warning/30 text-warning",
     destructive: "bg-destructive/5 border-destructive/30 text-destructive",
   };
@@ -50,18 +72,18 @@ function KpiPill({ label, value, icon: Icon, variant = "default", loading, onCli
     <button
       onClick={onClick}
       className={cn(
-        "flex flex-col items-center gap-1 rounded-xl border p-3 min-w-0 flex-1 transition-colors active:bg-muted/50",
-        colors[variant],
+        "flex flex-col items-center gap-0.5 rounded-lg border p-2.5 min-w-0 flex-1 transition-colors active:bg-muted/50",
+        styles[variant],
       )}
     >
-      <Icon className="h-4 w-4 shrink-0" />
+      <Icon className="h-3.5 w-3.5 shrink-0" />
       {loading ? (
-        <Skeleton className="h-6 w-8" />
+        <Skeleton className="h-5 w-7" />
       ) : (
-        <span className="text-lg font-semibold tabular-nums leading-tight">{value}</span>
+        <span className="text-base font-bold tabular-nums leading-tight">{value}</span>
       )}
-      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground truncate w-full text-center flex items-center justify-center gap-0.5">
-        {label} <ChevronRight className="h-2.5 w-2.5" />
+      <span className="text-[9px] font-semibold uppercase tracking-wider truncate w-full text-center flex items-center justify-center gap-0.5">
+        {label} <ChevronRight className="h-2 w-2" />
       </span>
     </button>
   );
@@ -73,14 +95,14 @@ function InterventionKpis() {
   const { data: missingEvidence, isLoading: evidenceLoading } = useAdminMissingEvidence();
 
   return (
-    <div className="grid grid-cols-4 gap-2">
+    <div className="grid grid-cols-4 gap-1.5">
       <KpiPill
         label="Unassigned"
         value={kpis?.unassigned ?? 0}
         icon={UserX}
         variant={(kpis?.unassigned ?? 0) > 0 ? "destructive" : "default"}
         loading={isLoading}
-        onClick={() => navigate("/control/jobs?status=unassigned")}
+        onClick={() => navigate("/admin/jobs")}
       />
       <KpiPill
         label="Stale"
@@ -99,20 +121,20 @@ function InterventionKpis() {
         onClick={() => navigate("/control/pod-review")}
       />
       <KpiPill
-        label="No Evidence"
+        label="Evidence"
         value={missingEvidence ?? 0}
         icon={ImageOff}
         variant={(missingEvidence ?? 0) > 0 ? "destructive" : "default"}
         loading={evidenceLoading}
-        onClick={() => navigate("/super-admin/attention")}
+        onClick={() => navigate("/super-admin/attention?category=evidence")}
       />
     </div>
   );
 }
 
-/* ─── Needs Action Preview ─────────────────────────────────────── */
+// ── Tier 2: Ranked Needs Action Queue ────────────────────────────────
 
-function NeedsActionPreview() {
+function NeedsActionQueue() {
   const navigate = useNavigate();
   const { data: queues, isLoading: queuesLoading } = useAdminJobQueues();
   const defaultFilters: AttentionFiltersState = { severity: "all", category: "all", orgId: "all", dateFrom: "", dateTo: "" };
@@ -121,105 +143,218 @@ function NeedsActionPreview() {
 
   const loading = queuesLoading || attentionLoading;
 
-  // Build unified "needs action" list: top 5 items from unassigned, stale + high-severity exceptions
-  const needsActionItems: { key: string; type: string; label: string; detail: string; age: string; route: string; actionLabel: string; jobId?: string; driverId?: string | null; jobRef?: string }[] = [];
+  const items = useMemo(() => {
+    const result: NeedsActionItem[] = [];
 
-  // Unassigned jobs
-  for (const job of (queues?.unassigned ?? []).slice(0, 3)) {
-    needsActionItems.push({
-      key: `unassigned-${job.id}`,
-      type: "Unassigned",
-      label: job.vehicle_reg,
-      detail: `${job.pickup_postcode} → ${job.delivery_postcode}`,
-      age: humanAge(job.updated_at),
-      route: `/jobs/${job.id}`,
-      actionLabel: "Assign",
-      jobId: job.id,
-      driverId: job.driver_id,
-      jobRef: job.external_job_number || job.id.slice(0, 8),
-    });
-  }
+    // Priority 1: Unassigned jobs (blocked)
+    for (const job of (queues?.unassigned ?? [])) {
+      result.push({
+        key: `unassigned-${job.id}`,
+        priority: 1,
+        queueType: "unassigned",
+        queueLabel: "Unassigned",
+        jobId: job.id,
+        jobRef: job.external_job_number || job.id.slice(0, 8),
+        vehicleReg: job.vehicle_reg,
+        route: `${job.pickup_postcode} → ${job.delivery_postcode}`,
+        age: humanAge(job.updated_at),
+        driverId: job.driver_id,
+        resolvedDriverName: job.resolvedDriverName,
+        status: job.status,
+        actionLabel: "Assign",
+        actionRoute: `/jobs/${job.id}`,
+      });
+    }
 
-  // High-severity attention exceptions
-  const highExceptions = (attentionData?.exceptions ?? []).filter(e => e.severity === "critical" || e.severity === "high");
-  for (const ex of highExceptions.slice(0, 3)) {
-    needsActionItems.push({
-      key: `exc-${ex.id}`,
-      type: ex.category,
-      label: ex.title,
-      detail: ex.jobNumber ?? "",
-      age: humanAge(ex.createdAt),
-      route: ex.actionRoute,
-      actionLabel: ex.actionLabel,
-    });
-  }
+    // Priority 2: Stale active jobs (not already in unassigned)
+    const unassignedIds = new Set(result.map(r => r.jobId));
+    for (const job of (queues?.needsAttention ?? [])) {
+      if (unassignedIds.has(job.id)) continue;
+      if (!isJobStale(job)) continue;
+      result.push({
+        key: `stale-${job.id}`,
+        priority: 2,
+        queueType: "stale",
+        queueLabel: "Stale",
+        jobId: job.id,
+        jobRef: job.external_job_number || job.id.slice(0, 8),
+        vehicleReg: job.vehicle_reg,
+        route: `${job.pickup_postcode} → ${job.delivery_postcode}`,
+        age: humanAge(job.updated_at),
+        driverId: job.driver_id,
+        resolvedDriverName: job.resolvedDriverName,
+        status: job.status,
+        actionLabel: "View",
+        actionRoute: `/jobs/${job.id}`,
+      });
+    }
 
-  // Cap at 5
-  const items = needsActionItems.slice(0, 5);
+    // Priority 3: High-severity evidence exceptions
+    const highExceptions = (attentionData?.exceptions ?? []).filter(
+      e => (e.severity === "critical" || e.severity === "high") && e.category === "evidence"
+    );
+    for (const ex of highExceptions.slice(0, 5)) {
+      result.push({
+        key: `evidence-${ex.id}`,
+        priority: 3,
+        queueType: "evidence",
+        queueLabel: "Evidence",
+        jobRef: ex.jobNumber ?? undefined,
+        age: humanAge(ex.createdAt),
+        actionLabel: ex.actionLabel || "Review",
+        actionRoute: ex.actionRoute,
+      });
+    }
+
+    // Priority 4: POD review backlog
+    for (const job of (queues?.review ?? [])) {
+      result.push({
+        key: `pod-${job.id}`,
+        priority: 4,
+        queueType: "pod_review",
+        queueLabel: "POD Review",
+        jobId: job.id,
+        jobRef: job.external_job_number || job.id.slice(0, 8),
+        vehicleReg: job.vehicle_reg,
+        route: `${job.pickup_postcode} → ${job.delivery_postcode}`,
+        age: humanAge(job.updated_at),
+        driverId: job.driver_id,
+        resolvedDriverName: job.resolvedDriverName,
+        status: job.status,
+        actionLabel: "Review POD",
+        actionRoute: `/jobs/${job.id}/pod`,
+      });
+    }
+
+    // Sort by priority, then by age (older first within same priority)
+    result.sort((a, b) => a.priority - b.priority);
+
+    return result;
+  }, [queues, attentionData]);
 
   if (loading) {
     return (
-      <section className="space-y-2">
-        <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-          <Zap className="h-4 w-4 text-destructive" /> Needs Action
+      <section className="space-y-1.5">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-destructive flex items-center gap-1.5">
+          <Zap className="h-3.5 w-3.5" /> Needs Action
         </h3>
-        {[1, 2, 3].map(i => <Skeleton key={i} className="h-14 w-full rounded-xl" />)}
+        {[1, 2, 3].map(i => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}
       </section>
     );
   }
 
   if (items.length === 0) {
     return (
-      <section className="space-y-2">
-        <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-          <Zap className="h-4 w-4 text-muted-foreground" /> Needs Action
+      <section className="space-y-1.5">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          <Zap className="h-3.5 w-3.5" /> Needs Action
         </h3>
-        <div className="text-center py-6">
+        <div className="text-center py-6 rounded-lg border border-dashed border-border">
           <p className="text-sm font-medium text-foreground">✅ All clear</p>
-          <p className="text-xs text-muted-foreground mt-0.5">No immediate interventions needed.</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">No interventions required.</p>
         </div>
       </section>
     );
   }
 
-  return (
-    <section className="space-y-2">
-      <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-        <Zap className="h-4 w-4 text-destructive" /> Needs Action
-        <Badge variant="destructive" className="text-[10px] ml-1">{items.length}</Badge>
-      </h3>
+  const queueColors: Record<string, string> = {
+    unassigned: "bg-destructive/10 text-destructive border-destructive/20",
+    stale: "bg-warning/10 text-warning border-warning/20",
+    evidence: "bg-destructive/10 text-destructive border-destructive/20",
+    pod_review: "bg-primary/10 text-primary border-primary/20",
+  };
 
-      <div className="space-y-1.5">
+  const queueActionVariants: Record<string, "default" | "outline" | "destructive"> = {
+    unassigned: "default",
+    stale: "outline",
+    evidence: "outline",
+    pod_review: "outline",
+  };
+
+  return (
+    <section className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-destructive flex items-center gap-1.5">
+          <Zap className="h-3.5 w-3.5" /> Needs Action
+          <Badge variant="destructive" className="text-[9px] px-1.5 py-0 h-4">{items.length}</Badge>
+        </h3>
+      </div>
+
+      <div className="space-y-1">
         {items.map(item => (
           <div
             key={item.key}
-            className="flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-2.5 cursor-pointer active:bg-muted/50 transition-colors"
-            onClick={() => navigate(item.route)}
+            className="flex items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-2 cursor-pointer active:bg-muted/50 transition-colors"
+            onClick={() => navigate(item.actionRoute)}
           >
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-0.5">
-                <Badge variant="outline" className="text-[10px] font-mono uppercase shrink-0">{item.type}</Badge>
-                <span className="text-[10px] text-muted-foreground">{item.age}</span>
+            {/* Left: queue chip + info */}
+            <div className="flex-1 min-w-0 space-y-0.5">
+              {/* Band 1: chip + ref + age */}
+              <div className="flex items-center gap-1.5">
+                <span className={cn(
+                  "inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none shrink-0 border",
+                  queueColors[item.queueType],
+                )}>
+                  {item.queueLabel}
+                </span>
+                {item.jobRef && (
+                  <span className="text-[10px] font-mono text-muted-foreground truncate">{item.jobRef}</span>
+                )}
+                <span className="text-[9px] text-muted-foreground shrink-0 ml-auto mr-1">{item.age}</span>
               </div>
-              <p className="text-sm font-medium text-foreground truncate">{item.label}</p>
-              {item.detail && <p className="text-xs text-muted-foreground truncate">{item.detail}</p>}
+
+              {/* Band 2: reg + route or title */}
+              <div className="flex items-center gap-1.5 min-w-0">
+                {item.vehicleReg && <UKPlate reg={item.vehicleReg} />}
+                {item.route && (
+                  <span className="text-[11px] text-muted-foreground truncate flex items-center gap-0.5">
+                    <MapPin className="h-2.5 w-2.5 shrink-0" /> {item.route}
+                  </span>
+                )}
+                {!item.vehicleReg && !item.route && (
+                  <span className="text-[11px] text-foreground truncate">{item.jobRef}</span>
+                )}
+              </div>
+
+              {/* Band 2b: driver state (for job items) */}
+              {item.jobId && (
+                <div className="flex items-center gap-1">
+                  {item.resolvedDriverName ? (
+                    <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                      <User className="h-2.5 w-2.5" /> {item.resolvedDriverName}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-warning font-medium flex items-center gap-0.5">
+                      <AlertTriangle className="h-2.5 w-2.5" /> Unassigned
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
+
+            {/* Right: dominant action */}
             <Button
               size="sm"
-              variant={item.type === "Unassigned" ? "default" : "outline"}
+              variant={queueActionVariants[item.queueType]}
               className={cn(
-                "min-h-[36px] text-xs shrink-0",
-                item.type === "Unassigned" && "bg-warning hover:bg-warning/90 text-warning-foreground"
+                "min-h-[34px] text-[11px] shrink-0 px-3",
+                item.queueType === "unassigned" && "bg-warning hover:bg-warning/90 text-warning-foreground",
               )}
               onClick={(e) => {
                 e.stopPropagation();
-                if (item.jobId && item.type === "Unassigned") {
-                  setAssignTarget({ jobId: item.jobId, jobRef: item.jobRef ?? "", driverId: item.driverId ?? null });
+                if (item.queueType === "unassigned" && item.jobId) {
+                  setAssignTarget({
+                    jobId: item.jobId,
+                    jobRef: item.jobRef ?? "",
+                    driverId: item.driverId ?? null,
+                  });
                 } else {
-                  navigate(item.route);
+                  navigate(item.actionRoute);
                 }
               }}
             >
+              {item.queueType === "unassigned" && <UserPlus className="h-3 w-3 mr-1" />}
+              {item.queueType === "pod_review" && <ClipboardCheck className="h-3 w-3 mr-1" />}
               {item.actionLabel}
             </Button>
           </div>
@@ -239,18 +374,85 @@ function NeedsActionPreview() {
   );
 }
 
-function humanAge(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(ms / 60000);
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
+// ── Tier 3: Live Operational Queue Previews ──────────────────────────
+
+function CompactJobRow({
+  job,
+  onView,
+  onAssign,
+}: {
+  job: AdminJobRow;
+  onView: () => void;
+  onAssign: () => void;
+}) {
+  const statusStyle = getStatusStyle(job.status);
+  const stale = isJobStale(job);
+  const unassigned = isUnassigned(job);
+
+  return (
+    <div
+      className="flex items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-2 cursor-pointer active:bg-muted/50 transition-colors"
+      onClick={onView}
+    >
+      <div className="flex-1 min-w-0 space-y-0.5">
+        <div className="flex items-center gap-1.5">
+          <span
+            style={{ backgroundColor: statusStyle.backgroundColor, color: statusStyle.color }}
+            className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none shrink-0"
+          >
+            {statusStyle.label}
+          </span>
+          <span className="text-[10px] font-mono text-muted-foreground truncate">
+            {job.external_job_number || job.id.slice(0, 8)}
+          </span>
+          {stale && (
+            <span className="text-[9px] text-warning font-medium flex items-center gap-0.5 shrink-0">
+              <Clock className="h-2.5 w-2.5" /> Stale
+            </span>
+          )}
+          <span className="text-[9px] text-muted-foreground shrink-0 ml-auto">{humanAge(job.updated_at)}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <UKPlate reg={job.vehicle_reg} />
+          <span className="text-[11px] text-muted-foreground truncate">
+            {job.pickup_postcode} → {job.delivery_postcode}
+          </span>
+        </div>
+        {unassigned ? (
+          <span className="text-[10px] text-warning font-medium flex items-center gap-0.5">
+            <AlertTriangle className="h-2.5 w-2.5" /> Unassigned
+          </span>
+        ) : (
+          <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+            <User className="h-2.5 w-2.5" /> {job.resolvedDriverName}
+          </span>
+        )}
+      </div>
+
+      {/* One dominant action */}
+      {unassigned ? (
+        <Button
+          size="sm"
+          className="min-h-[34px] text-[11px] shrink-0 px-3 bg-warning hover:bg-warning/90 text-warning-foreground"
+          onClick={(e) => { e.stopPropagation(); onAssign(); }}
+        >
+          <UserPlus className="h-3 w-3 mr-1" /> Assign
+        </Button>
+      ) : (
+        <Button
+          size="sm"
+          variant="outline"
+          className="min-h-[34px] text-[11px] shrink-0 px-3"
+          onClick={(e) => { e.stopPropagation(); onView(); }}
+        >
+          <Eye className="h-3 w-3 mr-1" /> View
+        </Button>
+      )}
+    </div>
+  );
 }
 
-/* ─── Queue Preview ────────────────────────────────────────────── */
-
-function QueuePreview({
+function QueuePreviewSection({
   title,
   count,
   items,
@@ -270,40 +472,46 @@ function QueuePreview({
 
   if (loading) {
     return (
-      <section className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-        </div>
-        {[1, 2].map(i => <Skeleton key={i} className="h-20 w-full rounded-xl" />)}
+      <section className="space-y-1.5">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">{title}</h3>
+        {[1, 2].map(i => <Skeleton key={i} className="h-14 w-full rounded-lg" />)}
       </section>
     );
   }
 
+  const displayCount = count ?? items.length;
+
   return (
-    <section className="space-y-2">
+    <section className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
           {title}
-          {(count ?? items.length) > 0 && (
-            <Badge variant="secondary" className="text-[10px]">{count ?? items.length}</Badge>
+          {displayCount > 0 && (
+            <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4">{displayCount}</Badge>
           )}
         </h3>
-        <Button variant="ghost" size="sm" onClick={onViewAll} className="text-xs text-muted-foreground h-7 gap-1">
+        <button onClick={onViewAll} className="text-[11px] text-muted-foreground flex items-center gap-0.5 active:text-foreground">
           View all <ChevronRight className="h-3 w-3" />
-        </Button>
+        </button>
       </div>
+
       {items.length === 0 ? (
-        <p className="text-xs text-muted-foreground py-4 text-center">{emptyText}</p>
+        <p className="text-[11px] text-muted-foreground py-3 text-center">{emptyText}</p>
       ) : (
-        items.slice(0, 3).map(job => (
-          <AdminJobCard
-            key={job.id}
-            job={job}
-            onView={() => navigate(`/jobs/${job.id}`)}
-            onAssign={() => setAssignTarget({ jobId: job.id, jobRef: job.external_job_number || job.id.slice(0, 8), driverId: job.driver_id })}
-            onPod={() => navigate(`/jobs/${job.id}/pod`)}
-          />
-        ))
+        <div className="space-y-1">
+          {items.slice(0, 3).map(job => (
+            <CompactJobRow
+              key={job.id}
+              job={job}
+              onView={() => navigate(`/jobs/${job.id}`)}
+              onAssign={() => setAssignTarget({
+                jobId: job.id,
+                jobRef: job.external_job_number || job.id.slice(0, 8),
+                driverId: job.driver_id,
+              })}
+            />
+          ))}
+        </div>
       )}
 
       {assignTarget && (
@@ -319,45 +527,39 @@ function QueuePreview({
   );
 }
 
-/* ─── Quick Routes ─────────────────────────────────────────────── */
+// ── Tier 4: Management Routes ────────────────────────────────────────
 
-function QuickRoutes() {
+function ManagementRoutes() {
   const navigate = useNavigate();
 
+  const routes = [
+    { label: "Jobs Queue", icon: Truck, path: "/admin/jobs" },
+    { label: "Drivers", icon: Users, path: "/control/drivers" },
+    { label: "POD Review", icon: ClipboardCheck, path: "/control/pod-review" },
+    { label: "Finance", icon: Receipt, path: "/control/finance" },
+  ];
+
   return (
-    <section>
-      <h3 className="text-sm font-semibold text-foreground mb-2">Quick Access</h3>
-      <div className="grid grid-cols-2 gap-3">
-        <DashboardCard
-          icon={<Truck className="w-5 h-5 stroke-[2]" />}
-          title="Jobs Queue"
-          subtitle="Manage all jobs"
-          onClick={() => navigate("/control/jobs")}
-        />
-        <DashboardCard
-          icon={<Users className="w-5 h-5 stroke-[2]" />}
-          title="Drivers"
-          subtitle="Fleet & workload"
-          onClick={() => navigate("/control/drivers")}
-        />
-        <DashboardCard
-          icon={<ClipboardCheck className="w-5 h-5 stroke-[2]" />}
-          title="POD Review"
-          subtitle="Closure workflow"
-          onClick={() => navigate("/control/pod-review")}
-        />
-        <DashboardCard
-          icon={<Receipt className="w-5 h-5 stroke-[2]" />}
-          title="Finance"
-          subtitle="Expenses & invoices"
-          onClick={() => navigate("/control/finance")}
-        />
+    <section className="space-y-1.5">
+      <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Management</h3>
+      <div className="grid grid-cols-2 gap-1.5">
+        {routes.map(r => (
+          <button
+            key={r.path}
+            onClick={() => navigate(r.path)}
+            className="flex items-center gap-2.5 rounded-lg border border-border bg-card px-3 py-2.5 text-left active:bg-muted/50 transition-colors"
+          >
+            <r.icon className="h-4 w-4 text-muted-foreground shrink-0" />
+            <span className="text-[12px] font-medium text-foreground">{r.label}</span>
+            <ChevronRight className="h-3 w-3 text-muted-foreground ml-auto" />
+          </button>
+        ))}
       </div>
     </section>
   );
 }
 
-/* ─── Main Dashboard ───────────────────────────────────────────── */
+// ── Main Page ────────────────────────────────────────────────────────
 
 export const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -376,42 +578,45 @@ export const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <AppHeader title="Admin Dashboard" showBack onBack={() => navigate("/")} />
+      <AppHeader title="Admin" showBack onBack={() => navigate("/")} />
 
-      <div className="p-4 max-w-lg mx-auto space-y-5">
-        {/* 1. Intervention KPI Band */}
+      <div className="p-3 max-w-lg mx-auto space-y-4">
+        {/* Tier 1 — Intervention KPIs */}
         <InterventionKpis />
 
-        <Separator />
+        {/* Tier 2 — Ranked Needs Action (primary section) */}
+        <NeedsActionQueue />
 
-        {/* 2. Needs Action (unified top priority items) */}
-        <NeedsActionPreview />
+        {/* Tier 3 — Live Queue Previews */}
+        <div className="space-y-3">
+          <QueuePreviewSection
+            title="Unassigned"
+            count={queues?.unassigned?.length}
+            items={queues?.unassigned ?? []}
+            loading={isLoading}
+            emptyText="All jobs assigned."
+            onViewAll={() => navigate("/admin/jobs")}
+          />
+          <QueuePreviewSection
+            title="In Progress"
+            count={queues?.inProgress?.length}
+            items={queues?.inProgress ?? []}
+            loading={isLoading}
+            emptyText="No active jobs."
+            onViewAll={() => navigate("/control/jobs?status=active")}
+          />
+          <QueuePreviewSection
+            title="POD Review"
+            count={queues?.review?.length}
+            items={queues?.review ?? []}
+            loading={isLoading}
+            emptyText="No PODs pending."
+            onViewAll={() => navigate("/control/pod-review")}
+          />
+        </div>
 
-        <Separator />
-
-        {/* 3. Queue Previews */}
-        <QueuePreview
-          title="Unassigned Jobs"
-          count={queues?.unassigned?.length}
-          items={queues?.unassigned ?? []}
-          loading={isLoading}
-          emptyText="All jobs are assigned."
-          onViewAll={() => navigate("/control/jobs?status=unassigned")}
-        />
-
-        <QueuePreview
-          title="In Progress"
-          count={queues?.inProgress?.length}
-          items={queues?.inProgress ?? []}
-          loading={isLoading}
-          emptyText="No jobs in progress."
-          onViewAll={() => navigate("/control/jobs?status=active")}
-        />
-
-        <Separator />
-
-        {/* 4. Quick Routes */}
-        <QuickRoutes />
+        {/* Tier 4 — Management Routes */}
+        <ManagementRoutes />
       </div>
 
       <BottomNav />
