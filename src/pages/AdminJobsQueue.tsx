@@ -11,12 +11,13 @@
  *   4. Completed — recent terminal jobs
  */
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { AdminJobCard, type AdminJobRow } from "@/components/AdminJobCard";
+import { isJobStale } from "@/features/control/pages/jobs/jobsUtils";
 import { useAdminJobQueues, useAdminJobQueueKpis } from "@/hooks/useAdminJobQueues";
 import { AssignDriverModal } from "@/features/control/components/AssignDriverModal";
 import { Button } from "@/components/ui/button";
@@ -26,11 +27,12 @@ import {
   UserX, Clock,
 } from "lucide-react";
 
-type QueueFilter = "all" | "attention" | "unassigned" | "in_progress" | "review" | "completed";
+type QueueFilter = "all" | "attention" | "stale" | "unassigned" | "in_progress" | "review" | "completed";
 
 const FILTERS: { value: QueueFilter; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { value: "all", label: "All", icon: Truck },
   { value: "attention", label: "Attention", icon: AlertTriangle },
+  { value: "stale", label: "Stale", icon: Clock },
   { value: "unassigned", label: "Unassigned", icon: UserX },
   { value: "in_progress", label: "Active", icon: Truck },
   { value: "review", label: "Review", icon: ClipboardCheck },
@@ -43,8 +45,9 @@ export function AdminJobsQueue() {
   const { data: queues, isLoading, error } = useAdminJobQueues();
   const { data: kpis } = useAdminJobQueueKpis();
   const initialFilter = (searchParams.get("filter") as QueueFilter) || "all";
+  const validFilters: QueueFilter[] = ["all", "attention", "stale", "unassigned", "in_progress", "review", "completed"];
   const [filter, setFilter] = useState<QueueFilter>(
-    ["all", "attention", "in_progress", "review", "completed", "unassigned"].includes(initialFilter) ? initialFilter : "all"
+    validFilters.includes(initialFilter) ? initialFilter : "all"
   );
   const [search, setSearch] = useState("");
   const [assignTarget, setAssignTarget] = useState<{
@@ -138,6 +141,17 @@ export function AdminJobsQueue() {
                 iconClass="text-warning"
                 jobs={filterJobs(queues.needsAttention)}
                 emptyText="No jobs need attention."
+                actions={actions}
+              />
+            )}
+
+            {filter === "stale" && (
+              <QueueSection
+                title="Stale Jobs"
+                icon={Clock}
+                iconClass="text-warning"
+                jobs={filterJobs(queues.needsAttention.filter(j => isJobStale(j)))}
+                emptyText="No stale jobs."
                 actions={actions}
               />
             )}

@@ -111,7 +111,7 @@ function InterventionKpis() {
         icon={Clock}
         variant={(kpis?.stale ?? 0) > 0 ? "warning" : "default"}
         loading={isLoading}
-        onClick={() => navigate("/admin/jobs?filter=attention")}
+        onClick={() => navigate("/admin/jobs?filter=stale")}
       />
       <KpiPill
         label="POD Review"
@@ -127,7 +127,7 @@ function InterventionKpis() {
         icon={ImageOff}
         variant={(missingEvidence ?? 0) > 0 ? "destructive" : "default"}
         loading={evidenceLoading}
-        onClick={() => navigate("/admin/jobs?filter=attention")}
+        onClick={() => navigate("/admin/jobs?filter=review")}
       />
     </div>
   );
@@ -603,7 +603,7 @@ export const AdminDashboard = () => {
             items={(queues?.needsAttention ?? []).filter(j => isJobStale(j))}
             loading={isLoading}
             emptyText="No stale jobs."
-            onViewAll={() => navigate("/admin/jobs?filter=attention")}
+            onViewAll={() => navigate("/admin/jobs?filter=stale")}
           />
           <QueuePreviewSection
             title="Awaiting Review"
