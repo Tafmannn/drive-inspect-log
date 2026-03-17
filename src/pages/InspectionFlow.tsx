@@ -965,30 +965,6 @@ export const InspectionFlow = () => {
         !!formState.customerName &&
         customerSigned);
 
-    // Checklist items for the review – only shown for pickup type
-    const REVIEW_CHECKLIST = [
-      { field: "vehicleCondition" as const, label: "Vehicle Condition" },
-      { field: "lightCondition" as const, label: "Light Condition" },
-      { field: "oilLevel" as const, label: "Oil Level" },
-      { field: "waterLevel" as const, label: "Water Level" },
-      { field: "handbook" as const, label: "Handbook" },
-      { field: "serviceBook" as const, label: "Service Book" },
-      { field: "mot" as const, label: "MOT" },
-      { field: "v5" as const, label: "V5" },
-      { field: "parcelShelf" as const, label: "Parcel Shelf" },
-      { field: "spareWheel" as const, label: "Spare Wheel" },
-      { field: "toolKit" as const, label: "Tool Kit" },
-      { field: "tyreInflationKit" as const, label: "Tyre Inflation Kit" },
-      { field: "lockingWheelNut" as const, label: "Locking Wheel Nut" },
-      { field: "satNavWorking" as const, label: "Sat Nav Working" },
-      { field: "alloysOrTrims" as const, label: "Alloys / Trims" },
-      { field: "alloysDamaged" as const, label: "Alloys Damaged" },
-      { field: "wheelTrimsDamaged" as const, label: "Wheel Trims Damaged" },
-      { field: "numberOfKeys" as const, label: "Number of Keys" },
-      { field: "evChargingCables" as const, label: "EV Charging Cables" },
-      { field: "aerial" as const, label: "Aerial" },
-      { field: "customerPaperwork" as const, label: "Customer Paperwork" },
-    ];
 
     // For delivery review, show the saved pickup checklist from the job data
     const savedPickup = job?.inspections?.find((i) => i.type === "pickup") ?? null;
