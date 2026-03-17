@@ -126,3 +126,4 @@ export function useDriversKpis() {
     },
     staleTime: 60_000,
   });
+}
