@@ -1,6 +1,7 @@
 import { Search, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useControlAccess } from "../hooks/useControlAccess";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 export function ControlTopbar({
   title,
@@ -15,9 +16,7 @@ export function ControlTopbar({
     <header className="h-14 shrink-0 border-b bg-card flex items-center justify-between px-6 gap-4">
       {/* Left: breadcrumb / title */}
       <div className="flex items-center gap-3 min-w-0">
-        {title && (
-          <span className="text-sm font-medium text-foreground truncate">{title}</span>
-        )}
+        <Breadcrumbs compact />
       </div>
 
       {/* Right: actions */}

@@ -1,5 +1,6 @@
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 interface AppHeaderProps {
   title?: string;
@@ -35,6 +36,10 @@ export const AppHeader = ({
           <span className="text-[14px] font-semibold text-white tracking-tight">Axentra Vehicles</span>
         </button>
         <span className="text-[11px] text-white/60 font-medium">Driver App</span>
+      </div>
+      {/* Breadcrumb trail */}
+      <div className="px-4 py-1.5 border-b border-border bg-muted/50">
+        <Breadcrumbs compact />
       </div>
       {/* Page header */}
       <header className="px-4 py-3 border-b border-border bg-card flex items-center justify-between min-h-[56px]">
