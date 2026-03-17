@@ -24,16 +24,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   AlertTriangle, Truck, ClipboardCheck, CheckCircle, Search,
-  UserX, Clock,
+  UserX, Clock, ImageOff,
 } from "lucide-react";
 
-type QueueFilter = "all" | "attention" | "stale" | "unassigned" | "in_progress" | "review" | "completed";
+type QueueFilter = "all" | "attention" | "stale" | "unassigned" | "evidence" | "in_progress" | "review" | "completed";
 
 const FILTERS: { value: QueueFilter; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { value: "all", label: "All", icon: Truck },
   { value: "attention", label: "Attention", icon: AlertTriangle },
   { value: "stale", label: "Stale", icon: Clock },
   { value: "unassigned", label: "Unassigned", icon: UserX },
+  { value: "evidence", label: "Evidence", icon: ImageOff },
   { value: "in_progress", label: "Active", icon: Truck },
   { value: "review", label: "Review", icon: ClipboardCheck },
   { value: "completed", label: "Done", icon: CheckCircle },
