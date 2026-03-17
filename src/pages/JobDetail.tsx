@@ -284,14 +284,16 @@ export const JobDetail = () => {
           <InspectionRow
             label="Pickup Inspection"
             done={!!pickupInspection}
-            onAction={isBlocked ? undefined : () => navigate(withFrom(`/inspection/${job.id}/pickup`, searchParams))}
+            onAction={() => navigate(withFrom(`/inspection/${job.id}/pickup`, searchParams))}
             actionIcon={ClipboardCheck}
+            warning={isBlocked ? execEval.reason : undefined}
           />
           <InspectionRow
             label="Delivery Inspection"
             done={!!deliveryInspection}
-            onAction={(isBlocked || isReviewOnly) ? undefined : () => navigate(withFrom(`/inspection/${job.id}/delivery`, searchParams))}
+            onAction={() => navigate(withFrom(`/inspection/${job.id}/delivery`, searchParams))}
             actionIcon={Truck}
+            warning={isBlocked || isReviewOnly ? (execEval.reason || "Awaiting review") : undefined}
           />
         </Section>
 
