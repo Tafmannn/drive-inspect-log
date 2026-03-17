@@ -674,21 +674,25 @@ export const PodReport = () => {
                     label="Pickup Driver"
                     name={pickup?.inspected_by_name}
                     url={resolvedSignatures["pickup_driver"] ?? null}
+                    slot="pickup_driver"
                   />
                   <SignatureCard
                     label="Pickup Customer"
                     name={pickup?.customer_name}
                     url={resolvedSignatures["pickup_customer"] ?? null}
+                    slot="pickup_customer"
                   />
                   <SignatureCard
                     label="Delivery Driver"
                     name={delivery?.inspected_by_name}
                     url={resolvedSignatures["delivery_driver"] ?? null}
+                    slot="delivery_driver"
                   />
                   <SignatureCard
                     label="Delivery Customer"
                     name={delivery?.customer_name}
                     url={resolvedSignatures["delivery_customer"] ?? null}
+                    slot="delivery_customer"
                   />
                 </div>
               </Card>
