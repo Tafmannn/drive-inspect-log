@@ -757,6 +757,7 @@ async function handlePull(
         const { data: existing } = await supabase
           .from("jobs")
           .select("id")
+          .eq("org_id", orgId)
           .or(`sheet_job_id.eq.${jobPayload.external_job_number},external_job_number.eq.${jobPayload.external_job_number}`)
           .maybeSingle();
         
