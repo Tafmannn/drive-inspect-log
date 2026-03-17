@@ -27,7 +27,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 export const Dashboard = () => {
   const navigate = useNavigate();
-  const { data: counts, isLoading } = useDashboardCounts();
+  const { data: counts, isLoading } = useDashboardCounts(gate.isDriverOnly ? gate.driverProfileId : undefined);
   const { isAdmin, isSuperAdmin } = useAuth();
   const gate = useDriverGate();
   const [exporting, setExporting] = useState(false);
