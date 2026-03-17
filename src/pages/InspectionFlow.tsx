@@ -1443,16 +1443,18 @@ export const InspectionFlow = () => {
 
 
   const renderCurrentStep = () => {
-    // Clear previous step error on re-render attempt
     try {
-      setStepError(null);
       return type === "pickup"
         ? renderPickupStep(currentStep)
         : renderDeliveryStep(currentStep);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Unknown error";
       console.error("InspectionFlow step render error:", e);
-      setStepError(msg);
+      // Only set error state if not already showing an error (avoid re-render loop)
+      if (!stepError) {
+        // Use queueMicrotask to avoid setState during render
+        queueMicrotask(() => setStepError(msg));
+      }
       return null;
     }
   };
