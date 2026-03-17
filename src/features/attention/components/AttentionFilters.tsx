@@ -1,8 +1,14 @@
+/**
+ * Attention Filters — compact mobile-first filter bar.
+ * Severity chips, category dropdown, org filter (global only), refresh.
+ * Date fields removed to reduce clutter on mobile.
+ */
+
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
 import { RefreshCw } from "lucide-react";
-import type { AttentionFiltersState } from "../types/exceptionTypes";
+import type { AttentionFiltersState, ExceptionSeverity } from "../types/exceptionTypes";
+import { cn } from "@/lib/utils";
 
 interface Props {
   filters: AttentionFiltersState;
@@ -13,40 +19,56 @@ interface Props {
   orgs: { id: string; name: string }[];
 }
 
+const SEVERITY_OPTIONS: { label: string; value: ExceptionSeverity | "all" }[] = [
+  { label: "All", value: "all" },
+  { label: "Critical", value: "critical" },
+  { label: "High", value: "high" },
+  { label: "Medium", value: "medium" },
+  { label: "Low", value: "low" },
+];
+
 export function AttentionFilters({ filters, onChange, onRefresh, refreshing, showOrgFilter, orgs }: Props) {
   const set = (partial: Partial<AttentionFiltersState>) => onChange({ ...filters, ...partial });
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Select value={filters.severity} onValueChange={v => set({ severity: v as any })}>
-        <SelectTrigger className="w-[120px] min-h-[40px] text-sm">
-          <SelectValue placeholder="Severity" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All severity</SelectItem>
-          <SelectItem value="critical">Critical</SelectItem>
-          <SelectItem value="high">High</SelectItem>
-          <SelectItem value="medium">Medium</SelectItem>
-          <SelectItem value="low">Low</SelectItem>
-        </SelectContent>
-      </Select>
+      {/* Severity chips */}
+      <div className="flex gap-1 flex-wrap">
+        {SEVERITY_OPTIONS.map(opt => (
+          <Button
+            key={opt.value}
+            size="sm"
+            variant={filters.severity === opt.value ? "default" : "outline"}
+            className={cn(
+              "text-xs h-8 px-2.5",
+              filters.severity === opt.value && opt.value === "critical" && "bg-destructive hover:bg-destructive/90",
+              filters.severity === opt.value && opt.value === "high" && "bg-destructive/80 hover:bg-destructive/70",
+            )}
+            onClick={() => set({ severity: opt.value })}
+          >
+            {opt.label}
+          </Button>
+        ))}
+      </div>
 
+      {/* Category dropdown */}
       <Select value={filters.category} onValueChange={v => set({ category: v as any })}>
-        <SelectTrigger className="w-[120px] min-h-[40px] text-sm">
+        <SelectTrigger className="w-[120px] h-8 text-xs">
           <SelectValue placeholder="Category" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All categories</SelectItem>
-          <SelectItem value="timing">Timing</SelectItem>
-          <SelectItem value="evidence">Evidence</SelectItem>
-          <SelectItem value="sync">Sync</SelectItem>
-          <SelectItem value="state">State</SelectItem>
+          <SelectItem value="timing">⏱ Timing</SelectItem>
+          <SelectItem value="evidence">📎 Evidence</SelectItem>
+          <SelectItem value="sync">🔄 Sync</SelectItem>
+          <SelectItem value="state">🔒 State</SelectItem>
         </SelectContent>
       </Select>
 
+      {/* Org filter (global only) */}
       {showOrgFilter && (
         <Select value={filters.orgId} onValueChange={v => set({ orgId: v })}>
-          <SelectTrigger className="w-[160px] min-h-[40px] text-sm">
+          <SelectTrigger className="w-[140px] h-8 text-xs">
             <SelectValue placeholder="Organisation" />
           </SelectTrigger>
           <SelectContent>
@@ -56,23 +78,9 @@ export function AttentionFilters({ filters, onChange, onRefresh, refreshing, sho
         </Select>
       )}
 
-      <Input
-        type="date"
-        className="w-[140px] min-h-[40px] text-sm"
-        value={filters.dateFrom}
-        onChange={e => set({ dateFrom: e.target.value })}
-        placeholder="From"
-      />
-      <Input
-        type="date"
-        className="w-[140px] min-h-[40px] text-sm"
-        value={filters.dateTo}
-        onChange={e => set({ dateTo: e.target.value })}
-        placeholder="To"
-      />
-
-      <Button variant="outline" size="sm" className="min-h-[40px]" onClick={onRefresh} disabled={refreshing}>
-        <RefreshCw className={`w-4 h-4 mr-1 ${refreshing ? "animate-spin" : ""}`} /> Refresh
+      {/* Refresh */}
+      <Button variant="outline" size="sm" className="h-8 ml-auto" onClick={onRefresh} disabled={refreshing}>
+        <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
       </Button>
     </div>
   );
