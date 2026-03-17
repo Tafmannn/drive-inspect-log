@@ -168,7 +168,7 @@ function actionsCol(acts: RowActions): CompactColumn<DispatchBoardRow> {
             <UserPlus className="h-3 w-3 mr-0.5" /> Reassign
           </Button>
         )}
-        {canReviewPod(r as any) && (
+        {canReviewPod(r) && (
           <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2 text-info"
             onClick={(e) => { e.stopPropagation(); acts.onPod(r); }}>
             <ClipboardCheck className="h-3 w-3 mr-0.5" /> POD
