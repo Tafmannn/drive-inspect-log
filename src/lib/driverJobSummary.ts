@@ -52,6 +52,7 @@ export interface DriverJobSummary {
   job_id: string;
   job_ref: string;
   vehicle_reg: string;
+  client_name: string;
 
   // Derived states
   workflow_state: WorkflowState;
@@ -65,6 +66,14 @@ export interface DriverJobSummary {
   delivery_postcode: string;
   pickup_company: string | null;
   delivery_company: string | null;
+
+  // Full contacts (both sides always visible)
+  pickup_contact_name: string;
+  pickup_contact_phone: string;
+  pickup_address_full: string;
+  delivery_contact_name: string;
+  delivery_contact_phone: string;
+  delivery_address_full: string;
 
   // Current-phase contact
   current_contact_name: string;
