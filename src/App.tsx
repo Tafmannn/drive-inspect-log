@@ -19,6 +19,7 @@ import { PendingUploads } from "./pages/PendingUploads";
 import { Expenses } from "./pages/Expenses";
 import { ExpenseForm } from "./pages/ExpenseForm";
 import { AdminDashboard } from "./pages/AdminDashboard";
+import { AdminJobsQueue } from "./pages/AdminJobsQueue";
 import { Timesheets } from "./pages/Timesheets";
 import { AdminUsers } from "./pages/AdminUsers";
 import { SuperAdminDashboard } from "./pages/SuperAdminDashboard";
