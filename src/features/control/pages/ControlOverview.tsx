@@ -383,7 +383,7 @@ export function ControlOverview() {
             data={completed ?? []}
             loading={completedLoading}
             emptyMessage="No recent completions."
-            onRowClick={(row) => navigate(`/jobs/${row.id}`)}
+            onRowClick={(row) => navigate(`/jobs/${row.id}?from=/control`)}
             maxRows={8}
           />
         </ControlSection>
