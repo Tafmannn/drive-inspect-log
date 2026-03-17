@@ -75,6 +75,7 @@ export async function listExpenses(filters?: {
   let query = supabase
     .from('expenses')
     .select('*')
+    .eq('is_hidden', false)
     .order('date', { ascending: false })
     .order('created_at', { ascending: false });
 
