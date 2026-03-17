@@ -82,7 +82,6 @@ export function DriverGateScreen({ gateStatus }: { gateStatus: Exclude<DriverGat
         </Button>
       </div>
 
-      <BottomNav />
     </div>
   );
 }
