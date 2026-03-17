@@ -1,0 +1,1 @@
+UPDATE public.user_profiles SET is_protected = true WHERE lower(email) = 'info@axentravehicles.com';
