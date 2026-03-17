@@ -1,13 +1,15 @@
 /**
  * My Jobs — Ranked execution launcher.
- * Two-stage lattice: partition → sort → CTA governed by executable state.
+ * Driver-scoped: only shows jobs assigned to the current driver.
+ * Admin/SuperAdmin: shows all active jobs (existing behavior).
  */
 import { useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { useNavigate } from "react-router-dom";
 import { useActiveJobs } from "@/hooks/useJobs";
-import { Plus } from "lucide-react";
+import { useDriverGate } from "@/hooks/useDriverGate";
+import { Plus, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { LauncherCard } from "@/components/LauncherCard";
@@ -17,14 +19,12 @@ import { logDeviation } from "@/lib/deviationApi";
 import { useAuth } from "@/context/AuthContext";
 
 function getJobCta(job: RankedJob): { label: string; route: string } {
-  // Blocked/review_only → view only
   if (job.executable_state === "blocked") {
     return { label: "View Job", route: `/jobs/${job.id}` };
   }
   if (job.executable_state === "review_only") {
     return { label: "View POD", route: `/jobs/${job.id}/pod` };
   }
-  // Executable → derive from workflow step
   if (!job.has_pickup_inspection) return { label: "Start Pickup", route: `/inspection/${job.id}/pickup` };
   if (!job.has_delivery_inspection) return { label: "Start Delivery", route: `/inspection/${job.id}/delivery` };
   return { label: "View POD", route: `/jobs/${job.id}/pod` };
@@ -32,24 +32,27 @@ function getJobCta(job: RankedJob): { label: string; route: string } {
 
 export const JobList = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isAdmin, isSuperAdmin } = useAuth();
+  const gate = useDriverGate();
   const { data: jobs, isLoading } = useActiveJobs();
   const [deviation, setDeviation] = useState<{
     targetJob: RankedJob;
     recommendedJob: RankedJob;
   } | null>(null);
 
-  // Exclude terminal from driver view
-  const rankedJobs = jobs ? rankJobs(jobs).filter(j => j.execution_class !== "terminal") : [];
+  // Scope jobs for driver-only users: only show jobs assigned to their driver profile
+  const allRanked = jobs ? rankJobs(jobs).filter(j => j.execution_class !== "terminal") : [];
+  const rankedJobs = (gate.isDriverOnly && gate.driverProfileId)
+    ? allRanked.filter(j => j.driver_id === gate.driverProfileId)
+    : allRanked;
+
+  const isDriverOnly = gate.isDriverOnly;
 
   const handleJobAction = (job: RankedJob) => {
-    // Blocked jobs → no deviation prompt, just navigate to view
     if (job.executable_state !== "executable") {
       navigate(getJobCta(job).route);
       return;
     }
-
-    // Check for sequence deviation: only if target is executable and there's a clear recommended
     const recommended = rankedJobs.find(j => j.is_next_recommended);
     if (
       recommended &&
@@ -60,7 +63,6 @@ export const JobList = () => {
       setDeviation({ targetJob: job, recommendedJob: recommended });
       return;
     }
-
     navigate(getJobCta(job).route);
   };
 
@@ -74,9 +76,7 @@ export const JobList = () => {
         notes: notes || undefined,
         driverId: user?.id,
       });
-    } catch {
-      // Non-blocking
-    }
+    } catch { /* Non-blocking */ }
     const cta = getJobCta(deviation.targetJob);
     setDeviation(null);
     navigate(cta.route);
@@ -85,14 +85,17 @@ export const JobList = () => {
   return (
     <div className="min-h-screen bg-background pb-20">
       <AppHeader title="My Jobs" showBack onBack={() => navigate("/")}>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="min-h-[44px] min-w-[44px] text-muted-foreground hover:bg-muted"
-          onClick={() => navigate("/jobs/new")}
-        >
-          <Plus className="w-6 h-6 stroke-[2]" />
-        </Button>
+        {/* Only admins can create jobs */}
+        {(isAdmin || isSuperAdmin) && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="min-h-[44px] min-w-[44px] text-muted-foreground hover:bg-muted"
+            onClick={() => navigate("/jobs/new")}
+          >
+            <Plus className="w-6 h-6 stroke-[2]" />
+          </Button>
+        )}
       </AppHeader>
 
       <div className="p-4 max-w-lg mx-auto">
@@ -100,10 +103,21 @@ export const JobList = () => {
 
         {!isLoading && rankedJobs.length === 0 && (
           <div className="text-center py-12 space-y-4">
-            <p className="text-[14px] text-muted-foreground">No active jobs found.</p>
-            <Button onClick={() => navigate("/jobs/new")} className="min-h-[44px] rounded-lg">
-              Create Job
-            </Button>
+            <Truck className="w-12 h-12 mx-auto text-muted-foreground stroke-[1.5]" />
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-foreground">No jobs assigned</p>
+              <p className="text-[13px] text-muted-foreground">
+                {isDriverOnly
+                  ? "Your admin will assign work when ready."
+                  : "No active jobs found."
+                }
+              </p>
+            </div>
+            {(isAdmin || isSuperAdmin) && (
+              <Button onClick={() => navigate("/jobs/new")} className="min-h-[44px] rounded-lg">
+                Create Job
+              </Button>
+            )}
           </div>
         )}
 

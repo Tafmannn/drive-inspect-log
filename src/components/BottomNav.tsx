@@ -1,8 +1,9 @@
 import { Home, Briefcase, Upload, User } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
 
-const tabs = [
+const driverTabs = [
   { icon: Home, label: "Dashboard", path: "/" },
   { icon: Briefcase, label: "Jobs", path: "/jobs" },
   { icon: Upload, label: "Uploads", path: "/pending-uploads" },
@@ -12,6 +13,9 @@ const tabs = [
 export const BottomNav = () => {
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Always use the same tabs — routes themselves handle access control
+  const tabs = driverTabs;
 
   const isActive = (path: string) => {
     if (path === "/") return location.pathname === "/";

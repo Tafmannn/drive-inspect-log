@@ -155,12 +155,12 @@ const App = () => {
                 {/* ── Protected routes (flat) ── */}
                 <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                 <Route path="/jobs" element={<ProtectedRoute><JobList /></ProtectedRoute>} />
-                <Route path="/jobs/master" element={<ProtectedRoute><JobMasterList /></ProtectedRoute>} />
-                <Route path="/jobs/new" element={<ProtectedRoute><JobForm /></ProtectedRoute>} />
+                <Route path="/jobs/master" element={<ProtectedRoute><AdminRoute><JobMasterList /></AdminRoute></ProtectedRoute>} />
+                <Route path="/jobs/new" element={<ProtectedRoute><AdminRoute><JobForm /></AdminRoute></ProtectedRoute>} />
                 <Route path="/jobs/completed" element={<ProtectedRoute><CompletedJobs /></ProtectedRoute>} />
                 <Route path="/jobs/pending" element={<ProtectedRoute><PendingJobs /></ProtectedRoute>} />
                 <Route path="/jobs/:jobId" element={<ProtectedRoute><JobDetail /></ProtectedRoute>} />
-                <Route path="/jobs/:jobId/edit" element={<ProtectedRoute><JobForm /></ProtectedRoute>} />
+                <Route path="/jobs/:jobId/edit" element={<ProtectedRoute><AdminRoute><JobForm /></AdminRoute></ProtectedRoute>} />
                 <Route path="/jobs/:jobId/pod" element={<ProtectedRoute><PodReport /></ProtectedRoute>} />
                 <Route path="/inspection/:jobId/:inspectionType" element={<ProtectedRoute><InspectionFlow /></ProtectedRoute>} />
                 <Route path="/pending-uploads" element={<ProtectedRoute><PendingUploads /></ProtectedRoute>} />
