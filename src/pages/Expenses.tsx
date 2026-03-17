@@ -58,7 +58,10 @@ export const Expenses = () => {
   const pageTitle = isScoped ? `Expenses for Job ${jobRef}` : "Expenses";
 
   const handleBack = () => {
-    if (isScoped) {
+    const fromParam = resolveBackTarget(searchParams, "");
+    if (fromParam) {
+      navigate(fromParam);
+    } else if (isScoped) {
       navigate(`/jobs/${scopedJobId}`);
     } else {
       navigate("/");
