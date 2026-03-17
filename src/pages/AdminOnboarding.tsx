@@ -173,6 +173,7 @@ function OnboardingDetail({
         toast({ title: "Created" });
       }
       qc.invalidateQueries({ queryKey: ["admin-onboarding"] });
+      qc.invalidateQueries({ queryKey: ["admin-onboarding-detail"] });
       onBack();
     } catch (err) {
       toast({ title: "Save failed", description: err instanceof Error ? err.message : "Unknown error", variant: "destructive" });
