@@ -84,6 +84,7 @@ export interface Job {
   caz_ulez_flag: string | null;
   caz_ulez_cost: number | null;
   other_expenses: number | null;
+  driver_id: string | null;
   driver_name: string | null;
   driver_external_id: string | null;
   job_notes: string | null;

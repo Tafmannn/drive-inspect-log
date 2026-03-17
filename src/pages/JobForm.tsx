@@ -1,5 +1,6 @@
 // src/pages/JobForm.tsx
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
@@ -12,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 // Native select used instead of Radix Select to avoid BubbleSelect DOM crash
 import { useCreateJob, useUpdateJob, useJob } from "@/hooks/useJobs";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, MapPin, Navigation, Search } from "lucide-react";
+import { Loader2, MapPin, Navigation, Search, UserCheck, ChevronsUpDown, X } from "lucide-react";
 import { CAR_MAKES, getModelsForMake } from "@/lib/carData";
 import { isValidUkPostcode, calculateRoute, type RouteResult } from "@/lib/mapsApi";
 import { lookupVehicle } from "@/lib/vehicleLookupApi";
@@ -22,7 +23,8 @@ import { lookupPostcode, type AddressSuggestion } from "@/lib/postcodeApi";
 import { BusinessSearchInput } from "@/components/BusinessSearchInput";
 import { getPlaceDetails, type BusinessResult } from "@/lib/businessSearchApi";
 import { logClientEvent } from "@/lib/logger";
-
+import { supabase } from "@/integrations/supabase/client";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 type ErrorMap = Record<string, string>;
 
 interface JobFormDraft {
@@ -55,6 +57,41 @@ export const JobForm = () => {
   // For custom inputs, we use controlled values to avoid defaultValue conflicts
   const [customMakeValue, setCustomMakeValue] = useState("");
   const [customModelValue, setCustomModelValue] = useState("");
+
+  // Driver assignment state
+  const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
+  const [selectedDriverName, setSelectedDriverName] = useState<string | null>(null);
+  const [driverPickerOpen, setDriverPickerOpen] = useState(false);
+  const [driverSearch, setDriverSearch] = useState("");
+
+  // Fetch active drivers for picker
+  const { data: activeDrivers } = useQuery({
+    queryKey: ["job-form-drivers"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("driver_profiles")
+        .select("id, full_name, display_name, phone, is_active, trade_plate_number")
+        .eq("is_active", true)
+        .order("full_name", { ascending: true })
+        .limit(100);
+      if (error) throw error;
+      return data ?? [];
+    },
+    staleTime: 60_000,
+  });
+
+  const filteredDrivers = useMemo(() => {
+    if (!activeDrivers) return [];
+    if (!driverSearch.trim()) return activeDrivers;
+    const s = driverSearch.toLowerCase();
+    return activeDrivers.filter(
+      (d) =>
+        d.full_name.toLowerCase().includes(s) ||
+        d.display_name?.toLowerCase().includes(s) ||
+        d.phone?.toLowerCase().includes(s) ||
+        d.trade_plate_number?.toLowerCase().includes(s)
+    );
+  }, [activeDrivers, driverSearch]);
 
   // Autosave draft state
   const [showDraftPrompt, setShowDraftPrompt] = useState(false);
@@ -313,7 +350,7 @@ export const JobForm = () => {
     saveDraftFromForm();
   }, [triggerRouteCalc, saveDraftFromForm]);
 
-  // Sync make/model when editing once job is loaded
+  // Sync make/model + driver when editing once job is loaded
   useEffect(() => {
     if (isEdit && existingJob && !editHydrated.current) {
       editHydrated.current = true;
@@ -334,6 +371,12 @@ export const JobForm = () => {
       }
       if (!modelKnown) {
         setCustomModelValue(existingJob.vehicle_model);
+      }
+
+      // Hydrate driver assignment
+      if (existingJob.driver_id) {
+        setSelectedDriverId(existingJob.driver_id);
+        setSelectedDriverName(existingJob.driver_name ?? null);
       }
     }
   }, [isEdit, existingJob]);
@@ -426,6 +469,9 @@ export const JobForm = () => {
       delivery_notes: getStr(data, "delivery_notes") || null,
 
       earliest_delivery_date: getStr(data, "earliest_delivery_date") || null,
+      // Driver assignment — canonical FK + display name
+      driver_id: selectedDriverId ?? null,
+      driver_name: selectedDriverName ?? null,
       ...(routeResult?.valid ? {
         route_distance_miles: routeResult.distanceMiles,
         route_eta_minutes: routeResult.etaMinutes,
@@ -762,6 +808,96 @@ export const JobForm = () => {
                   className="mt-1"
                 />
               </div>
+            </div>
+          </div>
+
+          {/* DRIVER ASSIGNMENT */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-lg">Driver Assignment</h3>
+            <div>
+              <Label className="text-sm font-medium">Assign Driver</Label>
+              <Popover open={driverPickerOpen} onOpenChange={setDriverPickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={driverPickerOpen}
+                    className="w-full justify-between mt-1 font-normal"
+                  >
+                    {selectedDriverName ? (
+                      <span className="flex items-center gap-1.5">
+                        <UserCheck className="h-3.5 w-3.5 text-primary" />
+                        {selectedDriverName}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">No driver assigned</span>
+                    )}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                  <div className="p-2 border-b border-border">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                      <Input
+                        placeholder="Search drivers…"
+                        className="pl-7 h-8 text-xs"
+                        value={driverSearch}
+                        onChange={(e) => setDriverSearch(e.target.value)}
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+                  <div className="max-h-[200px] overflow-y-auto">
+                    {selectedDriverId && (
+                      <button
+                        type="button"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs hover:bg-muted/60 text-destructive border-b border-border"
+                        onClick={() => {
+                          setSelectedDriverId(null);
+                          setSelectedDriverName(null);
+                          setDriverPickerOpen(false);
+                          setDriverSearch("");
+                        }}
+                      >
+                        <X className="h-3 w-3" /> Remove driver
+                      </button>
+                    )}
+                    {filteredDrivers.length === 0 ? (
+                      <p className="text-xs text-muted-foreground text-center py-4">No active drivers found.</p>
+                    ) : (
+                      filteredDrivers.map((d) => {
+                        const label = d.display_name || d.full_name;
+                        const isSelected = d.id === selectedDriverId;
+                        return (
+                          <button
+                            type="button"
+                            key={d.id}
+                            className={`w-full flex items-center justify-between px-3 py-2 text-left text-xs transition-colors ${
+                              isSelected ? "bg-primary/10 font-medium" : "hover:bg-muted/60"
+                            }`}
+                            onClick={() => {
+                              setSelectedDriverId(d.id);
+                              setSelectedDriverName(label);
+                              setDriverPickerOpen(false);
+                              setDriverSearch("");
+                            }}
+                          >
+                            <div className="flex flex-col">
+                              <span className="text-foreground">{label}</span>
+                              <span className="text-[10px] text-muted-foreground">
+                                {[d.phone, d.trade_plate_number].filter(Boolean).join(" • ")}
+                              </span>
+                            </div>
+                            {isSelected && <UserCheck className="h-3.5 w-3.5 text-primary shrink-0" />}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
 
