@@ -25,6 +25,10 @@ import { AdminUsers } from "./pages/AdminUsers";
 import { AdminDrivers } from "./pages/AdminDrivers";
 import { AdminPodReview } from "./pages/AdminPodReview";
 import { SuperAdminDashboard } from "./pages/SuperAdminDashboard";
+import {
+  SuperAdminOrgs, SuperAdminUsers, SuperAdminJobs,
+  SuperAdminAudit, SuperAdminErrors, SuperAdminAttention, SuperAdminSettings,
+} from "./pages/SuperAdminPages";
 import { InvoiceGenerator } from "./pages/InvoiceGenerator";
 import { Profile } from "./pages/Profile";
 import { QrConfirm } from "./pages/QrConfirm";
@@ -173,8 +177,15 @@ const App = () => {
                 <Route path="/admin/pod-review" element={<ProtectedRoute><AdminRoute><AdminPodReview /></AdminRoute></ProtectedRoute>} />
 
 
-                {/* ── Super-admin-only route ── */}
+                {/* ── Super-admin-only routes ── */}
                 <Route path="/super-admin" element={<ProtectedRoute><SuperAdminRoute><SuperAdminDashboard /></SuperAdminRoute></ProtectedRoute>} />
+                <Route path="/super-admin/orgs" element={<ProtectedRoute><SuperAdminRoute><SuperAdminOrgs /></SuperAdminRoute></ProtectedRoute>} />
+                <Route path="/super-admin/users" element={<ProtectedRoute><SuperAdminRoute><SuperAdminUsers /></SuperAdminRoute></ProtectedRoute>} />
+                <Route path="/super-admin/jobs" element={<ProtectedRoute><SuperAdminRoute><SuperAdminJobs /></SuperAdminRoute></ProtectedRoute>} />
+                <Route path="/super-admin/audit" element={<ProtectedRoute><SuperAdminRoute><SuperAdminAudit /></SuperAdminRoute></ProtectedRoute>} />
+                <Route path="/super-admin/errors" element={<ProtectedRoute><SuperAdminRoute><SuperAdminErrors /></SuperAdminRoute></ProtectedRoute>} />
+                <Route path="/super-admin/attention" element={<ProtectedRoute><SuperAdminRoute><SuperAdminAttention /></SuperAdminRoute></ProtectedRoute>} />
+                <Route path="/super-admin/settings" element={<ProtectedRoute><SuperAdminRoute><SuperAdminSettings /></SuperAdminRoute></ProtectedRoute>} />
                 <Route path="/invoice/new" element={<ProtectedRoute><AdminRoute><InvoiceGenerator /></AdminRoute></ProtectedRoute>} />
                 <Route path="/invoice/new/:jobId" element={<ProtectedRoute><AdminRoute><InvoiceGenerator /></AdminRoute></ProtectedRoute>} />
 
