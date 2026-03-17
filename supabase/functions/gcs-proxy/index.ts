@@ -6,10 +6,33 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// ─── Rate limiter: 30 req/IP/min ───
+const ipHits = new Map<string, { count: number; resetAt: number }>();
+function rateLimit(req: Request): Response | null {
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const now = Date.now();
+  const entry = ipHits.get(ip);
+  if (!entry || now > entry.resetAt) {
+    ipHits.set(ip, { count: 1, resetAt: now + 60_000 });
+    return null;
+  }
+  entry.count++;
+  if (entry.count > 30) {
+    return new Response(JSON.stringify({ error: "RATE_LIMITED" }), {
+      status: 429,
+      headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "60" },
+    });
+  }
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const limited = rateLimit(req);
+  if (limited) return limited;
 
   try {
     const url = new URL(req.url);
@@ -21,12 +44,8 @@ serve(async (req) => {
       );
     }
 
-    // ─── Auth: accept header OR query param (for <img> tags) ───
-    let authHeader = req.headers.get("Authorization") ?? "";
-    const tokenParam = url.searchParams.get("token");
-    if (!authHeader && tokenParam) {
-      authHeader = `Bearer ${tokenParam}`;
-    }
+    // ─── Auth: Authorization header only (no ?token= param) ───
+    const authHeader = req.headers.get("Authorization") ?? "";
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -40,12 +59,21 @@ serve(async (req) => {
       });
     }
 
-    // org_id check — skip for super admins
-    const email = (authData.user.email ?? "").toLowerCase();
-    const isSuperAdmin = [
-      "axentravehiclelogistics@gmail.com",
-      "info@axentravehicles.com",
-    ].includes(email);
+    // Role-based superadmin check (no email whitelist)
+    const directRole = String(
+      authData.user.user_metadata?.role ?? authData.user.app_metadata?.role ?? ""
+    ).toLowerCase();
+    const roleSet = new Set(
+      [
+        ...((authData.user.user_metadata?.roles ?? []) as string[]),
+        ...((authData.user.app_metadata?.roles ?? []) as string[]),
+      ].map((r: string) => String(r).toUpperCase().replace(/-/g, "_"))
+    );
+    const isSuperAdmin =
+      directRole === "super_admin" ||
+      directRole === "superadmin" ||
+      roleSet.has("SUPERADMIN") ||
+      roleSet.has("SUPER_ADMIN");
 
     if (!isSuperAdmin) {
       const orgId =
@@ -59,7 +87,7 @@ serve(async (req) => {
       }
     }
 
-    // ─── Fetch from GCS ───
+    // ─── Generate GCS V4 signed URL and redirect ───
     const serviceAccountJson = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_JSON");
     if (!serviceAccountJson) {
       return new Response(
@@ -69,31 +97,15 @@ serve(async (req) => {
     }
 
     const sa = JSON.parse(serviceAccountJson);
-    const accessToken = await getAccessToken(sa);
     const bucket = "axentra_db";
+    const signedUrl = await generateV4SignedUrl(sa, bucket, objectPath, 900); // 15 min
 
-    const gcsUrl = `https://storage.googleapis.com/storage/v1/b/${bucket}/o/${encodeURIComponent(objectPath)}?alt=media`;
-    const gcsRes = await fetch(gcsUrl, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-
-    if (!gcsRes.ok) {
-      const errText = await gcsRes.text();
-      console.error("GCS proxy error:", gcsRes.status, errText);
-      return new Response(
-        JSON.stringify({ error: "Object not found or inaccessible", status: gcsRes.status }),
-        { status: gcsRes.status === 404 ? 404 : 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const contentType = gcsRes.headers.get("Content-Type") || "image/jpeg";
-    const body = await gcsRes.arrayBuffer();
-
-    return new Response(body, {
+    return new Response(null, {
+      status: 302,
       headers: {
         ...corsHeaders,
-        "Content-Type": contentType,
-        "Cache-Control": "public, max-age=86400, immutable",
+        Location: signedUrl,
+        "Cache-Control": "private, max-age=600",
       },
     });
   } catch (e: unknown) {
@@ -104,37 +116,72 @@ serve(async (req) => {
   }
 });
 
-// ─── Google Auth ───
-async function getAccessToken(sa: { client_email: string; private_key: string }): Promise<string> {
-  const now = Math.floor(Date.now() / 1000);
-  const header = { alg: "RS256", typ: "JWT" };
-  const payload = {
-    iss: sa.client_email,
-    scope: "https://www.googleapis.com/auth/devstorage.read_write",
-    aud: "https://oauth2.googleapis.com/token",
-    iat: now,
-    exp: now + 3600,
-  };
+// ─── GCS V4 Signed URL Generation ───
 
-  const enc = (obj: unknown) =>
-    btoa(JSON.stringify(obj)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+async function generateV4SignedUrl(
+  sa: { client_email: string; private_key: string },
+  bucket: string,
+  objectPath: string,
+  expiresInSeconds: number
+): Promise<string> {
+  const now = new Date();
+  const datestamp = now.toISOString().replace(/[-:T]/g, "").slice(0, 8);
+  const timestamp = datestamp + "T" + now.toISOString().replace(/[-:]/g, "").slice(9, 15) + "Z";
 
-  const unsigned = `${enc(header)}.${enc(payload)}`;
+  const credentialScope = `${datestamp}/auto/storage/goog4_request`;
+  const credential = `${sa.client_email}/${credentialScope}`;
+
+  const host = "storage.googleapis.com";
+  const canonicalUri = `/${bucket}/${objectPath.split("/").map(encodeURIComponent).join("/")}`;
+
+  const params = new URLSearchParams();
+  params.set("X-Goog-Algorithm", "GOOG4-RSA-SHA256");
+  params.set("X-Goog-Credential", credential);
+  params.set("X-Goog-Date", timestamp);
+  params.set("X-Goog-Expires", String(expiresInSeconds));
+  params.set("X-Goog-SignedHeaders", "host");
+
+  // Sort params for canonical query string
+  const sortedParams = new URLSearchParams([...params.entries()].sort());
+  const canonicalQueryString = sortedParams.toString();
+
+  const canonicalHeaders = `host:${host}\n`;
+  const signedHeaders = "host";
+
+  const canonicalRequest = [
+    "GET",
+    canonicalUri,
+    canonicalQueryString,
+    canonicalHeaders,
+    signedHeaders,
+    "UNSIGNED-PAYLOAD",
+  ].join("\n");
+
+  const stringToSign = [
+    "GOOG4-RSA-SHA256",
+    timestamp,
+    credentialScope,
+    await sha256Hex(canonicalRequest),
+  ].join("\n");
+
   const key = await importPrivateKey(sa.private_key);
-  const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(unsigned));
-  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig)))
-    .replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+  const signature = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5",
+    key,
+    new TextEncoder().encode(stringToSign)
+  );
+  const signatureHex = Array.from(new Uint8Array(signature))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 
-  const jwt = `${unsigned}.${sigB64}`;
-  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
-  });
+  return `https://${host}${canonicalUri}?${canonicalQueryString}&X-Goog-Signature=${signatureHex}`;
+}
 
-  const tokenData = await tokenRes.json();
-  if (!tokenData.access_token) throw new Error("Failed to get access token");
-  return tokenData.access_token;
+async function sha256Hex(data: string): Promise<string> {
+  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(data));
+  return Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 async function importPrivateKey(pem: string): Promise<CryptoKey> {

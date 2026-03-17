@@ -337,14 +337,11 @@ Deno.serve(async (req) => {
         ...((authData.user.app_metadata?.roles ?? []) as string[]),
       ].map((r) => String(r).toUpperCase().replace(/-/g, "_"))
     );
-    const email = (authData.user.email ?? "").toLowerCase();
     const isSuperAdmin =
       directRole === "super_admin" ||
       directRole === "superadmin" ||
       roleSet.has("SUPERADMIN") ||
-      roleSet.has("SUPER_ADMIN") ||
-      email === "axentravehiclelogistics@gmail.com" ||
-      email === "info@axentravehicles.com";
+      roleSet.has("SUPER_ADMIN");
     const isAdmin = isSuperAdmin || directRole === "admin" || roleSet.has("ADMIN");
 
     if (!userOrgId && !isSuperAdmin) {

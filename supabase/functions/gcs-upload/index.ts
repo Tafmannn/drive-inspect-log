@@ -152,7 +152,7 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        url: publicUrl,
+        url: objectPathUrl,
         backend: "googleCloud",
         backendRef: finalName,
         bucket,
