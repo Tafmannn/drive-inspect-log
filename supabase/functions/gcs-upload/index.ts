@@ -147,7 +147,8 @@ serve(async (req) => {
     }
 
     const result = await uploadRes.json();
-    const publicUrl = `https://storage.googleapis.com/${bucket}/${finalName}`;
+    // Return object path only — client resolves via gcs-proxy for secure access
+    const objectPathUrl = finalName;
 
     return new Response(
       JSON.stringify({
