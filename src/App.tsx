@@ -104,9 +104,16 @@ function SuperAdminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-/* ── Dev override roles ── */
+/* ── Dev override roles ──
+ * These query-param backdoors (?admin=1, ?super=1) are ONLY honoured
+ * in development mode (import.meta.env.DEV). In production builds,
+ * Vite statically replaces DEV with false and the branch is dead-code
+ * eliminated, so the backdoors cannot be exploited.
+ */
 
 function getDevOverrideRoles(): import("@/context/AuthContext").AppRole[] {
+  // Guard: never honour URL overrides in production
+  if (!import.meta.env.DEV) return ["DRIVER"];
   if (typeof window === "undefined") return ["DRIVER"];
   const params = new URLSearchParams(window.location.search);
   if (params.get("super") === "1") return ["SUPERADMIN", "ADMIN", "DRIVER"];

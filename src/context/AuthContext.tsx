@@ -10,11 +10,17 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import type { User as SupaUser, Session } from "@supabase/supabase-js";
 
-/* ── Feature toggle ────────────────────────────────────────────────── */
+/* ── Feature toggle ──────────────────────────────────────────────────
+ * VITE_ENABLE_AUTH=false is ONLY honoured in development mode.
+ * In production, auth is always required regardless of env var value.
+ * This prevents accidental deployment with auth disabled.
+ */
 
 const AUTH_ENABLED =
   typeof import.meta !== "undefined" &&
-  (import.meta.env.VITE_ENABLE_AUTH as string | undefined) !== "false";
+  (import.meta.env.DEV
+    ? (import.meta.env.VITE_ENABLE_AUTH as string | undefined) !== "false"
+    : true);
 
 /* ── Public types ──────────────────────────────────────────────────── */
 

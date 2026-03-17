@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -71,6 +71,31 @@ interface InspectionFormState {
   customerName: string;
 }
 
+// Moved outside component to avoid re-allocation on every render
+const REVIEW_CHECKLIST = [
+  { field: "vehicleCondition" as const, label: "Vehicle Condition" },
+  { field: "lightCondition" as const, label: "Light Condition" },
+  { field: "oilLevel" as const, label: "Oil Level" },
+  { field: "waterLevel" as const, label: "Water Level" },
+  { field: "handbook" as const, label: "Handbook" },
+  { field: "serviceBook" as const, label: "Service Book" },
+  { field: "mot" as const, label: "MOT" },
+  { field: "v5" as const, label: "V5" },
+  { field: "parcelShelf" as const, label: "Parcel Shelf" },
+  { field: "spareWheel" as const, label: "Spare Wheel" },
+  { field: "toolKit" as const, label: "Tool Kit" },
+  { field: "tyreInflationKit" as const, label: "Tyre Inflation Kit" },
+  { field: "lockingWheelNut" as const, label: "Locking Wheel Nut" },
+  { field: "satNavWorking" as const, label: "Sat Nav Working" },
+  { field: "alloysOrTrims" as const, label: "Alloys / Trims" },
+  { field: "alloysDamaged" as const, label: "Alloys Damaged" },
+  { field: "wheelTrimsDamaged" as const, label: "Wheel Trims Damaged" },
+  { field: "numberOfKeys" as const, label: "Number of Keys" },
+  { field: "evChargingCables" as const, label: "EV Charging Cables" },
+  { field: "aerial" as const, label: "Aerial" },
+  { field: "customerPaperwork" as const, label: "Customer Paperwork" },
+] as const;
+
 const PHOTO_TYPES_BY_INSPECTION: Record<
   InspectionType,
   { key: string; label: string }[]
@@ -109,6 +134,8 @@ export const InspectionFlow = () => {
   // Role-based: only admin can pick from gallery; drivers get camera only
   const captureAttr = canUseGallery ? undefined : ("environment" as const);
 
+  // ─── Memoized derived data ─────────────────────────────────────────
+
   const { data: job, isLoading: jobLoading } = useJob(jobId ?? "");
   const submitMutation = useSubmitInspection();
 
@@ -136,6 +163,7 @@ export const InspectionFlow = () => {
 
   // Additional photos label (lifted out of PhotosStep to avoid remount)
   const [newPhotoLabel, setNewPhotoLabel] = useState("");
+  const [stepError, setStepError] = useState<string | null>(null);
 
   const [formState, setFormState] = useState<InspectionFormState>({
     odometer: "",
@@ -173,6 +201,20 @@ export const InspectionFlow = () => {
   const pickupStepCount = 6;
   const deliveryStepCount = 5;
   const totalSteps = type === "pickup" ? pickupStepCount : deliveryStepCount;
+
+  // ─── Memoized derived data (avoid recomputing on every render) ─────
+  const standardPhotoCount = useMemo(
+    () => Object.values(formState.standardPhotos).filter(Boolean).length,
+    [formState.standardPhotos]
+  );
+
+  const capturedPhotos = useMemo(
+    () => ({
+      urls: formState.standardPhotoUrls,
+      additional: formState.additionalPhotos,
+    }),
+    [formState.standardPhotoUrls, formState.additionalPhotos]
+  );
 
   // ─── AUTOSAVE: save draft on every form change ───
   const dk = jobId ? draftKey(type, jobId) : "";
@@ -923,33 +965,9 @@ export const InspectionFlow = () => {
         !!formState.customerName &&
         customerSigned);
 
-    // Checklist items for the review – only shown for pickup type
-    const REVIEW_CHECKLIST = [
-      { field: "vehicleCondition" as const, label: "Vehicle Condition" },
-      { field: "lightCondition" as const, label: "Light Condition" },
-      { field: "oilLevel" as const, label: "Oil Level" },
-      { field: "waterLevel" as const, label: "Water Level" },
-      { field: "handbook" as const, label: "Handbook" },
-      { field: "serviceBook" as const, label: "Service Book" },
-      { field: "mot" as const, label: "MOT" },
-      { field: "v5" as const, label: "V5" },
-      { field: "parcelShelf" as const, label: "Parcel Shelf" },
-      { field: "spareWheel" as const, label: "Spare Wheel" },
-      { field: "toolKit" as const, label: "Tool Kit" },
-      { field: "tyreInflationKit" as const, label: "Tyre Inflation Kit" },
-      { field: "lockingWheelNut" as const, label: "Locking Wheel Nut" },
-      { field: "satNavWorking" as const, label: "Sat Nav Working" },
-      { field: "alloysOrTrims" as const, label: "Alloys / Trims" },
-      { field: "alloysDamaged" as const, label: "Alloys Damaged" },
-      { field: "wheelTrimsDamaged" as const, label: "Wheel Trims Damaged" },
-      { field: "numberOfKeys" as const, label: "Number of Keys" },
-      { field: "evChargingCables" as const, label: "EV Charging Cables" },
-      { field: "aerial" as const, label: "Aerial" },
-      { field: "customerPaperwork" as const, label: "Customer Paperwork" },
-    ];
 
     // For delivery review, show the saved pickup checklist from the job data
-    const savedPickup = job?.inspections.find((i) => i.type === "pickup");
+    const savedPickup = job?.inspections?.find((i) => i.type === "pickup") ?? null;
 
     return (
       <div className="space-y-6">
@@ -1421,10 +1439,23 @@ export const InspectionFlow = () => {
     }
   };
 
-  const renderCurrentStep = () =>
-    type === "pickup"
-      ? renderPickupStep(currentStep)
-      : renderDeliveryStep(currentStep);
+
+
+
+  const renderCurrentStep = () => {
+    // Clear previous step error on re-render attempt
+    try {
+      setStepError(null);
+      return type === "pickup"
+        ? renderPickupStep(currentStep)
+        : renderDeliveryStep(currentStep);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      console.error("InspectionFlow step render error:", e);
+      setStepError(msg);
+      return null;
+    }
+  };
 
   // ───────────────── SHELL ─────────────────
 
@@ -1448,7 +1479,25 @@ export const InspectionFlow = () => {
       </div>
 
       <div className="p-4">
-        {renderCurrentStep()}
+        {stepError ? (
+          <Card className="p-6 text-center space-y-3">
+            <p className="text-sm text-destructive font-medium">Something went wrong on this step</p>
+            <p className="text-xs text-muted-foreground">{stepError}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setStepError(null);
+                // Force a re-render by toggling step
+                setCurrentStep((s) => s);
+              }}
+            >
+              Tap to retry
+            </Button>
+          </Card>
+        ) : (
+          renderCurrentStep()
+        )}
 
         <div className="flex justify-between mt-8 pt-6 border-t">
           <Button
