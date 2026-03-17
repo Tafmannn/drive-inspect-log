@@ -285,13 +285,13 @@ export const JobDetail = () => {
           <InspectionRow
             label="Pickup Inspection"
             done={!!pickupInspection}
-            onAction={() => navigate(withFrom(`/inspection/${job.id}/pickup`, searchParams))}
+            onAction={isBlocked ? undefined : () => navigate(withFrom(`/inspection/${job.id}/pickup`, searchParams))}
             actionIcon={ClipboardCheck}
           />
           <InspectionRow
             label="Delivery Inspection"
             done={!!deliveryInspection}
-            onAction={() => navigate(withFrom(`/inspection/${job.id}/delivery`, searchParams))}
+            onAction={(isBlocked || isReviewOnly) ? undefined : () => navigate(withFrom(`/inspection/${job.id}/delivery`, searchParams))}
             actionIcon={Truck}
           />
         </Section>
