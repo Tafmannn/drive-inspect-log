@@ -13,6 +13,7 @@ export type JobControlRow = Pick<
   | "status" | "driver_name" | "pickup_city" | "pickup_postcode"
   | "delivery_city" | "delivery_postcode" | "job_date" | "updated_at"
   | "priority" | "completed_at" | "client_company" | "client_name"
+  | "has_pickup_inspection" | "has_delivery_inspection"
 > & {
   /** FK to driver_profiles if set */
   driver_id: string | null;
@@ -30,24 +31,28 @@ const ALL_OPERATIONAL = [
   "incomplete",
 ] as string[];
 
+/** Stale threshold in hours — active jobs not updated within this window */
+const STALE_HOURS = 24;
+
 export interface JobsFilter {
   search: string;
-  status: "all" | "active" | "pod_review" | "completed" | "unassigned";
+  status: "all" | "active" | "pod_review" | "completed" | "unassigned" | "stale";
+  sort?: "updated" | "date";
 }
 
 export function useControlJobs(filter: JobsFilter) {
   return useQuery({
     queryKey: ["control-jobs", filter],
     queryFn: async () => {
-      // Select with FK join to driver_profiles for resolved name
+      // Select with FK join to driver_profiles for resolved name + inspection flags
       let query = supabase
         .from("jobs")
         .select(
-          "id, external_job_number, vehicle_reg, vehicle_make, vehicle_model, status, driver_id, driver_name, pickup_city, pickup_postcode, delivery_city, delivery_postcode, job_date, updated_at, priority, completed_at, client_company, client_name, driver_profiles(display_name, full_name)"
+          "id, external_job_number, vehicle_reg, vehicle_make, vehicle_model, status, driver_id, driver_name, pickup_city, pickup_postcode, delivery_city, delivery_postcode, job_date, updated_at, priority, completed_at, client_company, client_name, has_pickup_inspection, has_delivery_inspection, driver_profiles(display_name, full_name)"
         )
         .eq("is_hidden", false);
 
-      // Status filtering — prefer driver_id for unassigned, fallback to driver_name
+      // Status filtering
       if (filter.status === "active") {
         query = query.in("status", ACTIVE_STATUSES as string[]);
       } else if (filter.status === "pod_review") {
@@ -55,11 +60,16 @@ export function useControlJobs(filter: JobsFilter) {
       } else if (filter.status === "completed") {
         query = query.in("status", TERMINAL_STATUSES as string[]);
       } else if (filter.status === "unassigned") {
-        // A job is unassigned only if both driver_id and driver_name are null
         query = query.in("status", ACTIVE_STATUSES as string[]).is("driver_id", null).is("driver_name", null);
+      } else if (filter.status === "stale") {
+        // Stale = active + not updated within threshold. Filter server-side as much as possible.
+        const staleThreshold = new Date(Date.now() - STALE_HOURS * 60 * 60 * 1000).toISOString();
+        query = query.in("status", ACTIVE_STATUSES as string[]).lt("updated_at", staleThreshold);
       }
 
-      query = query.order("updated_at", { ascending: false }).limit(100);
+      // Sort order
+      const sortCol = filter.sort === "date" ? "job_date" : "updated_at";
+      query = query.order(sortCol, { ascending: false }).limit(200);
 
       const { data, error } = await query;
       if (error) throw error;
@@ -105,7 +115,8 @@ export function useJobsKpis() {
   return useQuery({
     queryKey: ["control-jobs-kpis"],
     queryFn: async () => {
-      const [activeRes, podRes, unassignedRes, totalRes] = await Promise.all([
+      const staleThreshold = new Date(Date.now() - STALE_HOURS * 60 * 60 * 1000).toISOString();
+      const [activeRes, podRes, unassignedRes, staleRes, totalRes] = await Promise.all([
         supabase.from("jobs").select("id", { count: "exact", head: true })
           .eq("is_hidden", false).in("status", ACTIVE_STATUSES as string[]),
         supabase.from("jobs").select("id", { count: "exact", head: true })
@@ -113,12 +124,15 @@ export function useJobsKpis() {
         supabase.from("jobs").select("id", { count: "exact", head: true })
           .eq("is_hidden", false).in("status", ACTIVE_STATUSES as string[]).is("driver_id", null).is("driver_name", null),
         supabase.from("jobs").select("id", { count: "exact", head: true })
+          .eq("is_hidden", false).in("status", ACTIVE_STATUSES as string[]).lt("updated_at", staleThreshold),
+        supabase.from("jobs").select("id", { count: "exact", head: true })
           .eq("is_hidden", false),
       ]);
       return {
         active: activeRes.count ?? 0,
         podReview: podRes.count ?? 0,
         unassigned: unassignedRes.count ?? 0,
+        stale: staleRes.count ?? 0,
         total: totalRes.count ?? 0,
       };
     },
