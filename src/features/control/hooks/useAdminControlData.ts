@@ -100,7 +100,7 @@ export function useDispatchBoard() {
         .from("jobs")
         .select(DISPATCH_SELECT)
         .eq("is_hidden", false)
-        .in("status", [...(ACTIVE_STATUSES as string[]), ...(PENDING_STATUSES as string[])])
+        .in("status", [...(ACTIVE_STATUSES as string[]), ...(PENDING_STATUSES as string[]), "assigned"])
         .order("updated_at", { ascending: false })
         .limit(50);
       if (error) throw error;

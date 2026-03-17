@@ -121,6 +121,9 @@ export function AssignDriverModal({
       queryClient.invalidateQueries({ queryKey: ["control-drivers-kpis"] });
       queryClient.invalidateQueries({ queryKey: ["control-admin-kpis"] });
       queryClient.invalidateQueries({ queryKey: ["control-dispatch-board"] });
+      queryClient.invalidateQueries({ queryKey: ["control-unassigned-queue"] });
+      queryClient.invalidateQueries({ queryKey: ["control-overview-pod-queue"] });
+      queryClient.invalidateQueries({ queryKey: ["control-recent-completed"] });
       toast({ title: `Driver unassigned from ${jobRef}` });
       onOpenChange(false);
     },
