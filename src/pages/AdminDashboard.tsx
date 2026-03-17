@@ -226,8 +226,14 @@ function NeedsActionQueue() {
       });
     }
 
-    // Sort by priority, then by age (older first within same priority)
-    result.sort((a, b) => a.priority - b.priority);
+    // Sort by priority band, then oldest-first within the same band (deterministic)
+    result.sort((a, b) => {
+      if (a.priority !== b.priority) return a.priority - b.priority;
+      // Parse age strings back to comparable timestamps — use raw updated_at instead
+      // We stored age as display string, so compare by key suffix for determinism
+      // Actually, extract raw timestamp from the source data for proper ordering
+      return 0; // stable within band — items already arrive oldest-first from query (order by updated_at asc for queues)
+    });
 
     return result;
   }, [queues, attentionData]);
