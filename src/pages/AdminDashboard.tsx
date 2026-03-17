@@ -90,7 +90,7 @@ function InterventionKpis() {
         icon={FileSearch}
         variant={(kpis?.podReview ?? 0) > 0 ? "warning" : "default"}
         loading={isLoading}
-        onClick={() => navigate("/admin/jobs")}
+        onClick={() => navigate("/admin/pod-review")}
       />
       <KpiPill
         label="No Evidence"
@@ -187,7 +187,7 @@ function QuickRoutes() {
           icon={<ClipboardCheck className="w-5 h-5 stroke-[2]" />}
           title="POD Review"
           subtitle="Closure workflow"
-          onClick={() => navigate("/admin/jobs")}
+          onClick={() => navigate("/admin/pod-review")}
         />
       </div>
     </section>
