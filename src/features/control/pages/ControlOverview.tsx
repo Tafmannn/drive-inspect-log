@@ -241,7 +241,7 @@ export function ControlOverview() {
   ];
 
   const quickActions = [
-    { label: "New Job", icon: FileText, onClick: () => navigate("/jobs/new") },
+    { label: "New Job", icon: FileText, onClick: () => navigate("/jobs/new?from=/control") },
     { label: "View All Jobs", icon: Eye, onClick: () => navigate("/control/jobs") },
     { label: "Drivers", icon: UserPlus, onClick: () => navigate("/control/drivers") },
     { label: "Expenses", icon: Receipt, onClick: () => navigate("/control/finance") },
