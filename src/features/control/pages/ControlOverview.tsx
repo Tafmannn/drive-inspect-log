@@ -322,7 +322,7 @@ export function ControlOverview() {
             data={unassigned ?? []}
             loading={unassignedLoading}
             emptyMessage="All active jobs are assigned."
-            onRowClick={(row) => navigate(`/jobs/${row.id}`)}
+            onRowClick={(row) => navigate(`/jobs/${row.id}?from=/control`)}
             maxRows={8}
           />
         </ControlSection>
