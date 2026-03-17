@@ -1,15 +1,23 @@
 /**
- * Jobs dispatch utilities — local to the Jobs control page.
- * Kept here because only the Jobs surface needs these rules right now.
+ * Jobs dispatch utilities — shared by Jobs page and Admin overview.
+ * Accepts minimal row shapes so both JobControlRow and DispatchBoardRow work.
  */
 import { ACTIVE_STATUSES, PENDING_STATUSES, TERMINAL_STATUSES } from "@/lib/statusConfig";
-import type { JobControlRow } from "../../hooks/useControlJobsData";
+
+/** Minimal shape needed by dispatch utilities */
+export interface DispatchRow {
+  status: string;
+  updated_at: string;
+  has_pickup_inspection?: boolean;
+  has_delivery_inspection?: boolean;
+  resolvedDriverName?: string | null;
+}
 
 // ─── Stale threshold ─────────────────────────────────────────────────
 /** An active job with no update for >24 h is considered stale. */
 const STALE_HOURS = 24;
 
-export function isJobStale(row: JobControlRow): boolean {
+export function isJobStale(row: DispatchRow): boolean {
   if (!ACTIVE_STATUSES.includes(row.status as any)) return false;
   const ms = Date.now() - new Date(row.updated_at).getTime();
   return ms > STALE_HOURS * 60 * 60 * 1000;
@@ -17,21 +25,20 @@ export function isJobStale(row: JobControlRow): boolean {
 
 // ─── Action eligibility ──────────────────────────────────────────────
 
-export function canReviewPod(row: JobControlRow): boolean {
+export function canReviewPod(row: DispatchRow): boolean {
   return PENDING_STATUSES.includes(row.status as any);
 }
 
-export function canInspect(row: JobControlRow): boolean {
-  // Only active jobs where pickup or delivery inspection is still missing
+export function canInspect(row: DispatchRow): boolean {
   if (!ACTIVE_STATUSES.includes(row.status as any)) return false;
   return !row.has_pickup_inspection || !row.has_delivery_inspection;
 }
 
-export function canAddExpense(row: JobControlRow): boolean {
+export function canAddExpense(row: DispatchRow): boolean {
   return !TERMINAL_STATUSES.includes(row.status as any);
 }
 
-export function isUnassigned(row: JobControlRow): boolean {
+export function isUnassigned(row: DispatchRow): boolean {
   return !row.resolvedDriverName;
 }
 
