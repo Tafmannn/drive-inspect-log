@@ -218,7 +218,7 @@ export function ControlPodReview() {
             variant="ghost"
             size="sm"
             className="h-6 text-[10px] px-2"
-            onClick={(e) => { e.stopPropagation(); navigate(`/jobs/${r.id}/pod?from=pod-review`); }}
+            onClick={(e) => { e.stopPropagation(); navigate(`/jobs/${r.id}/pod?from=/control/pod-review`); }}
           >
             <FileText className="h-3 w-3 mr-0.5" /> POD
           </Button>
@@ -236,7 +236,7 @@ export function ControlPodReview() {
             variant="ghost"
             size="sm"
             className="h-6 text-[10px] px-2"
-            onClick={(e) => { e.stopPropagation(); navigate(`/jobs/${r.id}?from=pod-review`); }}
+            onClick={(e) => { e.stopPropagation(); navigate(`/jobs/${r.id}?from=/control/pod-review`); }}
           >
             <Eye className="h-3 w-3 mr-0.5" /> View
           </Button>
@@ -303,7 +303,7 @@ export function ControlPodReview() {
           data={rows}
           loading={isLoading}
           emptyMessage="No jobs in the closure review queue."
-          onRowClick={(row) => navigate(`/jobs/${row.id}`)}
+          onRowClick={(row) => navigate(`/jobs/${row.id}?from=/control/pod-review`)}
         />
       </ControlSection>
     </ControlShell>

@@ -48,13 +48,13 @@ export function ControlJobs() {
 
   // Column action callbacks — stable references
   const columnActions: JobsColumnActions = useMemo(() => ({
-    onView: (r) => navigate(`/jobs/${r.id}`),
+    onView: (r) => navigate(`/jobs/${r.id}?from=/control/jobs`),
     onAssign: (r) => setAssignTarget({
       jobId: r.id,
       jobRef: r.external_job_number || r.id.slice(0, 8),
       driverId: r.driver_id ?? null,
     }),
-    onReviewPod: (r) => navigate(`/jobs/${r.id}/pod`),
+    onReviewPod: (r) => navigate(`/jobs/${r.id}/pod?from=/control/jobs`),
     onAddExpense: (r) => navigate(`/expenses/new?jobId=${r.id}&from=/control/jobs`),
   }), [navigate]);
 
@@ -78,7 +78,7 @@ export function ControlJobs() {
         title="Jobs"
         subtitle="Dispatch workspace — filter, prioritise, and progress jobs"
         actions={
-          <Button size="sm" className="gap-1.5" onClick={() => navigate("/jobs/new")}>
+          <Button size="sm" className="gap-1.5" onClick={() => navigate("/jobs/new?from=/control/jobs")}>
             <Plus className="h-3.5 w-3.5" /> New Job
           </Button>
         }
@@ -149,7 +149,7 @@ export function ControlJobs() {
             data={jobs ?? []}
             loading={isLoading}
             emptyMessage="No jobs match your filters."
-            onRowClick={(row) => navigate(`/jobs/${row.id}`)}
+            onRowClick={(row) => navigate(`/jobs/${row.id}?from=/control/jobs`)}
           />
         )}
       </ControlSection>

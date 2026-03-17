@@ -1468,7 +1468,7 @@ export const InspectionFlow = () => {
           type === "pickup" ? "Pickup" : "Delivery"
         } — Step ${currentStep}/${totalSteps}`}
         showBack
-        onBack={() => navigate(`/jobs/${jobId}`)}
+        onBack={() => navigate(`/jobs/${jobId}${window.location.search}`)}
       />
 
       <div className="px-4 py-2 bg-muted/30">

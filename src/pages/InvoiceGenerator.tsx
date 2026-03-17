@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { resolveBackTarget } from "@/lib/navigationUtils";
 import { useAuth } from "@/context/AuthContext";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
@@ -127,6 +128,7 @@ export function InvoiceGenerator() {
   const { jobId: routeJobId } = useParams<{ jobId?: string }>();
   const [searchParams] = useSearchParams();
   const jobId = routeJobId || searchParams.get("jobId") || undefined;
+  const backTarget = resolveBackTarget(searchParams, jobId ? `/jobs/${jobId}` : "/admin");
   const { isAdmin, isSuperAdmin } = useAuth();
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -280,7 +282,7 @@ export function InvoiceGenerator() {
   if (!isAdmin && !isSuperAdmin) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <AppHeader title="Invoice Generator" showBack onBack={() => navigate(-1)} />
+        <AppHeader title="Invoice Generator" showBack onBack={() => navigate(backTarget)} />
         <div className="flex items-center justify-center h-64">
           <p className="text-muted-foreground">Admin access required.</p>
         </div>
@@ -291,7 +293,7 @@ export function InvoiceGenerator() {
 
   return (
     <div className="min-h-screen bg-muted pb-24">
-      <AppHeader title="Invoice Generator" showBack onBack={() => navigate(-1)}>
+      <AppHeader title="Invoice Generator" showBack onBack={() => navigate(backTarget)}>
         <div className="flex gap-1">
           <Button size="sm" variant="outline" onClick={handleSave} disabled={saving || generating}>
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save Draft"}

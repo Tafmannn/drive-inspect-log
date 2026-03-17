@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { resolveBackTarget } from "@/lib/navigationUtils";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
@@ -57,7 +58,10 @@ export const Expenses = () => {
   const pageTitle = isScoped ? `Expenses for Job ${jobRef}` : "Expenses";
 
   const handleBack = () => {
-    if (isScoped) {
+    const fromParam = resolveBackTarget(searchParams, "");
+    if (fromParam) {
+      navigate(fromParam);
+    } else if (isScoped) {
       navigate(`/jobs/${scopedJobId}`);
     } else {
       navigate("/");

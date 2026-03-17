@@ -14,7 +14,8 @@
  * Does NOT include: financial data, admin rate, activity log for drivers.
  */
 
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { resolveBackTarget, withFrom } from "@/lib/navigationUtils";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
@@ -101,6 +102,8 @@ function isStepComplete(step: WorkflowStep, status: string): boolean {
 export const JobDetail = () => {
   const navigate = useNavigate();
   const { jobId } = useParams<{ jobId: string }>();
+  const [searchParams] = useSearchParams();
+  const backTarget = resolveBackTarget(searchParams, "/jobs");
   const { data: job, isLoading } = useJob(jobId ?? "");
   const { data: jobExpenses } = useJobExpenses(jobId ?? "");
   const { isAdmin } = useAuth();
@@ -132,7 +135,7 @@ export const JobDetail = () => {
   if (isLoading || !job) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <AppHeader title="Job Detail" showBack onBack={() => navigate("/jobs")} />
+        <AppHeader title="Job Detail" showBack onBack={() => navigate(backTarget)} />
         <div className="p-4"><DashboardSkeleton /></div>
         <BottomNav />
       </div>
@@ -156,7 +159,7 @@ export const JobDetail = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <AppHeader title={`Job ${jobRef}`} showBack onBack={() => navigate("/jobs")} />
+      <AppHeader title={`Job ${jobRef}`} showBack onBack={() => navigate(backTarget)} />
 
       <div className="p-4 space-y-3 max-w-lg mx-auto">
         {/* ── 1. HEADER ── */}
@@ -274,13 +277,13 @@ export const JobDetail = () => {
           <InspectionRow
             label="Pickup Inspection"
             done={!!pickupInspection}
-            onAction={() => navigate(`/inspection/${job.id}/pickup`)}
+            onAction={() => navigate(withFrom(`/inspection/${job.id}/pickup`, searchParams))}
             actionIcon={ClipboardCheck}
           />
           <InspectionRow
             label="Delivery Inspection"
             done={!!deliveryInspection}
-            onAction={() => navigate(`/inspection/${job.id}/delivery`)}
+            onAction={() => navigate(withFrom(`/inspection/${job.id}/delivery`, searchParams))}
             actionIcon={Truck}
           />
         </Section>
@@ -337,12 +340,12 @@ export const JobDetail = () => {
 
           {/* Secondary: Expenses */}
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="flex-1 min-h-[44px] rounded-lg" onClick={() => navigate(`/expenses?jobId=${job.id}`)}>
+            <Button variant="outline" size="sm" className="flex-1 min-h-[44px] rounded-lg" onClick={() => navigate(withFrom(`/expenses?jobId=${job.id}`, searchParams))}>
               <Receipt className="h-4 w-4 mr-1.5" />
               Expenses{jobExpenses?.length ? ` (${jobExpenses.length})` : ""}
             </Button>
             {(job.has_pickup_inspection || job.has_delivery_inspection) && (
-              <Button variant="outline" size="sm" className="flex-1 min-h-[44px] rounded-lg" onClick={() => navigate(`/jobs/${job.id}/pod`)}>
+              <Button variant="outline" size="sm" className="flex-1 min-h-[44px] rounded-lg" onClick={() => navigate(withFrom(`/jobs/${job.id}/pod`, searchParams))}>
                 <FileText className="h-4 w-4 mr-1.5" /> POD Report
               </Button>
             )}
@@ -350,7 +353,7 @@ export const JobDetail = () => {
 
           {/* Admin-only: Edit */}
           {isAdmin && (
-            <Button variant="outline" className="w-full min-h-[44px] rounded-lg" onClick={() => navigate(`/jobs/${job.id}/edit`)}>
+            <Button variant="outline" className="w-full min-h-[44px] rounded-lg" onClick={() => navigate(withFrom(`/jobs/${job.id}/edit`, searchParams))}>
               <Edit className="h-4 w-4 mr-1.5" /> Edit Job
             </Button>
           )}

@@ -1,7 +1,8 @@
 // src/pages/JobForm.tsx
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { resolveBackTarget } from "@/lib/navigationUtils";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
@@ -40,7 +41,9 @@ interface JobFormDraft {
 export const JobForm = () => {
   const navigate = useNavigate();
   const { jobId } = useParams();
+  const [searchParams] = useSearchParams();
   const isEdit = !!jobId;
+  const backTarget = resolveBackTarget(searchParams, isEdit ? `/jobs/${jobId}` : "/jobs");
 
   const { data: existingJob, isLoading: jobLoading } = useJob(jobId ?? "");
   const createMutation = useCreateJob();
@@ -535,7 +538,7 @@ export const JobForm = () => {
       <AppHeader
         title={isEdit ? "Edit Job" : "New Job"}
         showBack
-        onBack={() => navigate(isEdit ? `/jobs/${jobId}` : "/jobs")}
+        onBack={() => navigate(backTarget)}
       />
       <div className="p-4 space-y-6 max-w-lg mx-auto">
         <form

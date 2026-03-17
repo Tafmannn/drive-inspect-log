@@ -114,7 +114,7 @@ export function ControlFinance() {
         r.job_number || r.job_reg ? (
           <button
             className="text-xs text-primary hover:underline truncate block max-w-[110px]"
-            onClick={(e) => { e.stopPropagation(); navigate(`/jobs/${r.job_id}`); }}
+            onClick={(e) => { e.stopPropagation(); navigate(`/jobs/${r.job_id}?from=/control/finance`); }}
           >
             {r.job_number || r.job_reg}
           </button>
@@ -161,7 +161,7 @@ export function ControlFinance() {
               variant="ghost"
               size="sm"
               className="h-6 text-[10px] px-2"
-              onClick={(e) => { e.stopPropagation(); navigate(`/jobs/${r.job_id}?from=control-finance`); }}
+              onClick={(e) => { e.stopPropagation(); navigate(`/jobs/${r.job_id}?from=/control/finance`); }}
             >
               <ExternalLink className="h-3 w-3 mr-0.5" /> Job
             </Button>

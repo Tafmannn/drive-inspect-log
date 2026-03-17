@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { PhotoViewer } from "@/components/PhotoViewer";
 import { useJob } from "@/hooks/useJobs";
 import { useJobExpenses } from "@/hooks/useExpenses";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { resolveBackTarget } from "@/lib/navigationUtils";
 import { Loader2, Mail, Share2, FileDown, ImageOff, PenLine, Images, Receipt } from "lucide-react";
 import { openPodEmail, generatePodEmailBody } from "@/lib/podEmail";
 import { sharePodPdf, emailPodPdf } from "@/lib/podPdf";
@@ -75,6 +76,8 @@ const SignatureCard = ({ label, name, url }: { label: string; name: string | nul
 export const PodReport = () => {
   const navigate = useNavigate();
   const { jobId } = useParams<{ jobId: string }>();
+  const [searchParams] = useSearchParams();
+  const backTarget = resolveBackTarget(searchParams, `/jobs/${jobId}`);
   const { data: job, isLoading } = useJob(jobId ?? "");
   const { data: jobExpenses } = useJobExpenses(jobId ?? "");
   const { isAdmin, isSuperAdmin } = useAuth();
@@ -192,7 +195,7 @@ export const PodReport = () => {
   if (isLoading || !job || !tokenReady) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
-        <AppHeader title="POD Report" showBack />
+        <AppHeader title="POD Report" showBack onBack={() => navigate(backTarget)} />
         <div className="flex-1 flex items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
@@ -223,7 +226,7 @@ export const PodReport = () => {
   return (
     <div className="min-h-screen bg-muted flex flex-col print:bg-white">
       <div className="print:hidden">
-        <AppHeader title="POD Report" showBack>
+        <AppHeader title="POD Report" showBack onBack={() => navigate(backTarget)}>
           <div className="flex gap-1">
             {(isAdmin || isSuperAdmin) && (
               <Button size="sm" variant="ghost" className="gap-1" onClick={() => navigate(`/invoice/new?jobId=${jobId}`)}>

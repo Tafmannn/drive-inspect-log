@@ -198,13 +198,13 @@ export function ControlOverview() {
 
   // Stable action callbacks shared by all dispatch tables
   const rowActions: RowActions = useMemo(() => ({
-    onView: (r) => navigate(`/jobs/${r.id}`),
+    onView: (r) => navigate(`/jobs/${r.id}?from=/control`),
     onAssign: (r) => setAssignTarget({
       jobId: r.id,
       jobRef: r.external_job_number || r.id.slice(0, 8),
       driverId: r.driver_id ?? null,
     }),
-    onPod: (r) => navigate(`/jobs/${r.id}/pod`),
+    onPod: (r) => navigate(`/jobs/${r.id}/pod?from=/control`),
     onExpense: (r) => navigate(`/expenses/new?jobId=${r.id}&from=/control`),
   }), [navigate]);
 
@@ -241,7 +241,7 @@ export function ControlOverview() {
   ];
 
   const quickActions = [
-    { label: "New Job", icon: FileText, onClick: () => navigate("/jobs/new") },
+    { label: "New Job", icon: FileText, onClick: () => navigate("/jobs/new?from=/control") },
     { label: "View All Jobs", icon: Eye, onClick: () => navigate("/control/jobs") },
     { label: "Drivers", icon: UserPlus, onClick: () => navigate("/control/drivers") },
     { label: "Expenses", icon: Receipt, onClick: () => navigate("/control/finance") },
@@ -322,7 +322,7 @@ export function ControlOverview() {
             data={unassigned ?? []}
             loading={unassignedLoading}
             emptyMessage="All active jobs are assigned."
-            onRowClick={(row) => navigate(`/jobs/${row.id}`)}
+            onRowClick={(row) => navigate(`/jobs/${row.id}?from=/control`)}
             maxRows={8}
           />
         </ControlSection>
@@ -345,7 +345,7 @@ export function ControlOverview() {
           data={dispatch ?? []}
           loading={dispatchLoading}
           emptyMessage="No active jobs in pipeline."
-          onRowClick={(row) => navigate(`/jobs/${row.id}`)}
+            onRowClick={(row) => navigate(`/jobs/${row.id}?from=/control`)}
           maxRows={15}
         />
       </ControlSection>
@@ -368,7 +368,7 @@ export function ControlOverview() {
             data={podQueue ?? []}
             loading={podLoading}
             emptyMessage="No jobs awaiting POD review."
-            onRowClick={(row) => navigate(`/jobs/${row.id}/pod`)}
+            onRowClick={(row) => navigate(`/jobs/${row.id}/pod?from=/control`)}
             maxRows={8}
           />
         </ControlSection>
@@ -383,7 +383,7 @@ export function ControlOverview() {
             data={completed ?? []}
             loading={completedLoading}
             emptyMessage="No recent completions."
-            onRowClick={(row) => navigate(`/jobs/${row.id}`)}
+            onRowClick={(row) => navigate(`/jobs/${row.id}?from=/control`)}
             maxRows={8}
           />
         </ControlSection>
