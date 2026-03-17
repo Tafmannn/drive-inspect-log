@@ -159,7 +159,7 @@ export const JobDetail = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <AppHeader title={`Job ${jobRef}`} showBack onBack={() => navigate("/jobs")} />
+      <AppHeader title={`Job ${jobRef}`} showBack onBack={() => navigate(backTarget)} />
 
       <div className="p-4 space-y-3 max-w-lg mx-auto">
         {/* ── 1. HEADER ── */}
