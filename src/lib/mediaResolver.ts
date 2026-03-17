@@ -20,16 +20,28 @@ async function resolveGcsViaAuthenticatedFetch(objectPath: string): Promise<stri
   const token = data.session?.access_token;
   if (!token) return null;
 
+  // Use redirect: "manual" to extract the signed URL from the 302 Location header.
+  // redirect: "follow" fails because the browser follows the redirect to GCS which
+  // may not return proper CORS headers, causing an opaque redirect error.
   const res = await fetch(`${GCS_PROXY_ENDPOINT}?path=${encodeURIComponent(objectPath)}`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
-    redirect: "follow",
+    redirect: "manual",
   });
 
-  if (!res.ok) return null;
+  // 302 redirect — extract Location header containing the signed GCS URL
+  if (res.status === 302 || res.status === 301) {
+    return res.headers.get("Location") || null;
+  }
 
-  return res.url || null;
+  // Fallback: if proxy returned the data directly (200), build a token-authenticated URL
+  // that <img> tags can use
+  if (res.ok) {
+    return `${GCS_PROXY_ENDPOINT}?path=${encodeURIComponent(objectPath)}&token=${encodeURIComponent(token)}`;
+  }
+
+  return null;
 }
 
 export async function resolveMediaUrlAsync(

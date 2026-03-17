@@ -459,28 +459,44 @@ function InspectionRow({
   done,
   onAction,
   actionIcon: ActionIcon,
+  warning,
 }: {
   label: string;
   done: boolean;
   onAction?: () => void;
   actionIcon: React.ComponentType<{ className?: string }>;
+  warning?: string;
 }) {
+  const [dismissed, setDismissed] = useState(false);
+
+  const handleAction = () => {
+    if (warning && !dismissed) {
+      setDismissed(true);
+      toast({ title: `⚠️ ${warning}`, description: "Tap again to proceed anyway." });
+      return;
+    }
+    onAction?.();
+  };
+
   return (
     <div className="flex items-center justify-between min-h-[44px]">
-      <span className="text-sm text-foreground">{label}</span>
+      <div className="flex flex-col">
+        <span className="text-sm text-foreground">{label}</span>
+        {warning && !dismissed && (
+          <span className="text-[10px] text-warning font-medium flex items-center gap-0.5">
+            <AlertTriangle className="h-2.5 w-2.5" /> {warning}
+          </span>
+        )}
+      </div>
       {done ? (
         <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase leading-none bg-success text-success-foreground">
           Complete
         </span>
       ) : onAction ? (
-        <Button size="sm" onClick={onAction} className="min-h-[44px] rounded-lg">
-          <ActionIcon className="w-4 h-4 mr-1" /> Start
+        <Button size="sm" onClick={handleAction} variant={warning && !dismissed ? "outline" : "default"} className="min-h-[44px] rounded-lg">
+          <ActionIcon className="w-4 h-4 mr-1" /> {warning && !dismissed ? "Override" : "Start"}
         </Button>
-      ) : (
-        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-          <Lock className="h-3 w-3" /> Blocked
-        </span>
-      )}
+      ) : null}
     </div>
   );
 }
