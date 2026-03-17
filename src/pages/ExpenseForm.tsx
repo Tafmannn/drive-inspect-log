@@ -170,7 +170,7 @@ export const ExpenseForm = () => {
     };
 
     loadJobAndExpense();
-  }, [expenseId, jobId]);
+  }, [expenseId, initialJobId]);
 
   const handleFileSelect = (files: FileList | null) => {
     if (!files) return;
