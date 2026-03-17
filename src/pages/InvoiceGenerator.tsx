@@ -128,6 +128,7 @@ export function InvoiceGenerator() {
   const { jobId: routeJobId } = useParams<{ jobId?: string }>();
   const [searchParams] = useSearchParams();
   const jobId = routeJobId || searchParams.get("jobId") || undefined;
+  const backTarget = resolveBackTarget(searchParams, jobId ? `/jobs/${jobId}` : "/admin");
   const { isAdmin, isSuperAdmin } = useAuth();
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
