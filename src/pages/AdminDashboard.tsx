@@ -603,7 +603,7 @@ export const AdminDashboard = () => {
             items={(queues?.needsAttention ?? []).filter(j => isJobStale(j))}
             loading={isLoading}
             emptyText="No stale jobs."
-            onViewAll={() => navigate("/admin/jobs?filter=attention")}
+            onViewAll={() => navigate("/admin/jobs?filter=stale")}
           />
           <QueuePreviewSection
             title="Awaiting Review"
