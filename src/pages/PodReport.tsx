@@ -139,18 +139,28 @@ export const PodReport = () => {
       const nextSignatures: Record<string, string | null> = {};
       const nextPhotos: Record<string, string> = {};
 
-      nextSignatures["pickup_driver"] = await resolveMediaUrlAsync(
-        pickup?.driver_signature_url
-      );
-      nextSignatures["pickup_customer"] = await resolveMediaUrlAsync(
-        pickup?.customer_signature_url
-      );
-      nextSignatures["delivery_driver"] = await resolveMediaUrlAsync(
-        delivery?.driver_signature_url
-      );
-      nextSignatures["delivery_customer"] = await resolveMediaUrlAsync(
-        delivery?.customer_signature_url
-      );
+      const sigSlots = {
+        pickup_driver: pickup?.driver_signature_url ?? null,
+        pickup_customer: pickup?.customer_signature_url ?? null,
+        delivery_driver: delivery?.driver_signature_url ?? null,
+        delivery_customer: delivery?.customer_signature_url ?? null,
+      };
+
+      console.info('[POD-Sig] raw inputs', { jobId: job.id, ...sigSlots });
+
+      for (const [slot, raw] of Object.entries(sigSlots)) {
+        if (!raw) {
+          nextSignatures[slot] = null;
+          continue;
+        }
+        const resolved = await resolveMediaUrlAsync(raw);
+        nextSignatures[slot] = resolved;
+        if (!resolved) {
+          console.error(`[POD-Sig] ${slot} FAILED — raw present but resolved null`, { raw: raw.slice(0, 80) });
+        } else {
+          console.info(`[POD-Sig] ${slot} OK`, { resolved: resolved.slice(0, 80) });
+        }
+      }
 
       await Promise.all(
         (job.photos ?? []).map(async (photo) => {
