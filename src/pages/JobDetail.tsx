@@ -25,9 +25,10 @@ import { BottomNav } from "@/components/BottomNav";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { useJob } from "@/hooks/useJobs";
 import { useJobExpenses } from "@/hooks/useExpenses";
+import { evaluateExecutableState, type ExecutableState } from "@/lib/executionRanking";
 import {
   Phone, MapPin, Building, Edit, ClipboardCheck, Truck,
-  FileText, Receipt, QrCode, Navigation, AlertTriangle, ChevronRight,
+  FileText, Receipt, QrCode, Navigation, AlertTriangle, ChevronRight, Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
