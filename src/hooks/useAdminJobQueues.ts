@@ -64,6 +64,7 @@ export function useAdminJobQueues() {
         inProgress: [],
         review: [],
         completed: [],
+        missingEvidence: [],
       };
 
       for (const row of rows) {
