@@ -138,6 +138,20 @@ export const ExpenseForm = () => {
         setTime(expense.time || "");
         setLabel(expense.label || "");
         setNotes(expense.notes || "");
+
+        // Hydrate job_id from the persisted record (critical for edit-from-global flow)
+        if (expense.job_id) {
+          setJobId(expense.job_id);
+          // Also load the associated job if not already loaded
+          if (!jobId) {
+            const { data: jobData } = await supabase
+              .from("jobs")
+              .select("*")
+              .eq("id", expense.job_id)
+              .single();
+            setJob(jobData as Job | null);
+          }
+        }
       }
 
       // Load existing receipts for this expense
