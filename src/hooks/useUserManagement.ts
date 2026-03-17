@@ -34,82 +34,94 @@ export function useUserDetail(userId: string | null) {
   });
 }
 
-function useLifecycleMutation<T extends any[]>(
-  actionFn: (...args: T) => Promise<any>,
-  successMsg: string
-) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (...args: T) => actionFn(...args),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: [KEY] });
-      toast({ title: successMsg });
-    },
-    onError: (err: Error) => {
-      toast({ title: "Action failed", description: err.message, variant: "destructive" });
-    },
-  });
+function onSuccess(qc: ReturnType<typeof useQueryClient>, msg: string) {
+  qc.invalidateQueries({ queryKey: [KEY] });
+  toast({ title: msg });
+}
+
+function onError(err: Error) {
+  toast({ title: "Action failed", description: err.message, variant: "destructive" });
 }
 
 export function useCreateUser() {
-  return useLifecycleMutation(
-    (params: Parameters<typeof createUser>[0]) => createUser(params),
-    "User created"
-  );
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (params: Parameters<typeof createUser>[0]) => createUser(params),
+    onSuccess: () => onSuccess(qc, "User created"),
+    onError,
+  });
 }
 
 export function useUpdateProfile() {
-  return useLifecycleMutation(
-    (userId: string, fields: Parameters<typeof updateProfile>[1]) => updateProfile(userId, fields),
-    "Profile updated"
-  );
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { userId: string; fields: Parameters<typeof updateProfile>[1] }) =>
+      updateProfile(vars.userId, vars.fields),
+    onSuccess: () => onSuccess(qc, "Profile updated"),
+    onError,
+  });
 }
 
 export function useSetUserRole() {
-  return useLifecycleMutation(
-    (userId: string, role: string) => setUserRole(userId, role),
-    "Role updated"
-  );
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { userId: string; role: string }) => setUserRole(vars.userId, vars.role),
+    onSuccess: () => onSuccess(qc, "Role updated"),
+    onError,
+  });
 }
 
 export function useActivateUser() {
-  return useLifecycleMutation(
-    (userId: string) => activateUser(userId),
-    "User activated"
-  );
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => activateUser(userId),
+    onSuccess: () => onSuccess(qc, "User activated"),
+    onError,
+  });
 }
 
 export function useSuspendUser() {
-  return useLifecycleMutation(
-    (userId: string, reason?: string) => suspendUser(userId, reason),
-    "User suspended"
-  );
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { userId: string; reason?: string }) => suspendUser(vars.userId, vars.reason),
+    onSuccess: () => onSuccess(qc, "User suspended"),
+    onError,
+  });
 }
 
 export function useReactivateUser() {
-  return useLifecycleMutation(
-    (userId: string) => reactivateUser(userId),
-    "User reactivated"
-  );
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => reactivateUser(userId),
+    onSuccess: () => onSuccess(qc, "User reactivated"),
+    onError,
+  });
 }
 
 export function useArchiveDriver() {
-  return useLifecycleMutation(
-    (userId: string, reason?: string) => archiveDriver(userId, reason),
-    "Driver archived"
-  );
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { userId: string; reason?: string }) => archiveDriver(vars.userId, vars.reason),
+    onSuccess: () => onSuccess(qc, "Driver archived"),
+    onError,
+  });
 }
 
 export function useRestoreDriver() {
-  return useLifecycleMutation(
-    (userId: string, reactivate: boolean, note?: string) => restoreDriver(userId, reactivate, note),
-    "Driver restored"
-  );
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { userId: string; reactivate: boolean; note?: string }) =>
+      restoreDriver(vars.userId, vars.reactivate, vars.note),
+    onSuccess: () => onSuccess(qc, "Driver restored"),
+    onError,
+  });
 }
 
 export function useSyncProfiles() {
-  return useLifecycleMutation(
-    () => syncProfiles(),
-    "Profiles synced"
-  );
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => syncProfiles(),
+    onSuccess: () => onSuccess(qc, "Profiles synced"),
+    onError,
+  });
 }
