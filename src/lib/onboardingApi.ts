@@ -1,11 +1,12 @@
 /**
- * Phase 5 — Driver onboarding API.
- * Admin-managed workflow: draft → pending_review → approved | rejected.
+ * Driver onboarding API with typed document status semantics.
  */
 import { supabase } from "@/integrations/supabase/client";
 import { getOrgId } from "./orgHelper";
 
 export type OnboardingStatus = "draft" | "pending_review" | "approved" | "rejected";
+
+export type DocStatus = "missing" | "uploaded" | "approved" | "rejected" | "expired";
 
 export interface OnboardingRecord {
   id: string;
@@ -28,6 +29,53 @@ export interface OnboardingRecord {
   licence_back_url: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface DocSlot {
+  type: "headshot" | "licence_front" | "licence_back";
+  label: string;
+  url: string | null;
+  status: DocStatus;
+}
+
+/**
+ * Derive typed document status from record state.
+ */
+export function getDocSlots(record: OnboardingRecord): DocSlot[] {
+  const today = new Date().toISOString().slice(0, 10);
+  const licenceExpired = record.licence_expiry ? record.licence_expiry < today : false;
+
+  function docStatus(url: string | null, isLicence: boolean): DocStatus {
+    if (!url) return "missing";
+    if (isLicence && licenceExpired) return "expired";
+    if (record.status === "approved") return "approved";
+    if (record.status === "rejected") return "rejected";
+    return "uploaded";
+  }
+
+  return [
+    { type: "headshot", label: "Headshot / ID", url: record.headshot_url, status: docStatus(record.headshot_url, false) },
+    { type: "licence_front", label: "Licence Front", url: record.licence_front_url, status: docStatus(record.licence_front_url, true) },
+    { type: "licence_back", label: "Licence Back", url: record.licence_back_url, status: docStatus(record.licence_back_url, true) },
+  ];
+}
+
+/**
+ * Count missing required documents.
+ */
+export function countMissingDocs(record: OnboardingRecord): number {
+  const slots = getDocSlots(record);
+  // headshot and licence_front are required
+  return [slots[0], slots[1]].filter(s => s.status === "missing").length;
+}
+
+/**
+ * Evaluate dispatch eligibility from onboarding state.
+ */
+export function isDispatchEligible(record: OnboardingRecord): boolean {
+  if (record.status !== "approved") return false;
+  const slots = getDocSlots(record);
+  return slots[0].status !== "missing" && slots[1].status !== "missing" && slots[1].status !== "expired";
 }
 
 export async function listOnboarding(statusFilter?: OnboardingStatus): Promise<OnboardingRecord[]> {
@@ -108,4 +156,34 @@ export async function uploadOnboardingDoc(
   await supabase.from("driver_onboarding").update({ [urlField]: signedData.signedUrl } as any).eq("id", onboardingId);
 
   return signedData.signedUrl;
+}
+
+/**
+ * Get onboarding compliance summary counts for admin dashboard.
+ */
+export async function getComplianceCounts(): Promise<{
+  pendingReview: number;
+  missingDocs: number;
+  expiredLicences: number;
+}> {
+  const { data, error } = await supabase
+    .from("driver_onboarding")
+    .select("*")
+    .in("status", ["draft", "pending_review", "approved"]);
+  if (error) throw error;
+
+  const records = (data ?? []) as OnboardingRecord[];
+  const today = new Date().toISOString().slice(0, 10);
+
+  let pendingReview = 0;
+  let missingDocs = 0;
+  let expiredLicences = 0;
+
+  for (const r of records) {
+    if (r.status === "pending_review") pendingReview++;
+    if (!r.headshot_url || !r.licence_front_url) missingDocs++;
+    if (r.licence_expiry && r.licence_expiry < today) expiredLicences++;
+  }
+
+  return { pendingReview, missingDocs, expiredLicences };
 }

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as expApi from '@/lib/expenseApi';
+import { invalidateForEvent } from '@/lib/mutationEvents';
 
 export function useExpenses(filters?: {
   jobId?: string;
@@ -33,13 +34,7 @@ export function useCreateExpense() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: expApi.createExpense,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['expenses'] });
-      qc.invalidateQueries({ queryKey: ['expense-totals'] });
-      qc.invalidateQueries({ queryKey: ['dashboard-counts'] });
-      qc.invalidateQueries({ queryKey: ['admin-job-queues'] });
-      qc.invalidateQueries({ queryKey: ['control-finance'] });
-    },
+    onSuccess: () => invalidateForEvent(qc, 'expense_changed'),
   });
 }
 
@@ -50,13 +45,7 @@ export function useUpdateExpense() {
       const { id, ...fields } = params;
       return expApi.updateExpense({ id, ...fields });
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['expenses'] });
-      qc.invalidateQueries({ queryKey: ['expense-totals'] });
-      qc.invalidateQueries({ queryKey: ['dashboard-counts'] });
-      qc.invalidateQueries({ queryKey: ['admin-job-queues'] });
-      qc.invalidateQueries({ queryKey: ['control-finance'] });
-    },
+    onSuccess: () => invalidateForEvent(qc, 'expense_changed'),
   });
 }
 
@@ -64,13 +53,7 @@ export function useDeleteExpense() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: expApi.deleteExpense,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['expenses'] });
-      qc.invalidateQueries({ queryKey: ['expense-totals'] });
-      qc.invalidateQueries({ queryKey: ['dashboard-counts'] });
-      qc.invalidateQueries({ queryKey: ['admin-job-queues'] });
-      qc.invalidateQueries({ queryKey: ['control-finance'] });
-    },
+    onSuccess: () => invalidateForEvent(qc, 'expense_changed'),
   });
 }
 

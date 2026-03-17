@@ -9,7 +9,7 @@ import { useExpenses, useExpenseTotals, useJobExpenses } from "@/hooks/useExpens
 import { useJob } from "@/hooks/useJobs";
 import { EXPENSE_CATEGORIES } from "@/lib/expenseApi";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
-import { Plus, Receipt, Filter, ArrowLeft, ExternalLink } from "lucide-react";
+import { Plus, Receipt, Filter, ArrowLeft, ExternalLink, Paperclip } from "lucide-react";
 
 const DATE_RANGES = [
   { label: "Today", value: "today" },
@@ -36,11 +36,9 @@ export const Expenses = () => {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
 
-  // Job context when scoped
   const { data: scopedJob } = useJob(scopedJobId);
   const { data: scopedExpenses, isLoading: scopedLoading } = useJobExpenses(scopedJobId);
 
-  // Global mode
   const globalFilters = {
     dateFrom: getDateFrom(dateRange),
     category: categoryFilter !== "all" ? categoryFilter : undefined,
@@ -170,35 +168,42 @@ export const Expenses = () => {
           </div>
         )}
 
-        {expenses?.map(e => (
-          <div
-            key={e.id}
-            className="p-4 rounded-xl bg-card border border-border shadow-sm space-y-2 cursor-pointer active:bg-muted/50 transition-colors"
-            onClick={() => navigate(`/expenses/${e.id}/edit${isScoped ? `?jobId=${scopedJobId}` : ""}`)}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-[13px] font-mono">
-                  {"job_number" in e ? (e as any).job_number || (e as any).job_id?.slice(0, 6) : e.job_id.slice(0, 6)}
-                </Badge>
-                {"job_reg" in e && (
-                  <span className="text-[13px] text-muted-foreground">{(e as any).job_reg}</span>
-                )}
+        {/* Expense rows — ledger semantics: amount, receipt, category, date */}
+        {expenses?.map(e => {
+          const hasReceipts = e.receipts.length > 0;
+          return (
+            <div
+              key={e.id}
+              className="p-3 rounded-xl bg-card border border-border shadow-sm space-y-1.5 cursor-pointer active:bg-muted/50 transition-colors"
+              onClick={() => navigate(`/expenses/${e.id}/edit${isScoped ? `?jobId=${scopedJobId}` : ""}`)}
+            >
+              {/* Row 1: Amount + receipt indicator */}
+              <div className="flex items-center justify-between">
+                <span className="text-[16px] font-semibold text-foreground tabular-nums">{fmt(Number(e.amount))}</span>
+                <div className="flex items-center gap-1.5">
+                  {hasReceipts ? (
+                    <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                      <Paperclip className="h-3 w-3" /> {e.receipts.length}
+                    </span>
+                  ) : (
+                    <Badge variant="outline" className="text-[10px] text-warning border-warning/30 px-1.5 py-0">
+                      No receipt
+                    </Badge>
+                  )}
+                </div>
               </div>
-              <span className="text-[16px] font-semibold text-foreground">{fmt(Number(e.amount))}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="text-[13px]">{e.category}</Badge>
-                {e.label && <span className="text-[13px] text-muted-foreground truncate max-w-[140px]">{e.label}</span>}
+              {/* Row 2: Category + date */}
+              <div className="flex items-center justify-between">
+                <Badge variant="secondary" className="text-[11px]">{e.category}</Badge>
+                <span className="text-[12px] text-muted-foreground">{new Date(e.date).toLocaleDateString("en-GB")}</span>
               </div>
-              <span className="text-[13px] text-muted-foreground">{new Date(e.date).toLocaleDateString("en-GB")}</span>
+              {/* Row 3: Label if present (no internal IDs) */}
+              {e.label && (
+                <p className="text-[11px] text-muted-foreground truncate">{e.label}</p>
+              )}
             </div>
-            {e.receipts.length > 0 && (
-              <p className="text-[13px] text-muted-foreground">{e.receipts.length} receipt{e.receipts.length !== 1 ? "s" : ""}</p>
-            )}
-          </div>
-        ))}
+          );
+        })}
 
         {/* FAB */}
         <div className="fixed bottom-20 right-4 z-40">

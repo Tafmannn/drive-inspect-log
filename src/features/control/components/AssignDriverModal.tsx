@@ -1,10 +1,11 @@
 /**
  * Assign Driver Modal — compact driver picker for dispatch workflows.
- * Writes both driver_id (FK) and driver_name (display text) to the job row.
+ * Uses domain event invalidation for mutation coherence.
  */
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { invalidateForEvent } from "@/lib/mutationEvents";
 import {
   Dialog,
   DialogContent,
@@ -46,7 +47,6 @@ export function AssignDriverModal({
   const [search, setSearch] = useState("");
   const queryClient = useQueryClient();
 
-  // Fetch active drivers
   const { data: drivers, isLoading: driversLoading } = useQuery({
     queryKey: ["assign-driver-list"],
     queryFn: async () => {
@@ -63,7 +63,6 @@ export function AssignDriverModal({
     staleTime: 30_000,
   });
 
-  // Assign mutation
   const assignMutation = useMutation({
     mutationFn: async (driver: DriverOption) => {
       const displayName = driver.display_name || driver.full_name;
@@ -78,27 +77,7 @@ export function AssignDriverModal({
       return displayName;
     },
     onSuccess: (displayName) => {
-      // Phase 2: Invalidate ALL dependent surfaces
-      queryClient.invalidateQueries({ queryKey: ["control-jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["control-jobs-kpis"] });
-      queryClient.invalidateQueries({ queryKey: ["control-drivers"] });
-      queryClient.invalidateQueries({ queryKey: ["control-drivers-kpis"] });
-      queryClient.invalidateQueries({ queryKey: ["control-admin-kpis"] });
-      queryClient.invalidateQueries({ queryKey: ["control-dispatch-board"] });
-      queryClient.invalidateQueries({ queryKey: ["control-unassigned-queue"] });
-      queryClient.invalidateQueries({ queryKey: ["control-overview-pod-queue"] });
-      queryClient.invalidateQueries({ queryKey: ["control-recent-completed"] });
-      queryClient.invalidateQueries({ queryKey: ["closure-review-queue"] });
-      queryClient.invalidateQueries({ queryKey: ["closure-review-kpis"] });
-      // Admin mobile surfaces
-      queryClient.invalidateQueries({ queryKey: ["admin-job-queues"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-job-queue-kpis"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-missing-evidence-count"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-drivers"] });
-      // Driver surfaces
-      queryClient.invalidateQueries({ queryKey: ["jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["job"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard-counts"] });
+      invalidateForEvent(queryClient, "driver_assignment_changed");
       toast({ title: `${displayName} assigned to ${jobRef}` });
       onOpenChange(false);
     },
@@ -111,7 +90,6 @@ export function AssignDriverModal({
     },
   });
 
-  // Unassign mutation
   const unassignMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase
@@ -124,22 +102,7 @@ export function AssignDriverModal({
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["control-jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["control-jobs-kpis"] });
-      queryClient.invalidateQueries({ queryKey: ["control-drivers"] });
-      queryClient.invalidateQueries({ queryKey: ["control-drivers-kpis"] });
-      queryClient.invalidateQueries({ queryKey: ["control-admin-kpis"] });
-      queryClient.invalidateQueries({ queryKey: ["control-dispatch-board"] });
-      queryClient.invalidateQueries({ queryKey: ["control-unassigned-queue"] });
-      queryClient.invalidateQueries({ queryKey: ["control-overview-pod-queue"] });
-      queryClient.invalidateQueries({ queryKey: ["control-recent-completed"] });
-      // Admin mobile + driver surfaces
-      queryClient.invalidateQueries({ queryKey: ["admin-job-queues"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-job-queue-kpis"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-drivers"] });
-      queryClient.invalidateQueries({ queryKey: ["jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["job"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard-counts"] });
+      invalidateForEvent(queryClient, "driver_assignment_changed");
       toast({ title: `Driver unassigned from ${jobRef}` });
       onOpenChange(false);
     },
@@ -177,7 +140,6 @@ export function AssignDriverModal({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Search */}
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
@@ -189,7 +151,6 @@ export function AssignDriverModal({
           />
         </div>
 
-        {/* Current assignment + unassign */}
         {currentDriverId && (
           <div className="flex items-center justify-between px-2 py-1.5 rounded-md bg-muted/50 border border-border">
             <span className="text-xs text-muted-foreground">Currently assigned</span>
@@ -205,7 +166,6 @@ export function AssignDriverModal({
           </div>
         )}
 
-        {/* Driver list */}
         <div className="flex-1 overflow-y-auto min-h-0 space-y-0.5 -mx-1 px-1">
           {driversLoading ? (
             <div className="flex items-center justify-center py-8">

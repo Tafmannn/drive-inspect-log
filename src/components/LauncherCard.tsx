@@ -1,18 +1,19 @@
 /**
- * Phase 6 — Compact launcher card for My Jobs.
+ * Compact launcher card for My Jobs.
  * Three bands: recognition, context, action.
- * No workflow bars, no full addresses, no detail metadata.
+ * CTA variant governed by executable state.
  */
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { UKPlate } from "@/components/UKPlate";
 import { getStatusStyle } from "@/lib/statusConfig";
-import { Phone, Navigation, ChevronRight, AlertTriangle, Sparkles } from "lucide-react";
+import { Phone, Navigation, ChevronRight, AlertTriangle, Sparkles, Lock } from "lucide-react";
 import type { RankedJob } from "@/lib/executionRanking";
 
 interface LauncherCardProps {
   job: RankedJob;
   ctaLabel: string;
+  ctaVariant?: "default" | "outline";
   onPrimaryAction: () => void;
   onCardClick: () => void;
 }
@@ -21,10 +22,9 @@ function mapsNavUrl(address: string): string {
   return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
 }
 
-export function LauncherCard({ job, ctaLabel, onPrimaryAction, onCardClick }: LauncherCardProps) {
+export function LauncherCard({ job, ctaLabel, ctaVariant = "default", onPrimaryAction, onCardClick }: LauncherCardProps) {
   const statusStyle = getStatusStyle(job.status);
 
-  // Determine active phone and nav address from status
   const isDeliveryPhase = ["pickup_complete", "in_transit", "delivery_in_progress"].includes(job.status);
   const activePhone = isDeliveryPhase ? job.delivery_contact_phone : job.pickup_contact_phone;
   const navAddress = isDeliveryPhase
@@ -35,6 +35,8 @@ export function LauncherCard({ job, ctaLabel, onPrimaryAction, onCardClick }: La
   const restriction = job.earliest_delivery_date
     ? `Do not deliver before ${job.earliest_delivery_date}`
     : null;
+
+  const isBlocked = job.executable_state === "blocked";
 
   return (
     <Card
@@ -57,7 +59,7 @@ export function LauncherCard({ job, ctaLabel, onPrimaryAction, onCardClick }: La
         <UKPlate reg={job.vehicle_reg} />
       </div>
 
-      {/* ── Execution reason (only for recommended) ── */}
+      {/* ── Execution reason ── */}
       {job.is_next_recommended && (
         <div className="px-3 pb-1">
           <span className="inline-flex items-center gap-1 text-[10px] font-medium text-primary bg-primary/5 rounded px-1.5 py-0.5">
@@ -66,9 +68,12 @@ export function LauncherCard({ job, ctaLabel, onPrimaryAction, onCardClick }: La
           </span>
         </div>
       )}
-      {!job.is_next_recommended && job.execution_rank <= 3 && (
+      {!job.is_next_recommended && job.execution_reason && job.execution_class !== "eligible_due_later" && (
         <div className="px-3 pb-1">
-          <span className="text-[10px] text-muted-foreground">{job.execution_reason}</span>
+          <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+            {isBlocked && <Lock className="h-2.5 w-2.5" />}
+            {job.execution_reason}
+          </span>
         </div>
       )}
 
@@ -77,7 +82,6 @@ export function LauncherCard({ job, ctaLabel, onPrimaryAction, onCardClick }: La
         <span className="text-[11px] text-muted-foreground">{compressedRoute}</span>
       </div>
 
-      {/* Restriction (compact) */}
       {restriction && (
         <div className="mx-3 mb-1.5 flex items-center gap-1.5 text-[10px] text-warning font-medium">
           <AlertTriangle className="h-3 w-3 shrink-0" />
@@ -90,6 +94,7 @@ export function LauncherCard({ job, ctaLabel, onPrimaryAction, onCardClick }: La
         <Button
           onClick={(e) => { e.stopPropagation(); onPrimaryAction(); }}
           className="flex-1 min-h-[40px] text-xs"
+          variant={ctaVariant}
           size="sm"
         >
           {ctaLabel}
