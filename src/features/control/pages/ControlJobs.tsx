@@ -78,7 +78,7 @@ export function ControlJobs() {
         title="Jobs"
         subtitle="Dispatch workspace — filter, prioritise, and progress jobs"
         actions={
-          <Button size="sm" className="gap-1.5" onClick={() => navigate("/jobs/new")}>
+          <Button size="sm" className="gap-1.5" onClick={() => navigate("/jobs/new?from=/control/jobs")}>
             <Plus className="h-3.5 w-3.5" /> New Job
           </Button>
         }
