@@ -1,31 +1,28 @@
 /**
- * DriverJobCard — Decision-optimized card for the My Jobs launcher.
+ * DriverJobCard — Visual layout matching the detailed card screenshot.
  *
- * 7-row layout:
- * 1. Workflow badge · Job ref · Reg plate
- * 2. Pickup postcode → Delivery postcode
- * 3. Pickup company / Delivery company
- * 4. Constraints (time windows, restrictions)
- * 5. Route economics (miles, ETA) — only if reliable
- * 6. Priority/recommendation row with reason
- * 7. Primary CTA + Call + Maps
+ * Layout:
+ * 1. Header: Avatar + client name + job ref | UK plate
+ * 2. Status pill
+ * 3. Collect From section (contact, phone, company, address)
+ * 4. Deliver To section (contact, phone, company, address)
+ * 5. Constraint warning strip
+ * 6. Full-width primary CTA
  */
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { UKPlate } from "@/components/UKPlate";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Phone,
-  Navigation,
+  MapPin,
   ChevronRight,
   AlertTriangle,
-  Sparkles,
-  Clock,
-  Lock,
-  Route,
-  Timer,
+  User,
 } from "lucide-react";
-import type { DriverJobSummary, PriorityState, WorkflowState } from "@/lib/driverJobSummary";
+import { getStatusStyle } from "@/lib/statusConfig";
+import type { DriverJobSummary } from "@/lib/driverJobSummary";
 
 interface DriverJobCardProps {
   summary: DriverJobSummary;
@@ -33,180 +30,154 @@ interface DriverJobCardProps {
   onCardClick: () => void;
 }
 
-// ── Workflow badge styling ───────────────────────────────────────────
-
-const WORKFLOW_BADGE: Record<WorkflowState, { label: string; bg: string; fg: string }> = {
-  awaiting_pickup:  { label: "AWAITING PICKUP",  bg: "hsl(var(--primary))",     fg: "#fff" },
-  pickup_active:    { label: "PICKUP ACTIVE",    bg: "hsl(30 100% 50%)",       fg: "#fff" },
-  in_transit:       { label: "IN TRANSIT",       bg: "hsl(30 100% 50%)",       fg: "#fff" },
-  awaiting_delivery:{ label: "AWAITING DELIVERY",bg: "hsl(var(--primary))",     fg: "#fff" },
-  delivery_active:  { label: "DELIVERY ACTIVE",  bg: "hsl(30 100% 50%)",       fg: "#fff" },
-  pending_review:   { label: "PENDING REVIEW",   bg: "hsl(258 56% 59%)",       fg: "#fff" },
-  terminal:         { label: "COMPLETE",          bg: "hsl(var(--muted))",      fg: "hsl(var(--muted-foreground))" },
-};
-
-// ── Priority row styling ────────────────────────────────────────────
-
-function priorityRow(state: PriorityState, reason: string | null) {
-  if (!reason) return null;
-
-  const configs: Record<PriorityState, { icon: typeof Sparkles; className: string; prefix: string } | null> = {
-    recommended_now: { icon: Sparkles, className: "text-primary bg-primary/10", prefix: "Recommended" },
-    due_soon:        { icon: Clock,    className: "text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-950", prefix: "Due soon" },
-    blocked:         { icon: Lock,     className: "text-destructive bg-destructive/10", prefix: "Blocked" },
-    late_risk:       { icon: AlertTriangle, className: "text-destructive bg-destructive/10", prefix: "Late risk" },
-    normal:          null,
-  };
-
-  const cfg = configs[state];
-  if (!cfg) return null;
-
-  const Icon = cfg.icon;
-  return (
-    <div className={`inline-flex items-center gap-1.5 rounded px-2 py-1 text-[11px] font-medium ${cfg.className}`}>
-      <Icon className="h-3 w-3 shrink-0" />
-      <span>{cfg.prefix}: {reason}</span>
-    </div>
-  );
-}
-
-// ── CTA variant ─────────────────────────────────────────────────────
-
-function ctaVariant(state: PriorityState): "default" | "outline" | "destructive" {
-  if (state === "blocked") return "outline";
-  if (state === "late_risk") return "destructive";
-  return "default";
-}
-
-function mapsNavUrl(address: string): string {
+function mapsUrl(address: string): string {
   return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
 }
 
-// ── Component ───────────────────────────────────────────────────────
-
 export function DriverJobCard({ summary, onPrimaryAction, onCardClick }: DriverJobCardProps) {
-  const badge = WORKFLOW_BADGE[summary.workflow_state];
+  const status = getStatusStyle(summary._raw.status);
+  const initial = (summary.client_name || "?")[0].toUpperCase();
+
+  // Find the first "do_not_deliver_before" constraint for the warning strip
+  const deliveryRestriction = summary.constraints.find(
+    (c) => c.kind === "do_not_deliver_before"
+  );
 
   return (
     <Card
       className="p-0 mb-2 border border-border overflow-hidden cursor-pointer active:bg-muted/50 transition-colors"
       onClick={onCardClick}
     >
-      {/* ── ROW 1: Workflow badge · Job ref · Reg plate ── */}
-      <div className="flex items-center justify-between px-3 pt-2.5 pb-1">
-        <div className="flex items-center gap-2 min-w-0">
-          <span
-            style={{ backgroundColor: badge.bg, color: badge.fg }}
-            className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase leading-none shrink-0 tracking-wide"
-          >
-            {badge.label}
-          </span>
-          <span className="text-[10px] font-medium text-muted-foreground truncate">
-            {summary.job_ref}
-          </span>
+      {/* ── Header: Avatar + Client + Ref | Plate ── */}
+      <div className="flex items-center justify-between px-3 pt-3 pb-2">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <Avatar className="h-8 w-8 shrink-0">
+            <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
+              {initial}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground truncate leading-tight">
+              {summary.client_name}
+            </p>
+            <p className="text-[10px] text-muted-foreground leading-tight">
+              {summary.job_ref}
+            </p>
+          </div>
         </div>
         <UKPlate reg={summary.vehicle_reg} />
       </div>
 
-      {/* ── ROW 2: Postcodes ── */}
-      <div className="px-3 pb-0.5">
-        <span className="text-[12px] font-mono font-semibold text-foreground tracking-wide">
-          {summary.pickup_postcode}
-          <span className="text-muted-foreground font-normal mx-1.5">→</span>
-          {summary.delivery_postcode}
+      {/* ── Status pill ── */}
+      <div className="px-3 pb-2">
+        <span
+          style={{ backgroundColor: status.backgroundColor, color: status.color }}
+          className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide"
+        >
+          {status.label}
         </span>
       </div>
 
-      {/* ── ROW 3: Companies ── */}
-      {(summary.pickup_company || summary.delivery_company) && (
-        <div className="px-3 pb-1">
-          <span className="text-[11px] text-muted-foreground truncate block">
-            {summary.pickup_company || "—"}
-            <span className="mx-1">→</span>
-            {summary.delivery_company || "—"}
-          </span>
-        </div>
-      )}
-
-      {/* ── ROW 4: Constraints ── */}
-      {summary.constraints.length > 0 && (
-        <div className="px-3 pb-1 flex flex-wrap gap-1">
-          {summary.constraints.slice(0, 3).map((c, i) => (
-            <span
-              key={i}
-              className={`inline-flex items-center gap-1 text-[10px] font-medium rounded px-1.5 py-0.5 ${
-                c.kind === "do_not_deliver_before" || c.kind === "blocked_until"
-                  ? "text-destructive bg-destructive/10"
-                  : c.kind === "late_risk"
-                  ? "text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-950"
-                  : "text-muted-foreground bg-muted"
-              }`}
+      {/* ── Collect From ── */}
+      <div className="px-3 pb-2">
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+          Collect From
+        </p>
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-xs text-foreground">
+            <User className="h-3 w-3 shrink-0 text-muted-foreground" />
+            <span className="truncate">{summary.pickup_contact_name}</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <Phone className="h-3 w-3 shrink-0 text-muted-foreground" />
+            <a
+              href={`tel:${summary.pickup_contact_phone}`}
+              onClick={(e) => e.stopPropagation()}
+              className="text-primary hover:underline truncate"
             >
-              {(c.kind === "do_not_deliver_before" || c.kind === "late_risk") && (
-                <AlertTriangle className="h-2.5 w-2.5 shrink-0" />
-              )}
-              <span className="truncate max-w-[200px]">{c.label}</span>
-            </span>
-          ))}
+              {summary.pickup_contact_phone}
+            </a>
+          </div>
+          {summary.pickup_company && (
+            <p className="text-[11px] text-muted-foreground pl-5 truncate">
+              {summary.pickup_company}
+            </p>
+          )}
+          <div className="flex items-start gap-2 text-xs">
+            <MapPin className="h-3 w-3 shrink-0 mt-0.5 text-muted-foreground" />
+            <a
+              href={mapsUrl(summary.pickup_address_full)}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="text-primary hover:underline leading-tight"
+            >
+              {summary.pickup_address_full}
+            </a>
+          </div>
         </div>
-      )}
+      </div>
 
-      {/* ── ROW 5: Route economics ── */}
-      {summary.route_metrics_reliable && (
-        <div className="px-3 pb-1 flex items-center gap-3">
-          <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-            <Route className="h-3 w-3" />
-            {summary.route_distance_miles} mi
+      {/* ── Deliver To ── */}
+      <div className="px-3 pb-2">
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+          Deliver To
+        </p>
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-xs text-foreground">
+            <User className="h-3 w-3 shrink-0 text-muted-foreground" />
+            <span className="truncate">{summary.delivery_contact_name}</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <Phone className="h-3 w-3 shrink-0 text-muted-foreground" />
+            <a
+              href={`tel:${summary.delivery_contact_phone}`}
+              onClick={(e) => e.stopPropagation()}
+              className="text-primary hover:underline truncate"
+            >
+              {summary.delivery_contact_phone}
+            </a>
+          </div>
+          {summary.delivery_company && (
+            <p className="text-[11px] text-muted-foreground pl-5 truncate">
+              {summary.delivery_company}
+            </p>
+          )}
+          <div className="flex items-start gap-2 text-xs">
+            <MapPin className="h-3 w-3 shrink-0 mt-0.5 text-muted-foreground" />
+            <a
+              href={mapsUrl(summary.delivery_address_full)}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="text-primary hover:underline leading-tight"
+            >
+              {summary.delivery_address_full}
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Constraint warning strip ── */}
+      {deliveryRestriction && (
+        <div className="mx-3 mb-2 flex items-center gap-1.5 rounded bg-destructive/10 px-2 py-1.5">
+          <AlertTriangle className="h-3 w-3 shrink-0 text-destructive" />
+          <span className="text-[11px] font-medium text-destructive truncate">
+            {deliveryRestriction.label}
           </span>
-          <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-            <Timer className="h-3 w-3" />
-            {summary.route_eta_minutes} min
-          </span>
         </div>
       )}
 
-      {/* ── ROW 6: Priority / recommendation ── */}
-      {summary.recommendation_reason && (
-        <div className="px-3 pb-1.5">
-          {priorityRow(summary.priority_state, summary.recommendation_reason)}
-        </div>
-      )}
-
-      {/* ── ROW 7: Actions ── */}
-      <div className="px-3 pb-2.5 flex items-center gap-2">
+      {/* ── Primary CTA ── */}
+      <div className="px-3 pb-3">
         <Button
           onClick={(e) => { e.stopPropagation(); onPrimaryAction(); }}
-          className="flex-1 min-h-[40px] text-xs font-semibold"
-          variant={ctaVariant(summary.priority_state)}
+          className="w-full min-h-[44px] text-sm font-semibold"
           size="sm"
         >
           {summary.primary_cta.label}
-          <ChevronRight className="ml-1 h-3.5 w-3.5" />
+          <ChevronRight className="ml-1 h-4 w-4" />
         </Button>
-
-        {summary.current_contact_phone && (
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-[40px] w-[40px] shrink-0"
-            onClick={(e) => { e.stopPropagation(); window.open(`tel:${summary.current_contact_phone}`); }}
-            aria-label={`Call ${summary.current_contact_name}`}
-          >
-            <Phone className="h-3.5 w-3.5" />
-          </Button>
-        )}
-
-        {summary.nav_address && (
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-[40px] w-[40px] shrink-0"
-            onClick={(e) => { e.stopPropagation(); window.open(mapsNavUrl(summary.nav_address), "_blank"); }}
-            aria-label="Navigate"
-          >
-            <Navigation className="h-3.5 w-3.5" />
-          </Button>
-        )}
       </div>
     </Card>
   );

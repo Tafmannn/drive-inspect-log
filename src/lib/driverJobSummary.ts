@@ -52,6 +52,7 @@ export interface DriverJobSummary {
   job_id: string;
   job_ref: string;
   vehicle_reg: string;
+  client_name: string;
 
   // Derived states
   workflow_state: WorkflowState;
@@ -65,6 +66,14 @@ export interface DriverJobSummary {
   delivery_postcode: string;
   pickup_company: string | null;
   delivery_company: string | null;
+
+  // Full contacts (both sides always visible)
+  pickup_contact_name: string;
+  pickup_contact_phone: string;
+  pickup_address_full: string;
+  delivery_contact_name: string;
+  delivery_contact_phone: string;
+  delivery_address_full: string;
 
   // Current-phase contact
   current_contact_name: string;
@@ -366,6 +375,7 @@ export function deriveJobSummary(
     job_id: job.id,
     job_ref: job.external_job_number || job.id.slice(0, 8),
     vehicle_reg: job.vehicle_reg,
+    client_name: job.client_name || job.pickup_company || "Client",
 
     workflow_state: workflow,
     action_state: action,
@@ -377,6 +387,13 @@ export function deriveJobSummary(
     delivery_postcode: job.delivery_postcode,
     pickup_company: job.pickup_company,
     delivery_company: job.delivery_company,
+
+    pickup_contact_name: job.pickup_contact_name,
+    pickup_contact_phone: job.pickup_contact_phone,
+    pickup_address_full: [job.pickup_address_line1, job.pickup_city, job.pickup_postcode].filter(Boolean).join(", "),
+    delivery_contact_name: job.delivery_contact_name,
+    delivery_contact_phone: job.delivery_contact_phone,
+    delivery_address_full: [job.delivery_address_line1, job.delivery_city, job.delivery_postcode].filter(Boolean).join(", "),
 
     current_contact_name: contact.name,
     current_contact_phone: contact.phone,
