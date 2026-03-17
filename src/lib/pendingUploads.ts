@@ -66,12 +66,29 @@ function loadAll(): PendingUpload[] {
     const raw = storage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
+    // Validate: if corrupted (not an array), clear and return empty
+    if (!Array.isArray(parsed)) {
+      console.warn("[pendingUploads] Corrupt queue data (not an array) — clearing.");
+      storage.removeItem(STORAGE_KEY);
+      return [];
+    }
     return parsed as PendingUpload[];
   } catch {
     return [];
   }
 }
+
+/**
+ * Measure byte size of the current queue in localStorage.
+ */
+function getStorageUsageBytes(): number {
+  const storage = safeGetStorage();
+  if (!storage) return 0;
+  const raw = storage.getItem(STORAGE_KEY);
+  return raw ? new Blob([raw]).size : 0;
+}
+
+const MAX_QUEUE_BYTES = 3.5 * 1024 * 1024; // 3.5 MB — headroom for other storage
 
 /**
  * Persist the queue. Throws if localStorage is unavailable or over quota —
