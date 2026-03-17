@@ -293,7 +293,7 @@ export function InvoiceGenerator() {
 
   return (
     <div className="min-h-screen bg-muted pb-24">
-      <AppHeader title="Invoice Generator" showBack onBack={() => navigate(-1)}>
+      <AppHeader title="Invoice Generator" showBack onBack={() => navigate(backTarget)}>
         <div className="flex gap-1">
           <Button size="sm" variant="outline" onClick={handleSave} disabled={saving || generating}>
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save Draft"}
