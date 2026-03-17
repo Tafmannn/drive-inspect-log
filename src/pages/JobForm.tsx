@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 // Native select used instead of Radix Select to avoid BubbleSelect DOM crash
 import { useCreateJob, useUpdateJob, useJob } from "@/hooks/useJobs";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, MapPin, Navigation, Search } from "lucide-react";
+import { Loader2, MapPin, Navigation, Search, UserCheck, ChevronsUpDown, X } from "lucide-react";
 import { CAR_MAKES, getModelsForMake } from "@/lib/carData";
 import { isValidUkPostcode, calculateRoute, type RouteResult } from "@/lib/mapsApi";
 import { lookupVehicle } from "@/lib/vehicleLookupApi";
