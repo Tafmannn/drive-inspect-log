@@ -85,6 +85,9 @@ export function AssignDriverModal({
       queryClient.invalidateQueries({ queryKey: ["control-drivers-kpis"] });
       queryClient.invalidateQueries({ queryKey: ["control-admin-kpis"] });
       queryClient.invalidateQueries({ queryKey: ["control-dispatch-board"] });
+      queryClient.invalidateQueries({ queryKey: ["control-unassigned-queue"] });
+      queryClient.invalidateQueries({ queryKey: ["control-overview-pod-queue"] });
+      queryClient.invalidateQueries({ queryKey: ["control-recent-completed"] });
       queryClient.invalidateQueries({ queryKey: ["closure-review-queue"] });
       queryClient.invalidateQueries({ queryKey: ["closure-review-kpis"] });
       toast({ title: `${displayName} assigned to ${jobRef}` });
