@@ -4,6 +4,7 @@ import {
   getUser,
   createUser,
   updateProfile,
+  updateDriverProfile,
   setUserRole,
   activateUser,
   suspendUser,
@@ -11,7 +12,10 @@ import {
   archiveDriver,
   restoreDriver,
   syncProfiles,
+  getPermissions,
+  setPermissionOverride,
   type UserProfile,
+  type PermissionsData,
 } from "@/lib/userLifecycleApi";
 import { toast } from "@/hooks/use-toast";
 
@@ -58,6 +62,16 @@ export function useUpdateProfile() {
     mutationFn: (vars: { userId: string; fields: Parameters<typeof updateProfile>[1] }) =>
       updateProfile(vars.userId, vars.fields),
     onSuccess: () => onSuccess(qc, "Profile updated"),
+    onError,
+  });
+}
+
+export function useUpdateDriverProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { userId: string; fields: Record<string, any> }) =>
+      updateDriverProfile(vars.userId, vars.fields),
+    onSuccess: () => onSuccess(qc, "Driver profile updated"),
     onError,
   });
 }
@@ -122,6 +136,25 @@ export function useSyncProfiles() {
   return useMutation({
     mutationFn: () => syncProfiles(),
     onSuccess: () => onSuccess(qc, "Profiles synced"),
+    onError,
+  });
+}
+
+export function usePermissions(userId: string | null) {
+  return useQuery<PermissionsData>({
+    queryKey: [KEY, "permissions", userId],
+    queryFn: () => getPermissions(userId!),
+    enabled: !!userId,
+    staleTime: 10_000,
+  });
+}
+
+export function useSetPermissionOverride() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { userId: string; permissionKey: string; grantType: "allow" | "deny" | "default"; reason?: string }) =>
+      setPermissionOverride(vars.userId, vars.permissionKey, vars.grantType, vars.reason),
+    onSuccess: () => onSuccess(qc, "Permission updated"),
     onError,
   });
 }

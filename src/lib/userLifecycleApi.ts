@@ -33,6 +33,19 @@ export interface UserProfile {
     full_name: string;
     display_name: string | null;
     licence_expiry: string | null;
+    licence_number: string | null;
+    date_of_birth: string | null;
+    address_line1: string | null;
+    address_line2: string | null;
+    city: string | null;
+    postcode: string | null;
+    phone: string | null;
+    emergency_contact_name: string | null;
+    emergency_contact_phone: string | null;
+    trade_plate_number: string | null;
+    employment_type: string | null;
+    notes: string | null;
+    licence_categories: string[] | null;
     archived_by?: string | null;
     archive_reason?: string | null;
     restored_at?: string | null;
@@ -40,6 +53,21 @@ export interface UserProfile {
     restore_note?: string | null;
     [key: string]: any;
   }>;
+}
+
+export interface PermissionCatalogEntry {
+  key: string;
+  label: string;
+  category: string;
+  description: string | null;
+  is_sensitive: boolean;
+}
+
+export interface PermissionsData {
+  role: string;
+  catalog: PermissionCatalogEntry[];
+  role_defaults: Record<string, boolean>;
+  overrides: Record<string, { permission_key: string; grant_type: string; granted_by: string | null; reason: string | null; updated_at: string }>;
 }
 
 async function invoke(body: Record<string, unknown>) {
@@ -83,6 +111,13 @@ export async function updateProfile(
   await invoke({ _action: "update_profile", user_id: userId, ...fields });
 }
 
+export async function updateDriverProfile(
+  userId: string,
+  fields: Record<string, any>
+): Promise<void> {
+  await invoke({ _action: "update_driver_profile", user_id: userId, ...fields });
+}
+
 export async function setUserRole(userId: string, role: string): Promise<void> {
   await invoke({ _action: "set_role", user_id: userId, role });
 }
@@ -110,4 +145,24 @@ export async function restoreDriver(userId: string, reactivateAccount: boolean, 
 export async function syncProfiles(): Promise<number> {
   const result = await invoke({ _action: "sync_profiles" });
   return result.synced ?? 0;
+}
+
+export async function getPermissions(userId: string): Promise<PermissionsData> {
+  const result = await invoke({ _action: "get_permissions", user_id: userId });
+  return result as PermissionsData;
+}
+
+export async function setPermissionOverride(
+  userId: string,
+  permissionKey: string,
+  grantType: "allow" | "deny" | "default",
+  reason?: string
+): Promise<void> {
+  await invoke({
+    _action: "set_permission_override",
+    user_id: userId,
+    permission_key: permissionKey,
+    grant_type: grantType,
+    reason,
+  });
 }

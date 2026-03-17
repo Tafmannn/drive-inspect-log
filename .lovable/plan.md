@@ -1,113 +1,78 @@
 
 
-## Plan: Complete Lifecycle User Management — Next Stage
+## End-to-End Fix Plan: Broken Integrations
 
-### What's Already Done
-- Database: `user_profiles`, `driver_profiles` archive fields, `admin_audit_log`, RLS policies, helper functions, `permissions_catalog`, `role_permission_templates`, `user_permission_overrides`, views
-- Edge function: `user-lifecycle` with list/get/create/update_profile/set_role/activate/suspend/reactivate/archive_driver/restore_driver/sync_profiles
-- UI: `UserIndex` (search, filters), `UserDetailEditor` (identity, role select, account actions, basic driver section, archive/restore), `CreateUserModal`, status badges
-- Auth: `ProtectedRoute` blocks suspended/pending users, `AuthContext` fetches `accountStatus`
-- Data: 4 users synced, `is_protected` flag on protected account (needs setting)
+### Root Causes Identified
 
-### What's Missing (Prioritized)
+**Issue 1 — CORS blocks all edge function calls from the preview domain**
 
-#### 1. Driver Profile Editing in UserDetailEditor
-The driver section currently only displays 3 read-only fields. The spec requires editable fields: licence_number, licence_expiry, date_of_birth, address (line1/2, city, postcode), emergency_contact_name, emergency_contact_phone, trade_plate_number, employment_type, notes. Need a new `update_driver_profile` action in the edge function and form fields in the UI.
+Every single edge function (11 functions) uses a hardcoded `ALLOWED_ORIGINS` list containing only `localhost:5173`, `*.lovable.app`, and `axentra.lovable.app`. The actual preview runs on `*.lovableproject.com`, which is NOT in this list. When the origin doesn't match, the function returns `Access-Control-Allow-Origin: http://localhost:5173`, which the browser rejects. This silently breaks DVLA lookup, company search, postcode lookup, maps directions, GCS upload/proxy, vision OCR, sheet sync, and all admin functions.
 
-#### 2. Permissions UI (Grouped Permission Editor)
-The `permissions_catalog` and `role_permission_templates` tables exist with 27 permissions across 8 categories. The `user_permission_overrides` table exists. But the UserDetailEditor has no permissions section. Need to:
-- Add a `get_permissions` action to the edge function that returns the catalog, role defaults, and user overrides
-- Add a `set_permission_override` action to the edge function with escalation checks
-- Build a grouped permission editor component showing categories with allow/deny/default toggles
+**Issue 2 — Client APIs send anon key instead of user session token**
 
-#### 3. Profile Photo Upload/Replace/Remove
-The `profile-photos` storage bucket exists with RLS policies. Need:
-- Upload component in UserDetailEditor with preview and fallback avatar
-- `profile_photo_path` already supported in `update_profile` action
-- Helper to resolve storage URL from path
-
-#### 4. Organisation Filter for Super Admin
-The UserIndex has role/status/archive filters but no org filter for super admins. Need to add an org selector that queries `organisations` table.
-
-#### 5. Set Protected Account
-The `is_protected` flag on `info@axentravehicles.com` is currently `false`. Need a migration to set it.
+Four client-side API modules (`businessSearchApi.ts`, `postcodeApi.ts`, `mapsApi.ts`, `sheetSyncApi.ts`) use raw `fetch()` with `Authorization: Bearer ${ANON_KEY}`. The edge functions then call `supabase.auth.getUser()` which returns null for anon keys, causing a 401 UNAUTHENTICATED response. Only `vehicleLookupApi.ts`, `adminApi.ts`, `visionApi.ts`, and `gcsStorageService.ts` correctly use `supabase.functions.invoke()` which sends the real user token.
 
 ---
 
-### Implementation Plan
+### Fix Plan
 
-**Task 1: Expand Driver Profile Editing**
+#### Part 1: Fix CORS in all 11 edge functions
 
-Edge function — add `update_driver_profile` action:
-- Accept `user_id` + driver fields (licence_number, licence_expiry, date_of_birth, address_line1, address_line2, city, postcode, emergency_contact_name, emergency_contact_phone, trade_plate_number, employment_type, notes)
-- Validate caller is admin+same_org or super_admin
-- Check target not protected (unless super_admin)
-- Update `driver_profiles` where `user_id = target`
-- Write audit log
+Replace the restrictive `ALLOWED_ORIGINS` + `cors()` function in every edge function with the standard Lovable CORS pattern:
 
-UI — expand the Driver Profile section in `UserDetailEditor.tsx`:
-- Add editable form fields for all driver columns
-- Add a "Save Driver Profile" button
-- Show fields only when `user.role === "driver"` and driver profile exists
+```javascript
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+```
 
-Hook — add `useUpdateDriverProfile` mutation in `useUserManagement.ts`
-API — add `updateDriverProfile` in `userLifecycleApi.ts`
+**Files to update (CORS block, lines 4-16 in each):**
+- `supabase/functions/vehicle-lookup/index.ts`
+- `supabase/functions/business-search/index.ts`
+- `supabase/functions/place-details/index.ts`
+- `supabase/functions/postcode-lookup/index.ts`
+- `supabase/functions/maps-directions/index.ts`
+- `supabase/functions/gcs-upload/index.ts`
+- `supabase/functions/gcs-proxy/index.ts`
+- `supabase/functions/gcs-fix-acl/index.ts`
+- `supabase/functions/vision-ocr/index.ts`
+- `supabase/functions/promote-admin/index.ts`
+- `supabase/functions/assign-driver/index.ts`
+- `supabase/functions/get-org-users/index.ts`
+- `supabase/functions/google-sheets-sync/index.ts` (same pattern, slightly different location)
 
-**Task 2: Build Permissions Editor**
+Also replace `cors(req.headers.get("Origin"))` in catch blocks with just `corsHeaders`.
 
-Edge function — add two actions:
-- `get_permissions`: returns `{ catalog, role_defaults, overrides }` for a target user
-- `set_permission_override`: accepts `user_id, permission_key, grant_type` (allow/deny/default). Validates:
-  - Caller has authority (admin can't set sensitive permissions they don't have)
-  - Super admin can set anything
-  - Writes to `user_permission_overrides` table
-  - Logs to `permission_audit_log`
+#### Part 2: Switch client APIs to use `supabase.functions.invoke()`
 
-UI — new `PermissionEditor` component:
-- Fetch permissions via the edge function
-- Group by category from catalog
-- For each permission: show label, effective state (from role template + override), toggle control
-- Admin sees only non-sensitive permissions they're allowed to grant
-- Super admin sees all
+**`src/lib/businessSearchApi.ts`** — Replace raw fetch calls with `supabase.functions.invoke('business-search', ...)` and `supabase.functions.invoke('place-details', ...)`. This sends the user's real auth token.
 
-Hook/API additions for permissions fetch and mutation.
+**`src/lib/postcodeApi.ts`** — Replace raw fetch with `supabase.functions.invoke('postcode-lookup', ...)`.
 
-**Task 3: Profile Photo Upload**
+**`src/lib/mapsApi.ts`** — Replace raw fetch with `supabase.functions.invoke('maps-directions', ...)`.
 
-UI component in UserDetailEditor:
-- Circular avatar preview (or fallback initials)
-- Upload button triggers file picker
-- Upload to `profile-photos/{org_id}/{auth_user_id}/{filename}` via Supabase storage
-- On success, call `update_profile` with new `profile_photo_path`
-- Remove button clears path and optionally deletes object
-- Replace overwrites
+**`src/lib/sheetSyncApi.ts`** — Replace raw fetch `callSync` function with `supabase.functions.invoke('google-sheets-sync', ...)`.
 
-Add a `resolveProfilePhotoUrl` helper in a shared lib file.
+#### Part 3: Deploy all edge functions
 
-**Task 4: Org Filter + Protected Account**
+All 13 edge functions must be redeployed after CORS fixes.
 
-- Add org `Select` in UserIndex (super admin only), pass to `useUserList` filters
-- SQL migration: `UPDATE user_profiles SET is_protected = true WHERE lower(email) = 'info@axentravehicles.com'`
+---
 
-### File Changes Summary
+### Summary of what this fixes
 
-| File | Change |
-|---|---|
-| `supabase/functions/user-lifecycle/index.ts` | Add `update_driver_profile`, `get_permissions`, `set_permission_override` actions |
-| `src/lib/userLifecycleApi.ts` | Add `updateDriverProfile`, `getPermissions`, `setPermissionOverride` API functions |
-| `src/hooks/useUserManagement.ts` | Add `useUpdateDriverProfile`, `usePermissions`, `useSetPermissionOverride` hooks |
-| `src/features/users/components/UserDetailEditor.tsx` | Expand driver section with editable fields, add permissions section, add photo upload |
-| `src/features/users/components/PermissionEditor.tsx` | New — grouped permission toggle UI |
-| `src/features/users/components/ProfilePhotoUpload.tsx` | New — avatar upload/preview/remove |
-| `src/features/users/components/UserIndex.tsx` | Add org filter for super admin |
-| `src/lib/profilePhotoUtils.ts` | New — URL resolver helper |
-| Migration SQL | Set `is_protected = true` for platform owner |
+| Feature | Broken because | Fix |
+|---|---|---|
+| DVLA Lookup | CORS block | Fix CORS headers |
+| Company Search | CORS + anon key auth | Fix CORS + use `supabase.functions.invoke` |
+| Postcode Lookup | CORS + anon key auth | Fix CORS + use `supabase.functions.invoke` |
+| Maps/Route Calc | CORS + anon key auth | Fix CORS + use `supabase.functions.invoke` |
+| Google Sheets Sync | CORS + anon key auth | Fix CORS + use `supabase.functions.invoke` |
+| GCS Photo Upload | CORS block | Fix CORS headers |
+| GCS Photo Proxy | CORS block | Fix CORS headers |
+| Vision OCR | CORS block | Fix CORS headers |
+| Admin user mgmt | CORS block | Fix CORS headers |
 
-### Execution Order
-1. Migration for protected account
-2. Edge function updates (all 3 new actions)
-3. API + hooks
-4. UI components (driver fields, permissions, photo, org filter)
-5. Deploy edge function
-6. Manual verification
+No database, RLS, routing, or business logic changes needed.
 

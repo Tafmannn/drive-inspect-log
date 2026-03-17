@@ -1,10 +1,11 @@
 /**
  * UserIndex — searchable, filterable user list for admin & super admin.
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useUserList, useSyncProfiles } from "@/hooks/useUserManagement";
 import type { UserProfile } from "@/lib/userLifecycleApi";
+import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -22,13 +23,24 @@ export function UserIndex({ onSelectUser, onCreateUser }: UserIndexProps) {
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [archiveFilter, setArchiveFilter] = useState<string>("active");
+  const [orgFilter, setOrgFilter] = useState<string>("all");
+  const [orgs, setOrgs] = useState<Array<{ id: string; name: string }>>([]);
+
+  // Load orgs for super admin filter
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    supabase.from("organisations").select("id, name").order("name").then(({ data }) => {
+      setOrgs(data ?? []);
+    });
+  }, [isSuperAdmin]);
 
   const filters = useMemo(() => {
     const f: Record<string, string> = {};
     if (roleFilter !== "all") f.role = roleFilter;
     if (statusFilter !== "all") f.account_status = statusFilter;
+    if (orgFilter !== "all") f.org_id = orgFilter;
     return f;
-  }, [roleFilter, statusFilter]);
+  }, [roleFilter, statusFilter, orgFilter]);
 
   const { data: users, isLoading, refetch } = useUserList(filters);
   const syncMutation = useSyncProfiles();
@@ -114,6 +126,20 @@ export function UserIndex({ onSelectUser, onCreateUser }: UserIndexProps) {
             <SelectItem value="all">All</SelectItem>
           </SelectContent>
         </Select>
+
+        {isSuperAdmin && orgs.length > 0 && (
+          <Select value={orgFilter} onValueChange={setOrgFilter}>
+            <SelectTrigger className="h-8 w-[130px] text-xs">
+              <SelectValue placeholder="Organisation" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Orgs</SelectItem>
+              {orgs.map((o) => (
+                <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => refetch()}>
           <RefreshCw className="h-3 w-3 mr-1" /> Refresh

@@ -1,7 +1,8 @@
 /**
  * user-lifecycle — unified edge function for user management.
  * Actions: list, get, create, update_profile, set_role, activate, suspend, reactivate,
- *          archive_driver, restore_driver, sync_profiles
+ *          archive_driver, restore_driver, sync_profiles, update_driver_profile,
+ *          get_permissions, set_permission_override
  *
  * Auth: JWT verified in code. Caller must be admin (org-scoped) or super_admin (global).
  */
@@ -349,6 +350,219 @@ serve(async (req) => {
           profile_photo_path: current.profile_photo_path,
         },
         after_state: updates,
+      });
+
+      return json({ success: true });
+    }
+
+    // ── UPDATE DRIVER PROFILE ──
+    if (action === "update_driver_profile") {
+      const { user_id, ...fields } = body;
+      if (!user_id) return json({ error: "USER_ID_REQUIRED" }, 400);
+
+      const { data: profile } = await admin
+        .from("user_profiles")
+        .select("*")
+        .eq("auth_user_id", user_id)
+        .single();
+
+      if (!profile) return json({ error: "NOT_FOUND" }, 404);
+      if (profile.role !== "driver") return json({ error: "NOT_A_DRIVER" }, 400);
+      if (!callerIsSuper && profile.org_id !== callerOrgId(caller)) {
+        return json({ error: "ORG_SCOPE_VIOLATION" }, 403);
+      }
+      if (profile.is_protected && !callerIsSuper) {
+        return json({ error: "PROTECTED_ACCOUNT" }, 403);
+      }
+
+      const allowed = [
+        "full_name", "display_name", "phone", "licence_number", "licence_expiry",
+        "date_of_birth", "address_line1", "address_line2", "city", "postcode",
+        "emergency_contact_name", "emergency_contact_phone", "trade_plate_number",
+        "employment_type", "notes", "licence_categories",
+      ];
+
+      const updates: Record<string, any> = {};
+      for (const k of allowed) {
+        if (k in fields && k !== "_action" && k !== "user_id") {
+          updates[k] = fields[k];
+        }
+      }
+
+      if (Object.keys(updates).length === 0) {
+        return json({ error: "NO_FIELDS_TO_UPDATE" }, 400);
+      }
+
+      const { data: before } = await admin
+        .from("driver_profiles")
+        .select("*")
+        .eq("user_id", user_id)
+        .maybeSingle();
+
+      if (!before) return json({ error: "DRIVER_PROFILE_NOT_FOUND" }, 404);
+
+      const { error } = await admin
+        .from("driver_profiles")
+        .update(updates)
+        .eq("user_id", user_id);
+
+      if (error) return json({ error: error.message }, 500);
+
+      await writeAudit(admin, caller, "update_driver_profile", {
+        target_user_id: user_id,
+        target_org_id: profile.org_id,
+        before_state: Object.fromEntries(allowed.filter(k => k in updates).map(k => [k, before[k]])),
+        after_state: updates,
+      });
+
+      return json({ success: true });
+    }
+
+    // ── GET PERMISSIONS ──
+    if (action === "get_permissions") {
+      const { user_id } = body;
+      if (!user_id) return json({ error: "USER_ID_REQUIRED" }, 400);
+
+      const { data: targetProfile } = await admin
+        .from("user_profiles")
+        .select("role, org_id")
+        .eq("auth_user_id", user_id)
+        .single();
+
+      if (!targetProfile) return json({ error: "NOT_FOUND" }, 404);
+      if (!callerIsSuper && targetProfile.org_id !== callerOrgId(caller)) {
+        return json({ error: "ORG_SCOPE_VIOLATION" }, 403);
+      }
+
+      const { data: catalog } = await admin
+        .from("permissions_catalog")
+        .select("key, label, category, description, is_sensitive")
+        .order("category")
+        .order("key");
+
+      const { data: roleDefaults } = await admin
+        .from("role_permission_templates")
+        .select("permission_key, is_allowed")
+        .eq("role", targetProfile.role);
+
+      const { data: overrides } = await admin
+        .from("user_permission_overrides")
+        .select("permission_key, grant_type, granted_by, reason, updated_at")
+        .eq("user_id", user_id);
+
+      return json({
+        role: targetProfile.role,
+        catalog: catalog ?? [],
+        role_defaults: (roleDefaults ?? []).reduce((acc: Record<string, boolean>, r: any) => {
+          acc[r.permission_key] = r.is_allowed;
+          return acc;
+        }, {}),
+        overrides: (overrides ?? []).reduce((acc: Record<string, any>, r: any) => {
+          acc[r.permission_key] = r;
+          return acc;
+        }, {}),
+      });
+    }
+
+    // ── SET PERMISSION OVERRIDE ──
+    if (action === "set_permission_override") {
+      const { user_id, permission_key, grant_type, reason } = body;
+      if (!user_id || !permission_key) {
+        return json({ error: "USER_ID_AND_PERMISSION_KEY_REQUIRED" }, 400);
+      }
+
+      // grant_type: "allow", "deny", or "default" (delete override)
+      if (!["allow", "deny", "default"].includes(grant_type)) {
+        return json({ error: "INVALID_GRANT_TYPE" }, 400);
+      }
+
+      const { data: targetProfile } = await admin
+        .from("user_profiles")
+        .select("role, org_id, is_protected")
+        .eq("auth_user_id", user_id)
+        .single();
+
+      if (!targetProfile) return json({ error: "NOT_FOUND" }, 404);
+      if (!callerIsSuper && targetProfile.org_id !== callerOrgId(caller)) {
+        return json({ error: "ORG_SCOPE_VIOLATION" }, 403);
+      }
+      if (targetProfile.is_protected && !callerIsSuper) {
+        return json({ error: "PROTECTED_ACCOUNT" }, 403);
+      }
+
+      // Check permission exists
+      const { data: permDef } = await admin
+        .from("permissions_catalog")
+        .select("key, is_sensitive")
+        .eq("key", permission_key)
+        .single();
+
+      if (!permDef) return json({ error: "PERMISSION_NOT_FOUND" }, 404);
+
+      // Non-super admin escalation checks
+      if (!callerIsSuper) {
+        // Admin can't manage super_admin targets
+        if (targetProfile.role === "super_admin") {
+          return json({ error: "CANNOT_MANAGE_SUPER_ADMIN" }, 403);
+        }
+        // Admin can't manage sensitive permissions they don't have authority over
+        if (permDef.is_sensitive && ["users.manage_permissions", "users.manage_admins", "platform.super_admin"].includes(permission_key)) {
+          return json({ error: "CANNOT_MANAGE_SENSITIVE_PERMISSION" }, 403);
+        }
+      }
+
+      const callerEmail = caller.email ?? "";
+
+      if (grant_type === "default") {
+        // Delete override
+        await admin
+          .from("user_permission_overrides")
+          .delete()
+          .eq("user_id", user_id)
+          .eq("permission_key", permission_key);
+
+        // Audit
+        await admin.from("permission_audit_log").insert({
+          actor_user_id: caller.id,
+          actor_email: callerEmail,
+          target_user_id: user_id,
+          permission_key,
+          action: "delete_override",
+          old_grant_type: null,
+          new_grant_type: null,
+          reason: reason ?? null,
+        });
+      } else {
+        // Upsert override
+        await admin
+          .from("user_permission_overrides")
+          .upsert(
+            {
+              user_id,
+              permission_key,
+              grant_type,
+              granted_by: caller.id,
+              reason: reason ?? null,
+            },
+            { onConflict: "user_id,permission_key" }
+          );
+
+        // Audit
+        await admin.from("permission_audit_log").insert({
+          actor_user_id: caller.id,
+          actor_email: callerEmail,
+          target_user_id: user_id,
+          permission_key,
+          action: grant_type === "allow" ? "create_override" : "create_override",
+          old_grant_type: null,
+          new_grant_type: grant_type,
+          reason: reason ?? null,
+        });
+      }
+
+      await writeAudit(admin, caller, "set_permission_override", {
+        target_user_id: user_id,
+        after_state: { permission_key, grant_type, reason },
       });
 
       return json({ success: true });
