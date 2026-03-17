@@ -7,7 +7,30 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { ACTIVE_STATUSES } from "@/lib/statusConfig";
+import { ACTIVE_STATUSES, PENDING_STATUSES } from "@/lib/statusConfig";
+import { isJobStale } from "@/features/control/pages/jobs/jobsUtils";
+
+/** Statuses that count as "workload" for a driver (active + pending-review). */
+const WORKLOAD_STATUSES: string[] = [
+  ...(ACTIVE_STATUSES as string[]),
+  ...(PENDING_STATUSES as string[]),
+  "assigned",
+];
+
+interface WorkloadJob {
+  driver_id: string | null;
+  driver_name: string | null;
+  vehicle_reg: string;
+  status: string;
+  updated_at: string;
+}
+
+export interface DriverWorkloadJob {
+  vehicle_reg: string;
+  status: string;
+  updated_at: string;
+  isStale: boolean;
+}
 
 export interface DriverControlRow {
   id: string;
@@ -20,14 +43,23 @@ export interface DriverControlRow {
   trade_plate_number: string | null;
   employment_type: string | null;
   created_at: string;
-  // derived
+  // derived workload
   activeJobCount: number;
   latestJobReg: string | null;
+  latestJobStatus: string | null;
+  hasStaleJob: boolean;
+  /** Whether workload was derived via FK (true) or name fallback (false). null = no workload. */
+  workloadLinkType: "fk" | "name" | null;
+  // derived risk cues
+  missingPhone: boolean;
+  missingTradePlate: boolean;
 }
 
-export function useControlDrivers(search: string) {
+export type DriverFilter = "all" | "active" | "inactive" | "with-workload" | "no-workload" | "licence-expiring" | "missing-plate";
+
+export function useControlDrivers(search: string, filter: DriverFilter = "all") {
   return useQuery({
-    queryKey: ["control-drivers", search],
+    queryKey: ["control-drivers", search, filter],
     queryFn: async () => {
       // Fetch drivers
       const { data: drivers, error: dErr } = await supabase
@@ -37,57 +69,66 @@ export function useControlDrivers(search: string) {
         .limit(200);
       if (dErr) throw dErr;
 
-      // Fetch active jobs — include driver_id + driver_name for hybrid matching
+      // Fetch workload jobs — include driver_id + driver_name for hybrid matching
       const { data: jobs, error: jErr } = await supabase
         .from("jobs")
-        .select("driver_id, driver_name, vehicle_reg, updated_at")
+        .select("driver_id, driver_name, vehicle_reg, status, updated_at")
         .eq("is_hidden", false)
-        .in("status", ACTIVE_STATUSES as string[])
+        .in("status", WORKLOAD_STATUSES)
         .order("updated_at", { ascending: false })
         .limit(500);
       if (jErr) throw jErr;
 
-      // Build workload map keyed by driver_profile.id (preferred) with name fallback
-      const workloadById = new Map<string, { count: number; latestReg: string | null }>();
-      const workloadByName = new Map<string, { count: number; latestReg: string | null }>();
+      // Build workload maps keyed by driver_profile.id (preferred) with name fallback
+      const workloadById = new Map<string, WorkloadJob[]>();
+      const workloadByName = new Map<string, WorkloadJob[]>();
 
-      for (const j of jobs ?? []) {
-        // Prefer FK-based linking
+      for (const j of (jobs ?? []) as WorkloadJob[]) {
         if (j.driver_id) {
-          const existing = workloadById.get(j.driver_id);
-          if (existing) {
-            existing.count++;
-          } else {
-            workloadById.set(j.driver_id, { count: 1, latestReg: j.vehicle_reg });
-          }
+          const arr = workloadById.get(j.driver_id) ?? [];
+          arr.push(j);
+          workloadById.set(j.driver_id, arr);
         } else if (j.driver_name) {
-          // Legacy fallback: name-based matching for rows without driver_id
           const key = j.driver_name.toLowerCase().trim();
           if (!key) continue;
-          const existing = workloadByName.get(key);
-          if (existing) {
-            existing.count++;
-          } else {
-            workloadByName.set(key, { count: 1, latestReg: j.vehicle_reg });
-          }
+          const arr = workloadByName.get(key) ?? [];
+          arr.push(j);
+          workloadByName.set(key, arr);
         }
       }
 
+      const thirtyDaysMs = 30 * 86400_000;
+
       let rows: DriverControlRow[] = (drivers ?? []).map((d) => {
-        // Prefer FK match by driver_profile.id
-        const fkMatch = workloadById.get(d.id);
-        if (fkMatch) {
-          return { ...d, activeJobCount: fkMatch.count, latestJobReg: fkMatch.latestReg };
-        }
-        // Fallback: name-based match for legacy jobs
+        // Prefer FK match
+        const fkJobs = workloadById.get(d.id);
         const nameKey = (d.display_name || d.full_name || "").toLowerCase().trim();
-        const nameMatch = workloadByName.get(nameKey);
+        const nameJobs = !fkJobs ? workloadByName.get(nameKey) : undefined;
+        const matchedJobs = fkJobs ?? nameJobs;
+        const linkType: "fk" | "name" | null = fkJobs ? "fk" : nameJobs ? "name" : null;
+
+        const latest = matchedJobs?.[0]; // already sorted by updated_at desc
+        const hasStaleJob = matchedJobs?.some((j) => isJobStale({ status: j.status, updated_at: j.updated_at })) ?? false;
+
         return {
           ...d,
-          activeJobCount: nameMatch?.count ?? 0,
-          latestJobReg: nameMatch?.latestReg ?? null,
+          activeJobCount: matchedJobs?.length ?? 0,
+          latestJobReg: latest?.vehicle_reg ?? null,
+          latestJobStatus: latest?.status ?? null,
+          hasStaleJob,
+          workloadLinkType: linkType,
+          missingPhone: !d.phone,
+          missingTradePlate: !d.trade_plate_number,
         };
       });
+
+      // Apply filter
+      if (filter === "active") rows = rows.filter((r) => r.is_active);
+      else if (filter === "inactive") rows = rows.filter((r) => !r.is_active);
+      else if (filter === "with-workload") rows = rows.filter((r) => r.activeJobCount > 0);
+      else if (filter === "no-workload") rows = rows.filter((r) => r.activeJobCount === 0);
+      else if (filter === "licence-expiring") rows = rows.filter((r) => isLicenceExpiringSoon(r.licence_expiry));
+      else if (filter === "missing-plate") rows = rows.filter((r) => r.missingTradePlate && r.is_active);
 
       if (search.trim()) {
         const s = search.toLowerCase();
@@ -110,20 +151,32 @@ export function useDriversKpis() {
   return useQuery({
     queryKey: ["control-drivers-kpis"],
     queryFn: async () => {
-      const [totalRes, activeRes, expiringRes] = await Promise.all([
+      const thirtyDays = new Date(Date.now() + 30 * 86400_000).toISOString().slice(0, 10);
+      const [totalRes, activeRes, expiringRes, missingPlateRes] = await Promise.all([
         supabase.from("driver_profiles").select("id", { count: "exact", head: true }),
         supabase.from("driver_profiles").select("id", { count: "exact", head: true }).eq("is_active", true),
         supabase.from("driver_profiles").select("id", { count: "exact", head: true })
           .eq("is_active", true)
           .not("licence_expiry", "is", null)
-          .lte("licence_expiry", new Date(Date.now() + 30 * 86400_000).toISOString().slice(0, 10)),
+          .lte("licence_expiry", thirtyDays),
+        supabase.from("driver_profiles").select("id", { count: "exact", head: true })
+          .eq("is_active", true)
+          .is("trade_plate_number", null),
       ]);
       return {
         total: totalRes.count ?? 0,
         active: activeRes.count ?? 0,
         licenceExpiring: expiringRes.count ?? 0,
+        missingPlate: missingPlateRes.count ?? 0,
       };
     },
     staleTime: 60_000,
   });
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────
+
+export function isLicenceExpiringSoon(dateStr: string | null): boolean {
+  if (!dateStr) return false;
+  return new Date(dateStr).getTime() < Date.now() + 30 * 86400_000;
 }
