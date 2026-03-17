@@ -108,7 +108,6 @@ export const PodReport = () => {
   const navigate = useNavigate();
   const { jobId } = useParams<{ jobId: string }>();
   const [searchParams] = useSearchParams();
-  const backTarget = resolveBackTarget(searchParams, `/jobs/${jobId}`);
   const { data: job, isLoading } = useJob(jobId ?? "");
   const { data: jobExpenses } = useJobExpenses(jobId ?? "");
   const { isAdmin, isSuperAdmin } = useAuth();
