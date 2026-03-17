@@ -168,7 +168,17 @@ export function AdminJobsQueue() {
               />
             )}
 
-            {(filter === "all" || filter === "in_progress") && (
+            {(filter === "all" || filter === "evidence") && (
+              <QueueSection
+                title="Missing Evidence"
+                icon={ImageOff}
+                iconClass="text-destructive"
+                jobs={filterJobs(queues.missingEvidence)}
+                emptyText="No evidence gaps found."
+                actions={actions}
+              />
+            )}
+
               <QueueSection
                 title="In Progress"
                 icon={Truck}
