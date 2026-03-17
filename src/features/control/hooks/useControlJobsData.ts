@@ -13,6 +13,7 @@ export type JobControlRow = Pick<
   | "status" | "driver_name" | "pickup_city" | "pickup_postcode"
   | "delivery_city" | "delivery_postcode" | "job_date" | "updated_at"
   | "priority" | "completed_at" | "client_company" | "client_name"
+  | "has_pickup_inspection" | "has_delivery_inspection"
 > & {
   /** FK to driver_profiles if set */
   driver_id: string | null;
