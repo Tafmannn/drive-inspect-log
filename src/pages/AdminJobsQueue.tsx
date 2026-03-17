@@ -178,7 +178,7 @@ export function AdminJobsQueue() {
                 actions={actions}
               />
             )}
-
+            {(filter === "all" || filter === "in_progress") && (
               <QueueSection
                 title="In Progress"
                 icon={Truck}
