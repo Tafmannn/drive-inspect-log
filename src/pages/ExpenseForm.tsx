@@ -34,7 +34,7 @@ export const ExpenseForm = () => {
   const [jobId, setJobId] = useState(initialJobId);
 
   const isEdit = Boolean(expenseId);
-  const DRAFT_KEY = draftKey("expense", jobId);
+  const DRAFT_KEY = draftKey("expense", initialJobId);
 
   const [job, setJob] = useState<Job | null>(null);
   const [category, setCategory] = useState("");
