@@ -469,6 +469,9 @@ export const JobForm = () => {
       delivery_notes: getStr(data, "delivery_notes") || null,
 
       earliest_delivery_date: getStr(data, "earliest_delivery_date") || null,
+      // Driver assignment — canonical FK + display name
+      driver_id: selectedDriverId ?? null,
+      driver_name: selectedDriverName ?? null,
       ...(routeResult?.valid ? {
         route_distance_miles: routeResult.distanceMiles,
         route_eta_minutes: routeResult.etaMinutes,
