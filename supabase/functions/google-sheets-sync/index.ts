@@ -458,7 +458,7 @@ Deno.serve(async (req) => {
       return await handlePull(supabase, token, spreadsheet_id, pullOrgId);
     } else if (action === "push") {
       const { jobIds } = body;
-      return await handlePush(supabase, token, spreadsheet_id, sheetName, jobIds);
+      return await handlePush(supabase, token, spreadsheet_id, sheetName, jobIds, userOrgId, isSuperAdmin);
     } else {
       return respond({ error: `Unknown action: ${action}` }, 400);
     }
