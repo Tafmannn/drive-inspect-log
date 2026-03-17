@@ -220,6 +220,7 @@ function OnboardingDetail({
     try {
       await uploadOnboardingDoc(recordId, docTarget, file);
       qc.invalidateQueries({ queryKey: ["admin-onboarding"] });
+      qc.invalidateQueries({ queryKey: ["admin-onboarding-detail", recordId] });
       toast({ title: "Document uploaded" });
     } catch (err) {
       toast({ title: "Upload failed", variant: "destructive" });
