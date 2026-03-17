@@ -303,7 +303,7 @@ export function ControlPodReview() {
           data={rows}
           loading={isLoading}
           emptyMessage="No jobs in the closure review queue."
-          onRowClick={(row) => navigate(`/jobs/${row.id}`)}
+          onRowClick={(row) => navigate(`/jobs/${row.id}?from=/control/pod-review`)}
         />
       </ControlSection>
     </ControlShell>
