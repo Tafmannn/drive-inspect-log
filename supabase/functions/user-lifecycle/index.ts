@@ -670,6 +670,29 @@ serve(async (req) => {
 
       await admin.auth.admin.updateUserById(user_id, { ban_duration: "none" });
 
+      // Auto-create driver_profiles row for driver-role users if missing
+      if (current.role === "driver" && current.org_id) {
+        const { data: existingDP } = await admin
+          .from("driver_profiles")
+          .select("id")
+          .eq("user_id", user_id)
+          .maybeSingle();
+
+        if (!existingDP) {
+          const displayName = [current.first_name, current.last_name]
+            .filter(Boolean)
+            .join(" ") || current.display_name || current.email;
+          await admin.from("driver_profiles").insert({
+            user_id,
+            org_id: current.org_id,
+            full_name: displayName,
+            display_name: current.display_name ?? null,
+            phone: current.phone ?? null,
+            is_active: true,
+          });
+        }
+      }
+
       await writeAudit(admin, caller, "activate", {
         target_user_id: user_id,
         before_state: { account_status: current.account_status },
