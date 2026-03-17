@@ -181,7 +181,7 @@ function QuickRoutes() {
           icon={<Receipt className="w-5 h-5 stroke-[2]" />}
           title="Finance"
           subtitle="Expenses & invoices"
-          onClick={() => navigate("/expenses")}
+          onClick={() => navigate("/admin/finance")}
         />
         <DashboardCard
           icon={<ClipboardCheck className="w-5 h-5 stroke-[2]" />}
