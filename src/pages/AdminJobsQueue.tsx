@@ -46,7 +46,7 @@ export function AdminJobsQueue() {
   const { data: queues, isLoading, error } = useAdminJobQueues();
   const { data: kpis } = useAdminJobQueueKpis();
   const initialFilter = (searchParams.get("filter") as QueueFilter) || "all";
-  const validFilters: QueueFilter[] = ["all", "attention", "stale", "unassigned", "in_progress", "review", "completed"];
+  const validFilters: QueueFilter[] = ["all", "attention", "stale", "unassigned", "evidence", "in_progress", "review", "completed"];
   const [filter, setFilter] = useState<QueueFilter>(
     validFilters.includes(initialFilter) ? initialFilter : "all"
   );
