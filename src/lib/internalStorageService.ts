@@ -1,6 +1,15 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { StorageService, StoredFileInfo } from './types';
 
+export interface SignatureResolveResult {
+  url: string | null;
+  format: string;
+  bucket: string | null;
+  path: string | null;
+  errorCode: 'OK' | 'OBJECT_NOT_FOUND' | 'PERMISSION' | 'MALFORMED_INPUT' | 'UNKNOWN_ERROR';
+  errorMessage?: string;
+}
+
 class InternalStorageService implements StorageService {
   async uploadImage(file: File, pathHint: string): Promise<StoredFileInfo> {
     const isSignature = pathHint.includes('signature');
@@ -15,9 +24,6 @@ class InternalStorageService implements StorageService {
     if (error) throw new Error(`Upload failed: ${error.message}`);
 
     if (isSignature) {
-      // G: Private bucket — store the *path* as the URL, not a signed URL.
-      // Signed URLs expire; the path is permanent and can be re-signed at read time.
-      // We prefix with a sentinel so resolvers know to create a signed URL on demand.
       return {
         url: `supabase-sig://${bucket}/${path}`,
         backend: 'internal',
@@ -35,10 +41,12 @@ class InternalStorageService implements StorageService {
 
   /**
    * Resolve a signature URL to a fresh signed URL.
-   * Handles: supabase-sig://, legacy Supabase URLs, bare storage paths.
+   * Returns structured result with error code for caller to decide fallback.
    */
-  async resolveSignatureUrl(url: string): Promise<string | null> {
-    if (!url) return null;
+  async resolveSignatureUrlStructured(url: string): Promise<SignatureResolveResult> {
+    if (!url) {
+      return { url: null, format: 'empty', bucket: null, path: null, errorCode: 'MALFORMED_INPUT', errorMessage: 'Empty URL' };
+    }
 
     let bucket: string | null = null;
     let path: string | null = null;
@@ -72,7 +80,7 @@ class InternalStorageService implements StorageService {
 
     if (!bucket || !path) {
       console.warn('[SignatureResolve] Could not extract bucket/path', { url, format });
-      return url; // return as-is
+      return { url: url, format, bucket, path, errorCode: 'MALFORMED_INPUT', errorMessage: 'Could not extract bucket/path' };
     }
 
     const { data, error } = await supabase.storage
@@ -80,14 +88,29 @@ class InternalStorageService implements StorageService {
       .createSignedUrl(path, 60 * 60);
 
     if (error || !data?.signedUrl) {
+      const msg = error?.message ?? 'No signed URL returned';
+      const errorCode = msg.includes('not found') || msg.includes('Not found')
+        ? 'OBJECT_NOT_FOUND' as const
+        : msg.includes('permission') || msg.includes('Permission') || msg.includes('403')
+          ? 'PERMISSION' as const
+          : 'UNKNOWN_ERROR' as const;
+
       console.error('[SignatureResolve] createSignedUrl failed', {
-        format, bucket, path,
-        error: error?.message,
+        format, bucket, path, error: msg, errorCode,
       });
-      return null;
+      return { url: null, format, bucket, path, errorCode, errorMessage: msg };
     }
 
-    return data.signedUrl;
+    console.info('[SignatureResolve] OK', { format, bucket, path: path.slice(0, 40) });
+    return { url: data.signedUrl, format, bucket, path, errorCode: 'OK' };
+  }
+
+  /**
+   * Legacy convenience method — returns URL or null.
+   */
+  async resolveSignatureUrl(url: string): Promise<string | null> {
+    const result = await this.resolveSignatureUrlStructured(url);
+    return result.url;
   }
 }
 

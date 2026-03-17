@@ -56,10 +56,12 @@ const SignatureCard = ({
   label,
   name,
   url,
+  slot,
 }: {
   label: string;
   name: string | null | undefined;
   url: string | null;
+  slot?: string;
 }) => {
   const [failed, setFailed] = useState(false);
 
@@ -79,7 +81,11 @@ const SignatureCard = ({
           alt={`${label} signature`}
           className="h-16 border rounded-md bg-white p-1.5 w-full object-contain"
           crossOrigin="anonymous"
-          onError={() => setFailed(true)}
+          onLoad={() => console.info(`[SigImg] loaded ${slot}`, { src: url.slice(0, 80) })}
+          onError={() => {
+            console.error(`[SigImg] failed ${slot}`, { src: url.slice(0, 80) });
+            setFailed(true);
+          }}
         />
       ) : (
         <div className="h-16 border border-dashed rounded-md bg-muted/50 flex flex-col items-center justify-center gap-0.5">
