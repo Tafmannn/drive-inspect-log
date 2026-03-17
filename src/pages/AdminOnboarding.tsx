@@ -188,6 +188,7 @@ function OnboardingDetail({
     try {
       await updateOnboarding(recordId, { status: "pending_review" } as any);
       qc.invalidateQueries({ queryKey: ["admin-onboarding"] });
+      qc.invalidateQueries({ queryKey: ["admin-onboarding-detail"] });
       toast({ title: "Submitted for review" });
       onBack();
     } catch (err) {
