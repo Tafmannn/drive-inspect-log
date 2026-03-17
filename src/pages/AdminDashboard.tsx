@@ -152,6 +152,7 @@ function NeedsActionQueue() {
       result.push({
         key: `unassigned-${job.id}`,
         priority: 1,
+        updatedAtMs: new Date(job.updated_at).getTime(),
         queueType: "unassigned",
         queueLabel: "Unassigned",
         jobId: job.id,
@@ -175,6 +176,7 @@ function NeedsActionQueue() {
       result.push({
         key: `stale-${job.id}`,
         priority: 2,
+        updatedAtMs: new Date(job.updated_at).getTime(),
         queueType: "stale",
         queueLabel: "Stale",
         jobId: job.id,
@@ -198,6 +200,7 @@ function NeedsActionQueue() {
       result.push({
         key: `evidence-${ex.id}`,
         priority: 3,
+        updatedAtMs: new Date(ex.createdAt).getTime(),
         queueType: "evidence",
         queueLabel: "Evidence",
         jobRef: ex.jobNumber ?? undefined,
@@ -212,6 +215,7 @@ function NeedsActionQueue() {
       result.push({
         key: `pod-${job.id}`,
         priority: 4,
+        updatedAtMs: new Date(job.updated_at).getTime(),
         queueType: "pod_review",
         queueLabel: "POD Review",
         jobId: job.id,
@@ -227,13 +231,10 @@ function NeedsActionQueue() {
       });
     }
 
-    // Sort by priority band, then oldest-first within the same band (deterministic)
+    // Sort: priority band first, then oldest-first within same band (deterministic)
     result.sort((a, b) => {
       if (a.priority !== b.priority) return a.priority - b.priority;
-      // Parse age strings back to comparable timestamps — use raw updated_at instead
-      // We stored age as display string, so compare by key suffix for determinism
-      // Actually, extract raw timestamp from the source data for proper ordering
-      return 0; // stable within band — items already arrive oldest-first from query (order by updated_at asc for queues)
+      return a.updatedAtMs - b.updatedAtMs; // older items surface first
     });
 
     return result;
