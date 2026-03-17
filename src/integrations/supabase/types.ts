@@ -683,6 +683,7 @@ export type Database = {
           delivery_time_to: string | null
           distance_miles: number | null
           driver_external_id: string | null
+          driver_id: string | null
           driver_name: string | null
           earliest_delivery_date: string | null
           external_job_number: string | null
@@ -757,6 +758,7 @@ export type Database = {
           delivery_time_to?: string | null
           distance_miles?: number | null
           driver_external_id?: string | null
+          driver_id?: string | null
           driver_name?: string | null
           earliest_delivery_date?: string | null
           external_job_number?: string | null
@@ -831,6 +833,7 @@ export type Database = {
           delivery_time_to?: string | null
           distance_miles?: number | null
           driver_external_id?: string | null
+          driver_id?: string | null
           driver_name?: string | null
           earliest_delivery_date?: string | null
           external_job_number?: string | null
@@ -881,6 +884,13 @@ export type Database = {
           vehicle_year?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "jobs_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "driver_profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "jobs_org_id_fkey"
             columns: ["org_id"]
