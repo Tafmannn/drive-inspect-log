@@ -147,7 +147,7 @@ export function ControlJobs() {
           >
             <Eye className="h-3 w-3 mr-0.5" /> View
           </Button>
-          {!r.driver_name && (
+          {!r.resolvedDriverName && (
             <Button
               variant="ghost"
               size="sm"
