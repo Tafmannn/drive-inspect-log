@@ -177,6 +177,20 @@ export const InspectionFlow = () => {
   const deliveryStepCount = 5;
   const totalSteps = type === "pickup" ? pickupStepCount : deliveryStepCount;
 
+  // ─── Memoized derived data (avoid recomputing on every render) ─────
+  const standardPhotoCount = useMemo(
+    () => Object.values(formState.standardPhotos).filter(Boolean).length,
+    [formState.standardPhotos]
+  );
+
+  const capturedPhotos = useMemo(
+    () => ({
+      urls: formState.standardPhotoUrls,
+      additional: formState.additionalPhotos,
+    }),
+    [formState.standardPhotoUrls, formState.additionalPhotos]
+  );
+
   // ─── AUTOSAVE: save draft on every form change ───
   const dk = jobId ? draftKey(type, jobId) : "";
 
