@@ -43,6 +43,7 @@ export function ControlJobs() {
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [assignTarget, setAssignTarget] = useState<{ jobId: string; jobRef: string; driverId: string | null } | null>(null);
 
   const filter: JobsFilter = useMemo(() => ({ search, status: statusFilter }), [search, statusFilter]);
   const { data: jobs, isLoading } = useControlJobs(filter);
