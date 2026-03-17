@@ -226,7 +226,7 @@ export const PodReport = () => {
   return (
     <div className="min-h-screen bg-muted flex flex-col print:bg-white">
       <div className="print:hidden">
-        <AppHeader title="POD Report" showBack>
+        <AppHeader title="POD Report" showBack onBack={() => navigate(backTarget)}>
           <div className="flex gap-1">
             {(isAdmin || isSuperAdmin) && (
               <Button size="sm" variant="ghost" className="gap-1" onClick={() => navigate(`/invoice/new?jobId=${jobId}`)}>
