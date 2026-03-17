@@ -115,7 +115,8 @@ export function useJobsKpis() {
   return useQuery({
     queryKey: ["control-jobs-kpis"],
     queryFn: async () => {
-      const [activeRes, podRes, unassignedRes, totalRes] = await Promise.all([
+      const staleThreshold = new Date(Date.now() - STALE_HOURS * 60 * 60 * 1000).toISOString();
+      const [activeRes, podRes, unassignedRes, staleRes, totalRes] = await Promise.all([
         supabase.from("jobs").select("id", { count: "exact", head: true })
           .eq("is_hidden", false).in("status", ACTIVE_STATUSES as string[]),
         supabase.from("jobs").select("id", { count: "exact", head: true })
@@ -123,12 +124,15 @@ export function useJobsKpis() {
         supabase.from("jobs").select("id", { count: "exact", head: true })
           .eq("is_hidden", false).in("status", ACTIVE_STATUSES as string[]).is("driver_id", null).is("driver_name", null),
         supabase.from("jobs").select("id", { count: "exact", head: true })
+          .eq("is_hidden", false).in("status", ACTIVE_STATUSES as string[]).lt("updated_at", staleThreshold),
+        supabase.from("jobs").select("id", { count: "exact", head: true })
           .eq("is_hidden", false),
       ]);
       return {
         active: activeRes.count ?? 0,
         podReview: podRes.count ?? 0,
         unassigned: unassignedRes.count ?? 0,
+        stale: staleRes.count ?? 0,
         total: totalRes.count ?? 0,
       };
     },
