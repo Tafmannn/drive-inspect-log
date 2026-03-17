@@ -149,7 +149,7 @@ export function ControlJobs() {
             data={jobs ?? []}
             loading={isLoading}
             emptyMessage="No jobs match your filters."
-            onRowClick={(row) => navigate(`/jobs/${row.id}`)}
+            onRowClick={(row) => navigate(`/jobs/${row.id}?from=/control/jobs`)}
           />
         )}
       </ControlSection>
