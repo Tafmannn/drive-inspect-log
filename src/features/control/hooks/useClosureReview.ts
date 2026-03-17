@@ -22,7 +22,7 @@
  *   - status                    → Queue membership
  *   - completed_at              → Recency for recently-closed items
  *   - updated_at                → Staleness / age calculation
- *   - driver_name               → Assignment state
+ *   - driver_id + driver_profiles → Assignment state (FK-preferred, driver_name fallback)
  *   - has_pickup_inspection      → Evidence completeness (canonical)
  *   - has_delivery_inspection    → Evidence completeness (canonical)
  *   - delivery_city, delivery_postcode → Location context
@@ -71,6 +71,10 @@ export type ClosureReviewRow = Pick<
   | "updated_at" | "completed_at" | "has_pickup_inspection" | "has_delivery_inspection"
   | "client_company" | "client_name" | "pickup_postcode"
 > & {
+  /** FK to driver_profiles if set */
+  driver_id: string | null;
+  /** Resolved driver display name from FK join or legacy driver_name */
+  resolvedDriverName: string | null;
   /** Derived: pickup inspection missing on a closure-stage job */
   missingPickupInspection: boolean;
   /** Derived: delivery inspection missing on a closure-stage job */
@@ -91,17 +95,24 @@ export interface ClosureKpis {
 
 const SELECT_FIELDS = [
   "id", "external_job_number", "vehicle_reg", "vehicle_make", "vehicle_model",
-  "status", "driver_name", "delivery_city", "delivery_postcode",
+  "status", "driver_id", "driver_name", "delivery_city", "delivery_postcode",
   "updated_at", "completed_at", "has_pickup_inspection", "has_delivery_inspection",
   "client_company", "client_name", "pickup_postcode",
+  "driver_profiles(display_name, full_name)",
 ].join(", ");
 
 // ── Derivation ───────────────────────────────────────────────────────
 
 function deriveRow(job: any, band: ClosureReviewRow["band"]): ClosureReviewRow {
   const hoursInState = (Date.now() - new Date(job.updated_at).getTime()) / 3_600_000;
+  const profile = job.driver_profiles;
+  const resolvedDriverName = profile
+    ? (profile.display_name || profile.full_name || job.driver_name)
+    : (job.driver_name || null);
   return {
     ...job,
+    driver_profiles: undefined, // strip join artifact
+    resolvedDriverName,
     band,
     missingPickupInspection: !job.has_pickup_inspection,
     missingDeliveryInspection: !job.has_delivery_inspection,

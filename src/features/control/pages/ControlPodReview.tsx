@@ -83,7 +83,7 @@ export function ControlPodReview() {
           r.external_job_number?.toLowerCase().includes(s) ||
           r.client_company?.toLowerCase().includes(s) ||
           r.client_name?.toLowerCase().includes(s) ||
-          r.driver_name?.toLowerCase().includes(s) ||
+          r.resolvedDriverName?.toLowerCase().includes(s) ||
           r.delivery_postcode?.toLowerCase().includes(s) ||
           r.delivery_city?.toLowerCase().includes(s)
       );
@@ -137,8 +137,8 @@ export function ControlPodReview() {
       header: "Driver",
       className: "w-[110px]",
       render: (r) =>
-        r.driver_name ? (
-          <span className="text-xs text-foreground">{r.driver_name}</span>
+        r.resolvedDriverName ? (
+          <span className="text-xs text-foreground">{r.resolvedDriverName}</span>
         ) : (
           <span className="text-xs font-medium text-warning">Unassigned</span>
         ),
