@@ -187,7 +187,7 @@ function QuickRoutes() {
           icon={<ClipboardCheck className="w-5 h-5 stroke-[2]" />}
           title="POD Review"
           subtitle="Closure workflow"
-          onClick={() => navigate("/admin/jobs")}
+          onClick={() => navigate("/admin/pod-review")}
         />
       </div>
     </section>

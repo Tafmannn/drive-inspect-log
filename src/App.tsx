@@ -170,7 +170,8 @@ const App = () => {
                 <Route path="/admin/sync-errors" element={<ProtectedRoute><AdminRoute><SyncErrors /></AdminRoute></ProtectedRoute>} />
                 <Route path="/admin/users" element={<ProtectedRoute><AdminRoute><AdminUsers /></AdminRoute></ProtectedRoute>} />
                 <Route path="/admin/drivers" element={<ProtectedRoute><AdminRoute><AdminDrivers /></AdminRoute></ProtectedRoute>} />
-                
+                <Route path="/admin/pod-review" element={<ProtectedRoute><AdminRoute><AdminPodReview /></AdminRoute></ProtectedRoute>} />
+
 
                 {/* ── Super-admin-only route ── */}
                 <Route path="/super-admin" element={<ProtectedRoute><SuperAdminRoute><SuperAdminDashboard /></SuperAdminRoute></ProtectedRoute>} />
