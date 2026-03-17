@@ -2,21 +2,21 @@
  * Jobs Control Page — /control/jobs
  * Primary dispatch workspace with search, filters, and inline actions.
  */
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ControlShell, ControlHeader, ControlSection } from "../components/shared/ControlShell";
 import { KpiStrip } from "../components/shared/KpiStrip";
 import { CompactTable, type CompactColumn } from "../components/shared/CompactTable";
-import { StatusChip } from "../components/shared/StatusChip";
 import { FilterBar } from "../components/shared/FilterBar";
 import { useControlJobs, useJobsKpis, type JobControlRow, type JobsFilter } from "../hooks/useControlJobsData";
+import { AssignDriverModal } from "../components/AssignDriverModal";
 import { UKPlate } from "@/components/UKPlate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getStatusStyle } from "@/lib/statusConfig";
 import {
   Search, Plus, Truck, ClipboardCheck, UserX, LayoutList,
-  Eye, UserPlus, FileText, Receipt,
+  Eye, UserPlus,
 } from "lucide-react";
 
 type StatusFilter = JobsFilter["status"];
@@ -43,6 +43,7 @@ export function ControlJobs() {
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [assignTarget, setAssignTarget] = useState<{ jobId: string; jobRef: string; driverId: string | null } | null>(null);
 
   const filter: JobsFilter = useMemo(() => ({ search, status: statusFilter }), [search, statusFilter]);
   const { data: jobs, isLoading } = useControlJobs(filter);
@@ -136,7 +137,7 @@ export function ControlJobs() {
     {
       key: "actions",
       header: "",
-      className: "w-[140px] text-right",
+      className: "w-[160px] text-right",
       render: (r) => (
         <div className="flex items-center justify-end gap-1">
           <Button
@@ -147,16 +148,21 @@ export function ControlJobs() {
           >
             <Eye className="h-3 w-3 mr-0.5" /> View
           </Button>
-          {!r.resolvedDriverName && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 text-[10px] px-2 text-warning"
-              onClick={(e) => { e.stopPropagation(); navigate(`/jobs/${r.id}/edit`); }}
-            >
-              <UserPlus className="h-3 w-3 mr-0.5" /> Assign
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`h-6 text-[10px] px-2 ${!r.resolvedDriverName ? "text-warning" : ""}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              setAssignTarget({
+                jobId: r.id,
+                jobRef: r.external_job_number || r.id.slice(0, 8),
+                driverId: r.driver_id ?? null,
+              });
+            }}
+          >
+            <UserPlus className="h-3 w-3 mr-0.5" /> {r.resolvedDriverName ? "Reassign" : "Assign"}
+          </Button>
         </div>
       ),
     },
@@ -215,6 +221,17 @@ export function ControlJobs() {
           onRowClick={(row) => navigate(`/jobs/${row.id}`)}
         />
       </ControlSection>
+
+      {/* Assign Driver Modal */}
+      {assignTarget && (
+        <AssignDriverModal
+          open={!!assignTarget}
+          onOpenChange={(open) => { if (!open) setAssignTarget(null); }}
+          jobId={assignTarget.jobId}
+          jobRef={assignTarget.jobRef}
+          currentDriverId={assignTarget.driverId}
+        />
+      )}
     </ControlShell>
   );
 }
