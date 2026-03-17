@@ -126,26 +126,3 @@ export function useDriversKpis() {
     },
     staleTime: 60_000,
   });
-}
-
-export function useDriversKpis() {
-  return useQuery({
-    queryKey: ["control-drivers-kpis"],
-    queryFn: async () => {
-      const [totalRes, activeRes, expiringRes] = await Promise.all([
-        supabase.from("driver_profiles").select("id", { count: "exact", head: true }),
-        supabase.from("driver_profiles").select("id", { count: "exact", head: true }).eq("is_active", true),
-        supabase.from("driver_profiles").select("id", { count: "exact", head: true })
-          .eq("is_active", true)
-          .not("licence_expiry", "is", null)
-          .lte("licence_expiry", new Date(Date.now() + 30 * 86400_000).toISOString().slice(0, 10)),
-      ]);
-      return {
-        total: totalRes.count ?? 0,
-        active: activeRes.count ?? 0,
-        licenceExpiring: expiringRes.count ?? 0,
-      };
-    },
-    staleTime: 60_000,
-  });
-}

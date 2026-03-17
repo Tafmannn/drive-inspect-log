@@ -10,10 +10,12 @@ import type { Job } from "@/lib/types";
 export type JobControlRow = Pick<
   Job,
   | "id" | "external_job_number" | "vehicle_reg" | "vehicle_make" | "vehicle_model"
-  | "status" | "driver_name" | "driver_id" | "pickup_city" | "pickup_postcode"
+  | "status" | "driver_name" | "pickup_city" | "pickup_postcode"
   | "delivery_city" | "delivery_postcode" | "job_date" | "updated_at"
   | "priority" | "completed_at" | "client_company" | "client_name"
 > & {
+  /** FK to driver_profiles if set */
+  driver_id: string | null;
   /** Resolved driver display name from FK join or legacy driver_name */
   resolvedDriverName: string | null;
 };
