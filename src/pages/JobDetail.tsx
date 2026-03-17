@@ -345,7 +345,7 @@ export const JobDetail = () => {
               Expenses{jobExpenses?.length ? ` (${jobExpenses.length})` : ""}
             </Button>
             {(job.has_pickup_inspection || job.has_delivery_inspection) && (
-              <Button variant="outline" size="sm" className="flex-1 min-h-[44px] rounded-lg" onClick={() => navigate(`/jobs/${job.id}/pod`)}>
+              <Button variant="outline" size="sm" className="flex-1 min-h-[44px] rounded-lg" onClick={() => navigate(withFrom(`/jobs/${job.id}/pod`, searchParams))}>
                 <FileText className="h-4 w-4 mr-1.5" /> POD Report
               </Button>
             )}
