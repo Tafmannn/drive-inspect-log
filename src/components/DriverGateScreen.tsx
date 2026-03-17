@@ -47,7 +47,7 @@ export function DriverGateScreen({ gateStatus }: { gateStatus: Exclude<DriverGat
   const config = STATUS_CONFIG[gateStatus];
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background pb-6">
       <AppHeader title="Dashboard" />
 
       <div className="p-4 max-w-lg mx-auto space-y-6">
