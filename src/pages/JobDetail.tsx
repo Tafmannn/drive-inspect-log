@@ -362,7 +362,6 @@ export const JobDetail = () => {
               <ChevronRight className="ml-1 h-4 w-4" />
             </Button>
           )}
-          </Button>
 
           {/* Secondary: Expenses */}
           <div className="flex gap-2">
