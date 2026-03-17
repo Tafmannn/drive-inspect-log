@@ -37,9 +37,11 @@ export function useAdminKpis() {
           .eq("is_hidden", false)
           .not("completed_at", "is", null)
           .gte("completed_at", `${todayStr}T00:00:00`),
+        // Prefer driver_id for unassigned detection; legacy rows with driver_name but no driver_id are still considered assigned
         supabase.from("jobs").select("id", { count: "exact", head: true })
           .eq("is_hidden", false)
           .in("status", ACTIVE_STATUSES as string[])
+          .is("driver_id", null)
           .is("driver_name", null),
       ]);
 

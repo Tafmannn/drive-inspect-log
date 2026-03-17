@@ -109,7 +109,7 @@ export function useJobsKpis() {
         supabase.from("jobs").select("id", { count: "exact", head: true })
           .eq("is_hidden", false).in("status", PENDING_STATUSES as string[]),
         supabase.from("jobs").select("id", { count: "exact", head: true })
-          .eq("is_hidden", false).in("status", ACTIVE_STATUSES as string[]).is("driver_name", null),
+          .eq("is_hidden", false).in("status", ACTIVE_STATUSES as string[]).is("driver_id", null).is("driver_name", null),
         supabase.from("jobs").select("id", { count: "exact", head: true })
           .eq("is_hidden", false),
       ]);
