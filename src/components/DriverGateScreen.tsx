@@ -1,8 +1,8 @@
 /**
  * Holding screens for drivers who aren't yet fully active.
+ * No BottomNav — gated drivers should not navigate freely.
  */
 import { AppHeader } from "@/components/AppHeader";
-import { BottomNav } from "@/components/BottomNav";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
