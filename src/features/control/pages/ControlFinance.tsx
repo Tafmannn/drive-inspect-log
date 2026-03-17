@@ -114,7 +114,7 @@ export function ControlFinance() {
         r.job_number || r.job_reg ? (
           <button
             className="text-xs text-primary hover:underline truncate block max-w-[110px]"
-            onClick={(e) => { e.stopPropagation(); navigate(`/jobs/${r.job_id}`); }}
+            onClick={(e) => { e.stopPropagation(); navigate(`/jobs/${r.job_id}?from=/control/finance`); }}
           >
             {r.job_number || r.job_reg}
           </button>
