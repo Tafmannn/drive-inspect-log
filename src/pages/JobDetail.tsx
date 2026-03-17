@@ -28,7 +28,7 @@ import { useJobExpenses } from "@/hooks/useExpenses";
 import { evaluateExecutableState, type ExecutableState } from "@/lib/executionRanking";
 import {
   Phone, MapPin, Building, Edit, ClipboardCheck, Truck,
-  FileText, Receipt, QrCode, Navigation, AlertTriangle, ChevronRight, Lock,
+  FileText, Receipt, QrCode, Navigation, AlertTriangle, ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
