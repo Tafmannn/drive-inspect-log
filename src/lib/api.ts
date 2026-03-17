@@ -257,20 +257,42 @@ export async function logJobActivity(
 }
 
 // ─── Dashboard Counts ────────────────────────────────────────────────
+// Uses count-only (head: true) queries to avoid transferring full row data.
 
 export async function getDashboardCounts(): Promise<{
   activeJobs: number;
   completedLast14Days: number;
   pending: number;
 }> {
-  const [active, completed, pending] = await Promise.all([
-    listActiveJobs(),
-    listCompletedJobs(),
-    listPendingJobs(),
+  const fourteenDaysAgo = new Date();
+  fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+
+  const [activeRes, completedRes, pendingRes] = await Promise.all([
+    supabase
+      .from('jobs')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_hidden', false)
+      .in('status', ACTIVE_STATUSES as string[]),
+    supabase
+      .from('jobs')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_hidden', false)
+      .not('completed_at', 'is', null)
+      .gte('completed_at', fourteenDaysAgo.toISOString()),
+    supabase
+      .from('jobs')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_hidden', false)
+      .in('status', PENDING_STATUSES as string[]),
   ]);
+
+  if (activeRes.error) throw activeRes.error;
+  if (completedRes.error) throw completedRes.error;
+  if (pendingRes.error) throw pendingRes.error;
+
   return {
-    activeJobs: active.length,
-    completedLast14Days: completed.length,
-    pending: pending.length,
+    activeJobs: activeRes.count ?? 0,
+    completedLast14Days: completedRes.count ?? 0,
+    pending: pendingRes.count ?? 0,
   };
 }

@@ -109,6 +109,8 @@ export const InspectionFlow = () => {
   // Role-based: only admin can pick from gallery; drivers get camera only
   const captureAttr = canUseGallery ? undefined : ("environment" as const);
 
+  // ─── Memoized derived data ─────────────────────────────────────────
+
   const { data: job, isLoading: jobLoading } = useJob(jobId ?? "");
   const submitMutation = useSubmitInspection();
 

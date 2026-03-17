@@ -218,6 +218,16 @@ export async function addPendingUpload(
   },
 ): Promise<PendingUpload> {
   const fileDataUrl = await compressAndConvertToDataUrl(file);
+
+  // Guard: check if adding this item would exceed the localStorage budget
+  const currentBytes = getStorageUsageBytes();
+  const newItemBytes = new Blob([fileDataUrl]).size + 500; // ~500 bytes overhead for metadata
+  if (currentBytes + newItemBytes > MAX_QUEUE_BYTES) {
+    throw new Error(
+      "Local storage limit reached. Please retry pending uploads before adding more photos."
+    );
+  }
+
   const id =
     "pu_" +
     (crypto.randomUUID
