@@ -458,7 +458,7 @@ Deno.serve(async (req) => {
       return await handlePull(supabase, token, spreadsheet_id, pullOrgId);
     } else if (action === "push") {
       const { jobIds } = body;
-      return await handlePush(supabase, token, spreadsheet_id, sheetName, jobIds);
+      return await handlePush(supabase, token, spreadsheet_id, sheetName, jobIds, userOrgId, isSuperAdmin);
     } else {
       return respond({ error: `Unknown action: ${action}` }, 400);
     }
@@ -757,6 +757,7 @@ async function handlePull(
         const { data: existing } = await supabase
           .from("jobs")
           .select("id")
+          .eq("org_id", orgId)
           .or(`sheet_job_id.eq.${jobPayload.external_job_number},external_job_number.eq.${jobPayload.external_job_number}`)
           .maybeSingle();
         
@@ -961,15 +962,26 @@ async function handlePush(
   token: string,
   spreadsheetId: string,
   sheetName: string,
-  jobIds?: string[]
+  jobIds?: string[],
+  userOrgId?: string | null,
+  isSuperAdmin?: boolean,
 ) {
   const log = { rows_processed: 0, rows_created: 0, rows_updated: 0, rows_skipped: 0, errors: [] as any[] };
 
   try {
-    // 1. Fetch jobs from Supabase
+    // 1. Fetch jobs from Supabase — always scope to org unless super admin with explicit jobIds
     let query = supabase.from("jobs").select("*").eq("is_hidden", false);
-    if (jobIds && jobIds.length > 0) {
+    if (isSuperAdmin && jobIds && jobIds.length > 0) {
+      // Super admin pushing specific jobs — allow cross-org
       query = query.in("id", jobIds);
+    } else if (userOrgId) {
+      query = query.eq("org_id", userOrgId);
+      if (jobIds && jobIds.length > 0) {
+        query = query.in("id", jobIds);
+      }
+    } else {
+      // No org_id and not super admin — should not happen (caught earlier), but fail safe
+      return respond({ error: "Cannot push: no org_id available." }, 403);
     }
     const { data: jobs, error: jobsErr } = await query;
     if (jobsErr) throw jobsErr;
@@ -979,11 +991,14 @@ async function handlePush(
 
     // 2. Fetch expenses aggregated per job
     const jobIdList = jobs.map((j: any) => j.id);
-    const { data: expenses } = await supabase
+    // Defence-in-depth: scope expenses to the same job set (already transitively org-scoped)
+    let expQuery = supabase
       .from("expenses")
       .select("job_id, amount")
       .in("job_id", jobIdList)
       .eq("is_hidden", false);
+    if (userOrgId) expQuery = expQuery.eq("org_id", userOrgId);
+    const { data: expenses } = await expQuery;
     const expensesByJob: Record<string, number> = {};
     for (const e of expenses ?? []) {
       expensesByJob[e.job_id] = (expensesByJob[e.job_id] || 0) + Number(e.amount || 0);
