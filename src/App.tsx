@@ -25,6 +25,7 @@ import { AdminUsers } from "./pages/AdminUsers";
 import { AdminDrivers } from "./pages/AdminDrivers";
 import { AdminPodReview } from "./pages/AdminPodReview";
 import { AdminFinance } from "./pages/AdminFinance";
+import { AdminOnboarding } from "./pages/AdminOnboarding";
 import { SuperAdminDashboard } from "./pages/SuperAdminDashboard";
 import {
   SuperAdminOrgs, SuperAdminUsers, SuperAdminJobs,
