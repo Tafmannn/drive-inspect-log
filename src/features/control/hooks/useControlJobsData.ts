@@ -31,9 +31,13 @@ const ALL_OPERATIONAL = [
   "incomplete",
 ] as string[];
 
+/** Stale threshold in hours — active jobs not updated within this window */
+const STALE_HOURS = 24;
+
 export interface JobsFilter {
   search: string;
-  status: "all" | "active" | "pod_review" | "completed" | "unassigned";
+  status: "all" | "active" | "pod_review" | "completed" | "unassigned" | "stale";
+  sort?: "updated" | "date";
 }
 
 export function useControlJobs(filter: JobsFilter) {
