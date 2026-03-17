@@ -20,26 +20,17 @@ export const CompletedJobs = () => {
         {jobs?.map((job) => (
           <JobCard
             key={job.id}
-            jobId={job.external_job_number || job.id.slice(0, 8)}
-            plateNumber={job.vehicle_reg}
-            clientName={job.client_name ?? undefined}
+            jobRef={job.external_job_number || job.id.slice(0, 8)}
+            reg={job.vehicle_reg}
             status={job.status}
-            jobDate={job.job_date ?? undefined}
-            distanceMiles={job.distance_miles}
-            collectFrom={{
-              name: job.pickup_contact_name,
-              phone: job.pickup_contact_phone,
-              company: job.pickup_company ?? undefined,
-              address: [job.pickup_address_line1, job.pickup_city, job.pickup_postcode].filter(Boolean).join(', '),
+            route={{
+              pickupAddress: [job.pickup_address_line1, job.pickup_city, job.pickup_postcode].filter(Boolean).join(', '),
+              deliveryAddress: [job.delivery_address_line1, job.delivery_city, job.delivery_postcode].filter(Boolean).join(', '),
             }}
-            deliverTo={{
-              name: job.delivery_contact_name,
-              phone: job.delivery_contact_phone,
-              company: job.delivery_company ?? undefined,
-              address: [job.delivery_address_line1, job.delivery_city, job.delivery_postcode].filter(Boolean).join(', '),
-            }}
+            hasPickupInspection={job.has_pickup_inspection}
+            hasDeliveryInspection={job.has_delivery_inspection}
             ctaLabel="View POD"
-            onStartInspection={() => navigate(`/jobs/${job.id}/pod`)}
+            onPrimaryAction={() => navigate(`/jobs/${job.id}/pod`)}
             onCardClick={() => navigate(`/jobs/${job.id}`)}
           />
         ))}

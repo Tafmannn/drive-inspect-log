@@ -59,28 +59,20 @@ export const JobList = () => {
           return (
             <JobCard
               key={job.id}
-              jobId={job.external_job_number || job.id.slice(0, 8)}
-              plateNumber={job.vehicle_reg}
-              clientName={job.client_name ?? undefined}
+              jobRef={job.external_job_number || job.id.slice(0, 8)}
+              reg={job.vehicle_reg}
               status={job.status}
-              jobDate={job.job_date ?? undefined}
-              distanceMiles={job.distance_miles}
-              collectFrom={{
-                name: job.pickup_contact_name,
-                phone: job.pickup_contact_phone,
-                company: job.pickup_company ?? undefined,
-                address: buildAddress([job.pickup_address_line1, job.pickup_address_line2, job.pickup_city, job.pickup_postcode]),
+              route={{
+                pickupAddress: buildAddress([job.pickup_address_line1, job.pickup_city, job.pickup_postcode]),
+                deliveryAddress: buildAddress([job.delivery_address_line1, job.delivery_city, job.delivery_postcode]),
+                pickupPhone: job.pickup_contact_phone || undefined,
+                deliveryPhone: job.delivery_contact_phone || undefined,
               }}
-              deliverTo={{
-                name: job.delivery_contact_name,
-                phone: job.delivery_contact_phone,
-                company: job.delivery_company ?? undefined,
-                address: buildAddress([job.delivery_address_line1, job.delivery_address_line2, job.delivery_city, job.delivery_postcode]),
-              }}
-              instructions={job.pickup_notes ?? undefined}
-              deadline={job.earliest_delivery_date ?? undefined}
+              restriction={job.earliest_delivery_date ? `Do not deliver before ${job.earliest_delivery_date}` : (job.pickup_notes ?? undefined)}
+              hasPickupInspection={job.has_pickup_inspection}
+              hasDeliveryInspection={job.has_delivery_inspection}
               ctaLabel={cta.label}
-              onStartInspection={() => navigate(cta.route)}
+              onPrimaryAction={() => navigate(cta.route)}
               onCardClick={() => navigate(`/jobs/${job.id}`)}
             />
           );
