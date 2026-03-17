@@ -144,7 +144,7 @@ export const ExpenseForm = () => {
         if (expense.job_id) {
           setJobId(expense.job_id);
           // Also load the associated job if not already loaded
-          if (!jobId) {
+          if (!initialJobId) {
             const { data: jobData } = await supabase
               .from("jobs")
               .select("*")
