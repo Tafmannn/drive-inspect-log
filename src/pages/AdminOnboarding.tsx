@@ -204,6 +204,7 @@ function OnboardingDetail({
     try {
       await reviewOnboarding(recordId, decision, reviewNotes);
       qc.invalidateQueries({ queryKey: ["admin-onboarding"] });
+      qc.invalidateQueries({ queryKey: ["admin-onboarding-detail"] });
       toast({ title: decision === "approved" ? "Approved" : "Rejected" });
       onBack();
     } catch (err) {
