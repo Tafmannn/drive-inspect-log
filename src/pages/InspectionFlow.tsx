@@ -1461,7 +1461,25 @@ export const InspectionFlow = () => {
       </div>
 
       <div className="p-4">
-        {renderCurrentStep()}
+        {stepError ? (
+          <Card className="p-6 text-center space-y-3">
+            <p className="text-sm text-destructive font-medium">Something went wrong on this step</p>
+            <p className="text-xs text-muted-foreground">{stepError}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setStepError(null);
+                // Force a re-render by toggling step
+                setCurrentStep((s) => s);
+              }}
+            >
+              Tap to retry
+            </Button>
+          </Card>
+        ) : (
+          renderCurrentStep()
+        )}
 
         <div className="flex justify-between mt-8 pt-6 border-t">
           <Button
