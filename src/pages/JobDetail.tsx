@@ -153,6 +153,9 @@ export const JobDetail = () => {
   const deliveryInspection = job.inspections.find((i) => i.type === "delivery");
   const primaryCta = derivePrimaryCta(job.status, job.has_pickup_inspection, job.has_delivery_inspection);
   const activeStep = deriveActiveStep(job.status);
+  const execEval = evaluateExecutableState(job);
+  const isBlocked = execEval.state === "blocked";
+  const isReviewOnly = execEval.state === "review_only";
 
   const pickupAddr = buildFullAddress([job.pickup_address_line1, job.pickup_address_line2, job.pickup_city, job.pickup_postcode]);
   const deliveryAddr = buildFullAddress([job.delivery_address_line1, job.delivery_address_line2, job.delivery_city, job.delivery_postcode]);
