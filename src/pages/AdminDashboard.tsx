@@ -175,7 +175,7 @@ function QuickRoutes() {
           icon={<Users className="w-5 h-5 stroke-[2]" />}
           title="Drivers"
           subtitle="Fleet & workload"
-          onClick={() => navigate("/admin/users")}
+          onClick={() => navigate("/admin/drivers")}
         />
         <DashboardCard
           icon={<Receipt className="w-5 h-5 stroke-[2]" />}
