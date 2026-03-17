@@ -122,23 +122,26 @@ serve(async (req) => {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+    // Validate JWT via getClaims (does not depend on session store)
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
-
     const token = authHeader.replace("Bearer ", "");
     const { data: claimsData, error: claimsErr } = await userClient.auth.getClaims(token);
     if (claimsErr || !claimsData?.claims) {
       return json({ error: "UNAUTHENTICATED" }, 401);
     }
 
-    // Fetch full user for role metadata
-    const { data: authData, error: authErr } = await userClient.auth.getUser();
-    if (authErr || !authData?.user) {
+    const userId = claimsData.claims.sub as string;
+
+    // Fetch full user via admin API (avoids session-store lookup)
+    const admin = createClient(supabaseUrl, serviceKey);
+    const { data: adminUserData, error: adminUserErr } = await admin.auth.admin.getUserById(userId);
+    if (adminUserErr || !adminUserData?.user) {
       return json({ error: "UNAUTHENTICATED" }, 401);
     }
 
-    const caller = authData.user;
+    const caller = adminUserData.user;
     const callerIsSuper = isSuperAdminCheck(caller);
     const callerIsAdmin = isAdminCheck(caller);
 
