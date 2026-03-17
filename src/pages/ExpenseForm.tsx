@@ -30,7 +30,8 @@ export const ExpenseForm = () => {
   const { canUseGallery } = useAuth();
   const { expenseId } = useParams();
   const [searchParams] = useSearchParams();
-  const jobId = searchParams.get("jobId") || "";
+  const initialJobId = searchParams.get("jobId") || "";
+  const [jobId, setJobId] = useState(initialJobId);
 
   const isEdit = Boolean(expenseId);
   const DRAFT_KEY = draftKey("expense", jobId);
