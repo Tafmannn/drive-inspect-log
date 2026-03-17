@@ -17,7 +17,7 @@ import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  listOnboarding, createOnboarding, updateOnboarding,
+  listOnboarding, getOnboarding, createOnboarding, updateOnboarding,
   reviewOnboarding, uploadOnboardingDoc,
   type OnboardingRecord, type OnboardingStatus,
 } from "@/lib/onboardingApi";
