@@ -83,7 +83,7 @@ export function ControlPodReview() {
           r.external_job_number?.toLowerCase().includes(s) ||
           r.client_company?.toLowerCase().includes(s) ||
           r.client_name?.toLowerCase().includes(s) ||
-          r.driver_name?.toLowerCase().includes(s) ||
+          r.resolvedDriverName?.toLowerCase().includes(s) ||
           r.delivery_postcode?.toLowerCase().includes(s) ||
           r.delivery_city?.toLowerCase().includes(s)
       );
