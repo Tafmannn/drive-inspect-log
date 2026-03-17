@@ -1498,7 +1498,15 @@ export const InspectionFlow = () => {
             </Button>
           </Card>
         ) : (
-          renderCurrentStep()
+          <>
+            {/* Keep signature step mounted (hidden) on review step so canvas refs stay alive */}
+            {currentStep === totalSteps && (
+              <div className="hidden" aria-hidden="true">
+                {renderSignaturesStep()}
+              </div>
+            )}
+            {renderCurrentStep()}
+          </>
         )}
 
         <div className="flex justify-between mt-8 pt-6 border-t">
