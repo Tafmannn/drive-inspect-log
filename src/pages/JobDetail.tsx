@@ -353,7 +353,7 @@ export const JobDetail = () => {
 
           {/* Admin-only: Edit */}
           {isAdmin && (
-            <Button variant="outline" className="w-full min-h-[44px] rounded-lg" onClick={() => navigate(`/jobs/${job.id}/edit`)}>
+            <Button variant="outline" className="w-full min-h-[44px] rounded-lg" onClick={() => navigate(withFrom(`/jobs/${job.id}/edit`, searchParams))}>
               <Edit className="h-4 w-4 mr-1.5" /> Edit Job
             </Button>
           )}
