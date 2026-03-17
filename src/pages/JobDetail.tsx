@@ -461,7 +461,7 @@ function InspectionRow({
 }: {
   label: string;
   done: boolean;
-  onAction: () => void;
+  onAction?: () => void;
   actionIcon: React.ComponentType<{ className?: string }>;
 }) {
   return (
@@ -471,10 +471,14 @@ function InspectionRow({
         <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase leading-none bg-success text-success-foreground">
           Complete
         </span>
-      ) : (
+      ) : onAction ? (
         <Button size="sm" onClick={onAction} className="min-h-[44px] rounded-lg">
           <ActionIcon className="w-4 h-4 mr-1" /> Start
         </Button>
+      ) : (
+        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+          <Lock className="h-3 w-3" /> Blocked
+        </span>
       )}
     </div>
   );
