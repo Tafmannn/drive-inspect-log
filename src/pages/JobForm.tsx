@@ -41,7 +41,9 @@ interface JobFormDraft {
 export const JobForm = () => {
   const navigate = useNavigate();
   const { jobId } = useParams();
+  const [searchParams] = useSearchParams();
   const isEdit = !!jobId;
+  const backTarget = resolveBackTarget(searchParams, isEdit ? `/jobs/${jobId}` : "/jobs");
 
   const { data: existingJob, isLoading: jobLoading } = useJob(jobId ?? "");
   const createMutation = useCreateJob();
