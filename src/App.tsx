@@ -22,6 +22,7 @@ import { AdminDashboard } from "./pages/AdminDashboard";
 import { AdminJobsQueue } from "./pages/AdminJobsQueue";
 import { Timesheets } from "./pages/Timesheets";
 import { AdminUsers } from "./pages/AdminUsers";
+import { AdminDrivers } from "./pages/AdminDrivers";
 import { SuperAdminDashboard } from "./pages/SuperAdminDashboard";
 import { InvoiceGenerator } from "./pages/InvoiceGenerator";
 import { Profile } from "./pages/Profile";
