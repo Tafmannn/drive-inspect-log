@@ -2,21 +2,21 @@
  * Jobs Control Page — /control/jobs
  * Primary dispatch workspace with search, filters, and inline actions.
  */
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ControlShell, ControlHeader, ControlSection } from "../components/shared/ControlShell";
 import { KpiStrip } from "../components/shared/KpiStrip";
 import { CompactTable, type CompactColumn } from "../components/shared/CompactTable";
-import { StatusChip } from "../components/shared/StatusChip";
 import { FilterBar } from "../components/shared/FilterBar";
 import { useControlJobs, useJobsKpis, type JobControlRow, type JobsFilter } from "../hooks/useControlJobsData";
+import { AssignDriverModal } from "../components/AssignDriverModal";
 import { UKPlate } from "@/components/UKPlate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getStatusStyle } from "@/lib/statusConfig";
 import {
   Search, Plus, Truck, ClipboardCheck, UserX, LayoutList,
-  Eye, UserPlus, FileText, Receipt,
+  Eye, UserPlus,
 } from "lucide-react";
 
 type StatusFilter = JobsFilter["status"];
