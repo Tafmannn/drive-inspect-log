@@ -16,6 +16,7 @@ export interface AdminJobQueues {
   inProgress: AdminJobRow[];
   review: AdminJobRow[];
   completed: AdminJobRow[];
+  missingEvidence: AdminJobRow[];
 }
 
 export function useAdminJobQueues() {
