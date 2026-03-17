@@ -113,7 +113,7 @@ function statusCol(): CompactColumn<DispatchBoardRow> {
     className: "w-[110px]",
     render: (r) => {
       const s = getStatusStyle(r.status);
-      const stale = isJobStale(r as any);
+      const stale = isJobStale(r);
       return (
         <div className="flex flex-col gap-0.5">
           <span
