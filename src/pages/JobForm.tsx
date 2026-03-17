@@ -58,6 +58,41 @@ export const JobForm = () => {
   const [customMakeValue, setCustomMakeValue] = useState("");
   const [customModelValue, setCustomModelValue] = useState("");
 
+  // Driver assignment state
+  const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
+  const [selectedDriverName, setSelectedDriverName] = useState<string | null>(null);
+  const [driverPickerOpen, setDriverPickerOpen] = useState(false);
+  const [driverSearch, setDriverSearch] = useState("");
+
+  // Fetch active drivers for picker
+  const { data: activeDrivers } = useQuery({
+    queryKey: ["job-form-drivers"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("driver_profiles")
+        .select("id, full_name, display_name, phone, is_active, trade_plate_number")
+        .eq("is_active", true)
+        .order("full_name", { ascending: true })
+        .limit(100);
+      if (error) throw error;
+      return data ?? [];
+    },
+    staleTime: 60_000,
+  });
+
+  const filteredDrivers = useMemo(() => {
+    if (!activeDrivers) return [];
+    if (!driverSearch.trim()) return activeDrivers;
+    const s = driverSearch.toLowerCase();
+    return activeDrivers.filter(
+      (d) =>
+        d.full_name.toLowerCase().includes(s) ||
+        d.display_name?.toLowerCase().includes(s) ||
+        d.phone?.toLowerCase().includes(s) ||
+        d.trade_plate_number?.toLowerCase().includes(s)
+    );
+  }, [activeDrivers, driverSearch]);
+
   // Autosave draft state
   const [showDraftPrompt, setShowDraftPrompt] = useState(false);
   const dk = isEdit ? "" : draftKey("newJob", "create");
