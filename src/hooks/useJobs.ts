@@ -14,26 +14,36 @@ export interface DashboardCounts {
   pendingUploads: number;
 }
 
-export function useDashboardCounts() {
+/**
+ * Dashboard counts. When driverProfileId is provided, scopes counts
+ * to only that driver's assigned jobs.
+ */
+export function useDashboardCounts(driverProfileId?: string | null) {
   return useQuery({
-    queryKey: ["dashboard-counts"],
+    queryKey: ["dashboard-counts", driverProfileId ?? "all"],
     queryFn: async () => {
       const fourteenDaysAgo = new Date();
       fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
 
-      const [activeRes, completedRes] = await Promise.all([
-        supabase
-          .from("jobs")
-          .select("id", { count: "exact", head: true })
-          .eq("is_hidden", false)
-          .in("status", ACTIVE_STATUSES as string[]),
-        supabase
-          .from("jobs")
-          .select("id", { count: "exact", head: true })
-          .eq("is_hidden", false)
-          .not("completed_at", "is", null)
-          .gte("completed_at", fourteenDaysAgo.toISOString()),
-      ]);
+      let activeQuery = supabase
+        .from("jobs")
+        .select("id", { count: "exact", head: true })
+        .eq("is_hidden", false)
+        .in("status", ACTIVE_STATUSES as string[]);
+
+      let completedQuery = supabase
+        .from("jobs")
+        .select("id", { count: "exact", head: true })
+        .eq("is_hidden", false)
+        .not("completed_at", "is", null)
+        .gte("completed_at", fourteenDaysAgo.toISOString());
+
+      if (driverProfileId) {
+        activeQuery = activeQuery.eq("driver_id", driverProfileId);
+        completedQuery = completedQuery.eq("driver_id", driverProfileId);
+      }
+
+      const [activeRes, completedRes] = await Promise.all([activeQuery, completedQuery]);
 
       return {
         myJobs: activeRes.count ?? 0,
