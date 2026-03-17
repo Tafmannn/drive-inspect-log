@@ -343,7 +343,7 @@ export const JobDetail = () => {
           {/* Executable state banner */}
           {(isBlocked || isReviewOnly) && (
             <div className="flex items-center gap-2 p-3 rounded-xl bg-muted/60 border border-border">
-              <Lock className="h-4 w-4 text-muted-foreground shrink-0" />
+              <AlertTriangle className="h-4 w-4 text-muted-foreground shrink-0" />
               <span className="text-xs text-muted-foreground font-medium">
                 {isBlocked ? `Blocked: ${execEval.reason}` : execEval.reason}
               </span>
