@@ -368,7 +368,7 @@ export function ControlOverview() {
             data={podQueue ?? []}
             loading={podLoading}
             emptyMessage="No jobs awaiting POD review."
-            onRowClick={(row) => navigate(`/jobs/${row.id}/pod`)}
+            onRowClick={(row) => navigate(`/jobs/${row.id}/pod?from=/control`)}
             maxRows={8}
           />
         </ControlSection>
