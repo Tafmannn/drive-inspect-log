@@ -595,31 +595,23 @@ export const AdminDashboard = () => {
         {/* Tier 2 — Ranked Needs Action (primary section) */}
         <NeedsActionQueue />
 
-        {/* Tier 3 — Live Queue Previews */}
+        {/* Tier 3 — Queue Snapshots (broader view, not top interventions) */}
         <div className="space-y-3">
           <QueuePreviewSection
-            title="Unassigned"
-            count={queues?.unassigned?.length}
-            items={queues?.unassigned ?? []}
+            title="Stale Active"
+            count={(queues?.needsAttention ?? []).filter(j => isJobStale(j)).length}
+            items={(queues?.needsAttention ?? []).filter(j => isJobStale(j))}
             loading={isLoading}
-            emptyText="All jobs assigned."
-            onViewAll={() => navigate("/admin/jobs")}
+            emptyText="No stale jobs."
+            onViewAll={() => navigate("/admin/jobs?filter=attention")}
           />
           <QueuePreviewSection
-            title="In Progress"
-            count={queues?.inProgress?.length}
-            items={queues?.inProgress ?? []}
-            loading={isLoading}
-            emptyText="No active jobs."
-            onViewAll={() => navigate("/control/jobs?status=active")}
-          />
-          <QueuePreviewSection
-            title="POD Review"
+            title="Awaiting Review"
             count={queues?.review?.length}
             items={queues?.review ?? []}
             loading={isLoading}
             emptyText="No PODs pending."
-            onViewAll={() => navigate("/control/pod-review")}
+            onViewAll={() => navigate("/admin/jobs?filter=review")}
           />
         </div>
 
