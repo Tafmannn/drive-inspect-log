@@ -138,7 +138,7 @@ function OnboardingDetail({
     queryKey: ["admin-onboarding-detail", recordId],
     queryFn: () => {
       if (!recordId) return null;
-      return listOnboarding().then(all => all.find(r => r.id === recordId) ?? null);
+      return getOnboarding(recordId);
     },
     enabled: !!recordId,
   });
