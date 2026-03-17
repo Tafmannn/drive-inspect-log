@@ -16,6 +16,7 @@ export interface AdminJobQueues {
   inProgress: AdminJobRow[];
   review: AdminJobRow[];
   completed: AdminJobRow[];
+  missingEvidence: AdminJobRow[];
 }
 
 export function useAdminJobQueues() {
@@ -63,6 +64,7 @@ export function useAdminJobQueues() {
         inProgress: [],
         review: [],
         completed: [],
+        missingEvidence: [],
       };
 
       for (const row of rows) {
@@ -95,6 +97,17 @@ export function useAdminJobQueues() {
         // Completed: terminal (show last 20)
         if (isTerminal) {
           queues.completed.push(row);
+        }
+
+        // Missing Evidence: completed/delivered jobs missing inspections (last 7 days)
+        if (
+          (isTerminal || isPending) &&
+          (!row.has_pickup_inspection || !row.has_delivery_inspection)
+        ) {
+          const weekAgo = Date.now() - 7 * 86400_000;
+          if (new Date(row.updated_at).getTime() > weekAgo) {
+            queues.missingEvidence.push(row);
+          }
         }
       }
 
