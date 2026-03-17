@@ -949,7 +949,7 @@ export const InspectionFlow = () => {
     ];
 
     // For delivery review, show the saved pickup checklist from the job data
-    const savedPickup = job?.inspections.find((i) => i.type === "pickup");
+    const savedPickup = job?.inspections?.find((i) => i.type === "pickup") ?? null;
 
     return (
       <div className="space-y-6">
