@@ -28,7 +28,7 @@ import { cn } from "@/lib/utils";
 import {
   UserX, Clock, FileSearch, ImageOff, ChevronRight,
   Zap, Eye, UserPlus, MapPin, AlertTriangle, User,
-  Truck, Users, ClipboardCheck, Receipt,
+  Truck, Users, ClipboardCheck, Receipt, ShieldAlert,
 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────
