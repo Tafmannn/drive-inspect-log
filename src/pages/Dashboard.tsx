@@ -117,18 +117,22 @@ export const Dashboard = () => {
         <section>
           <h2 className="text-[14px] font-semibold text-muted-foreground mb-3">Utilities</h2>
           <div className="space-y-3">
-            <DashboardCard
-              icon={syncing ? <Loader2 className="w-6 h-6 stroke-[2] animate-spin" /> : <Download className="w-6 h-6 stroke-[2]" />}
-              title="Download Jobs"
-              subtitle={syncing ? "Syncing jobs…" : "Refresh and sync your jobs"}
-              onClick={syncing ? undefined : handleDownloadJobs}
-            />
-            <DashboardCard
-              icon={<Receipt className="w-6 h-6 stroke-[2]" />}
-              title="Expenses"
-              subtitle="Log and view your expenses"
-              onClick={() => navigate("/expenses")}
-            />
+            {(isAdmin || isSuperAdmin) && (
+              <DashboardCard
+                icon={syncing ? <Loader2 className="w-6 h-6 stroke-[2] animate-spin" /> : <Download className="w-6 h-6 stroke-[2]" />}
+                title="Download Jobs"
+                subtitle={syncing ? "Syncing jobs…" : "Refresh and sync your jobs"}
+                onClick={syncing ? undefined : handleDownloadJobs}
+              />
+            )}
+            {(isAdmin || isSuperAdmin) && (
+              <DashboardCard
+                icon={<Receipt className="w-6 h-6 stroke-[2]" />}
+                title="Expenses"
+                subtitle="Log and view your expenses"
+                onClick={() => navigate("/expenses")}
+              />
+            )}
           </div>
         </section>
 
