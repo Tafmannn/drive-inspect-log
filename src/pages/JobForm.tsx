@@ -538,7 +538,7 @@ export const JobForm = () => {
       <AppHeader
         title={isEdit ? "Edit Job" : "New Job"}
         showBack
-        onBack={() => navigate(isEdit ? `/jobs/${jobId}` : "/jobs")}
+        onBack={() => navigate(backTarget)}
       />
       <div className="p-4 space-y-6 max-w-lg mx-auto">
         <form
