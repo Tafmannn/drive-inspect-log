@@ -151,7 +151,7 @@ serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const action = body._action ?? "list";
-    const admin = createClient(supabaseUrl, serviceKey);
+    // admin client already created above
 
     // ── LIST ──
     if (action === "list") {
