@@ -125,6 +125,7 @@ export async function getExpensesForJob(jobId: string): Promise<ExpenseWithRecei
     .from('expenses')
     .select('*')
     .eq('job_id', jobId)
+    .eq('is_hidden', false)
     .order('date', { ascending: false });
   if (error) throw error;
   const expenses = (data ?? []) as Expense[];

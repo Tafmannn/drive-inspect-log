@@ -7,10 +7,13 @@ export function useExpenses(filters?: {
   category?: string;
   dateFrom?: string;
   dateTo?: string;
-}) {
+} | undefined) {
+  // When filters is explicitly undefined (e.g. scoped mode), disable the query
+  const enabled = filters !== undefined;
   return useQuery({
     queryKey: ['expenses', filters],
     queryFn: () => expApi.listExpenses(filters),
+    enabled,
   });
 }
 
