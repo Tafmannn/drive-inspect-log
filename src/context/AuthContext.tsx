@@ -32,6 +32,8 @@ export interface AppUser {
   email: string;
   roles: AppRole[];
   status: "active" | "inactive";
+  /** App-level account status from user_profiles */
+  accountStatus?: "pending_activation" | "active" | "suspended";
 }
 
 interface AuthContextValue {
