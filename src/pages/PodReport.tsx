@@ -169,25 +169,34 @@ export const PodReport = () => {
           continue;
         }
 
-        const resolved = await resolveMediaUrlAsync(raw);
-        const hasRenderableHttpsUrl = typeof resolved === "string" && resolved.startsWith("https://");
+        try {
+          const resolved = await resolveMediaUrlAsync(raw);
+          const hasRenderableHttpsUrl = typeof resolved === "string" && resolved.startsWith("https://");
 
-        if (!hasRenderableHttpsUrl) {
-          nextSignatures[slot] = null;
-          console.error("[POD-Sig] resolution failed or non-https result", {
+          if (!hasRenderableHttpsUrl) {
+            nextSignatures[slot] = null;
+            console.error("[POD-Sig] resolution failed or non-https result", {
+              slot,
+              raw: raw.slice(0, 180),
+              resolved: resolved?.slice(0, 180) ?? null,
+            });
+            continue;
+          }
+
+          nextSignatures[slot] = resolved;
+          console.info("[POD-Sig] resolved", {
             slot,
             raw: raw.slice(0, 180),
-            resolved: resolved?.slice(0, 180) ?? null,
+            resolved: resolved.slice(0, 180),
           });
-          continue;
+        } catch (err) {
+          nextSignatures[slot] = null;
+          console.error("[POD-Sig] resolution threw", {
+            slot,
+            raw: raw.slice(0, 180),
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
-
-        nextSignatures[slot] = resolved;
-        console.info("[POD-Sig] resolved", {
-          slot,
-          raw: raw.slice(0, 180),
-          resolved: resolved.slice(0, 180),
-        });
       }
 
       await Promise.all(

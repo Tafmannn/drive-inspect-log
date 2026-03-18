@@ -119,13 +119,25 @@ export async function resolveMediaUrlAsync(
       const result = await internalStorageService.resolveSignatureUrlStructured(normalizedUrl);
       if (result.url) return result.url;
 
-      console.error("[MediaResolver] Bare signature path failed Supabase signing", {
+      // Supabase bucket miss → fallback to GCS proxy (object may live in GCS)
+      if (result.errorCode === 'OBJECT_NOT_FOUND') {
+        console.info("[MediaResolver] Supabase OBJECT_NOT_FOUND for signature, falling back to GCS", {
+          path: normalizedUrl.slice(0, 180),
+        });
+        const gcsUrl = await resolveGcsViaAuthenticatedFetch(normalizedUrl);
+        if (gcsUrl) return gcsUrl;
+
+        console.error("[MediaResolver] Signature path failed BOTH Supabase and GCS", {
+          rawInput: normalizedUrl.slice(0, 180),
+          supabaseError: result.errorMessage,
+        });
+        return null;
+      }
+
+      console.error("[MediaResolver] Bare signature path failed Supabase signing (non-recoverable)", {
         rawInput: normalizedUrl.slice(0, 180),
         errorCode: result.errorCode,
         errorMessage: result.errorMessage,
-        detectedFormat: result.format,
-        bucket: result.bucket,
-        path: result.path?.slice(0, 160) ?? null,
       });
       return null;
     }
