@@ -19,8 +19,6 @@ export const PhotoViewer = ({ photos, title }: PhotoViewerProps) => {
   const [zoom, setZoom] = useState(1);
   const [downloading, setDownloading] = useState(false);
 
-  if (photos.length === 0) return null;
-
   const openPhoto = (idx: number) => {
     setSelectedIndex(idx);
     setZoom(1);
