@@ -260,7 +260,7 @@ export const InspectionFlow = () => {
           if (typeof _currentStep === "number" && _currentStep >= 1 && _currentStep <= totalSteps) {
             setCurrentStep(_currentStep);
           }
-          sessionActive.current = true;
+          markSessionActive();
           return;
         }
         setShowDraftPrompt(true);
