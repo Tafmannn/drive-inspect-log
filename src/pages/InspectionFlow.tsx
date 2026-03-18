@@ -229,6 +229,9 @@ export const InspectionFlow = () => {
   }, [formState, currentStep, dk]);
 
   // ─── DRAFT RESTORE: check on mount (once) ───
+  // Guard against false triggers from screen rotation / orientation change:
+  // If the draft was saved <10 seconds ago, it's a remount, not a genuine interruption.
+  // In that case, silently restore without showing the prompt.
   useEffect(() => {
     if (!dk || sessionActive.current) return;
     const draft = loadDraft<Record<string, unknown>>(dk);
@@ -238,6 +241,20 @@ export const InspectionFlow = () => {
       const hasMeaningful = d.odometer || d.fuelLevel || d.notes || d.customerName || d.driverName ||
         d.vehicleCondition || d.lightCondition || d.numberOfKeys;
       if (hasMeaningful) {
+        // Check if this is a rotation/remount (draft saved very recently)
+        const savedAge = draft.savedAt
+          ? Date.now() - new Date(draft.savedAt).getTime()
+          : Infinity;
+        if (savedAge < 10_000) {
+          // Silent restore — rotation or brief remount, not a genuine interruption
+          const { _currentStep, ...fields } = draft.data;
+          setFormState(prev => ({ ...prev, ...fields }));
+          if (typeof _currentStep === "number" && _currentStep >= 1 && _currentStep <= totalSteps) {
+            setCurrentStep(_currentStep);
+          }
+          sessionActive.current = true;
+          return;
+        }
         setShowDraftPrompt(true);
         return;
       }
