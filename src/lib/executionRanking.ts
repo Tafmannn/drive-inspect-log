@@ -30,25 +30,18 @@ export interface ExecutableEvaluation {
 
 /**
  * Evaluate whether a job is executable, review-only, or blocked.
- * Checks workflow status, earliest delivery restriction, and prior-step completion.
+ * Checks workflow status and active-job lock (driver has another in-progress job).
+ *
+ * @param job - The job to evaluate
+ * @param siblingJobs - All jobs assigned to the same driver (for active-job lock)
  */
-export function evaluateExecutableState(job: Job): ExecutableEvaluation {
-  const now = new Date();
-  const todayStr = now.toISOString().slice(0, 10);
-
+export function evaluateExecutableState(
+  job: Job,
+  siblingJobs?: Job[],
+): ExecutableEvaluation {
   // Terminal jobs are review-only
   if ((TERMINAL_STATUSES as string[]).includes(job.status)) {
     return { state: "review_only", reason: "Completed" };
-  }
-
-  // If delivery restricted and pickup not started, block delivery action
-  if (
-    job.earliest_delivery_date &&
-    job.earliest_delivery_date > todayStr &&
-    job.has_pickup_inspection &&
-    !job.has_delivery_inspection
-  ) {
-    return { state: "blocked", reason: `Restricted until ${job.earliest_delivery_date}` };
   }
 
   // Pending statuses (delivery_complete, pod_ready) are review-only
@@ -59,6 +52,24 @@ export function evaluateExecutableState(job: Job): ExecutableEvaluation {
   // Draft/incomplete/cancelled are blocked
   if (["draft", "incomplete", "cancelled", "failed"].includes(job.status)) {
     return { state: "blocked", reason: "Not actionable" };
+  }
+
+  // Active-job lock: if driver has another in-progress job, block this one
+  if (siblingJobs && siblingJobs.length > 0) {
+    const inProgressStatuses = ["pickup_in_progress", "delivery_in_progress"];
+    const thisIsInProgress = inProgressStatuses.includes(job.status);
+    if (!thisIsInProgress) {
+      const blockingJob = siblingJobs.find(
+        (s) => s.id !== job.id && inProgressStatuses.includes(s.status)
+      );
+      if (blockingJob) {
+        const blockRef = blockingJob.external_job_number || blockingJob.id.slice(0, 8);
+        return {
+          state: "blocked",
+          reason: `Complete Job ${blockRef} first`,
+        };
+      }
+    }
   }
 
   // Default: executable
