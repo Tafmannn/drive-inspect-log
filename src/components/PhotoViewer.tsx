@@ -83,6 +83,8 @@ export const PhotoViewer = ({ photos, title }: PhotoViewerProps) => {
     }
   }, [selectedIndex, photos, downloading]);
 
+  if (photos.length === 0) return null;
+
   return (
     <div className="space-y-2">
       <h4 className="text-sm font-medium text-foreground">
