@@ -369,7 +369,7 @@ export const PodReport = () => {
   if (isLoading || !job) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
-        <AppHeader title="POD Report" showBack onBack={() => navigate(-1)} />
+        <AppHeader title="POD Report" showBack onBack={goBack} />
         <div className="flex-1 flex items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
