@@ -147,8 +147,12 @@ export const InspectionFlow = () => {
   const [submitting, setSubmitting] = useState(false);
   const [showDraftPrompt, setShowDraftPrompt] = useState(false);
   // Tracks that we're in an active editing session — prevents draft modal
-  // from re-appearing after camera/photo capture causes a remount.
-  const sessionActive = useRef(false);
+  // from re-appearing after camera/photo capture or screen rotation causes a remount.
+  // Backed by sessionStorage so it survives orientation-change remounts.
+  const sessionKey = `axentra.inspection.session.${jobId}.${type}`;
+  const sessionActive = useRef(
+    typeof window !== "undefined" && sessionStorage.getItem(sessionKey) === "1"
+  );
 
   // Photo label modal state
   const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
