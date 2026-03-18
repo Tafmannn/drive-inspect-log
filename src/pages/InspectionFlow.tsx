@@ -288,7 +288,7 @@ export const InspectionFlow = () => {
 
   const handleDiscardDraft = () => {
     if (dk) clearDraft(dk);
-    sessionActive.current = true;
+    markSessionActive();
     setShowDraftPrompt(false);
   };
 
