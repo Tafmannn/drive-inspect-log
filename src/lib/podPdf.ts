@@ -675,21 +675,20 @@ function renderSignatures(
 }
 
 /**
- * Resolve a signature URL to a fresh signed URL if it uses the
- * supabase-sig:// scheme or is an expired Supabase signed URL.
+ * Resolve a signature URL through the canonical server-side Edge Function.
  */
 async function resolveSignatureForPdf(
   url: string,
   meta?: { jobId?: string; orgId?: string }
 ): Promise<string> {
   try {
-    const { internalStorageService } = await import('./internalStorageService');
-    const resolved = await internalStorageService.resolveSignatureUrl(url);
+    const { resolveSignatureUrlViaEdge } = await import('./resolveSignatureUrlViaEdge');
+    const resolved = await resolveSignatureUrlViaEdge(url);
     if (!resolved) {
       const { logClientEvent } = await import('./logger');
       void logClientEvent('signature_resolve_failed', 'warn', {
         jobId: meta?.jobId,
-        message: `Could not resolve signature URL`,
+        message: `Could not resolve signature URL via Edge Function`,
         source: 'storage',
         type: 'upload',
         context: { originalUrl: url.slice(0, 120), orgId: meta?.orgId },
