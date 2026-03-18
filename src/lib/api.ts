@@ -124,7 +124,50 @@ export async function updateJob(jobId: string, input: Partial<Job>): Promise<Job
   return data as Job;
 }
 
-// ─── Archive ─────────────────────────────────────────────────────────
+// ─── Soft Delete ─────────────────────────────────────────────────────
+
+export async function deleteJob(jobId: string): Promise<void> {
+  const job = await getJob(jobId);
+  const fromStatus = job.status;
+  const { error } = await supabase.from('jobs').update({
+    is_hidden: true,
+    status: 'archived',
+  } as any).eq('id', jobId);
+  if (error) throw error;
+  await logJobActivity(jobId, 'job_deleted', fromStatus, 'archived', 'Soft-deleted by admin');
+}
+
+// ─── Admin Status Change ─────────────────────────────────────────────
+
+export async function adminChangeStatus(
+  jobId: string,
+  newStatus: string,
+  notes?: string,
+): Promise<Job> {
+  const job = await getJob(jobId);
+  const fromStatus = job.status;
+
+  const updates: Partial<Job> = { status: newStatus as any };
+  // Set completed_at for terminal statuses
+  if (['completed', 'pod_ready', 'delivery_complete'].includes(newStatus) && !job.completed_at) {
+    updates.completed_at = new Date().toISOString();
+  }
+  // Clear completed_at if re-opening
+  if (['ready_for_pickup', 'assigned'].includes(newStatus) && job.completed_at) {
+    updates.completed_at = null;
+  }
+
+  const updated = await updateJob(jobId, updates);
+  await logJobActivity(jobId, 'admin_status_change', fromStatus, newStatus, notes || `Admin changed status from ${fromStatus} to ${newStatus}`);
+
+  if (await isFeatureEnabled("AUTO_SHEET_SYNC_ON_JOB_UPDATE")) {
+    void syncJobToSheetIfEnabled(jobId);
+  }
+
+  return updated;
+}
+
+// ─── Archive (legacy) ────────────────────────────────────────────────
 
 export async function archiveJob(jobId: string): Promise<void> {
   const { error } = await supabase.from('jobs').update({ is_hidden: true } as any).eq('id', jobId);

@@ -109,6 +109,27 @@ export function useUpdateJob() {
   });
 }
 
+export function useDeleteJob() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (jobId: string) => api.deleteJob(jobId),
+    onSuccess: () => {
+      invalidateForEvent(qc, "job_status_changed");
+    },
+  });
+}
+
+export function useAdminChangeStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ jobId, newStatus, notes }: { jobId: string; newStatus: string; notes?: string }) =>
+      api.adminChangeStatus(jobId, newStatus, notes),
+    onSuccess: (_data, vars) => {
+      invalidateForEvent(qc, "job_status_changed", [["job", vars.jobId]]);
+    },
+  });
+}
+
 export function useSubmitInspection() {
   const qc = useQueryClient();
   return useMutation({
