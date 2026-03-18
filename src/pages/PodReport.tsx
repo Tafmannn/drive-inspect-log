@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { resolveMediaUrlAsync } from "@/lib/mediaResolver";
-import { supabase } from "@/integrations/supabase/client";
+import { resolveSignatureUrlSimple } from "@/lib/resolveSignatureUrlSimple";
 import { AppHeader } from "@/components/AppHeader";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
