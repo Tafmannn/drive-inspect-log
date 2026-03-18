@@ -244,12 +244,31 @@ function QueueSection({
 
 export function AdminPodReview() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const { data, isLoading, error } = usePodReviewData();
   const [filter, setFilter] = useState<BandFilter>("all");
   const [search, setSearch] = useState("");
+  const [confirming, setConfirming] = useState<string | null>(null);
 
   const kpis = data?.kpis;
   const groups = data?.groups;
+
+  const handleConfirmReview = async (jobId: string) => {
+    setConfirming(jobId);
+    try {
+      const { error } = await supabase
+        .from("jobs")
+        .update({ status: "completed", completed_at: new Date().toISOString() } as any)
+        .eq("id", jobId);
+      if (error) throw error;
+      toast({ title: "Review confirmed — job completed" });
+      invalidateForEvent(qc, "job_status_changed", [["job", jobId]]);
+    } catch (e: any) {
+      toast({ title: "Failed", description: e.message, variant: "destructive" });
+    } finally {
+      setConfirming(null);
+    }
+  };
 
   // Search helper
   const filterRows = (rows: PodReviewRow[]) => {
