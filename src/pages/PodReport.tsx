@@ -153,9 +153,10 @@ export const PodReport = () => {
         delivery_customer: delivery?.customer_signature_url ?? null,
       };
 
-      console.info("[POD-Sig] resolve start", { effectId, jobId: job.id, slots: sigSlots });
+      console.log("[DEBUG SIG SLOTS]", sigSlots);
 
-      // Resolve each slot independently with per-slot isolation
+      // BYPASS: resolve signatures directly via Supabase createSignedUrl
+      // instead of the edge function, to isolate the rendering issue
       await Promise.all(
         Object.entries(sigSlots).map(async ([slot, raw]) => {
           if (!raw) {
@@ -163,32 +164,37 @@ export const PodReport = () => {
             return;
           }
 
+          console.log("[DEBUG SIG RAW]", { slot, raw });
+
           try {
-            console.info("[POD-Sig] slot→edge", { effectId, slot, raw: raw.slice(0, 120) });
-            const resolved = await resolveMediaUrlAsync(raw);
+            // Direct signed URL from Supabase storage (bypasses edge function)
+            const { data, error } = await supabase.storage
+              .from("vehicle-signatures")
+              .createSignedUrl(raw, 3600);
 
-            if (cancelled) return; // guard stale write
+            if (cancelled) return;
 
-            if (typeof resolved !== "string" || !resolved.startsWith("https://")) {
-              nextSignatures[slot] = null;
-              console.error("[POD-Sig] non-https or null", {
-                effectId, slot,
-                raw: raw.slice(0, 120),
-                resolved: resolved?.slice(0, 80) ?? null,
-              });
+            if (error || !data?.signedUrl) {
+              console.error("[SIG DIRECT SIGN FAILED]", { slot, raw, error: error?.message });
+              // Fallback: try the edge function path
+              const resolved = await resolveMediaUrlAsync(raw);
+              if (cancelled) return;
+              console.log("[DEBUG SIG RESOLVED via edge]", { slot, resolved: resolved?.slice(0, 120) });
+              if (!resolved || !resolved.startsWith("https://")) {
+                console.error("[SIG FAIL]", { slot, raw, resolved });
+                nextSignatures[slot] = null;
+                return;
+              }
+              nextSignatures[slot] = resolved;
               return;
             }
 
-            nextSignatures[slot] = resolved;
-            console.info("[POD-Sig] slot resolved", {
-              effectId, slot,
-              urlPrefix: resolved.slice(0, 80),
-            });
+            console.log("[DEBUG SIG RESOLVED via direct]", { slot, url: data.signedUrl.slice(0, 120) });
+            nextSignatures[slot] = data.signedUrl;
           } catch (err) {
             nextSignatures[slot] = null;
-            console.error("[POD-Sig] slot threw", {
-              effectId, slot,
-              raw: raw.slice(0, 120),
+            console.error("[SIG EXCEPTION]", {
+              slot, raw: raw.slice(0, 120),
               error: err instanceof Error ? err.message : String(err),
             });
           }
