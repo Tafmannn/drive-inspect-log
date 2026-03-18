@@ -185,6 +185,8 @@ export interface JobWithRelations extends Job {
   photos: Photo[];
   damage_items: DamageItem[];
   activity_log: JobActivityLog[];
+  /** Resolved from driver_profiles FK join, fallback to driver_name */
+  resolvedDriverName?: string | null;
 }
 
 export interface DamageItemDraft {
