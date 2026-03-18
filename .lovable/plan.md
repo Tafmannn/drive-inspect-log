@@ -1,86 +1,78 @@
 
 
-## Diagnosis
+## End-to-End Fix Plan: Broken Integrations
 
-### 1. Role Downgrade (Root Cause of "lost" super admin)
-The audit log shows that at **22:37:46 today**, a `set_role` action was executed **against your own account**, changing JWT metadata from `super_admin` to `admin`:
+### Root Causes Identified
 
-```text
-action:      set_role
-target:      9982e4e3-... (info@axentravehicles.com)
-before_state: { role: super_admin }
-after_state:  { role: admin, roles: [ADMIN, DRIVER] }
-performed_by: info@axentravehicles.com
-```
+**Issue 1 — CORS blocks all edge function calls from the preview domain**
 
-**Database** (`user_profiles.role`) was also set to `admin` by the edge function (line 634-637), but the audit `before_state` shows it was `super_admin` before. However, a subsequent correction may have restored the DB row to `super_admin` — the current DB shows `role = 'super_admin'`.
+Every single edge function (11 functions) uses a hardcoded `ALLOWED_ORIGINS` list containing only `localhost:5173`, `*.lovable.app`, and `axentra.lovable.app`. The actual preview runs on `*.lovableproject.com`, which is NOT in this list. When the origin doesn't match, the function returns `Access-Control-Allow-Origin: http://localhost:5173`, which the browser rejects. This silently breaks DVLA lookup, company search, postcode lookup, maps directions, GCS upload/proxy, vision OCR, sheet sync, and all admin functions.
 
-**JWT metadata** still says `role: admin, roles: ["ADMIN", "DRIVER"]`. Since `AuthContext.deriveAppUser()` reads roles from JWT, the app sees you as ADMIN only. This hides all super-admin-only surfaces and routes.
+**Issue 2 — Client APIs send anon key instead of user session token**
 
-### 2. Data is NOT lost
-- **35 jobs** exist in org `a0000000-...`
-- **4 user profiles** exist
-- **2 driver profiles** exist
-
-The "disappeared work" is a visibility issue: super-admin-only pages/routes redirect you because the app thinks you're just an admin.
-
-### 3. The `is_protected` flag did not prevent this
-The `set_role` edge function checks `is_protected` but only blocks non-super-admin callers. Since you were super_admin at the time of the call, you were allowed to modify your own account. There is no self-modification guard for `set_role`.
+Four client-side API modules (`businessSearchApi.ts`, `postcodeApi.ts`, `mapsApi.ts`, `sheetSyncApi.ts`) use raw `fetch()` with `Authorization: Bearer ${ANON_KEY}`. The edge functions then call `supabase.auth.getUser()` which returns null for anon keys, causing a 401 UNAUTHENTICATED response. Only `vehicleLookupApi.ts`, `adminApi.ts`, `visionApi.ts`, and `gcsStorageService.ts` correctly use `supabase.functions.invoke()` which sends the real user token.
 
 ---
 
-## Fix Plan
+### Fix Plan
 
-### Step A — Restore JWT metadata to super_admin
-The `user_profiles` row already says `super_admin`, but the JWT is stale at `admin`. We need to update the auth user's metadata to match.
+#### Part 1: Fix CORS in all 11 edge functions
 
-**Approach:** Add a self-protection guard to the `set_role` action, then fix the JWT via the edge function.
+Replace the restrictive `ALLOWED_ORIGINS` + `cors()` function in every edge function with the standard Lovable CORS pattern:
 
-In `supabase/functions/user-lifecycle/index.ts`, add a guard at line ~603:
-```typescript
-// Prevent self-demotion
-if (user_id === caller.id) {
-  return json({ error: "CANNOT_MODIFY_OWN_ROLE" }, 403);
-}
+```javascript
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 ```
 
-### Step B — Fix the JWT now
-Call the edge function or use a one-time SQL/admin API call to re-sync the JWT metadata for `info@axentravehicles.com` to `super_admin`. The `set_role` action itself can do this — but since you're currently only `admin` in JWT, the edge function will reject escalation to `super_admin` (line 608: `CANNOT_ESCALATE_BEYOND_OWN_ROLE`).
+**Files to update (CORS block, lines 4-16 in each):**
+- `supabase/functions/vehicle-lookup/index.ts`
+- `supabase/functions/business-search/index.ts`
+- `supabase/functions/place-details/index.ts`
+- `supabase/functions/postcode-lookup/index.ts`
+- `supabase/functions/maps-directions/index.ts`
+- `supabase/functions/gcs-upload/index.ts`
+- `supabase/functions/gcs-proxy/index.ts`
+- `supabase/functions/gcs-fix-acl/index.ts`
+- `supabase/functions/vision-ocr/index.ts`
+- `supabase/functions/promote-admin/index.ts`
+- `supabase/functions/assign-driver/index.ts`
+- `supabase/functions/get-org-users/index.ts`
+- `supabase/functions/google-sheets-sync/index.ts` (same pattern, slightly different location)
 
-**Solution:** Add a `sync_role_from_db` action to the edge function that reads the `user_profiles.role` and writes it back to JWT metadata. This uses the service-role client so it bypasses the caller's current JWT role. Only super_admin (by DB check) or protected accounts should be eligible.
+Also replace `cors(req.headers.get("Origin"))` in catch blocks with just `corsHeaders`.
 
-### Step C — Make AuthContext also check user_profiles role
-Currently `handleSession` fetches `account_status` from `user_profiles` but ignores the `role` column. Add the DB role to the derived user so that even if JWT is stale, the correct role is used.
+#### Part 2: Switch client APIs to use `supabase.functions.invoke()`
 
-In `AuthContext.tsx` `handleSession`, after fetching `account_status`, also fetch `role` and merge it:
-```typescript
-const { data } = await supabase
-  .from("user_profiles")
-  .select("account_status, role")
-  .eq("auth_user_id", session.user.id)
-  .maybeSingle();
+**`src/lib/businessSearchApi.ts`** — Replace raw fetch calls with `supabase.functions.invoke('business-search', ...)` and `supabase.functions.invoke('place-details', ...)`. This sends the user's real auth token.
 
-if (data?.role) {
-  const dbRole = data.role === 'super_admin' ? 'SUPERADMIN' : data.role.toUpperCase();
-  if (['DRIVER', 'ADMIN', 'SUPERADMIN'].includes(dbRole) && !user.roles.includes(dbRole as AppRole)) {
-    user.roles.push(dbRole as AppRole);
-  }
-}
-```
+**`src/lib/postcodeApi.ts`** — Replace raw fetch with `supabase.functions.invoke('postcode-lookup', ...)`.
 
-This makes `user_profiles` the authoritative role source, with JWT as a fast-path fallback.
+**`src/lib/mapsApi.ts`** — Replace raw fetch with `supabase.functions.invoke('maps-directions', ...)`.
+
+**`src/lib/sheetSyncApi.ts`** — Replace raw fetch `callSync` function with `supabase.functions.invoke('google-sheets-sync', ...)`.
+
+#### Part 3: Deploy all edge functions
+
+All 13 edge functions must be redeployed after CORS fixes.
 
 ---
 
-### Files to change
+### Summary of what this fixes
 
-1. **`supabase/functions/user-lifecycle/index.ts`** — Add self-role-modification guard + `sync_role_from_db` action
-2. **`src/context/AuthContext.tsx`** — Merge DB role into derived user roles
-3. **One-time data fix** — Call `sync_role_from_db` to restore your JWT to `super_admin`
+| Feature | Broken because | Fix |
+|---|---|---|
+| DVLA Lookup | CORS block | Fix CORS headers |
+| Company Search | CORS + anon key auth | Fix CORS + use `supabase.functions.invoke` |
+| Postcode Lookup | CORS + anon key auth | Fix CORS + use `supabase.functions.invoke` |
+| Maps/Route Calc | CORS + anon key auth | Fix CORS + use `supabase.functions.invoke` |
+| Google Sheets Sync | CORS + anon key auth | Fix CORS + use `supabase.functions.invoke` |
+| GCS Photo Upload | CORS block | Fix CORS headers |
+| GCS Photo Proxy | CORS block | Fix CORS headers |
+| Vision OCR | CORS block | Fix CORS headers |
+| Admin user mgmt | CORS block | Fix CORS headers |
 
-### Outcome
-- JWT metadata restored to `super_admin` with roles `["SUPERADMIN", "ADMIN", "DRIVER"]`
-- All super-admin surfaces become visible again
-- Future self-demotion prevented by guard
-- AuthContext uses DB as role authority, making JWT-only stale role issues impossible
+No database, RLS, routing, or business logic changes needed.
 
