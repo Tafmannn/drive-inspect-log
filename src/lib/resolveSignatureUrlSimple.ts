@@ -1,154 +1,64 @@
-/**
- * Simple signature URL resolver.
- * Tries Supabase signed URL first; falls back to fetching from GCS proxy
- * and returning a browser-safe blob URL for rendering in <img>.
- *
- * This avoids handing the browser unstable proxy/redirect URLs.
- */
-import { supabase } from '@/integrations/supabase/client';
+Treat the current fix as a viewer-scoped rendering fix, not a universal signature architecture.
 
-const BUCKET = 'vehicle-signatures';
-const GCS_PROXY = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gcs-proxy`;
+OBJECTIVE
+Stabilize signature rendering in the live POD viewer by ensuring that every resolved GCS-backed signature becomes a browser-safe image source, while keeping the behavior explicit and safe for cleanup.
 
-/**
- * Extract the storage path from various signature reference formats:
- * - bare path: jobs/.../signatures/...
- * - supabase-sig://vehicle-signatures/...
- * - legacy Supabase URL containing /vehicle-signatures/
- */
-function extractPath(raw: string): string | null {
-  const trimmed = raw.trim();
+WHY
+The remaining failure is no longer signature persistence or URL normalization. It is terminal browser rendering. A GCS proxy URL or redirect chain can be unstable for <img src>. A blob URL created from actual image bytes is browser-stable for the viewer.
 
-  // supabase-sig://vehicle-signatures/path
-  const sigMatch = trimmed.match(/^supabase-sig:\/\/[^/]+\/(.+)$/);
-  if (sigMatch) return sigMatch[1];
+SCOPE
+Apply this change to the online viewer path only unless another consumer explicitly needs the same behavior.
+Do not assume blob URLs are appropriate for PDF/export/admin consumers.
 
-  // Legacy Supabase public URL
-  const publicMatch = trimmed.match(
-    /\/object\/public\/vehicle-signatures\/(.+?)(?:\?|$)/
-  );
-  if (publicMatch) return decodeURIComponent(publicMatch[1]);
+IMPLEMENTATION REQUIREMENTS
 
-  // Legacy Supabase signed URL
-  const signedMatch = trimmed.match(
-    /\/object\/sign\/vehicle-signatures\/(.+?)(?:\?|$)/
-  );
-  if (signedMatch) return decodeURIComponent(signedMatch[1]);
+1. In `src/lib/resolveSignatureUrlSimple.ts`:
+- normalize raw signature references into a storage path
+- try Supabase signed URL first
+- if Supabase signing fails, fetch the GCS proxy as raw bytes
+- validate:
+  - HTTP status is OK
+  - `content-type` contains `image`
+  - blob size is non-zero
+- return `URL.createObjectURL(blob)` for the viewer path
+- log:
+  - raw input
+  - normalized path
+  - Supabase signing success/failure
+  - GCS content-type
+  - blob size
 
-  // Bare path: jobs/<id>/signatures/...
-  if (/^jobs\/[^/]+\/signatures\//.test(trimmed)) return trimmed;
+2. In `src/pages/PodReport.tsx`:
+- resolve each signature slot independently
+- accept only:
+  - `https://...`
+  - `blob:...`
+- reject null or malformed values before setting state
+- log per slot:
+  - raw DB value
+  - resolved value prefix
+  - final img src
+  - onLoad with `naturalWidth` / `naturalHeight`
+  - onError
 
-  return null;
-}
+3. Blob URL lifecycle:
+- track created blob URLs inside the effect
+- revoke them in cleanup
+- ensure stale effect runs cannot overwrite good URLs with null
 
-async function getToken(): Promise<string | null> {
-  const { data } = await supabase.auth.getSession();
-  if (data.session?.access_token) return data.session.access_token;
+4. Consumer boundary:
+- do not automatically switch PDF/export/review helpers to blob URLs unless they are verified to support them
+- if another consumer needs signatures, it must either:
+  - fetch bytes directly, or
+  - use a stable remote URL path appropriate for that consumer
 
-  const { data: refreshed, error } = await supabase.auth.refreshSession();
-  if (error) {
-    console.error('[SigSimple] token refresh failed', error.message);
-    return null;
-  }
+5. Pass criteria for the live viewer:
+- pickup_driver image loads
+- pickup_customer image loads
+- delivery_driver image loads
+- delivery_customer image loads
+- `naturalWidth` and `naturalHeight` are both > 0
+- no raw `jobs/.../signatures/...` path reaches `<img src>`
 
-  return refreshed.session?.access_token ?? null;
-}
-
-async function fetchGcsAsBlobUrl(path: string): Promise<string | null> {
-  const token = await getToken();
-  if (!token) {
-    console.error('[SigSimple] no auth token for GCS proxy');
-    return null;
-  }
-
-  const proxyUrl = `${GCS_PROXY}?path=${encodeURIComponent(path)}`;
-
-  try {
-    const res = await fetch(proxyUrl, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    if (!res.ok) {
-      console.error('[SigSimple] GCS proxy fetch failed', {
-        status: res.status,
-        path: path.slice(0, 120),
-      });
-      return null;
-    }
-
-    const contentType = res.headers.get('content-type') || '';
-    if (!contentType.toLowerCase().includes('image')) {
-      console.error('[SigSimple] GCS proxy returned non-image content', {
-        contentType,
-        path: path.slice(0, 120),
-      });
-      return null;
-    }
-
-    const blob = await res.blob();
-    if (!blob.size) {
-      console.error('[SigSimple] GCS blob empty', {
-        path: path.slice(0, 120),
-      });
-      return null;
-    }
-
-    const blobUrl = URL.createObjectURL(blob);
-    console.info('[SigSimple] GCS blob URL OK', {
-      path: path.slice(0, 120),
-      size: blob.size,
-      type: blob.type,
-    });
-
-    return blobUrl;
-  } catch (err) {
-    console.error('[SigSimple] GCS proxy threw', {
-      error: err instanceof Error ? err.message : String(err),
-      path: path.slice(0, 120),
-    });
-    return null;
-  }
-}
-
-export async function resolveSignatureUrlSimple(
-  raw: string | null | undefined
-): Promise<string | null> {
-  if (!raw || typeof raw !== 'string') return null;
-
-  const path = extractPath(raw);
-  if (!path) {
-    console.warn('[SigSimple] unrecognized format', {
-      raw: raw.slice(0, 120),
-    });
-    return null;
-  }
-
-  console.info('[SigSimple] resolving', { path: path.slice(0, 120) });
-
-  // 1) Try Supabase storage signed URL
-  try {
-    const { data, error } = await supabase.storage
-      .from(BUCKET)
-      .createSignedUrl(path, 3600);
-
-    if (!error && data?.signedUrl) {
-      console.info('[SigSimple] Supabase signed URL OK', {
-        path: path.slice(0, 120),
-      });
-      return data.signedUrl;
-    }
-
-    console.info('[SigSimple] Supabase sign failed, trying GCS blob fallback', {
-      path: path.slice(0, 120),
-      error: error?.message ?? null,
-    });
-  } catch (err) {
-    console.warn('[SigSimple] Supabase sign threw', {
-      error: err instanceof Error ? err.message : String(err),
-      path: path.slice(0, 120),
-    });
-  }
-
-  // 2) GCS fallback as blob URL
-  return await fetchGcsAsBlobUrl(path);
-}
+IMPORTANT
+This is a browser rendering stabilization step for the live viewer. Do not represent it as the final canonical media architecture for every signature consumer.
