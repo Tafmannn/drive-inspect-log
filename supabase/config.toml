@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.user-lifecycle]
 verify_jwt = false
+
+[functions.resolve-signature-url]
+verify_jwt = false

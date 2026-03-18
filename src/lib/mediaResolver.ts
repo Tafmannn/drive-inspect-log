@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { internalStorageService } from "@/lib/internalStorageService";
+import { resolveSignatureUrlViaEdge } from "@/lib/resolveSignatureUrlViaEdge";
 
 const GCS_PUBLIC_PREFIX = "https://storage.googleapis.com/axentra_db/";
 const GCS_PROXY_ENDPOINT = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gcs-proxy`;
@@ -16,11 +16,14 @@ function isBareObjectPath(url: string): boolean {
 }
 
 /**
- * Detect bare paths that look like signature paths.
- * Pattern: jobs/{id}/signatures/...
+ * Detect values that are signature references.
+ * Any of: supabase-sig://, contains /vehicle-signatures/, bare path jobs/.../signatures/...
  */
-function isSignatureLikePath(url: string): boolean {
-  return /^jobs\/[^/]+\/signatures\//.test(url);
+function isSignatureReference(url: string): boolean {
+  if (url.startsWith("supabase-sig://")) return true;
+  if (url.includes("/vehicle-signatures/")) return true;
+  if (/^jobs\/[^/]+\/signatures\//.test(url)) return true;
+  return false;
 }
 
 async function resolveGcsViaAuthenticatedFetch(objectPath: string): Promise<string | null> {
@@ -60,9 +63,7 @@ export async function resolveMediaUrlAsync(
 
   const normalizedUrl = typeof url === "string" ? url.trim() : "";
   if (!normalizedUrl) {
-    console.error("[MediaResolver] URL became empty after trim", {
-      raw: String(url).slice(0, 120),
-    });
+    console.error("[MediaResolver] URL became empty after trim");
     return null;
   }
 
@@ -70,37 +71,17 @@ export async function resolveMediaUrlAsync(
     return normalizedUrl;
   }
 
-  // supabase-sig:// scheme — current canonical format
-  if (normalizedUrl.startsWith("supabase-sig://")) {
-    const result = await internalStorageService.resolveSignatureUrlStructured(normalizedUrl);
-    if (result.url) return result.url;
-    console.error("[MediaResolver] supabase-sig resolution failed", {
-      errorCode: result.errorCode,
-      errorMessage: result.errorMessage,
-      bucket: result.bucket,
-      path: result.path?.slice(0, 160) ?? null,
+  // ─── SIGNATURES: ALL signature references route through the Edge Function ───
+  if (isSignatureReference(normalizedUrl)) {
+    const resolved = await resolveSignatureUrlViaEdge(normalizedUrl);
+    if (resolved) return resolved;
+    console.error("[MediaResolver] Signature Edge Function resolution failed", {
+      raw: normalizedUrl.slice(0, 180),
     });
     return null;
   }
 
-  // Supabase URLs containing vehicle-signatures (legacy public/signed URLs)
-  if (
-    normalizedUrl.includes("/vehicle-signatures/") ||
-    normalizedUrl.includes("/object/sign/vehicle-signatures/") ||
-    normalizedUrl.includes("/object/public/vehicle-signatures/")
-  ) {
-    const result = await internalStorageService.resolveSignatureUrlStructured(normalizedUrl);
-    if (result.url) return result.url;
-    console.error("[MediaResolver] legacy Supabase signature URL resolution failed", {
-      errorCode: result.errorCode,
-      errorMessage: result.errorMessage,
-      bucket: result.bucket,
-      path: result.path?.slice(0, 160) ?? null,
-    });
-    return null;
-  }
-
-  // GCS full URLs — route through authenticated proxy
+  // ─── GCS full URLs — route through authenticated proxy ───
   if (normalizedUrl.startsWith(GCS_PUBLIC_PREFIX)) {
     const objectPath = normalizedUrl.slice(GCS_PUBLIC_PREFIX.length);
     const proxied = await resolveGcsViaAuthenticatedFetch(objectPath);
@@ -112,37 +93,8 @@ export async function resolveMediaUrlAsync(
     return proxied;
   }
 
-  // Bare paths
+  // ─── Bare non-signature paths → GCS ───
   if (isBareObjectPath(normalizedUrl)) {
-    // CRITICAL: Signature bare paths are always treated as Supabase vehicle-signatures paths.
-    if (isSignatureLikePath(normalizedUrl)) {
-      const result = await internalStorageService.resolveSignatureUrlStructured(normalizedUrl);
-      if (result.url) return result.url;
-
-      // Supabase bucket miss → fallback to GCS proxy (object may live in GCS)
-      if (result.errorCode === 'OBJECT_NOT_FOUND') {
-        console.info("[MediaResolver] Supabase OBJECT_NOT_FOUND for signature, falling back to GCS", {
-          path: normalizedUrl.slice(0, 180),
-        });
-        const gcsUrl = await resolveGcsViaAuthenticatedFetch(normalizedUrl);
-        if (gcsUrl) return gcsUrl;
-
-        console.error("[MediaResolver] Signature path failed BOTH Supabase and GCS", {
-          rawInput: normalizedUrl.slice(0, 180),
-          supabaseError: result.errorMessage,
-        });
-        return null;
-      }
-
-      console.error("[MediaResolver] Bare signature path failed Supabase signing (non-recoverable)", {
-        rawInput: normalizedUrl.slice(0, 180),
-        errorCode: result.errorCode,
-        errorMessage: result.errorMessage,
-      });
-      return null;
-    }
-
-    // Non-signature bare path → GCS
     const gcsResolved = await resolveGcsViaAuthenticatedFetch(normalizedUrl);
     if (!gcsResolved) {
       console.error("[MediaResolver] Non-signature bare path failed GCS resolution", {
