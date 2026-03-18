@@ -73,7 +73,7 @@ export const JobList = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <AppHeader title="My Jobs" showBack onBack={() => navigate(-1)}>
+      <AppHeader title="My Jobs" showBack onBack={() => navigate("/")}>
         {(isAdmin || isSuperAdmin) && (
           <Button
             size="sm"

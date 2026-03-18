@@ -20,6 +20,7 @@
 
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { withFrom } from "@/lib/navigationUtils";
+import { useSafeBack } from "@/hooks/useSafeBack";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
