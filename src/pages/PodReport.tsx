@@ -117,6 +117,7 @@ const SignatureCard = ({
 export const PodReport = () => {
   const navigate = useNavigate();
   const { jobId } = useParams<{ jobId: string }>();
+  const goBack = useSafeBack(jobId ? `/jobs/${jobId}` : "/jobs");
   const [searchParams] = useSearchParams();
   const { data: job, isLoading } = useJob(jobId ?? "");
   const { data: jobExpenses } = useJobExpenses(jobId ?? "");
