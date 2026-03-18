@@ -268,7 +268,7 @@ export const InspectionFlow = () => {
       }
     }
     // No meaningful draft — start fresh and mark session active
-    sessionActive.current = true;
+    markSessionActive();
   }, [dk]);
 
   const handleRestoreDraft = () => {
