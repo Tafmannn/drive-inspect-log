@@ -123,11 +123,57 @@ export const JobDetail = () => {
   const [searchParams] = useSearchParams();
   const { data: job, isLoading } = useJob(jobId ?? "");
   const { data: jobExpenses } = useJobExpenses(jobId ?? "");
-  const { isAdmin } = useAuth();
+  const { isAdmin, isSuperAdmin } = useAuth();
+  const deleteJob = useDeleteJob();
+  const changeStatus = useAdminChangeStatus();
+  const canAdmin = isAdmin || isSuperAdmin;
 
   const [qrConfirmations, setQrConfirmations] = useState<QrConfirmation[]>([]);
   const [generatingQr, setGeneratingQr] = useState(false);
   const [qrModal, setQrModal] = useState<{ open: boolean; url: string; eventType: string }>({ open: false, url: "", eventType: "" });
+  const [selectedStatus, setSelectedStatus] = useState<string>("");
+  const [changingStatus, setChangingStatus] = useState(false);
+  const [resolvedPhotos, setResolvedPhotos] = useState<Record<string, string>>({});
+
+  // Resolve photos for admin gallery
+  useEffect(() => {
+    if (!canAdmin || !job?.photos?.length) return;
+    let cancelled = false;
+    Promise.all(
+      job.photos.map(async (p: any) => {
+        const resolved = await resolveMediaUrlAsync(p.url);
+        if (!cancelled && resolved) {
+          setResolvedPhotos(prev => ({ ...prev, [p.id]: resolved }));
+        }
+      })
+    );
+    return () => { cancelled = true; };
+  }, [job?.photos, canAdmin]);
+
+  const handleDeleteJob = async () => {
+    if (!jobId) return;
+    try {
+      await deleteJob.mutateAsync(jobId);
+      toast({ title: "Job deleted" });
+      navigate("/jobs", { replace: true });
+    } catch (e: any) {
+      toast({ title: "Delete failed", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const handleChangeStatus = async () => {
+    if (!jobId || !selectedStatus || changingStatus) return;
+    setChangingStatus(true);
+    try {
+      await changeStatus.mutateAsync({ jobId, newStatus: selectedStatus });
+      toast({ title: `Status changed to ${selectedStatus.replace(/_/g, " ")}` });
+      setSelectedStatus("");
+    } catch (e: any) {
+      toast({ title: "Status change failed", description: e.message, variant: "destructive" });
+    } finally {
+      setChangingStatus(false);
+    }
+  };
 
   useEffect(() => {
     if (!jobId) return;
