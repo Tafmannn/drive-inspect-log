@@ -192,6 +192,12 @@ function RealAuthProvider({ children }: { children: ReactNode }) {
             !user.roles.includes(dbRole as AppRole)
           ) {
             user.roles.push(dbRole as AppRole);
+
+            // JWT is stale — trigger background sync to fix it
+            supabase.functions
+              .invoke("user-lifecycle", { body: { _action: "sync_role_from_db" } })
+              .then(() => console.log("[auth] JWT role synced from DB"))
+              .catch(() => {/* non-blocking */});
           }
         }
       } catch {
