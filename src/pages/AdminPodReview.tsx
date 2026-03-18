@@ -76,8 +76,15 @@ function KpiPill({
 
 /* ─── Review Card ──────────────────────────────────────────────── */
 
-function ReviewCard({ row, navigate }: { row: PodReviewRow; navigate: (path: string) => void }) {
+function ReviewCard({ row, navigate, onConfirm, confirming }: {
+  row: PodReviewRow;
+  navigate: (path: string) => void;
+  onConfirm: (id: string) => void;
+  confirming: string | null;
+}) {
   const s = getStatusStyle(row.status);
+  const isConfirming = confirming === row.id;
+  const canConfirm = ["pod_ready", "delivery_complete"].includes(row.status);
 
   return (
     <Card
@@ -147,6 +154,18 @@ function ReviewCard({ row, navigate }: { row: PodReviewRow; navigate: (path: str
         >
           <FileText className="h-3.5 w-3.5 mr-1" /> Review POD
         </Button>
+        {canConfirm && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="min-h-[40px] text-xs text-primary border-primary/30"
+            disabled={isConfirming}
+            onClick={(e) => { e.stopPropagation(); onConfirm(row.id); }}
+          >
+            {isConfirming ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <CheckCircle className="h-3.5 w-3.5 mr-1" />}
+            Confirm
+          </Button>
+        )}
         <Button
           variant="outline"
           size="sm"
