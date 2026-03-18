@@ -11,6 +11,7 @@
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
@@ -21,9 +22,12 @@ import { UKPlate } from "@/components/UKPlate";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getStatusStyle } from "@/lib/statusConfig";
 import { usePodReviewData, type PodReviewRow } from "@/hooks/usePodReviewData";
+import { supabase } from "@/integrations/supabase/client";
+import { invalidateForEvent } from "@/lib/mutationEvents";
+import { toast } from "@/hooks/use-toast";
 import {
   Search, ClipboardList, PenTool, FileCheck, CheckCircle,
-  Eye, FileText, MapPin, User, AlertTriangle, ChevronDown, ChevronUp,
+  Eye, FileText, MapPin, User, AlertTriangle, ChevronDown, ChevronUp, Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
