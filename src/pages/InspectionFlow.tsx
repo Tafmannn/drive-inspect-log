@@ -665,6 +665,7 @@ export const InspectionFlow = () => {
       const label = type === "pickup" ? "Pickup" : "Delivery";
       toast({ title: `${label} completed for job ${jobRef}.` });
       if (dk) clearDraft(dk);
+      try { sessionStorage.removeItem(sessionKey); } catch { /* ignore */ }
       navigate(`/jobs/${jobId}`);
     } catch {
       toast({ title: "Submission failed. Please try again.", variant: "destructive" });
