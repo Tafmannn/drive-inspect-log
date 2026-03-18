@@ -675,20 +675,20 @@ function renderSignatures(
 }
 
 /**
- * Resolve a signature URL through the canonical server-side Edge Function.
+ * Resolve a signature URL via the simple direct helper (no edge function).
  */
 async function resolveSignatureForPdf(
   url: string,
   meta?: { jobId?: string; orgId?: string }
 ): Promise<string> {
   try {
-    const { resolveSignatureUrlViaEdge } = await import('./resolveSignatureUrlViaEdge');
-    const resolved = await resolveSignatureUrlViaEdge(url);
+    const { resolveSignatureUrlSimple } = await import('./resolveSignatureUrlSimple');
+    const resolved = await resolveSignatureUrlSimple(url);
     if (!resolved) {
       const { logClientEvent } = await import('./logger');
       void logClientEvent('signature_resolve_failed', 'warn', {
         jobId: meta?.jobId,
-        message: `Could not resolve signature URL via Edge Function`,
+        message: `Could not resolve signature URL`,
         source: 'storage',
         type: 'upload',
         context: { originalUrl: url.slice(0, 120), orgId: meta?.orgId },

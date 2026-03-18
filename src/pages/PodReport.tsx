@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { resolveMediaUrlAsync } from "@/lib/mediaResolver";
-import { supabase } from "@/integrations/supabase/client";
+import { resolveSignatureUrlSimple } from "@/lib/resolveSignatureUrlSimple";
 import { AppHeader } from "@/components/AppHeader";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -80,14 +80,8 @@ const SignatureCard = ({
         <img
           src={url}
           alt={`${label} signature`}
-          style={{
-            width: "100%",
-            height: "80px",
-            objectFit: "contain",
-            border: "1px solid red",
-            background: "#f1f5f9",
-          }}
-          onLoad={() => console.log("[SIG IMG LOADED]", { slot, url: url.slice(0, 120) })}
+          className="w-full h-20 object-contain rounded border border-border bg-slate-100"
+          onLoad={() => console.info("[SIG IMG LOADED]", { slot, url: url.slice(0, 120) })}
           onError={() => {
             console.error("[SIG IMG FAILED]", { slot, url: url.slice(0, 120) });
             setFailed(true);
@@ -153,10 +147,9 @@ export const PodReport = () => {
         delivery_customer: delivery?.customer_signature_url ?? null,
       };
 
-      console.log("[DEBUG SIG SLOTS]", sigSlots);
+      console.info("[SIG SLOTS]", sigSlots);
 
-      // BYPASS: resolve signatures directly via Supabase createSignedUrl
-      // instead of the edge function, to isolate the rendering issue
+      // Resolve each signature slot independently via simple helper
       await Promise.all(
         Object.entries(sigSlots).map(async ([slot, raw]) => {
           if (!raw) {
@@ -164,37 +157,20 @@ export const PodReport = () => {
             return;
           }
 
-          console.log("[DEBUG SIG RAW]", { slot, raw });
-
           try {
-            // Direct signed URL from Supabase storage (bypasses edge function)
-            const { data, error } = await supabase.storage
-              .from("vehicle-signatures")
-              .createSignedUrl(raw, 3600);
-
+            const resolved = await resolveSignatureUrlSimple(raw);
             if (cancelled) return;
 
-            if (error || !data?.signedUrl) {
-              console.error("[SIG DIRECT SIGN FAILED]", { slot, raw, error: error?.message });
-              // Fallback: try the edge function path
-              const resolved = await resolveMediaUrlAsync(raw);
-              if (cancelled) return;
-              console.log("[DEBUG SIG RESOLVED via edge]", { slot, resolved: resolved?.slice(0, 120) });
-              if (!resolved || !resolved.startsWith("https://")) {
-                console.error("[SIG FAIL]", { slot, raw, resolved });
-                nextSignatures[slot] = null;
-                return;
-              }
-              nextSignatures[slot] = resolved;
+            if (!resolved || !resolved.startsWith("https://")) {
+              console.error("[SIG FAIL]", { slot, raw: raw.slice(0, 80), resolved });
+              nextSignatures[slot] = null;
               return;
             }
-
-            console.log("[DEBUG SIG RESOLVED via direct]", { slot, url: data.signedUrl.slice(0, 120) });
-            nextSignatures[slot] = data.signedUrl;
+            nextSignatures[slot] = resolved;
           } catch (err) {
             nextSignatures[slot] = null;
             console.error("[SIG EXCEPTION]", {
-              slot, raw: raw.slice(0, 120),
+              slot,
               error: err instanceof Error ? err.message : String(err),
             });
           }

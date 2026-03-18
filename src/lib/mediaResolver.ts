@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { resolveSignatureUrlViaEdge } from "@/lib/resolveSignatureUrlViaEdge";
+import { resolveSignatureUrlSimple } from "@/lib/resolveSignatureUrlSimple";
 
 const GCS_PUBLIC_PREFIX = "https://storage.googleapis.com/axentra_db/";
 const GCS_PROXY_ENDPOINT = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gcs-proxy`;
@@ -71,11 +71,11 @@ export async function resolveMediaUrlAsync(
     return normalizedUrl;
   }
 
-  // ─── SIGNATURES: ALL signature references route through the Edge Function ───
+  // ─── SIGNATURES: direct Supabase signed URL + GCS proxy fallback ───
   if (isSignatureReference(normalizedUrl)) {
-    const resolved = await resolveSignatureUrlViaEdge(normalizedUrl);
+    const resolved = await resolveSignatureUrlSimple(normalizedUrl);
     if (resolved) return resolved;
-    console.error("[MediaResolver] Signature Edge Function resolution failed", {
+    console.error("[MediaResolver] Signature resolution failed", {
       raw: normalizedUrl.slice(0, 180),
     });
     return null;
