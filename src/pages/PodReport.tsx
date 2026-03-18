@@ -9,6 +9,7 @@ import { PhotoViewer } from "@/components/PhotoViewer";
 import { useJob, useUpdateJob } from "@/hooks/useJobs";
 import { useJobExpenses } from "@/hooks/useExpenses";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useSafeBack } from "@/hooks/useSafeBack";
 import { useQueryClient } from "@tanstack/react-query";
 import { invalidateForEvent } from "@/lib/mutationEvents";
 // resolveBackTarget removed — using navigate(-1) for natural back behavior
