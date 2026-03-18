@@ -376,11 +376,12 @@ function navAddress(job: Job, workflow: WorkflowState): string {
 
 export function deriveJobSummary(
   job: Job,
-  isTopRecommended: boolean
+  isTopRecommended: boolean,
+  allJobs: Job[] = [],
 ): DriverJobSummary {
   const workflow = deriveWorkflowState(job);
-  const action = deriveActionState(job, workflow);
-  const priority = derivePriorityState(job, workflow, isTopRecommended);
+  const action = deriveActionState(job, workflow, allJobs);
+  const priority = derivePriorityState(job, workflow, isTopRecommended, allJobs);
   const contact = currentPhaseContact(job, workflow);
 
   return {
