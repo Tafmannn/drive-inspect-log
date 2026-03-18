@@ -443,12 +443,13 @@ export function deriveJobSummaries(jobs: Job[]): DriverJobSummary[] {
       break;
     }
   }
-  // If no in-progress, find first due-today executable
+  // If no in-progress, find first executable
   if (!recommendedId) {
     for (const job of jobs) {
       if ((TERMINAL_STATUSES as string[]).includes(job.status)) continue;
       if (["draft", "incomplete", "cancelled", "failed"].includes(job.status)) continue;
-      if (isBlockedByDeliveryDate(job)) continue;
+      const lock = isBlockedByActiveJob(job, jobs);
+      if (lock.blocked) continue;
       if (["delivery_complete", "pod_ready"].includes(job.status)) continue;
       recommendedId = job.id;
       break;
@@ -456,6 +457,6 @@ export function deriveJobSummaries(jobs: Job[]): DriverJobSummary[] {
   }
 
   return jobs.map((job) =>
-    deriveJobSummary(job, job.id === recommendedId)
+    deriveJobSummary(job, job.id === recommendedId, jobs)
   );
 }
