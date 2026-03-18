@@ -24,21 +24,32 @@ import { useSafeBack } from "@/hooks/useSafeBack";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
-import { useJob } from "@/hooks/useJobs";
+import { useJob, useDeleteJob, useAdminChangeStatus } from "@/hooks/useJobs";
 import { useJobExpenses } from "@/hooks/useExpenses";
 import { evaluateExecutableState, type ExecutableState } from "@/lib/executionRanking";
 import {
   Phone, MapPin, Building, Edit, ClipboardCheck, Truck,
   FileText, Receipt, QrCode, Navigation, AlertTriangle, ChevronRight,
+  Trash2, RefreshCw, Images, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { createQrConfirmation, getQrConfirmationsForJob, buildQrUrl, type QrConfirmation } from "@/lib/qrApi";
 import { QrDisplayModal } from "@/components/QrDisplayModal";
 import { useAuth } from "@/context/AuthContext";
-import { getStatusStyle } from "@/lib/statusConfig";
+import { getStatusStyle, ADMIN_ALLOWED_TRANSITIONS } from "@/lib/statusConfig";
 import { UKPlate } from "@/components/UKPlate";
+import { PhotoViewer } from "@/components/PhotoViewer";
+import { resolveMediaUrlAsync } from "@/lib/mediaResolver";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -112,11 +123,57 @@ export const JobDetail = () => {
   const [searchParams] = useSearchParams();
   const { data: job, isLoading } = useJob(jobId ?? "");
   const { data: jobExpenses } = useJobExpenses(jobId ?? "");
-  const { isAdmin } = useAuth();
+  const { isAdmin, isSuperAdmin } = useAuth();
+  const deleteJob = useDeleteJob();
+  const changeStatus = useAdminChangeStatus();
+  const canAdmin = isAdmin || isSuperAdmin;
 
   const [qrConfirmations, setQrConfirmations] = useState<QrConfirmation[]>([]);
   const [generatingQr, setGeneratingQr] = useState(false);
   const [qrModal, setQrModal] = useState<{ open: boolean; url: string; eventType: string }>({ open: false, url: "", eventType: "" });
+  const [selectedStatus, setSelectedStatus] = useState<string>("");
+  const [changingStatus, setChangingStatus] = useState(false);
+  const [resolvedPhotos, setResolvedPhotos] = useState<Record<string, string>>({});
+
+  // Resolve photos for admin gallery
+  useEffect(() => {
+    if (!canAdmin || !job?.photos?.length) return;
+    let cancelled = false;
+    Promise.all(
+      job.photos.map(async (p: any) => {
+        const resolved = await resolveMediaUrlAsync(p.url);
+        if (!cancelled && resolved) {
+          setResolvedPhotos(prev => ({ ...prev, [p.id]: resolved }));
+        }
+      })
+    );
+    return () => { cancelled = true; };
+  }, [job?.photos, canAdmin]);
+
+  const handleDeleteJob = async () => {
+    if (!jobId) return;
+    try {
+      await deleteJob.mutateAsync(jobId);
+      toast({ title: "Job deleted" });
+      navigate("/jobs", { replace: true });
+    } catch (e: any) {
+      toast({ title: "Delete failed", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const handleChangeStatus = async () => {
+    if (!jobId || !selectedStatus || changingStatus) return;
+    setChangingStatus(true);
+    try {
+      await changeStatus.mutateAsync({ jobId, newStatus: selectedStatus });
+      toast({ title: `Status changed to ${selectedStatus.replace(/_/g, " ")}` });
+      setSelectedStatus("");
+    } catch (e: any) {
+      toast({ title: "Status change failed", description: e.message, variant: "destructive" });
+    } finally {
+      setChangingStatus(false);
+    }
+  };
 
   useEffect(() => {
     if (!jobId) return;
@@ -381,11 +438,99 @@ export const JobDetail = () => {
             )}
           </div>
 
-          {/* Admin-only: Edit */}
-          {isAdmin && (
-            <Button variant="outline" className="w-full min-h-[44px] rounded-lg" onClick={() => navigate(withFrom(`/jobs/${job.id}/edit`, searchParams))}>
-              <Edit className="h-4 w-4 mr-1.5" /> Edit Job
-            </Button>
+          {/* Admin-only: Edit + Delete + Status Change */}
+          {canAdmin && (
+            <div className="space-y-2">
+              <Button variant="outline" className="w-full min-h-[44px] rounded-lg" onClick={() => navigate(withFrom(`/jobs/${job.id}/edit`, searchParams))}>
+                <Edit className="h-4 w-4 mr-1.5" /> Edit Job
+              </Button>
+
+              {/* Status Change */}
+              {ADMIN_ALLOWED_TRANSITIONS[job.status]?.length > 0 && (
+                <div className="flex gap-2">
+                  <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                    <SelectTrigger className="flex-1 min-h-[44px] rounded-lg">
+                      <SelectValue placeholder="Change status…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ADMIN_ALLOWED_TRANSITIONS[job.status].map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {s.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    className="min-h-[44px] min-w-[44px] rounded-lg"
+                    disabled={!selectedStatus || changingStatus}
+                    onClick={handleChangeStatus}
+                  >
+                    {changingStatus ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  </Button>
+                </div>
+              )}
+
+              {/* Delete Job */}
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" className="w-full min-h-[44px] rounded-lg text-destructive border-destructive/30 hover:bg-destructive/10">
+                    <Trash2 className="h-4 w-4 mr-1.5" /> Delete Job
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete this job?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will archive the job and remove it from all active lists. This action can be undone by a super admin.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDeleteJob} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          )}
+
+          {/* Admin Photos Section */}
+          {canAdmin && job.photos && job.photos.length > 0 && (
+            <Section>
+              <SectionLabel icon={Images}>Inspection Photos</SectionLabel>
+              <PhotoViewer
+                title="Collection"
+                photos={job.photos
+                  .filter((p: any) => p.type.startsWith("pickup_"))
+                  .map((p: any) => ({
+                    url: resolvedPhotos[p.id] || "",
+                    label: p.label || p.type.replace("pickup_", "").replace(/_/g, " "),
+                  }))
+                  .filter((p: any) => !!p.url)}
+              />
+              <PhotoViewer
+                title="Delivery"
+                photos={job.photos
+                  .filter((p: any) => p.type.startsWith("delivery_"))
+                  .map((p: any) => ({
+                    url: resolvedPhotos[p.id] || "",
+                    label: p.label || p.type.replace("delivery_", "").replace(/_/g, " "),
+                  }))
+                  .filter((p: any) => !!p.url)}
+              />
+              <PhotoViewer
+                title="Damage"
+                photos={job.photos
+                  .filter((p: any) => p.type === "damage_close_up")
+                  .map((p: any) => ({
+                    url: resolvedPhotos[p.id] || "",
+                    label: p.label || "Damage",
+                  }))
+                  .filter((p: any) => !!p.url)}
+              />
+            </Section>
           )}
         </div>
       </div>

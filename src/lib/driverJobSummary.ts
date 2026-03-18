@@ -134,11 +134,12 @@ function deriveWorkflowState(job: Job): WorkflowState {
 
 // ── Action State ────────────────────────────────────────────────────
 
-function deriveActionState(job: Job, workflow: WorkflowState): ActionState {
+function deriveActionState(job: Job, workflow: WorkflowState, allJobs: Job[]): ActionState {
   if (workflow === "pending_review" || workflow === "terminal") return "view_pod";
 
-  // Blocked by do-not-deliver-before → can only view
-  if (isBlockedByDeliveryDate(job) && workflow === "in_transit") return "view_job";
+  // Blocked by active-job lock → can only view
+  const lock = isBlockedByActiveJob(job, allJobs);
+  if (lock.blocked && (workflow === "in_transit" || workflow === "awaiting_pickup" || workflow === "awaiting_delivery")) return "view_job";
 
   if (!job.has_pickup_inspection) return "start_pickup";
 
@@ -173,8 +174,17 @@ function parseTimeToMinutes(t: string): number | null {
   return parseInt(m[1]) * 60 + parseInt(m[2]);
 }
 
-function isBlockedByDeliveryDate(job: Job): boolean {
-  return !!job.earliest_delivery_date && job.earliest_delivery_date > todayStr();
+function isBlockedByActiveJob(job: Job, allJobs: Job[]): { blocked: boolean; blockRef: string | null } {
+  const inProgressStatuses = ["pickup_in_progress", "delivery_in_progress"];
+  if (inProgressStatuses.includes(job.status)) return { blocked: false, blockRef: null };
+  
+  const blocker = allJobs.find(
+    (j) => j.id !== job.id && j.driver_id === job.driver_id && inProgressStatuses.includes(j.status)
+  );
+  if (blocker) {
+    return { blocked: true, blockRef: blocker.external_job_number || blocker.id.slice(0, 8) };
+  }
+  return { blocked: false, blockRef: null };
 }
 
 // ── Priority State ──────────────────────────────────────────────────
@@ -187,16 +197,18 @@ interface PriorityResult {
 function derivePriorityState(
   job: Job,
   workflow: WorkflowState,
-  isTopRecommended: boolean
+  isTopRecommended: boolean,
+  allJobs: Job[],
 ): PriorityResult {
   const today = todayStr();
   const now = nowMinutes();
 
-  // Blocked: delivery date restriction
-  if (isBlockedByDeliveryDate(job)) {
+  // Blocked: active-job lock
+  const lock = isBlockedByActiveJob(job, allJobs);
+  if (lock.blocked) {
     return {
       state: "blocked",
-      reason: `Cannot deliver before ${job.earliest_delivery_date}`,
+      reason: `Complete Job ${lock.blockRef} first`,
     };
   }
 
@@ -364,11 +376,12 @@ function navAddress(job: Job, workflow: WorkflowState): string {
 
 export function deriveJobSummary(
   job: Job,
-  isTopRecommended: boolean
+  isTopRecommended: boolean,
+  allJobs: Job[] = [],
 ): DriverJobSummary {
   const workflow = deriveWorkflowState(job);
-  const action = deriveActionState(job, workflow);
-  const priority = derivePriorityState(job, workflow, isTopRecommended);
+  const action = deriveActionState(job, workflow, allJobs);
+  const priority = derivePriorityState(job, workflow, isTopRecommended, allJobs);
   const contact = currentPhaseContact(job, workflow);
 
   return {
@@ -430,12 +443,13 @@ export function deriveJobSummaries(jobs: Job[]): DriverJobSummary[] {
       break;
     }
   }
-  // If no in-progress, find first due-today executable
+  // If no in-progress, find first executable
   if (!recommendedId) {
     for (const job of jobs) {
       if ((TERMINAL_STATUSES as string[]).includes(job.status)) continue;
       if (["draft", "incomplete", "cancelled", "failed"].includes(job.status)) continue;
-      if (isBlockedByDeliveryDate(job)) continue;
+      const lock = isBlockedByActiveJob(job, jobs);
+      if (lock.blocked) continue;
       if (["delivery_complete", "pod_ready"].includes(job.status)) continue;
       recommendedId = job.id;
       break;
@@ -443,6 +457,6 @@ export function deriveJobSummaries(jobs: Job[]): DriverJobSummary[] {
   }
 
   return jobs.map((job) =>
-    deriveJobSummary(job, job.id === recommendedId)
+    deriveJobSummary(job, job.id === recommendedId, jobs)
   );
 }
