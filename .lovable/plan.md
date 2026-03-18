@@ -1,63 +1,78 @@
 
 
-## Diagnosis
+## End-to-End Fix Plan: Broken Integrations
 
-### Root cause confirmed
+### Root Causes Identified
 
-The edge function **works** — logs at 13:40 show `GCS fallback succeeded` for bare signature paths. The remaining failure is one of two issues:
+**Issue 1 — CORS blocks all edge function calls from the preview domain**
 
-1. **Auth token expiry**: Console shows `AuthApiError: Invalid Refresh Token: Refresh Token Not Found` at 13:46. When the session expires, `resolveSignatureUrlViaEdge` gets no token (line 48) and returns `null`. Every signature slot becomes null → "Not signed" display.
+Every single edge function (11 functions) uses a hardcoded `ALLOWED_ORIGINS` list containing only `localhost:5173`, `*.lovable.app`, and `axentra.lovable.app`. The actual preview runs on `*.lovableproject.com`, which is NOT in this list. When the origin doesn't match, the function returns `Access-Control-Allow-Origin: http://localhost:5173`, which the browser rejects. This silently breaks DVLA lookup, company search, postcode lookup, maps directions, GCS upload/proxy, vision OCR, sheet sync, and all admin functions.
 
-2. **Upload destination mismatch**: When `CLOUD_STORAGE_ENABLED` is true, `gcsStorageService` uploads signatures to GCS bucket `axentra_db` with UUID filenames (e.g. `jobs/.../signatures/.../uuid-timestamp.png`). The GCS upload edge function returns the **bare path** as the URL (line 151 of `gcs-upload`). This bare path is stored in DB. On resolution, the `resolve-signature-url` edge function tries Supabase bucket `vehicle-signatures` first (always fails for GCS-uploaded files), then falls back to GCS V4 signing. This fallback works but adds latency and fragility.
+**Issue 2 — Client APIs send anon key instead of user session token**
 
-3. **Screenshot analysis**: Pickup slots show bordered boxes with no visible image (the `<img>` tag is rendered but content is invisible). This means either: (a) the GCS signed URL loads but the PNG has a transparent/white background making the signature invisible against the white card, OR (b) the resolution returned null and we see the fallback state, OR (c) an `onError` fired and we're seeing "Couldn't load" without the icon rendering properly.
-
-### Architecture problem
-
-The `internalStorageService.uploadImage` for signatures returns `supabase-sig://` URIs. The `gcsStorageService.uploadImage` returns bare paths. Both go through the same `storageService` proxy based on `CLOUD_STORAGE_ENABLED`. The edge function must handle both — it does, but Supabase signing always fails for GCS-uploaded objects, adding unnecessary round-trips.
-
-### Dead code
-
-`internalStorageService.resolveSignatureUrlStructured()` and `resolveSignatureUrl()` are no longer called in any active path. They're dead code creating confusion.
+Four client-side API modules (`businessSearchApi.ts`, `postcodeApi.ts`, `mapsApi.ts`, `sheetSyncApi.ts`) use raw `fetch()` with `Authorization: Bearer ${ANON_KEY}`. The edge functions then call `supabase.auth.getUser()` which returns null for anon keys, causing a 401 UNAUTHENTICATED response. Only `vehicleLookupApi.ts`, `adminApi.ts`, `visionApi.ts`, and `gcsStorageService.ts` correctly use `supabase.functions.invoke()` which sends the real user token.
 
 ---
 
-## Plan
+### Fix Plan
 
-### A. Fix auth resilience in `resolveSignatureUrlViaEdge.ts`
+#### Part 1: Fix CORS in all 11 edge functions
 
-Replace `supabase.auth.getSession()` with a pattern that attempts token refresh on failure. If refresh fails, log explicitly and return null. This prevents silent failures when the refresh token is stale.
+Replace the restrictive `ALLOWED_ORIGINS` + `cors()` function in every edge function with the standard Lovable CORS pattern:
 
-### B. Remove dead signature resolution from `internalStorageService.ts`
+```javascript
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+```
 
-Delete `resolveSignatureUrlStructured()` and `resolveSignatureUrl()` methods and the `SignatureResolveResult` interface. These are no longer called anywhere and create confusion about which path is active.
+**Files to update (CORS block, lines 4-16 in each):**
+- `supabase/functions/vehicle-lookup/index.ts`
+- `supabase/functions/business-search/index.ts`
+- `supabase/functions/place-details/index.ts`
+- `supabase/functions/postcode-lookup/index.ts`
+- `supabase/functions/maps-directions/index.ts`
+- `supabase/functions/gcs-upload/index.ts`
+- `supabase/functions/gcs-proxy/index.ts`
+- `supabase/functions/gcs-fix-acl/index.ts`
+- `supabase/functions/vision-ocr/index.ts`
+- `supabase/functions/promote-admin/index.ts`
+- `supabase/functions/assign-driver/index.ts`
+- `supabase/functions/get-org-users/index.ts`
+- `supabase/functions/google-sheets-sync/index.ts` (same pattern, slightly different location)
 
-### C. Add signature background contrast in `PodReport.tsx` SignatureCard
+Also replace `cors(req.headers.get("Origin"))` in catch blocks with just `corsHeaders`.
 
-Change the `<img>` container from `bg-white` to a light gray background (`bg-slate-50`) so signatures drawn on transparent canvases are visible. This is a likely contributor to the "empty box" appearance.
+#### Part 2: Switch client APIs to use `supabase.functions.invoke()`
 
-### D. Harden PodReport resolution effect
+**`src/lib/businessSearchApi.ts`** — Replace raw fetch calls with `supabase.functions.invoke('business-search', ...)` and `supabase.functions.invoke('place-details', ...)`. This sends the user's real auth token.
 
-- After resolution, validate each slot: reject any value that isn't a string starting with `https://`
-- Add explicit logging for the auth-failure case so it's distinguishable from resolution failure
-- Ensure `onError` in `SignatureCard` logs the full HTTP status if possible
+**`src/lib/postcodeApi.ts`** — Replace raw fetch with `supabase.functions.invoke('postcode-lookup', ...)`.
 
-### E. Verify edge function GCS fallback path encoding
+**`src/lib/mapsApi.ts`** — Replace raw fetch with `supabase.functions.invoke('maps-directions', ...)`.
 
-The V4 signing uses `objectPath.split("/").map(encodeURIComponent).join("/")` for the canonical URI. Verify this matches how `gcs-upload` stores the object (with UUID-timestamp filenames that may contain special characters). No code change expected, just validation.
+**`src/lib/sheetSyncApi.ts`** — Replace raw fetch `callSync` function with `supabase.functions.invoke('google-sheets-sync', ...)`.
 
-### F. Consumer consistency check
+#### Part 3: Deploy all edge functions
 
-- `podPdf.ts`: Already uses `resolveSignatureUrlViaEdge` ✓
-- `mediaResolver.ts`: Already routes through edge function ✓  
-- `internalStorageService`: Dead code to be removed (step B)
-- No other active signature consumers found
+All 13 edge functions must be redeployed after CORS fixes.
 
 ---
 
-### Files to change
+### Summary of what this fixes
 
-1. `src/lib/resolveSignatureUrlViaEdge.ts` — auth resilience
-2. `src/lib/internalStorageService.ts` — remove dead signature resolution methods
-3. `src/pages/PodReport.tsx` — signature card contrast fix + logging hardening
+| Feature | Broken because | Fix |
+|---|---|---|
+| DVLA Lookup | CORS block | Fix CORS headers |
+| Company Search | CORS + anon key auth | Fix CORS + use `supabase.functions.invoke` |
+| Postcode Lookup | CORS + anon key auth | Fix CORS + use `supabase.functions.invoke` |
+| Maps/Route Calc | CORS + anon key auth | Fix CORS + use `supabase.functions.invoke` |
+| Google Sheets Sync | CORS + anon key auth | Fix CORS + use `supabase.functions.invoke` |
+| GCS Photo Upload | CORS block | Fix CORS headers |
+| GCS Photo Proxy | CORS block | Fix CORS headers |
+| Vision OCR | CORS block | Fix CORS headers |
+| Admin user mgmt | CORS block | Fix CORS headers |
+
+No database, RLS, routing, or business logic changes needed.
 

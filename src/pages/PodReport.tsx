@@ -88,7 +88,7 @@ const SignatureCard = ({
         <img
           src={url}
           alt={`${label} signature`}
-          className="h-16 border rounded-md bg-white p-1.5 w-full object-contain"
+          className="h-16 border rounded-md bg-slate-100 p-1.5 w-full object-contain"
           onLoad={() =>
             console.info("[SigImg] onLoad", { slot, srcPrefix: url.slice(0, 80) })
           }
