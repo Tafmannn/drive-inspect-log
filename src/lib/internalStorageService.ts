@@ -141,9 +141,11 @@ class InternalStorageService implements StorageService {
     if (error || !data?.signedUrl) {
       const msg = error?.message ?? 'No signed URL returned';
       const lower = msg.toLowerCase();
-      const errorCode = lower.includes('not found')
-        ? 'OBJECT_NOT_FOUND' as const
-        : lower.includes('permission') || lower.includes('forbidden') || lower.includes('403')
+      const statusCode = String((error as { statusCode?: string | number }).statusCode ?? '');
+      const errorCode =
+        lower.includes('not found') || lower.includes('resource not found') || statusCode === '404'
+          ? 'OBJECT_NOT_FOUND' as const
+        : lower.includes('permission') || lower.includes('forbidden') || lower.includes('403') || statusCode === '403'
           ? 'PERMISSION' as const
           : 'UNKNOWN_ERROR' as const;
 
