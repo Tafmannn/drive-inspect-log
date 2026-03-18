@@ -70,15 +70,6 @@ const SignatureCard = ({
     setFailed(false);
   }, [url]);
 
-  useEffect(() => {
-    console.info("[SigImg] mount", {
-      slot,
-      hasUrl: !!url,
-      isHttps: url?.startsWith("https://") ?? false,
-      srcPrefix: url?.slice(0, 80) ?? null,
-    });
-  }, [slot, url]);
-
   return (
     <div className="space-y-1">
       <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
@@ -89,12 +80,16 @@ const SignatureCard = ({
         <img
           src={url}
           alt={`${label} signature`}
-          className="h-16 border rounded-md bg-slate-100 p-1.5 w-full object-contain"
-          onLoad={() =>
-            console.info("[SigImg] onLoad", { slot, srcPrefix: url.slice(0, 80) })
-          }
+          style={{
+            width: "100%",
+            height: "80px",
+            objectFit: "contain",
+            border: "1px solid red",
+            background: "#f1f5f9",
+          }}
+          onLoad={() => console.log("[SIG IMG LOADED]", { slot, url: url.slice(0, 120) })}
           onError={() => {
-            console.error("[SigImg] onError", { slot, srcPrefix: url.slice(0, 80) });
+            console.error("[SIG IMG FAILED]", { slot, url: url.slice(0, 120) });
             setFailed(true);
           }}
         />
