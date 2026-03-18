@@ -134,19 +134,27 @@ export const JobDetail = () => {
   const [selectedStatus, setSelectedStatus] = useState<string>("");
   const [changingStatus, setChangingStatus] = useState(false);
   const [resolvedPhotos, setResolvedPhotos] = useState<Record<string, string>>({});
+  const [photosLoading, setPhotosLoading] = useState(false);
 
   // Resolve photos for admin gallery
   useEffect(() => {
     if (!canAdmin || !job?.photos?.length) return;
     let cancelled = false;
+    setPhotosLoading(true);
     Promise.all(
       job.photos.map(async (p: any) => {
-        const resolved = await resolveMediaUrlAsync(p.url);
-        if (!cancelled && resolved) {
-          setResolvedPhotos(prev => ({ ...prev, [p.id]: resolved }));
+        try {
+          const resolved = await resolveMediaUrlAsync(p.url);
+          if (!cancelled && resolved) {
+            setResolvedPhotos(prev => ({ ...prev, [p.id]: resolved }));
+          }
+        } catch {
+          // skip unresolvable photos
         }
       })
-    );
+    ).finally(() => {
+      if (!cancelled) setPhotosLoading(false);
+    });
     return () => { cancelled = true; };
   }, [job?.photos, canAdmin]);
 
