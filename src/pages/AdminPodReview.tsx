@@ -192,7 +192,7 @@ function ReviewCard({ row, navigate, onConfirm, confirming }: {
 /* ─── Queue Section ────────────────────────────────────────────── */
 
 function QueueSection({
-  title, icon: Icon, iconClass, rows, emptyText, navigate, collapsible,
+  title, icon: Icon, iconClass, rows, emptyText, navigate, collapsible, onConfirm, confirming,
 }: {
   title: string;
   icon: React.ComponentType<{ className?: string }>;
@@ -201,6 +201,8 @@ function QueueSection({
   emptyText: string;
   navigate: (path: string) => void;
   collapsible?: boolean;
+  onConfirm: (id: string) => void;
+  confirming: string | null;
 }) {
   const [collapsed, setCollapsed] = useState(!!collapsible);
 
@@ -228,7 +230,7 @@ function QueueSection({
           ) : (
             <div className="space-y-2">
               {rows.map((row) => (
-                <ReviewCard key={row.id} row={row} navigate={navigate} />
+                <ReviewCard key={row.id} row={row} navigate={navigate} onConfirm={onConfirm} confirming={confirming} />
               ))}
             </div>
           )}
