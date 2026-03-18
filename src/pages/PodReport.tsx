@@ -143,6 +143,7 @@ export const PodReport = () => {
 
   useEffect(() => {
     let cancelled = false;
+    const effectId = Date.now();
 
     async function resolveAllMedia() {
       if (!job) return;
@@ -153,62 +154,77 @@ export const PodReport = () => {
       const nextSignatures: Record<string, string | null> = {};
       const nextPhotos: Record<string, string> = {};
 
-      const sigSlots = {
+      const sigSlots: Record<string, string | null> = {
         pickup_driver: pickup?.driver_signature_url ?? null,
         pickup_customer: pickup?.customer_signature_url ?? null,
         delivery_driver: delivery?.driver_signature_url ?? null,
         delivery_customer: delivery?.customer_signature_url ?? null,
       };
 
-      console.info("[POD-Sig] raw inputs", { jobId: job.id, ...sigSlots });
+      console.info("[POD-Sig] resolve start", { effectId, jobId: job.id, slots: sigSlots });
 
-      for (const [slot, raw] of Object.entries(sigSlots)) {
-        if (!raw) {
-          nextSignatures[slot] = null;
-          console.info("[POD-Sig] no raw value", { slot });
-          continue;
-        }
-
-        try {
-          const resolved = await resolveMediaUrlAsync(raw);
-          const hasRenderableHttpsUrl = typeof resolved === "string" && resolved.startsWith("https://");
-
-          if (!hasRenderableHttpsUrl) {
+      // Resolve each slot independently with per-slot isolation
+      await Promise.all(
+        Object.entries(sigSlots).map(async ([slot, raw]) => {
+          if (!raw) {
             nextSignatures[slot] = null;
-            console.error("[POD-Sig] resolution failed or non-https result", {
-              slot,
-              raw: raw.slice(0, 180),
-              resolved: resolved?.slice(0, 180) ?? null,
-            });
-            continue;
+            return;
           }
 
-          nextSignatures[slot] = resolved;
-          console.info("[POD-Sig] resolved", {
-            slot,
-            raw: raw.slice(0, 180),
-            resolved: resolved.slice(0, 180),
-          });
-        } catch (err) {
-          nextSignatures[slot] = null;
-          console.error("[POD-Sig] resolution threw", {
-            slot,
-            raw: raw.slice(0, 180),
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
+          try {
+            console.info("[POD-Sig] slot→edge", { effectId, slot, raw: raw.slice(0, 120) });
+            const resolved = await resolveMediaUrlAsync(raw);
+
+            if (cancelled) return; // guard stale write
+
+            if (typeof resolved !== "string" || !resolved.startsWith("https://")) {
+              nextSignatures[slot] = null;
+              console.error("[POD-Sig] non-https or null", {
+                effectId, slot,
+                raw: raw.slice(0, 120),
+                resolved: resolved?.slice(0, 80) ?? null,
+              });
+              return;
+            }
+
+            nextSignatures[slot] = resolved;
+            console.info("[POD-Sig] slot resolved", {
+              effectId, slot,
+              urlPrefix: resolved.slice(0, 80),
+            });
+          } catch (err) {
+            nextSignatures[slot] = null;
+            console.error("[POD-Sig] slot threw", {
+              effectId, slot,
+              raw: raw.slice(0, 120),
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        })
+      );
+
+      if (cancelled) {
+        console.info("[POD-Sig] effect cancelled, discarding", { effectId });
+        return;
       }
 
+      // Resolve photos in parallel
       await Promise.all(
         (job.photos ?? []).map(async (photo) => {
           const resolved = await resolveMediaUrlAsync(photo.url);
-          if (resolved) {
+          if (resolved && !cancelled) {
             nextPhotos[photo.id] = resolved;
           }
         })
       );
 
       if (!cancelled) {
+        console.info("[POD-Sig] committing state", {
+          effectId,
+          slots: Object.fromEntries(
+            Object.entries(nextSignatures).map(([k, v]) => [k, v ? "https://..." : null])
+          ),
+        });
         setResolvedSignatures(nextSignatures);
         setResolvedPhotos(nextPhotos);
       }
