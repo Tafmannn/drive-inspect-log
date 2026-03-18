@@ -78,6 +78,7 @@ export function ControlPodReview() {
       setConfirming(null);
     }
   };
+  const { data, isLoading } = useClosureReviewQueue();
   const { data: kpis, isLoading: kpisLoading } = useClosureKpis();
 
   // Merge + filter
