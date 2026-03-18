@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, Download, Loader2 } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 interface PhotoItem {
   url: string;
@@ -16,6 +17,7 @@ interface PhotoViewerProps {
 export const PhotoViewer = ({ photos, title }: PhotoViewerProps) => {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [zoom, setZoom] = useState(1);
+  const [downloading, setDownloading] = useState(false);
 
   if (photos.length === 0) return null;
 
@@ -44,6 +46,44 @@ export const PhotoViewer = ({ photos, title }: PhotoViewerProps) => {
   const toggleZoom = () => {
     setZoom((z) => (z === 1 ? 2 : z === 2 ? 3 : 1));
   };
+
+  const handleDownload = useCallback(async () => {
+    if (selectedIndex === null || downloading) return;
+    const photo = photos[selectedIndex];
+    if (!photo?.url) return;
+
+    setDownloading(true);
+    try {
+      // Fetch via proxy to handle CORS/signed URLs
+      const response = await fetch(photo.url, { mode: "cors" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const blob = await response.blob();
+
+      const ext = blob.type.includes("png") ? "png" : blob.type.includes("webp") ? "webp" : "jpg";
+      const filename = photo.label
+        ? `${photo.label.replace(/[^a-zA-Z0-9_-]/g, "_")}.${ext}`
+        : `photo_${selectedIndex + 1}.${ext}`;
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("[PhotoViewer] Download failed", err);
+      // Fallback: open in new tab
+      try {
+        window.open(photo.url, "_blank");
+      } catch {
+        toast({ title: "Download failed", description: "Could not download image.", variant: "destructive" });
+      }
+    } finally {
+      setDownloading(false);
+    }
+  }, [selectedIndex, photos, downloading]);
 
   return (
     <div className="space-y-2">
@@ -86,12 +126,15 @@ export const PhotoViewer = ({ photos, title }: PhotoViewerProps) => {
           <div className="relative w-full h-full flex flex-col">
             {/* Top bar */}
             <div className="flex items-center justify-between px-4 py-3 bg-black/80 z-10">
-              <span className="text-white text-sm">
+              <span className="text-white text-sm truncate mr-2">
                 {selectedIndex !== null && photos[selectedIndex]?.label
                   ? photos[selectedIndex].label
                   : `Photo ${(selectedIndex ?? 0) + 1} of ${photos.length}`}
               </span>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="sm" onClick={handleDownload} disabled={downloading} className="text-white hover:bg-white/20">
+                  {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                </Button>
                 <Button variant="ghost" size="sm" onClick={toggleZoom} className="text-white hover:bg-white/20">
                   {zoom > 1 ? <ZoomOut className="h-4 w-4" /> : <ZoomIn className="h-4 w-4" />}
                 </Button>

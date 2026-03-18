@@ -85,6 +85,7 @@ export function useJob(jobId: string) {
     queryKey: ["job", jobId],
     queryFn: () => api.getJobWithRelations(jobId),
     enabled: !!jobId,
+    staleTime: 30_000,
   });
 }
 

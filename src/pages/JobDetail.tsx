@@ -508,6 +508,12 @@ export const JobDetail = () => {
           {canAdmin && job.photos && job.photos.length > 0 && (
             <Section>
               <SectionLabel icon={Images}>Inspection Photos</SectionLabel>
+              {photosLoading && (
+                <div className="flex items-center gap-2 py-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">Loading photos…</span>
+                </div>
+              )}
               <PhotoViewer
                 title="Collection"
                 photos={job.photos
