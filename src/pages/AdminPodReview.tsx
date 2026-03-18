@@ -370,6 +370,8 @@ export function AdminPodReview() {
                 rows={filterRows(groups.missingInspection)}
                 emptyText="All closure jobs have delivery inspections."
                 navigate={navigate}
+                onConfirm={handleConfirmReview}
+                confirming={confirming}
               />
             )}
 
@@ -381,6 +383,8 @@ export function AdminPodReview() {
                 rows={filterRows(groups.missingSignatures)}
                 emptyText="All inspected jobs have complete signatures."
                 navigate={navigate}
+                onConfirm={handleConfirmReview}
+                confirming={confirming}
               />
             )}
 
@@ -392,6 +396,8 @@ export function AdminPodReview() {
                 rows={filterRows(groups.podReady)}
                 emptyText="No jobs with complete evidence awaiting review."
                 navigate={navigate}
+                onConfirm={handleConfirmReview}
+                confirming={confirming}
               />
             )}
 
@@ -404,6 +410,8 @@ export function AdminPodReview() {
                 emptyText="No recently completed jobs."
                 navigate={navigate}
                 collapsible
+                onConfirm={handleConfirmReview}
+                confirming={confirming}
               />
             )}
           </>

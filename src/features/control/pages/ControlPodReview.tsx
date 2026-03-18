@@ -13,6 +13,7 @@
  */
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { ControlShell, ControlHeader, ControlSection } from "../components/shared/ControlShell";
 import { KpiStrip } from "../components/shared/KpiStrip";
 import { CompactTable, type CompactColumn } from "../components/shared/CompactTable";
@@ -28,9 +29,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { getStatusStyle } from "@/lib/statusConfig";
+import { supabase } from "@/integrations/supabase/client";
+import { invalidateForEvent } from "@/lib/mutationEvents";
+import { toast } from "@/hooks/use-toast";
 import {
   Search, ClipboardCheck, FileCheck, Truck, AlertTriangle,
-  Eye, FileText, ClipboardList, Receipt, Clock,
+  Eye, FileText, ClipboardList, Receipt, Clock, CheckCircle, Loader2,
 } from "lucide-react";
 
 type StatusFilterValue = "all" | "pod_ready" | "delivery_complete" | "recently_completed";
