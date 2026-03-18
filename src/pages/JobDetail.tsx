@@ -141,7 +141,7 @@ export const JobDetail = () => {
   if (isLoading || !job) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <AppHeader title="Job Detail" showBack onBack={() => navigate(-1)} />
+        <AppHeader title="Job Detail" showBack onBack={goBack} />
         <div className="p-4"><DashboardSkeleton /></div>
         <BottomNav />
       </div>
