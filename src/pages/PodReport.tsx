@@ -9,6 +9,7 @@ import { PhotoViewer } from "@/components/PhotoViewer";
 import { useJob, useUpdateJob } from "@/hooks/useJobs";
 import { useJobExpenses } from "@/hooks/useExpenses";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useSafeBack } from "@/hooks/useSafeBack";
 import { useQueryClient } from "@tanstack/react-query";
 import { invalidateForEvent } from "@/lib/mutationEvents";
 // resolveBackTarget removed — using navigate(-1) for natural back behavior
@@ -116,6 +117,7 @@ const SignatureCard = ({
 export const PodReport = () => {
   const navigate = useNavigate();
   const { jobId } = useParams<{ jobId: string }>();
+  const goBack = useSafeBack(jobId ? `/jobs/${jobId}` : "/jobs");
   const [searchParams] = useSearchParams();
   const { data: job, isLoading } = useJob(jobId ?? "");
   const { data: jobExpenses } = useJobExpenses(jobId ?? "");
@@ -367,7 +369,7 @@ export const PodReport = () => {
   if (isLoading || !job) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
-        <AppHeader title="POD Report" showBack onBack={() => navigate(-1)} />
+        <AppHeader title="POD Report" showBack onBack={goBack} />
         <div className="flex-1 flex items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
@@ -404,7 +406,7 @@ export const PodReport = () => {
   return (
     <div className="min-h-screen bg-muted flex flex-col print:bg-white">
       <div className="print:hidden">
-        <AppHeader title="POD Report" showBack onBack={() => navigate(-1)}>
+        <AppHeader title="POD Report" showBack onBack={goBack}>
           <div className="flex gap-1">
             {(isAdmin || isSuperAdmin) && (
               <Button

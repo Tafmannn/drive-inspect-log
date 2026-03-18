@@ -20,6 +20,7 @@
 
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { withFrom } from "@/lib/navigationUtils";
+import { useSafeBack } from "@/hooks/useSafeBack";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
@@ -106,6 +107,7 @@ function isStepComplete(step: WorkflowStep, status: string): boolean {
 
 export const JobDetail = () => {
   const navigate = useNavigate();
+  const goBack = useSafeBack("/jobs");
   const { jobId } = useParams<{ jobId: string }>();
   const [searchParams] = useSearchParams();
   const { data: job, isLoading } = useJob(jobId ?? "");
@@ -139,7 +141,7 @@ export const JobDetail = () => {
   if (isLoading || !job) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <AppHeader title="Job Detail" showBack onBack={() => navigate(-1)} />
+        <AppHeader title="Job Detail" showBack onBack={goBack} />
         <div className="p-4"><DashboardSkeleton /></div>
         <BottomNav />
       </div>
@@ -166,7 +168,7 @@ export const JobDetail = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <AppHeader title={`Job ${jobRef}`} showBack onBack={() => navigate(-1)} />
+      <AppHeader title={`Job ${jobRef}`} showBack onBack={goBack} />
 
       <div className="p-4 space-y-3 max-w-lg mx-auto">
         {/* ── 1. HEADER ── */}

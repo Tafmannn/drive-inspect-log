@@ -147,8 +147,16 @@ export const InspectionFlow = () => {
   const [submitting, setSubmitting] = useState(false);
   const [showDraftPrompt, setShowDraftPrompt] = useState(false);
   // Tracks that we're in an active editing session — prevents draft modal
-  // from re-appearing after camera/photo capture causes a remount.
-  const sessionActive = useRef(false);
+  // from re-appearing after camera/photo capture or screen rotation causes a remount.
+  // Backed by sessionStorage so it survives orientation-change remounts.
+  const sessionKey = `axentra.inspection.session.${jobId}.${type}`;
+  const sessionActive = useRef(
+    typeof window !== "undefined" && sessionStorage.getItem(sessionKey) === "1"
+  );
+  const markSessionActive = useCallback(() => {
+    sessionActive.current = true;
+    try { sessionStorage.setItem(sessionKey, "1"); } catch { /* quota */ }
+  }, [sessionKey]);
 
   // Photo label modal state
   const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
@@ -229,6 +237,9 @@ export const InspectionFlow = () => {
   }, [formState, currentStep, dk]);
 
   // ─── DRAFT RESTORE: check on mount (once) ───
+  // Guard against false triggers from screen rotation / orientation change:
+  // If the draft was saved <10 seconds ago, it's a remount, not a genuine interruption.
+  // In that case, silently restore without showing the prompt.
   useEffect(() => {
     if (!dk || sessionActive.current) return;
     const draft = loadDraft<Record<string, unknown>>(dk);
@@ -238,12 +249,26 @@ export const InspectionFlow = () => {
       const hasMeaningful = d.odometer || d.fuelLevel || d.notes || d.customerName || d.driverName ||
         d.vehicleCondition || d.lightCondition || d.numberOfKeys;
       if (hasMeaningful) {
+        // Check if this is a rotation/remount (draft saved very recently)
+        const savedAge = draft.savedAt
+          ? Date.now() - new Date(draft.savedAt).getTime()
+          : Infinity;
+        if (savedAge < 10_000) {
+          // Silent restore — rotation or brief remount, not a genuine interruption
+          const { _currentStep, ...fields } = draft.data;
+          setFormState(prev => ({ ...prev, ...fields }));
+          if (typeof _currentStep === "number" && _currentStep >= 1 && _currentStep <= totalSteps) {
+            setCurrentStep(_currentStep);
+          }
+          markSessionActive();
+          return;
+        }
         setShowDraftPrompt(true);
         return;
       }
     }
     // No meaningful draft — start fresh and mark session active
-    sessionActive.current = true;
+    markSessionActive();
   }, [dk]);
 
   const handleRestoreDraft = () => {
@@ -257,13 +282,13 @@ export const InspectionFlow = () => {
       }
       toast({ title: "Draft restored." });
     }
-    sessionActive.current = true;
+    markSessionActive();
     setShowDraftPrompt(false);
   };
 
   const handleDiscardDraft = () => {
     if (dk) clearDraft(dk);
-    sessionActive.current = true;
+    markSessionActive();
     setShowDraftPrompt(false);
   };
 
@@ -640,6 +665,7 @@ export const InspectionFlow = () => {
       const label = type === "pickup" ? "Pickup" : "Delivery";
       toast({ title: `${label} completed for job ${jobRef}.` });
       if (dk) clearDraft(dk);
+      try { sessionStorage.removeItem(sessionKey); } catch { /* ignore */ }
       navigate(`/jobs/${jobId}`);
     } catch {
       toast({ title: "Submission failed. Please try again.", variant: "destructive" });
