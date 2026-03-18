@@ -197,16 +197,18 @@ interface PriorityResult {
 function derivePriorityState(
   job: Job,
   workflow: WorkflowState,
-  isTopRecommended: boolean
+  isTopRecommended: boolean,
+  allJobs: Job[],
 ): PriorityResult {
   const today = todayStr();
   const now = nowMinutes();
 
-  // Blocked: delivery date restriction
-  if (isBlockedByDeliveryDate(job)) {
+  // Blocked: active-job lock
+  const lock = isBlockedByActiveJob(job, allJobs);
+  if (lock.blocked) {
     return {
       state: "blocked",
-      reason: `Cannot deliver before ${job.earliest_delivery_date}`,
+      reason: `Complete Job ${lock.blockRef} first`,
     };
   }
 
