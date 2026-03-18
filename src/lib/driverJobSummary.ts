@@ -134,11 +134,12 @@ function deriveWorkflowState(job: Job): WorkflowState {
 
 // ── Action State ────────────────────────────────────────────────────
 
-function deriveActionState(job: Job, workflow: WorkflowState): ActionState {
+function deriveActionState(job: Job, workflow: WorkflowState, allJobs: Job[]): ActionState {
   if (workflow === "pending_review" || workflow === "terminal") return "view_pod";
 
-  // Blocked by do-not-deliver-before → can only view
-  if (isBlockedByDeliveryDate(job) && workflow === "in_transit") return "view_job";
+  // Blocked by active-job lock → can only view
+  const lock = isBlockedByActiveJob(job, allJobs);
+  if (lock.blocked && (workflow === "in_transit" || workflow === "awaiting_pickup" || workflow === "awaiting_delivery")) return "view_job";
 
   if (!job.has_pickup_inspection) return "start_pickup";
 
