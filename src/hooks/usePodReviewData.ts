@@ -62,6 +62,10 @@ function resolveDriverName(row: any): string | null {
   return p ? (p.display_name || p.full_name || row.driver_name) : (row.driver_name || null);
 }
 
+function hasPersistedSignature(url: string | null | undefined): boolean {
+  return typeof url === "string" && url.trim().length > 0;
+}
+
 export function usePodReviewData() {
   return useQuery({
     queryKey: ["admin-pod-review"],
@@ -96,20 +100,27 @@ export function usePodReviewData() {
         ...(completedRes.data ?? []).map((j: any) => j.id),
       ];
 
-      // 2) Fetch delivery inspections for signature status
-      let sigMap: Record<string, { customer: boolean; driver: boolean }> = {};
+      // 2) Fetch delivery inspections for signature status (persisted DB fields only)
+      const sigMap: Record<string, { customer: boolean; driver: boolean; ts: number }> = {};
       if (allJobIds.length > 0) {
         const { data: inspections } = await supabase
           .from("inspections")
-          .select("job_id, customer_signature_url, driver_signature_url")
+          .select("job_id, customer_signature_url, driver_signature_url, inspected_at, created_at")
           .eq("type", "delivery")
           .in("job_id", allJobIds);
 
         for (const insp of inspections ?? []) {
-          sigMap[insp.job_id] = {
-            customer: !!insp.customer_signature_url,
-            driver: !!insp.driver_signature_url,
-          };
+          const ts = Date.parse(insp.inspected_at ?? insp.created_at ?? "") || 0;
+          const existing = sigMap[insp.job_id];
+
+          // Use latest persisted delivery inspection only.
+          if (!existing || ts >= existing.ts) {
+            sigMap[insp.job_id] = {
+              customer: hasPersistedSignature(insp.customer_signature_url),
+              driver: hasPersistedSignature(insp.driver_signature_url),
+              ts,
+            };
+          }
         }
       }
 
