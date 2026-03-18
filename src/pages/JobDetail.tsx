@@ -106,6 +106,7 @@ function isStepComplete(step: WorkflowStep, status: string): boolean {
 // ── Component ────────────────────────────────────────────────────────
 
 export const JobDetail = () => {
+  const navigate = useNavigate();
   const goBack = useSafeBack("/jobs");
   const { jobId } = useParams<{ jobId: string }>();
   const [searchParams] = useSearchParams();
