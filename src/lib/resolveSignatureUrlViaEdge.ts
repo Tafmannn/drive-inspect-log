@@ -25,6 +25,26 @@ interface ResolveResult {
 // Simple in-memory cache to avoid redundant Edge Function calls
 const cache = new Map<string, { url: string; expiresAt: number }>();
 
+async function getAccessToken(): Promise<string | null> {
+  // Try current session first
+  const { data: sessionData } = await supabase.auth.getSession();
+  const existingToken = sessionData.session?.access_token;
+  if (existingToken) return existingToken;
+
+  // Session missing — attempt a refresh before giving up
+  console.warn('[SigEdge] no session, attempting token refresh');
+  const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+  if (refreshError || !refreshData.session?.access_token) {
+    console.error('[SigEdge] token refresh failed', {
+      error: refreshError?.message ?? 'no session after refresh',
+    });
+    return null;
+  }
+
+  console.info('[SigEdge] token refresh succeeded');
+  return refreshData.session.access_token;
+}
+
 export async function resolveSignatureUrlViaEdge(
   rawUrl: string | null | undefined
 ): Promise<string | null> {
@@ -43,10 +63,9 @@ export async function resolveSignatureUrlViaEdge(
   }
 
   try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData.session?.access_token;
+    const token = await getAccessToken();
     if (!token) {
-      console.error('[SigEdge] no auth token');
+      console.error('[SigEdge] no auth token after refresh attempt');
       return null;
     }
 
