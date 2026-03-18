@@ -173,8 +173,17 @@ function parseTimeToMinutes(t: string): number | null {
   return parseInt(m[1]) * 60 + parseInt(m[2]);
 }
 
-function isBlockedByDeliveryDate(job: Job): boolean {
-  return !!job.earliest_delivery_date && job.earliest_delivery_date > todayStr();
+function isBlockedByActiveJob(job: Job, allJobs: Job[]): { blocked: boolean; blockRef: string | null } {
+  const inProgressStatuses = ["pickup_in_progress", "delivery_in_progress"];
+  if (inProgressStatuses.includes(job.status)) return { blocked: false, blockRef: null };
+  
+  const blocker = allJobs.find(
+    (j) => j.id !== job.id && j.driver_id === job.driver_id && inProgressStatuses.includes(j.status)
+  );
+  if (blocker) {
+    return { blocked: true, blockRef: blocker.external_job_number || blocker.id.slice(0, 8) };
+  }
+  return { blocked: false, blockRef: null };
 }
 
 // ── Priority State ──────────────────────────────────────────────────
