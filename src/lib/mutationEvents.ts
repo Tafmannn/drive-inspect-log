@@ -58,7 +58,9 @@ const EVENT_INVALIDATIONS: Record<EventClass, string[][]> = {
     ["admin-job-queues"], ["admin-job-queue-kpis"],
     ["admin-missing-evidence-count"],
     ["control-jobs"], ["control-jobs-kpis"],
-    ["closure-review-queue"],
+    ["closure-review-queue"], ["closure-review-kpis"],
+    ["admin-pod-review"],
+    ["attention-center"],
   ],
 };
 

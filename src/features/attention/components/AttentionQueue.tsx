@@ -93,18 +93,30 @@ export function AttentionQueue({ exceptions, showOrg, loading, acknowledged = fa
   const handleAcknowledge = async (mode: "ack" | "snooze") => {
     if (!ackDialog || !user) return;
     setSubmitting(true);
+    const exId = ackDialog.exception.id;
     try {
       const { error } = await supabase.from("attention_acknowledgements").insert({
-        exception_id: ackDialog.exception.id,
+        exception_id: exId,
         job_id: ackDialog.exception.jobId ?? null,
         acknowledged_by: user.id,
         note: note || null,
         snoozed_until: mode === "snooze" ? new Date(Date.now() + 24 * 3600_000).toISOString() : null,
-      } as any);
+      });
       if (error) throw error;
       toast({ title: mode === "snooze" ? "Snoozed for 24h" : "Acknowledged" });
       setAckDialog(null);
       setNote("");
+      // Immediately remove from local cache for instant UI feedback
+      qc.setQueriesData({ queryKey: ["attention-center"] }, (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          exceptions: (old.exceptions ?? []).filter((e: any) => e.id !== exId),
+          acknowledgedExceptions: [...(old.acknowledgedExceptions ?? []), ackDialog.exception],
+          acknowledgedCount: (old.acknowledgedCount ?? 0) + 1,
+        };
+      });
+      // Then refetch to ensure consistency
       qc.invalidateQueries({ queryKey: ["attention-center"] });
     } catch (e: any) {
       toast({ title: "Failed", description: e.message, variant: "destructive" });

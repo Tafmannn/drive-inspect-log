@@ -6,9 +6,11 @@ import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { PhotoViewer } from "@/components/PhotoViewer";
-import { useJob } from "@/hooks/useJobs";
+import { useJob, useUpdateJob } from "@/hooks/useJobs";
 import { useJobExpenses } from "@/hooks/useExpenses";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { invalidateForEvent } from "@/lib/mutationEvents";
 // resolveBackTarget removed — using navigate(-1) for natural back behavior
 import {
   Loader2,
@@ -19,6 +21,7 @@ import {
   PenLine,
   Images,
   Receipt,
+  CheckCircle,
 } from "lucide-react";
 import { openPodEmail, generatePodEmailBody } from "@/lib/podEmail";
 import { sharePodPdf, emailPodPdf } from "@/lib/podPdf";
@@ -117,9 +120,32 @@ export const PodReport = () => {
   const { data: job, isLoading } = useJob(jobId ?? "");
   const { data: jobExpenses } = useJobExpenses(jobId ?? "");
   const { isAdmin, isSuperAdmin } = useAuth();
+  const updateJob = useUpdateJob();
+  const qc = useQueryClient();
 
   const [pdfLoading, setPdfLoading] = useState(false);
   const [downloadingPhotos, setDownloadingPhotos] = useState(false);
+  const [confirmingReview, setConfirmingReview] = useState(false);
+
+  const canConfirmReview = (isAdmin || isSuperAdmin) && job &&
+    ["pod_ready", "delivery_complete"].includes(job.status);
+
+  const handleConfirmReview = async () => {
+    if (!job || confirmingReview) return;
+    setConfirmingReview(true);
+    try {
+      await updateJob.mutateAsync({
+        jobId: job.id,
+        input: { status: "completed" as any, completed_at: new Date().toISOString() },
+      });
+      invalidateForEvent(qc, "job_status_changed", [["job", job.id]]);
+      toast({ title: "Review confirmed — job completed" });
+    } catch (e: any) {
+      toast({ title: "Failed to confirm", description: e.message, variant: "destructive" });
+    } finally {
+      setConfirmingReview(false);
+    }
+  };
   const [resolvedSignatures, setResolvedSignatures] = useState<
     Record<string, string | null>
   >({});
@@ -481,7 +507,29 @@ export const PodReport = () => {
                   label="Delivery Status"
                   value={delivery ? "✓ Delivered" : "Not delivered"}
                 />
+                <DetailRow
+                  label="Assigned Driver"
+                  value={job.resolvedDriverName || job.driver_name || "Unassigned"}
+                />
               </Card>
+
+              {/* Confirm Review Button — admin only, for reviewable statuses */}
+              {canConfirmReview && (
+                <div className="print:hidden">
+                  <Button
+                    className="w-full min-h-[48px] text-sm font-semibold gap-2"
+                    onClick={handleConfirmReview}
+                    disabled={confirmingReview}
+                  >
+                    {confirmingReview ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <CheckCircle className="h-4 w-4" />
+                    )}
+                    Confirm Review — Mark Complete
+                  </Button>
+                </div>
+              )}
 
               <Separator className="print:hidden" />
 

@@ -13,6 +13,7 @@
  */
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { ControlShell, ControlHeader, ControlSection } from "../components/shared/ControlShell";
 import { KpiStrip } from "../components/shared/KpiStrip";
 import { CompactTable, type CompactColumn } from "../components/shared/CompactTable";
@@ -28,9 +29,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { getStatusStyle } from "@/lib/statusConfig";
+import { supabase } from "@/integrations/supabase/client";
+import { invalidateForEvent } from "@/lib/mutationEvents";
+import { toast } from "@/hooks/use-toast";
 import {
   Search, ClipboardCheck, FileCheck, Truck, AlertTriangle,
-  Eye, FileText, ClipboardList, Receipt, Clock,
+  Eye, FileText, ClipboardList, Receipt, Clock, CheckCircle, Loader2,
 } from "lucide-react";
 
 type StatusFilterValue = "all" | "pod_ready" | "delivery_complete" | "recently_completed";
@@ -53,9 +57,27 @@ function humanAge(iso: string): string {
 
 export function ControlPodReview() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilterValue>("all");
+  const [confirming, setConfirming] = useState<string | null>(null);
 
+  const handleConfirmReview = async (jobId: string) => {
+    setConfirming(jobId);
+    try {
+      const { error } = await supabase
+        .from("jobs")
+        .update({ status: "completed", completed_at: new Date().toISOString() } as any)
+        .eq("id", jobId);
+      if (error) throw error;
+      toast({ title: "Review confirmed — job completed" });
+      invalidateForEvent(qc, "job_status_changed", [["job", jobId]]);
+    } catch (e: any) {
+      toast({ title: "Failed", description: e.message, variant: "destructive" });
+    } finally {
+      setConfirming(null);
+    }
+  };
   const { data, isLoading } = useClosureReviewQueue();
   const { data: kpis, isLoading: kpisLoading } = useClosureKpis();
 
@@ -211,9 +233,20 @@ export function ControlPodReview() {
     {
       key: "actions",
       header: "",
-      className: "w-[180px] text-right",
+      className: "w-[220px] text-right",
       render: (r) => (
         <div className="flex items-center justify-end gap-1">
+          {["pod_ready", "delivery_complete"].includes(r.status) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 text-[10px] px-2 text-primary"
+              disabled={confirming === r.id}
+              onClick={(e) => { e.stopPropagation(); handleConfirmReview(r.id); }}
+            >
+              {confirming === r.id ? <Loader2 className="h-3 w-3 animate-spin mr-0.5" /> : <CheckCircle className="h-3 w-3 mr-0.5" />} Confirm
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -239,14 +272,6 @@ export function ControlPodReview() {
             onClick={(e) => { e.stopPropagation(); navigate(`/jobs/${r.id}?from=/control/pod-review`); }}
           >
             <Eye className="h-3 w-3 mr-0.5" /> View
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 text-[10px] px-2"
-            onClick={(e) => { e.stopPropagation(); navigate(`/expenses/new?jobId=${r.id}&from=pod-review`); }}
-          >
-            <Receipt className="h-3 w-3 mr-0.5" /> Expense
           </Button>
         </div>
       ),

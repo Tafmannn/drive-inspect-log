@@ -11,6 +11,7 @@
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
@@ -21,9 +22,12 @@ import { UKPlate } from "@/components/UKPlate";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getStatusStyle } from "@/lib/statusConfig";
 import { usePodReviewData, type PodReviewRow } from "@/hooks/usePodReviewData";
+import { supabase } from "@/integrations/supabase/client";
+import { invalidateForEvent } from "@/lib/mutationEvents";
+import { toast } from "@/hooks/use-toast";
 import {
   Search, ClipboardList, PenTool, FileCheck, CheckCircle,
-  Eye, FileText, MapPin, User, AlertTriangle, ChevronDown, ChevronUp,
+  Eye, FileText, MapPin, User, AlertTriangle, ChevronDown, ChevronUp, Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -72,8 +76,15 @@ function KpiPill({
 
 /* ─── Review Card ──────────────────────────────────────────────── */
 
-function ReviewCard({ row, navigate }: { row: PodReviewRow; navigate: (path: string) => void }) {
+function ReviewCard({ row, navigate, onConfirm, confirming }: {
+  row: PodReviewRow;
+  navigate: (path: string) => void;
+  onConfirm: (id: string) => void;
+  confirming: string | null;
+}) {
   const s = getStatusStyle(row.status);
+  const isConfirming = confirming === row.id;
+  const canConfirm = ["pod_ready", "delivery_complete"].includes(row.status);
 
   return (
     <Card
@@ -143,6 +154,18 @@ function ReviewCard({ row, navigate }: { row: PodReviewRow; navigate: (path: str
         >
           <FileText className="h-3.5 w-3.5 mr-1" /> Review POD
         </Button>
+        {canConfirm && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="min-h-[40px] text-xs text-primary border-primary/30"
+            disabled={isConfirming}
+            onClick={(e) => { e.stopPropagation(); onConfirm(row.id); }}
+          >
+            {isConfirming ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <CheckCircle className="h-3.5 w-3.5 mr-1" />}
+            Confirm
+          </Button>
+        )}
         <Button
           variant="outline"
           size="sm"
@@ -169,7 +192,7 @@ function ReviewCard({ row, navigate }: { row: PodReviewRow; navigate: (path: str
 /* ─── Queue Section ────────────────────────────────────────────── */
 
 function QueueSection({
-  title, icon: Icon, iconClass, rows, emptyText, navigate, collapsible,
+  title, icon: Icon, iconClass, rows, emptyText, navigate, collapsible, onConfirm, confirming,
 }: {
   title: string;
   icon: React.ComponentType<{ className?: string }>;
@@ -178,6 +201,8 @@ function QueueSection({
   emptyText: string;
   navigate: (path: string) => void;
   collapsible?: boolean;
+  onConfirm: (id: string) => void;
+  confirming: string | null;
 }) {
   const [collapsed, setCollapsed] = useState(!!collapsible);
 
@@ -205,7 +230,7 @@ function QueueSection({
           ) : (
             <div className="space-y-2">
               {rows.map((row) => (
-                <ReviewCard key={row.id} row={row} navigate={navigate} />
+                <ReviewCard key={row.id} row={row} navigate={navigate} onConfirm={onConfirm} confirming={confirming} />
               ))}
             </div>
           )}
@@ -219,12 +244,31 @@ function QueueSection({
 
 export function AdminPodReview() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const { data, isLoading, error } = usePodReviewData();
   const [filter, setFilter] = useState<BandFilter>("all");
   const [search, setSearch] = useState("");
+  const [confirming, setConfirming] = useState<string | null>(null);
 
   const kpis = data?.kpis;
   const groups = data?.groups;
+
+  const handleConfirmReview = async (jobId: string) => {
+    setConfirming(jobId);
+    try {
+      const { error } = await supabase
+        .from("jobs")
+        .update({ status: "completed", completed_at: new Date().toISOString() } as any)
+        .eq("id", jobId);
+      if (error) throw error;
+      toast({ title: "Review confirmed — job completed" });
+      invalidateForEvent(qc, "job_status_changed", [["job", jobId]]);
+    } catch (e: any) {
+      toast({ title: "Failed", description: e.message, variant: "destructive" });
+    } finally {
+      setConfirming(null);
+    }
+  };
 
   // Search helper
   const filterRows = (rows: PodReviewRow[]) => {
@@ -326,6 +370,8 @@ export function AdminPodReview() {
                 rows={filterRows(groups.missingInspection)}
                 emptyText="All closure jobs have delivery inspections."
                 navigate={navigate}
+                onConfirm={handleConfirmReview}
+                confirming={confirming}
               />
             )}
 
@@ -337,6 +383,8 @@ export function AdminPodReview() {
                 rows={filterRows(groups.missingSignatures)}
                 emptyText="All inspected jobs have complete signatures."
                 navigate={navigate}
+                onConfirm={handleConfirmReview}
+                confirming={confirming}
               />
             )}
 
@@ -348,6 +396,8 @@ export function AdminPodReview() {
                 rows={filterRows(groups.podReady)}
                 emptyText="No jobs with complete evidence awaiting review."
                 navigate={navigate}
+                onConfirm={handleConfirmReview}
+                confirming={confirming}
               />
             )}
 
@@ -360,6 +410,8 @@ export function AdminPodReview() {
                 emptyText="No recently completed jobs."
                 navigate={navigate}
                 collapsible
+                onConfirm={handleConfirmReview}
+                confirming={confirming}
               />
             )}
           </>

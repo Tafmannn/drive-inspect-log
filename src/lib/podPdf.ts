@@ -774,6 +774,7 @@ export async function generatePodPdf(
     ...(job.vehicle_year ? [["Year", String(job.vehicle_year)] as [string, string]] : []),
     ["Job ID", `Job ${ref}`],
     ["Route", `${clean(job.pickup_city)} → ${clean(job.delivery_city)}`],
+    ["Assigned Driver", clean(job.resolvedDriverName ?? job.driver_name)],
     ["Collection Status", pickup ? "✓ Collected" : "Not collected"],
     ["Delivery Status", delivery ? "✓ Delivered" : "Not delivered"],
   ]);

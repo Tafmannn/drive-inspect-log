@@ -67,7 +67,7 @@ export async function getJob(jobId: string): Promise<Job> {
 
 export async function getJobWithRelations(jobId: string): Promise<JobWithRelations> {
   const [jobRes, inspRes, photoRes, actRes] = await Promise.all([
-    supabase.from('jobs').select('*').eq('id', jobId).single(),
+    supabase.from('jobs').select('*, driver_profiles(display_name, full_name)').eq('id', jobId).single(),
     supabase.from('inspections').select('*').eq('job_id', jobId),
     supabase.from('photos').select('*').eq('job_id', jobId),
     supabase.from('job_activity_log').select('*').eq('job_id', jobId).order('created_at', { ascending: true }),
@@ -83,8 +83,16 @@ export async function getJobWithRelations(jobId: string): Promise<JobWithRelatio
     damageItems = (data ?? []) as DamageItem[];
   }
 
+  // Resolve assigned driver name via FK join, with fallback chain
+  const raw = jobRes.data as any;
+  const dp = raw.driver_profiles;
+  const resolvedDriverName = dp
+    ? (dp.display_name || dp.full_name || raw.driver_name)
+    : (raw.driver_name || null);
+
   return {
-    ...(jobRes.data as Job),
+    ...(raw as Job),
+    resolvedDriverName,
     inspections,
     photos: (photoRes.data ?? []) as Photo[],
     damage_items: damageItems,
