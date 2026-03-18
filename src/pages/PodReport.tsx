@@ -6,9 +6,11 @@ import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { PhotoViewer } from "@/components/PhotoViewer";
-import { useJob } from "@/hooks/useJobs";
+import { useJob, useUpdateJob } from "@/hooks/useJobs";
 import { useJobExpenses } from "@/hooks/useExpenses";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { invalidateForEvent } from "@/lib/mutationEvents";
 // resolveBackTarget removed — using navigate(-1) for natural back behavior
 import {
   Loader2,
@@ -19,6 +21,7 @@ import {
   PenLine,
   Images,
   Receipt,
+  CheckCircle,
 } from "lucide-react";
 import { openPodEmail, generatePodEmailBody } from "@/lib/podEmail";
 import { sharePodPdf, emailPodPdf } from "@/lib/podPdf";
