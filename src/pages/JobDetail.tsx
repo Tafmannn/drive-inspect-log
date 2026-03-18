@@ -134,19 +134,27 @@ export const JobDetail = () => {
   const [selectedStatus, setSelectedStatus] = useState<string>("");
   const [changingStatus, setChangingStatus] = useState(false);
   const [resolvedPhotos, setResolvedPhotos] = useState<Record<string, string>>({});
+  const [photosLoading, setPhotosLoading] = useState(false);
 
   // Resolve photos for admin gallery
   useEffect(() => {
     if (!canAdmin || !job?.photos?.length) return;
     let cancelled = false;
+    setPhotosLoading(true);
     Promise.all(
       job.photos.map(async (p: any) => {
-        const resolved = await resolveMediaUrlAsync(p.url);
-        if (!cancelled && resolved) {
-          setResolvedPhotos(prev => ({ ...prev, [p.id]: resolved }));
+        try {
+          const resolved = await resolveMediaUrlAsync(p.url);
+          if (!cancelled && resolved) {
+            setResolvedPhotos(prev => ({ ...prev, [p.id]: resolved }));
+          }
+        } catch {
+          // skip unresolvable photos
         }
       })
-    );
+    ).finally(() => {
+      if (!cancelled) setPhotosLoading(false);
+    });
     return () => { cancelled = true; };
   }, [job?.photos, canAdmin]);
 
@@ -500,6 +508,12 @@ export const JobDetail = () => {
           {canAdmin && job.photos && job.photos.length > 0 && (
             <Section>
               <SectionLabel icon={Images}>Inspection Photos</SectionLabel>
+              {photosLoading && (
+                <div className="flex items-center gap-2 py-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">Loading photos…</span>
+                </div>
+              )}
               <PhotoViewer
                 title="Collection"
                 photos={job.photos

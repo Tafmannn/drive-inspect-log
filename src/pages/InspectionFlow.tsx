@@ -674,7 +674,9 @@ export const InspectionFlow = () => {
     }
   };
 
-  if (jobLoading) {
+  // Only show full-screen spinner on initial load (no cached data).
+  // On rotation remounts, staleTime keeps the cached data so we skip the spinner.
+  if (jobLoading && !job) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
