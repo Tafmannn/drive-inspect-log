@@ -166,3 +166,9 @@ export async function setPermissionOverride(
     reason,
   });
 }
+
+/** Sync JWT metadata from user_profiles.role (fixes stale JWT) */
+export async function syncRoleFromDb(userId?: string): Promise<{ synced_role: string; roles: string[] }> {
+  const result = await invoke({ _action: "sync_role_from_db", user_id: userId });
+  return result as { synced_role: string; roles: string[] };
+}
