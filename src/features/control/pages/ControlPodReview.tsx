@@ -233,9 +233,20 @@ export function ControlPodReview() {
     {
       key: "actions",
       header: "",
-      className: "w-[180px] text-right",
+      className: "w-[220px] text-right",
       render: (r) => (
         <div className="flex items-center justify-end gap-1">
+          {["pod_ready", "delivery_complete"].includes(r.status) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 text-[10px] px-2 text-primary"
+              disabled={confirming === r.id}
+              onClick={(e) => { e.stopPropagation(); handleConfirmReview(r.id); }}
+            >
+              {confirming === r.id ? <Loader2 className="h-3 w-3 animate-spin mr-0.5" /> : <CheckCircle className="h-3 w-3 mr-0.5" />} Confirm
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -261,14 +272,6 @@ export function ControlPodReview() {
             onClick={(e) => { e.stopPropagation(); navigate(`/jobs/${r.id}?from=/control/pod-review`); }}
           >
             <Eye className="h-3 w-3 mr-0.5" /> View
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 text-[10px] px-2"
-            onClick={(e) => { e.stopPropagation(); navigate(`/expenses/new?jobId=${r.id}&from=pod-review`); }}
-          >
-            <Receipt className="h-3 w-3 mr-0.5" /> Expense
           </Button>
         </div>
       ),
