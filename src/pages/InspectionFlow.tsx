@@ -153,6 +153,10 @@ export const InspectionFlow = () => {
   const sessionActive = useRef(
     typeof window !== "undefined" && sessionStorage.getItem(sessionKey) === "1"
   );
+  const markSessionActive = useCallback(() => {
+    sessionActive.current = true;
+    try { sessionStorage.setItem(sessionKey, "1"); } catch { /* quota */ }
+  }, [sessionKey]);
 
   // Photo label modal state
   const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
