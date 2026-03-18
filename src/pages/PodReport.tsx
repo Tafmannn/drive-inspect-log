@@ -120,9 +120,32 @@ export const PodReport = () => {
   const { data: job, isLoading } = useJob(jobId ?? "");
   const { data: jobExpenses } = useJobExpenses(jobId ?? "");
   const { isAdmin, isSuperAdmin } = useAuth();
+  const updateJob = useUpdateJob();
+  const qc = useQueryClient();
 
   const [pdfLoading, setPdfLoading] = useState(false);
   const [downloadingPhotos, setDownloadingPhotos] = useState(false);
+  const [confirmingReview, setConfirmingReview] = useState(false);
+
+  const canConfirmReview = (isAdmin || isSuperAdmin) && job &&
+    ["pod_ready", "delivery_complete"].includes(job.status);
+
+  const handleConfirmReview = async () => {
+    if (!job || confirmingReview) return;
+    setConfirmingReview(true);
+    try {
+      await updateJob.mutateAsync({
+        jobId: job.id,
+        input: { status: "completed" as any, completed_at: new Date().toISOString() },
+      });
+      invalidateForEvent(qc, "job_status_changed", [["job", job.id]]);
+      toast({ title: "Review confirmed — job completed" });
+    } catch (e: any) {
+      toast({ title: "Failed to confirm", description: e.message, variant: "destructive" });
+    } finally {
+      setConfirmingReview(false);
+    }
+  };
   const [resolvedSignatures, setResolvedSignatures] = useState<
     Record<string, string | null>
   >({});
