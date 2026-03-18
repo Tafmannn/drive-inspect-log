@@ -438,11 +438,99 @@ export const JobDetail = () => {
             )}
           </div>
 
-          {/* Admin-only: Edit */}
-          {isAdmin && (
-            <Button variant="outline" className="w-full min-h-[44px] rounded-lg" onClick={() => navigate(withFrom(`/jobs/${job.id}/edit`, searchParams))}>
-              <Edit className="h-4 w-4 mr-1.5" /> Edit Job
-            </Button>
+          {/* Admin-only: Edit + Delete + Status Change */}
+          {canAdmin && (
+            <div className="space-y-2">
+              <Button variant="outline" className="w-full min-h-[44px] rounded-lg" onClick={() => navigate(withFrom(`/jobs/${job.id}/edit`, searchParams))}>
+                <Edit className="h-4 w-4 mr-1.5" /> Edit Job
+              </Button>
+
+              {/* Status Change */}
+              {ADMIN_ALLOWED_TRANSITIONS[job.status]?.length > 0 && (
+                <div className="flex gap-2">
+                  <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                    <SelectTrigger className="flex-1 min-h-[44px] rounded-lg">
+                      <SelectValue placeholder="Change status…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ADMIN_ALLOWED_TRANSITIONS[job.status].map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {s.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    className="min-h-[44px] min-w-[44px] rounded-lg"
+                    disabled={!selectedStatus || changingStatus}
+                    onClick={handleChangeStatus}
+                  >
+                    {changingStatus ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  </Button>
+                </div>
+              )}
+
+              {/* Delete Job */}
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" className="w-full min-h-[44px] rounded-lg text-destructive border-destructive/30 hover:bg-destructive/10">
+                    <Trash2 className="h-4 w-4 mr-1.5" /> Delete Job
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete this job?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will archive the job and remove it from all active lists. This action can be undone by a super admin.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDeleteJob} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          )}
+
+          {/* Admin Photos Section */}
+          {canAdmin && job.photos && job.photos.length > 0 && (
+            <Section>
+              <SectionLabel icon={Images}>Inspection Photos</SectionLabel>
+              <PhotoViewer
+                title="Collection"
+                photos={job.photos
+                  .filter((p: any) => p.type.startsWith("pickup_"))
+                  .map((p: any) => ({
+                    url: resolvedPhotos[p.id] || "",
+                    label: p.label || p.type.replace("pickup_", "").replace(/_/g, " "),
+                  }))
+                  .filter((p: any) => !!p.url)}
+              />
+              <PhotoViewer
+                title="Delivery"
+                photos={job.photos
+                  .filter((p: any) => p.type.startsWith("delivery_"))
+                  .map((p: any) => ({
+                    url: resolvedPhotos[p.id] || "",
+                    label: p.label || p.type.replace("delivery_", "").replace(/_/g, " "),
+                  }))
+                  .filter((p: any) => !!p.url)}
+              />
+              <PhotoViewer
+                title="Damage"
+                photos={job.photos
+                  .filter((p: any) => p.type === "damage_close_up")
+                  .map((p: any) => ({
+                    url: resolvedPhotos[p.id] || "",
+                    label: p.label || "Damage",
+                  }))
+                  .filter((p: any) => !!p.url)}
+              />
+            </Section>
           )}
         </div>
       </div>
