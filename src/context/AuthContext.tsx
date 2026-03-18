@@ -175,15 +175,24 @@ function RealAuthProvider({ children }: { children: ReactNode }) {
   const handleSession = useCallback(async (session: Session | null) => {
     if (session?.user) {
       const user = deriveAppUser(session.user);
-      // Fetch account_status from user_profiles (non-blocking; defaults to active if no row)
+      // Fetch account_status + role from user_profiles (DB is authoritative)
       try {
         const { data } = await (supabase as any)
           .from("user_profiles")
-          .select("account_status")
+          .select("account_status, role")
           .eq("auth_user_id", session.user.id)
           .maybeSingle();
         if (data?.account_status) {
           user.accountStatus = data.account_status as AppUser["accountStatus"];
+        }
+        if (data?.role) {
+          const dbRole = data.role === "super_admin" ? "SUPERADMIN" : data.role.toUpperCase();
+          if (
+            ["DRIVER", "ADMIN", "SUPERADMIN"].includes(dbRole) &&
+            !user.roles.includes(dbRole as AppRole)
+          ) {
+            user.roles.push(dbRole as AppRole);
+          }
         }
       } catch {
         // If fetch fails, allow through (fail-open for now)

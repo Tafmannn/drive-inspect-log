@@ -590,6 +590,11 @@ serve(async (req) => {
         return json({ error: "USER_ID_AND_ROLE_REQUIRED" }, 400);
       }
 
+      // Prevent self-demotion / self-role-modification
+      if (user_id === caller.id) {
+        return json({ error: "CANNOT_MODIFY_OWN_ROLE" }, 403);
+      }
+
       const { data: current } = await admin
         .from("user_profiles")
         .select("*")
@@ -645,6 +650,58 @@ serve(async (req) => {
       });
 
       return json({ success: true });
+    }
+
+    // ── SYNC ROLE FROM DB (restore JWT from user_profiles) ──
+    if (action === "sync_role_from_db") {
+      const { user_id } = body;
+      const targetId = user_id ?? caller.id;
+
+      const { data: profile } = await admin
+        .from("user_profiles")
+        .select("role, is_protected, org_id")
+        .eq("auth_user_id", targetId)
+        .single();
+
+      if (!profile) return json({ error: "NOT_FOUND" }, 404);
+
+      // Only allow: super_admin (by DB), protected accounts, or self-sync
+      const dbIsSuperAdmin = profile.role === "super_admin";
+      if (!dbIsSuperAdmin && !profile.is_protected && targetId !== caller.id) {
+        return json({ error: "NOT_AUTHORIZED_FOR_SYNC" }, 403);
+      }
+
+      const dbRole = profile.role;
+      const rolesArray =
+        dbRole === "super_admin"
+          ? ["SUPERADMIN", "ADMIN", "DRIVER"]
+          : dbRole === "admin"
+          ? ["ADMIN", "DRIVER"]
+          : ["DRIVER"];
+
+      const { data: authUser } = await admin.auth.admin.getUserById(targetId);
+      if (!authUser?.user) return json({ error: "AUTH_USER_NOT_FOUND" }, 404);
+
+      await admin.auth.admin.updateUserById(targetId, {
+        app_metadata: {
+          ...authUser.user.app_metadata,
+          role: dbRole,
+          org_id: profile.org_id,
+          roles: rolesArray,
+        },
+        user_metadata: {
+          ...authUser.user.user_metadata,
+          role: dbRole,
+        },
+      });
+
+      await writeAudit(admin, caller, "sync_role_from_db", {
+        target_user_id: targetId,
+        before_state: { jwt_role: authUser.user.app_metadata?.role },
+        after_state: { jwt_role: dbRole, roles: rolesArray },
+      });
+
+      return json({ success: true, synced_role: dbRole, roles: rolesArray });
     }
 
     // ── ACTIVATE ──
