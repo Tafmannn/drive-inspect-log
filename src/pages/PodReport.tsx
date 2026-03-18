@@ -80,14 +80,8 @@ const SignatureCard = ({
         <img
           src={url}
           alt={`${label} signature`}
-          style={{
-            width: "100%",
-            height: "80px",
-            objectFit: "contain",
-            border: "1px solid red",
-            background: "#f1f5f9",
-          }}
-          onLoad={() => console.log("[SIG IMG LOADED]", { slot, url: url.slice(0, 120) })}
+          className="w-full h-20 object-contain rounded border border-border bg-slate-100"
+          onLoad={() => console.info("[SIG IMG LOADED]", { slot, url: url.slice(0, 120) })}
           onError={() => {
             console.error("[SIG IMG FAILED]", { slot, url: url.slice(0, 120) });
             setFailed(true);
