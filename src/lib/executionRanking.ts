@@ -209,7 +209,7 @@ function withinClassSort(a: RankedJob, b: RankedJob, lastDeliveryPostcode: strin
 export function rankJobs(jobs: Job[]): RankedJob[] {
   // Stage A: classify
   const classified: RankedJob[] = jobs.map(job => {
-    const execEval = evaluateExecutableState(job);
+    const execEval = evaluateExecutableState(job, jobs);
     const cls = classifyJob(job, execEval);
     return {
       ...job,
