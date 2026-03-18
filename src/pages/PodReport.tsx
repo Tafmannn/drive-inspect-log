@@ -507,7 +507,29 @@ export const PodReport = () => {
                   label="Delivery Status"
                   value={delivery ? "✓ Delivered" : "Not delivered"}
                 />
+                <DetailRow
+                  label="Assigned Driver"
+                  value={job.resolvedDriverName || job.driver_name || "Unassigned"}
+                />
               </Card>
+
+              {/* Confirm Review Button — admin only, for reviewable statuses */}
+              {canConfirmReview && (
+                <div className="print:hidden">
+                  <Button
+                    className="w-full min-h-[48px] text-sm font-semibold gap-2"
+                    onClick={handleConfirmReview}
+                    disabled={confirmingReview}
+                  >
+                    {confirmingReview ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <CheckCircle className="h-4 w-4" />
+                    )}
+                    Confirm Review — Mark Complete
+                  </Button>
+                </div>
+              )}
 
               <Separator className="print:hidden" />
 
