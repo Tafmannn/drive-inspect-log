@@ -282,7 +282,7 @@ export const InspectionFlow = () => {
       }
       toast({ title: "Draft restored." });
     }
-    sessionActive.current = true;
+    markSessionActive();
     setShowDraftPrompt(false);
   };
 
