@@ -53,53 +53,92 @@ async function resolveGcsViaAuthenticatedFetch(objectPath: string): Promise<stri
 export async function resolveMediaUrlAsync(
   url: string | null | undefined
 ): Promise<string | null> {
-  if (!url) return null;
+  if (!url) {
+    console.error("[MediaResolver] Empty URL input");
+    return null;
+  }
 
-  if (url.startsWith("data:") || url.startsWith("blob:")) return url;
+  const normalizedUrl = typeof url === "string" ? url.trim() : "";
+  if (!normalizedUrl) {
+    console.error("[MediaResolver] URL became empty after trim", {
+      raw: String(url).slice(0, 120),
+    });
+    return null;
+  }
+
+  if (normalizedUrl.startsWith("data:") || normalizedUrl.startsWith("blob:")) {
+    return normalizedUrl;
+  }
 
   // supabase-sig:// scheme — current canonical format
-  if (url.startsWith("supabase-sig://")) {
-    return await internalStorageService.resolveSignatureUrl(url);
+  if (normalizedUrl.startsWith("supabase-sig://")) {
+    const result = await internalStorageService.resolveSignatureUrlStructured(normalizedUrl);
+    if (result.url) return result.url;
+    console.error("[MediaResolver] supabase-sig resolution failed", {
+      errorCode: result.errorCode,
+      errorMessage: result.errorMessage,
+      bucket: result.bucket,
+      path: result.path?.slice(0, 160) ?? null,
+    });
+    return null;
   }
 
   // Supabase URLs containing vehicle-signatures (legacy public/signed URLs)
   if (
-    url.includes("/vehicle-signatures/") ||
-    url.includes("/object/sign/vehicle-signatures/") ||
-    url.includes("/object/public/vehicle-signatures/")
+    normalizedUrl.includes("/vehicle-signatures/") ||
+    normalizedUrl.includes("/object/sign/vehicle-signatures/") ||
+    normalizedUrl.includes("/object/public/vehicle-signatures/")
   ) {
-    return await internalStorageService.resolveSignatureUrl(url);
+    const result = await internalStorageService.resolveSignatureUrlStructured(normalizedUrl);
+    if (result.url) return result.url;
+    console.error("[MediaResolver] legacy Supabase signature URL resolution failed", {
+      errorCode: result.errorCode,
+      errorMessage: result.errorMessage,
+      bucket: result.bucket,
+      path: result.path?.slice(0, 160) ?? null,
+    });
+    return null;
   }
 
   // GCS full URLs — route through authenticated proxy
-  if (url.startsWith(GCS_PUBLIC_PREFIX)) {
-    const objectPath = url.slice(GCS_PUBLIC_PREFIX.length);
-    return await resolveGcsViaAuthenticatedFetch(objectPath);
+  if (normalizedUrl.startsWith(GCS_PUBLIC_PREFIX)) {
+    const objectPath = normalizedUrl.slice(GCS_PUBLIC_PREFIX.length);
+    const proxied = await resolveGcsViaAuthenticatedFetch(objectPath);
+    if (!proxied) {
+      console.error("[MediaResolver] GCS public URL proxy resolution failed", {
+        objectPath: objectPath.slice(0, 160),
+      });
+    }
+    return proxied;
   }
 
   // Bare paths
-  if (isBareObjectPath(url)) {
-    // Signature-like paths: try Supabase first, fallback to GCS if object not found
-    if (isSignatureLikePath(url)) {
-      const result = await internalStorageService.resolveSignatureUrlStructured(url);
-      if (result.errorCode === 'OK' && result.url) {
-        return result.url;
-      }
-      // Object not in Supabase — likely uploaded to GCS when CLOUD_STORAGE_ENABLED was true
-      if (result.errorCode === 'OBJECT_NOT_FOUND') {
-        console.info('[MediaResolver] Signature not in Supabase, trying GCS fallback', { path: url.slice(0, 60) });
-        const gcsUrl = await resolveGcsViaAuthenticatedFetch(url);
-        if (gcsUrl) return gcsUrl;
-        console.error('[MediaResolver] Signature not found in Supabase OR GCS', { path: url.slice(0, 60) });
-        return null;
-      }
-      // Other errors (permission, malformed) — don't fallback
-      console.error('[MediaResolver] Signature resolve failed', { path: url.slice(0, 60), errorCode: result.errorCode });
+  if (isBareObjectPath(normalizedUrl)) {
+    // CRITICAL: Signature bare paths are always treated as Supabase vehicle-signatures paths.
+    if (isSignatureLikePath(normalizedUrl)) {
+      const result = await internalStorageService.resolveSignatureUrlStructured(normalizedUrl);
+      if (result.url) return result.url;
+
+      console.error("[MediaResolver] Bare signature path failed Supabase signing", {
+        rawInput: normalizedUrl.slice(0, 180),
+        errorCode: result.errorCode,
+        errorMessage: result.errorMessage,
+        detectedFormat: result.format,
+        bucket: result.bucket,
+        path: result.path?.slice(0, 160) ?? null,
+      });
       return null;
     }
+
     // Non-signature bare path → GCS
-    return await resolveGcsViaAuthenticatedFetch(url);
+    const gcsResolved = await resolveGcsViaAuthenticatedFetch(normalizedUrl);
+    if (!gcsResolved) {
+      console.error("[MediaResolver] Non-signature bare path failed GCS resolution", {
+        rawInput: normalizedUrl.slice(0, 180),
+      });
+    }
+    return gcsResolved;
   }
 
-  return url;
+  return normalizedUrl;
 }

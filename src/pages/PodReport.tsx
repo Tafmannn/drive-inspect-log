@@ -69,6 +69,13 @@ const SignatureCard = ({
     setFailed(false);
   }, [url]);
 
+  useEffect(() => {
+    console.info("[SigImg] render", {
+      slot,
+      src: url ? url.slice(0, 180) : null,
+    });
+  }, [slot, url]);
+
   return (
     <div className="space-y-1">
       <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
@@ -80,10 +87,17 @@ const SignatureCard = ({
           src={url}
           alt={`${label} signature`}
           className="h-16 border rounded-md bg-white p-1.5 w-full object-contain"
-          crossOrigin="anonymous"
-          onLoad={() => console.info(`[SigImg] loaded ${slot}`, { src: url.slice(0, 80) })}
+          onLoad={() =>
+            console.info("[SigImg] loaded", {
+              slot,
+              src: url.slice(0, 180),
+            })
+          }
           onError={() => {
-            console.error(`[SigImg] failed ${slot}`, { src: url.slice(0, 80) });
+            console.error("[SigImg] failed", {
+              slot,
+              src: url.slice(0, 180),
+            });
             setFailed(true);
           }}
         />
@@ -146,20 +160,34 @@ export const PodReport = () => {
         delivery_customer: delivery?.customer_signature_url ?? null,
       };
 
-      console.info('[POD-Sig] raw inputs', { jobId: job.id, ...sigSlots });
+      console.info("[POD-Sig] raw inputs", { jobId: job.id, ...sigSlots });
 
       for (const [slot, raw] of Object.entries(sigSlots)) {
         if (!raw) {
           nextSignatures[slot] = null;
+          console.info("[POD-Sig] no raw value", { slot });
           continue;
         }
+
         const resolved = await resolveMediaUrlAsync(raw);
-        nextSignatures[slot] = resolved;
-        if (!resolved) {
-          console.error(`[POD-Sig] ${slot} FAILED — raw present but resolved null`, { raw: raw.slice(0, 80) });
-        } else {
-          console.info(`[POD-Sig] ${slot} OK`, { resolved: resolved.slice(0, 80) });
+        const hasRenderableHttpsUrl = typeof resolved === "string" && resolved.startsWith("https://");
+
+        if (!hasRenderableHttpsUrl) {
+          nextSignatures[slot] = null;
+          console.error("[POD-Sig] resolution failed or non-https result", {
+            slot,
+            raw: raw.slice(0, 180),
+            resolved: resolved?.slice(0, 180) ?? null,
+          });
+          continue;
         }
+
+        nextSignatures[slot] = resolved;
+        console.info("[POD-Sig] resolved", {
+          slot,
+          raw: raw.slice(0, 180),
+          resolved: resolved.slice(0, 180),
+        });
       }
 
       await Promise.all(

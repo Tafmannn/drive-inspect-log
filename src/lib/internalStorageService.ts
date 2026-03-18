@@ -43,26 +43,41 @@ class InternalStorageService implements StorageService {
    * Resolve a signature URL to a fresh signed URL.
    * Returns structured result with error code for caller to decide fallback.
    */
-  async resolveSignatureUrlStructured(url: string): Promise<SignatureResolveResult> {
-    if (!url) {
-      return { url: null, format: 'empty', bucket: null, path: null, errorCode: 'MALFORMED_INPUT', errorMessage: 'Empty URL' };
+  async resolveSignatureUrlStructured(rawInput: string): Promise<SignatureResolveResult> {
+    const input = typeof rawInput === 'string' ? rawInput.trim() : '';
+
+    console.info('[SignatureResolve] start', {
+      rawInput: rawInput?.slice(0, 140) ?? null,
+      normalizedInput: input.slice(0, 140),
+    });
+
+    if (!input) {
+      console.error('[SignatureResolve] malformed input: empty');
+      return {
+        url: null,
+        format: 'empty',
+        bucket: null,
+        path: null,
+        errorCode: 'MALFORMED_INPUT',
+        errorMessage: 'Empty URL',
+      };
     }
 
     let bucket: string | null = null;
     let path: string | null = null;
     let format = 'unknown';
 
-    // New scheme: supabase-sig://bucket/path
-    const sigMatch = url.match(/^supabase-sig:\/\/([^/]+)\/(.+)$/);
+    // Canonical scheme: supabase-sig://bucket/path
+    const sigMatch = input.match(/^supabase-sig:\/\/([^/]+)\/(.+)$/);
     if (sigMatch) {
       format = 'supabase-sig';
       [, bucket, path] = sigMatch;
     }
 
-    // Legacy: Supabase public URL
-    if (!path && url.includes('/vehicle-signatures/')) {
-      const publicMatch = url.match(/\/object\/public\/vehicle-signatures\/(.+?)(?:\?|$)/);
-      const signedMatch = url.match(/\/object\/sign\/vehicle-signatures\/(.+?)\?/);
+    // Legacy Supabase URL formats
+    if (!path && input.includes('/vehicle-signatures/')) {
+      const publicMatch = input.match(/\/object\/public\/vehicle-signatures\/(.+?)(?:\?|$)/);
+      const signedMatch = input.match(/\/object\/sign\/vehicle-signatures\/(.+?)\?/);
       const extractedPath = publicMatch?.[1] ?? signedMatch?.[1];
       if (extractedPath) {
         format = publicMatch ? 'legacy-public-url' : 'legacy-signed-url';
@@ -71,37 +86,70 @@ class InternalStorageService implements StorageService {
       }
     }
 
-    // Bare storage path (no http/data prefix)
-    if (!path && !url.startsWith('http') && !url.startsWith('data:')) {
+    // Bare storage path, eg jobs/<jobId>/signatures/...
+    if (
+      !path &&
+      !input.startsWith('http://') &&
+      !input.startsWith('https://') &&
+      !input.startsWith('data:') &&
+      !input.startsWith('blob:')
+    ) {
       format = 'bare-path';
       bucket = 'vehicle-signatures';
-      path = url;
+      path = input;
     }
+
+    console.info('[SignatureResolve] normalized', {
+      format,
+      bucket,
+      path: path?.slice(0, 160) ?? null,
+    });
 
     if (!bucket || !path) {
-      console.warn('[SignatureResolve] Could not extract bucket/path', { url, format });
-      return { url: url, format, bucket, path, errorCode: 'MALFORMED_INPUT', errorMessage: 'Could not extract bucket/path' };
+      const msg = 'Could not extract bucket/path';
+      console.error('[SignatureResolve] malformed input', { input: input.slice(0, 160), format });
+      return {
+        url: null,
+        format,
+        bucket,
+        path,
+        errorCode: 'MALFORMED_INPUT',
+        errorMessage: msg,
+      };
     }
 
+    const expiresInSeconds = 60 * 60;
     const { data, error } = await supabase.storage
       .from(bucket)
-      .createSignedUrl(path, 60 * 60);
+      .createSignedUrl(path, expiresInSeconds);
+
+    console.info('[SignatureResolve] createSignedUrl result', {
+      format,
+      bucket,
+      path: path.slice(0, 160),
+      expiresInSeconds,
+      signedUrl: data?.signedUrl?.slice(0, 180) ?? null,
+      error: error
+        ? {
+            message: error.message,
+            statusCode: (error as { statusCode?: string | number }).statusCode ?? null,
+            name: (error as { name?: string }).name ?? null,
+          }
+        : null,
+    });
 
     if (error || !data?.signedUrl) {
       const msg = error?.message ?? 'No signed URL returned';
-      const errorCode = msg.includes('not found') || msg.includes('Not found')
+      const lower = msg.toLowerCase();
+      const errorCode = lower.includes('not found')
         ? 'OBJECT_NOT_FOUND' as const
-        : msg.includes('permission') || msg.includes('Permission') || msg.includes('403')
+        : lower.includes('permission') || lower.includes('forbidden') || lower.includes('403')
           ? 'PERMISSION' as const
           : 'UNKNOWN_ERROR' as const;
 
-      console.error('[SignatureResolve] createSignedUrl failed', {
-        format, bucket, path, error: msg, errorCode,
-      });
       return { url: null, format, bucket, path, errorCode, errorMessage: msg };
     }
 
-    console.info('[SignatureResolve] OK', { format, bucket, path: path.slice(0, 40) });
     return { url: data.signedUrl, format, bucket, path, errorCode: 'OK' };
   }
 
@@ -110,6 +158,15 @@ class InternalStorageService implements StorageService {
    */
   async resolveSignatureUrl(url: string): Promise<string | null> {
     const result = await this.resolveSignatureUrlStructured(url);
+    if (!result.url) {
+      console.error('[SignatureResolve] null return', {
+        errorCode: result.errorCode,
+        errorMessage: result.errorMessage ?? null,
+        format: result.format,
+        bucket: result.bucket,
+        path: result.path?.slice(0, 160) ?? null,
+      });
+    }
     return result.url;
   }
 }
