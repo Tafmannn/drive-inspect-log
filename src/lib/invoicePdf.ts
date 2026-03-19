@@ -38,7 +38,7 @@ const POS = {
   },
 
   table: {
-    startY: 109.6,
+    startY: 113.0,
     rowGap: 7.3,
     description: { x: 25.0, maxW: 101 },
     qty: { x: 139.2 },
