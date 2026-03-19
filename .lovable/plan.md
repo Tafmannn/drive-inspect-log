@@ -1,78 +1,138 @@
 
+## 1) Current implementation map (audited)
 
-## End-to-End Fix Plan: Broken Integrations
+- **Inspection capture**
+  - `src/pages/InspectionFlow.tsx`
+  - Submits `inspections.inspected_by_name`, `customer_name`, `driver_signature_url`, `customer_signature_url`.
+  - Current prefill sets `driverName` fallback to literal `"Driver"`.
 
-### Root Causes Identified
+- **Job/POD data loading**
+  - `src/lib/api.ts` (`getJobWithRelations`) loads jobs + inspections + photos; computes `resolvedDriverName`.
+  - `src/hooks/useJobs.ts` uses this for `useJob()`.
 
-**Issue 1 — CORS blocks all edge function calls from the preview domain**
+- **Media/signature resolution**
+  - `src/lib/mediaResolver.ts` and `src/lib/resolveSignatureUrlSimple.ts` currently do `fetch(..., { redirect: "manual" })` against `gcs-proxy` and try to read `Location`.
+  - `src/pages/PodReport.tsx` and `src/pages/JobDetail.tsx` rely on those resolvers.
+  - `src/lib/podPdf.ts` uses the same signature resolver before embedding signatures in PDF.
 
-Every single edge function (11 functions) uses a hardcoded `ALLOWED_ORIGINS` list containing only `localhost:5173`, `*.lovable.app`, and `axentra.lovable.app`. The actual preview runs on `*.lovableproject.com`, which is NOT in this list. When the origin doesn't match, the function returns `Access-Control-Allow-Origin: http://localhost:5173`, which the browser rejects. This silently breaks DVLA lookup, company search, postcode lookup, maps directions, GCS upload/proxy, vision OCR, sheet sync, and all admin functions.
+- **Photo viewer**
+  - `src/components/PhotoViewer.tsx` currently renders images with `crossOrigin="anonymous"` and download via `fetch()`.
 
-**Issue 2 — Client APIs send anon key instead of user session token**
+- **Backend**
+  - `supabase/functions/gcs-proxy/index.ts` exists and is used for GCS access.
+  - DB confirms this job has persisted photos/signatures; issue is retrieval, not missing data.
 
-Four client-side API modules (`businessSearchApi.ts`, `postcodeApi.ts`, `mapsApi.ts`, `sheetSyncApi.ts`) use raw `fetch()` with `Authorization: Bearer ${ANON_KEY}`. The edge functions then call `supabase.auth.getUser()` which returns null for anon keys, causing a 401 UNAUTHENTICATED response. Only `vehicleLookupApi.ts`, `adminApi.ts`, `visionApi.ts`, and `gcsStorageService.ts` correctly use `supabase.functions.invoke()` which sends the real user token.
+## 2) Root cause analysis (from code + DB + network evidence)
 
----
+1. **Photos/signatures not visible**
+   - Browser network shows repeated `gcs-proxy` calls with **Status 0** (opaque response pattern), caused by manual-redirect resolution flow in cross-origin browser context.
+   - Resolver returns `null`, so UI shows empty galleries / “Not signed”.
 
-### Fix Plan
+2. **Name not pulling on signature/POD/PDF**
+   - `InspectionFlow` hardcodes `driverName` default to `"Driver"`.
+   - That value is persisted into `inspections.inspected_by_name`, then reused by POD/PDF.
 
-#### Part 1: Fix CORS in all 11 edge functions
+3. **“Signature still not pulling”**
+   - Signatures are present in DB as GCS bare paths.
+   - Failing resolution path (manual redirect) prevents display.
 
-Replace the restrictive `ALLOWED_ORIGINS` + `cors()` function in every edge function with the standard Lovable CORS pattern:
+4. **“Only future jobs, no historic signature dependency”**
+   - Current resolver carries legacy branches and brittle behavior; needs a clean, canonical forward path.
 
-```javascript
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-```
+## 3) Minimal safe fix plan (patch existing logic, no workflow rewrite)
 
-**Files to update (CORS block, lines 4-16 in each):**
-- `supabase/functions/vehicle-lookup/index.ts`
-- `supabase/functions/business-search/index.ts`
-- `supabase/functions/place-details/index.ts`
-- `supabase/functions/postcode-lookup/index.ts`
-- `supabase/functions/maps-directions/index.ts`
-- `supabase/functions/gcs-upload/index.ts`
-- `supabase/functions/gcs-proxy/index.ts`
-- `supabase/functions/gcs-fix-acl/index.ts`
-- `supabase/functions/vision-ocr/index.ts`
-- `supabase/functions/promote-admin/index.ts`
-- `supabase/functions/assign-driver/index.ts`
-- `supabase/functions/get-org-users/index.ts`
-- `supabase/functions/google-sheets-sync/index.ts` (same pattern, slightly different location)
+### A. Replace brittle media resolution path (primary fix)
+**Files**
+- `src/lib/mediaResolver.ts`
+- `src/lib/resolveSignatureUrlSimple.ts`
 
-Also replace `cors(req.headers.get("Origin"))` in catch blocks with just `corsHeaders`.
+**Changes**
+- Stop using `fetch(... redirect: "manual")` for resolution.
+- Return a **tokenized proxy URL** (`/functions/v1/gcs-proxy?path=...&token=...`) directly for GCS/bare paths.
+- Keep support for `supabase-sig://...` for internal signatures.
+- Keep function signatures unchanged so existing callers remain intact.
 
-#### Part 2: Switch client APIs to use `supabase.functions.invoke()`
-
-**`src/lib/businessSearchApi.ts`** — Replace raw fetch calls with `supabase.functions.invoke('business-search', ...)` and `supabase.functions.invoke('place-details', ...)`. This sends the user's real auth token.
-
-**`src/lib/postcodeApi.ts`** — Replace raw fetch with `supabase.functions.invoke('postcode-lookup', ...)`.
-
-**`src/lib/mapsApi.ts`** — Replace raw fetch with `supabase.functions.invoke('maps-directions', ...)`.
-
-**`src/lib/sheetSyncApi.ts`** — Replace raw fetch `callSync` function with `supabase.functions.invoke('google-sheets-sync', ...)`.
-
-#### Part 3: Deploy all edge functions
-
-All 13 edge functions must be redeployed after CORS fixes.
+**Why**
+- Removes status-0 failure mode and restores image/signature rendering without changing page workflows.
 
 ---
 
-### Summary of what this fixes
+### B. Recreate forward signature naming logic for future jobs
+**File**
+- `src/pages/InspectionFlow.tsx`
 
-| Feature | Broken because | Fix |
-|---|---|---|
-| DVLA Lookup | CORS block | Fix CORS headers |
-| Company Search | CORS + anon key auth | Fix CORS + use `supabase.functions.invoke` |
-| Postcode Lookup | CORS + anon key auth | Fix CORS + use `supabase.functions.invoke` |
-| Maps/Route Calc | CORS + anon key auth | Fix CORS + use `supabase.functions.invoke` |
-| Google Sheets Sync | CORS + anon key auth | Fix CORS + use `supabase.functions.invoke` |
-| GCS Photo Upload | CORS block | Fix CORS headers |
-| GCS Photo Proxy | CORS block | Fix CORS headers |
-| Vision OCR | CORS block | Fix CORS headers |
-| Admin user mgmt | CORS block | Fix CORS headers |
+**Changes**
+- Replace `"Driver"` default with fallback chain:
+  1) `job.resolvedDriverName`
+  2) `job.driver_name`
+  3) authenticated user display name
+  4) empty string (not `"Driver"`).
+- Add validation guard so placeholder/generic `"Driver"` is not accepted for new submissions.
 
-No database, RLS, routing, or business logic changes needed.
+**Why**
+- Future inspections won’t persist generic driver names; POD/PDF will have real names.
 
+---
+
+### C. Harden display fallback for existing records (no migration required)
+**Files**
+- `src/pages/PodReport.tsx`
+- `src/lib/podPdf.ts`
+- `src/lib/podEmail.ts` (same signature/name section)
+
+**Changes**
+- For driver signature labels/details, use fallback chain when `inspected_by_name` is empty/generic:
+  1) inspection `inspected_by_name` if meaningful
+  2) `job.resolvedDriverName`
+  3) `job.driver_name`
+  4) `"—"`.
+
+**Why**
+- Fixes currently visible POD/PDF name issue immediately, while future captures are corrected at source.
+
+---
+
+### D. Photo viewer reliability tweak
+**File**
+- `src/components/PhotoViewer.tsx`
+
+**Changes**
+- Remove unnecessary `crossOrigin="anonymous"` on `<img>` elements used only for display.
+- Keep existing UI/controls; preserve current download fallback behavior.
+
+**Why**
+- Prevents avoidable image render failures with signed/proxied URLs.
+
+---
+
+### E. Backend connectivity/edge-function verification pass
+**Files**
+- No functional DB schema changes expected.
+- Deploy only if touched: `gcs-proxy` (if any backend patch needed), otherwise frontend-only deploy.
+
+**Checks**
+- Confirm `gcs-proxy` and `gcs-upload` are deployed and responding.
+- Validate one real photo URL + one signature URL end-to-end via app network after patch.
+
+## 4) Migrations / RLS
+
+- **No migration required** for this batch.
+- **No new tables/columns required**.
+- Existing RLS on `photos`, `inspections`, `jobs` remains source of truth.
+
+## 5) Verification checklist (workflow-level)
+
+1. Open existing job with persisted photos/signatures:
+   - Inspection Photos section shows thumbnails immediately.
+   - Tapping opens full viewer.
+2. POD page:
+   - Signatures render for pickup/delivery where URLs exist.
+   - Driver names no longer show generic “Driver” when job has assigned driver identity.
+3. Generate/share PDF:
+   - Signature blocks show names via fallback chain and render where accessible.
+4. Start a **new** pickup/delivery inspection:
+   - Driver name is prefilled from assigned driver chain (not literal “Driver”).
+   - Submit writes meaningful `inspected_by_name`.
+   - POD/PDF for this new job show correct driver name and signatures.
+5. Confirm no lifecycle break:
+   - job created → assigned → pickup → delivery → POD → admin review/completion still unchanged.
