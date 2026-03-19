@@ -815,7 +815,7 @@ export async function generatePodPdf(
     ["Date / Time", delivery ? safeDate(delivery.inspected_at) : "—"],
     ["Odometer", delivery?.odometer != null ? delivery.odometer.toLocaleString("en-GB") : "—"],
     ["Fuel", fuelLabel(delivery?.fuel_level_percent ?? null)],
-    ["Driver", clean(delivery?.inspected_by_name)],
+    ["Driver", clean(delivery?.inspected_by_name && delivery.inspected_by_name !== "Driver" ? delivery.inspected_by_name : (job.resolvedDriverName || job.driver_name))],
     ["Customer", clean(delivery?.customer_name)],
     ["Damages", String(deliveryDamages.length)],
     ["Photos", String(deliveryPhotos.length)],
