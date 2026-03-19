@@ -524,7 +524,7 @@ export const InspectionFlow = () => {
       if (driverFile) {
         const result = await storageService.uploadImage(
           driverFile,
-          `jobs/${jobId}/signatures/${type}/driver`
+          "jobs/" + jobId + "/signatures/" + type + "/driver"
         );
         driverSigUrl = result.url;
       }
