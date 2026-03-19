@@ -169,6 +169,12 @@ export const InspectionFlow = () => {
   const [driverSigned, setDriverSigned] = useState(false);
   const [customerSigned, setCustomerSigned] = useState(false);
 
+  // Eagerly-captured signature File objects — stored when leaving the signature step
+  const [driverSigFile, setDriverSigFile] = useState<File | null>(null);
+  const [customerSigFile, setCustomerSigFile] = useState<File | null>(null);
+  // Prevents double-tap on Next while async signature capture runs
+  const [capturing, setCapturing] = useState(false);
+
   // Additional photos label (lifted out of PhotosStep to avoid remount)
   const [newPhotoLabel, setNewPhotoLabel] = useState("");
   const [stepError, setStepError] = useState<string | null>(null);
