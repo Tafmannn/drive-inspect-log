@@ -515,22 +515,24 @@ export const InspectionFlow = () => {
 
     try {
       // ── 1) Upload signatures (critical for POD — do these synchronously) ──
+      // Use eagerly-captured File objects stored when the user left the signature step.
+      // Falls back to ref.toFile() only if files weren't captured (e.g. direct submit).
       let driverSigUrl: string | null = null;
       let customerSigUrl: string | null = null;
 
-      if (driverSigRef.current && driverSigned) {
-        const file = await driverSigRef.current.toFile("driver.png");
+      const driverFile = driverSigFile ?? (driverSigRef.current && driverSigned ? await driverSigRef.current.toFile("driver.png") : null);
+      if (driverFile) {
         const result = await storageService.uploadImage(
-          file,
+          driverFile,
           `jobs/${jobId}/signatures/${type}/driver`
         );
         driverSigUrl = result.url;
       }
 
-      if (customerSigRef.current && customerSigned) {
-        const file = await customerSigRef.current.toFile("customer.png");
+      const customerFile = customerSigFile ?? (customerSigRef.current && customerSigned ? await customerSigRef.current.toFile("customer.png") : null);
+      if (customerFile) {
         const result = await storageService.uploadImage(
-          file,
+          customerFile,
           `jobs/${jobId}/signatures/${type}/customer`
         );
         customerSigUrl = result.url;
