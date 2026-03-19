@@ -277,7 +277,8 @@ export async function submitInspection(
 
   if (await isFeatureEnabled("AUTO_SHEET_SYNC_ON_JOB_UPDATE")) {
     void syncJobToSheetIfEnabled(jobId);
-  }
+
+  return { inspectionId: inspection.id, damageItemIds };
 }
 
 // ─── Photos ──────────────────────────────────────────────────────────
