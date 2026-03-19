@@ -23,23 +23,23 @@ const AXENTRA_BANK = {
 
 // Locked overlay coordinates tuned for your template
 const POS = {
-  invoiceNoTopRight: { x: 186.0, y: 30.0, maxW: 34 },
+  invoiceNoTopRight: { x: 186.0, y: 47.0, maxW: 34 },
 
   leftCard: {
-    invoiceNo: { x: 69.0, y: 75.6, maxW: 38 },
-    date: { x: 69.0, y: 85.2, maxW: 38 },
+    invoiceNo: { x: 48.0, y: 77.5, maxW: 38 },
+    date: { x: 34.0, y: 87.5, maxW: 38 },
   },
 
   rightCard: {
-    line1: { x: 112.8, y: 79.5, maxW: 74 },
-    line2: { x: 112.8, y: 85.7, maxW: 74 },
-    line3: { x: 112.8, y: 91.9, maxW: 74 },
-    line4: { x: 112.8, y: 98.1, maxW: 74 },
+    line1: { x: 112.8, y: 86.5, maxW: 74 },
+    line2: { x: 112.8, y: 92.5, maxW: 74 },
+    line3: { x: 112.8, y: 98.5, maxW: 74 },
+    line4: { x: 112.8, y: 104.5, maxW: 74 },
   },
 
   table: {
-    startY: 113.0,
-    rowGap: 7.3,
+    startY: 124.0,
+    rowGap: 8.5,
     description: { x: 25.0, maxW: 101 },
     qty: { x: 139.2 },
     rate: { x: 165.6 },
@@ -48,9 +48,9 @@ const POS = {
   },
 
   totals: {
-    subtotal: { x: 189.4, y: 148.0 },
-    vat: { x: 189.4, y: 156.0 },
-    total: { x: 189.4, y: 167.0 },
+    subtotal: { x: 189.4, y: 158.0 },
+    vat: { x: 189.4, y: 166.0 },
+    total: { x: 189.4, y: 178.0 },
   },
 
   payment: {
@@ -62,8 +62,8 @@ const POS = {
   },
 
   notes: {
-    title: { x: 16.0, y: 227.0 },
-    body: { x: 16.0, y: 232.0, maxW: 178, lineH: 4.2, maxLines: 8 },
+    title: { x: 16.0, y: 260.0 },
+    body: { x: 16.0, y: 265.0, maxW: 178, lineH: 4.2, maxLines: 8 },
   },
 } as const;
 
@@ -492,7 +492,6 @@ export async function generateInvoicePdf(data: InvoiceData): Promise<Blob> {
   drawBillTo(doc, data);
   drawLineItems(doc, data);
   drawTotals(doc, data);
-  drawPaymentDetails(doc, data);
   drawNotes(doc, data.notes);
 
   return doc.output("blob");
