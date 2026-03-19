@@ -37,6 +37,7 @@ export interface PendingUpload {
   backendRef?: string | null;
   jobNumber?: string | null;
   vehicleReg?: string | null;
+  damageItemId?: string | null;
 }
 
 // ─────────────────────────────────────────────────────────────
