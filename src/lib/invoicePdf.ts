@@ -31,10 +31,10 @@ const POS = {
   },
 
   rightCard: {
-    line1: { x: 112.8, y: 76.5, maxW: 74 },
-    line2: { x: 112.8, y: 82.7, maxW: 74 },
-    line3: { x: 112.8, y: 88.9, maxW: 74 },
-    line4: { x: 112.8, y: 95.1, maxW: 74 },
+    line1: { x: 112.8, y: 79.5, maxW: 74 },
+    line2: { x: 112.8, y: 85.7, maxW: 74 },
+    line3: { x: 112.8, y: 91.9, maxW: 74 },
+    line4: { x: 112.8, y: 98.1, maxW: 74 },
   },
 
   table: {
