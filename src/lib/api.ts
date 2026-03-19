@@ -225,7 +225,7 @@ export async function submitInspection(
   type: InspectionType,
   inspectionPayload: Partial<Inspection>,
   damageItems: Array<Omit<DamageItem, 'id' | 'inspection_id' | 'created_at'>>,
-): Promise<void> {
+): Promise<{ inspectionId: string; damageItemIds: string[] }> {
   // J: Guard against accidental resubmission overwriting existing inspection
   const existingInspection = await getInspection(jobId, type);
   if (existingInspection?.inspected_at) {
