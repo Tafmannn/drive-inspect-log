@@ -36,7 +36,8 @@ serve(async (req) => {
 
   try {
     const url = new URL(req.url);
-    const objectPath = url.searchParams.get("path");
+    const rawObjectPath = url.searchParams.get("path");
+    const objectPath = (rawObjectPath ?? "").replace(/^\/+/, "");
     if (!objectPath) {
       return new Response(
         JSON.stringify({ error: "Missing ?path= parameter" }),
