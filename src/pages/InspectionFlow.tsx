@@ -423,11 +423,13 @@ export const InspectionFlow = () => {
   const clearDriverSignature = useCallback(() => {
     driverSigRef.current?.clear();
     setDriverSigned(false);
+    setDriverSigFile(null);
   }, []);
 
   const clearCustomerSignature = useCallback(() => {
     customerSigRef.current?.clear();
     setCustomerSigned(false);
+    setCustomerSigFile(null);
   }, []);
 
 
