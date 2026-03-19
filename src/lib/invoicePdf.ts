@@ -492,7 +492,6 @@ export async function generateInvoicePdf(data: InvoiceData): Promise<Blob> {
   drawBillTo(doc, data);
   drawLineItems(doc, data);
   drawTotals(doc, data);
-  drawPaymentDetails(doc, data);
   drawNotes(doc, data.notes);
 
   return doc.output("blob");
