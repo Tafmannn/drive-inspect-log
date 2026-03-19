@@ -15,7 +15,7 @@ const WHITE: [number, number, number] = [255, 255, 255];
 // Locked bank details
 const AXENTRA_BANK = {
   bankName: "Monzo Bank",
-  accountName: "Terrence Tapfumaneyi trading as Axentra Vehicle Logistics",
+  accountName: "Axentra Vehicle Logistics",
   sortCode: "04-00-03",
   accountNumber: "24861835",
   paymentTermsText: "Payable within 7 days. Please use invoice number as payment reference.",
