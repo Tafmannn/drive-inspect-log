@@ -338,6 +338,19 @@ export async function retryUpload(
       label: existing.label,
     });
 
+    // Write photo URL back to damage_items if this is a damage photo
+    if (existing.photoType === "damage_close_up" && existing.damageItemId) {
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        await supabase
+          .from("damage_items")
+          .update({ photo_url: stored.url })
+          .eq("id", existing.damageItemId);
+      } catch {
+        // Best-effort — the photo is already in the photos table
+      }
+    }
+
     // On success: record completion metadata and strip the raw image data
     // to reclaim localStorage quota. The DB row is now the source of truth.
     updateOne(id, (u) => ({
