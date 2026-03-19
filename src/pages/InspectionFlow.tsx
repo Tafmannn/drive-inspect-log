@@ -533,7 +533,7 @@ export const InspectionFlow = () => {
       if (customerFile) {
         const result = await storageService.uploadImage(
           customerFile,
-          `jobs/${jobId}/signatures/${type}/customer`
+          "jobs/" + jobId + "/signatures/" + type + "/customer"
         );
         customerSigUrl = result.url;
       }
