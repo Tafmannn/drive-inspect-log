@@ -769,7 +769,7 @@ export const PodReport = () => {
                   />
                   <SignatureCard
                     label="Delivery Driver"
-                    name={delivery?.inspected_by_name && delivery.inspected_by_name !== "Driver" ? delivery.inspected_by_name : (job.resolvedDriverName || job.driver_name)}
+                    name={delivery?.inspected_by_name && !/^\s*driver\s*$/i.test(delivery.inspected_by_name) ? delivery.inspected_by_name : (job.resolvedDriverName || job.driver_name)}
                     url={resolvedSignatures["delivery_driver"] ?? null}
                     slot="delivery_driver"
                   />
