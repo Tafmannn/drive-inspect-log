@@ -169,6 +169,12 @@ export const InspectionFlow = () => {
   const [driverSigned, setDriverSigned] = useState(false);
   const [customerSigned, setCustomerSigned] = useState(false);
 
+  // Eagerly-captured signature File objects — stored when leaving the signature step
+  const [driverSigFile, setDriverSigFile] = useState<File | null>(null);
+  const [customerSigFile, setCustomerSigFile] = useState<File | null>(null);
+  // Prevents double-tap on Next while async signature capture runs
+  const [capturing, setCapturing] = useState(false);
+
   // Additional photos label (lifted out of PhotosStep to avoid remount)
   const [newPhotoLabel, setNewPhotoLabel] = useState("");
   const [stepError, setStepError] = useState<string | null>(null);
@@ -417,11 +423,13 @@ export const InspectionFlow = () => {
   const clearDriverSignature = useCallback(() => {
     driverSigRef.current?.clear();
     setDriverSigned(false);
+    setDriverSigFile(null);
   }, []);
 
   const clearCustomerSignature = useCallback(() => {
     customerSigRef.current?.clear();
     setCustomerSigned(false);
+    setCustomerSigFile(null);
   }, []);
 
 
@@ -507,50 +515,32 @@ export const InspectionFlow = () => {
 
     try {
       // ── 1) Upload signatures (critical for POD — do these synchronously) ──
+      // Use eagerly-captured File objects stored when the user left the signature step.
+      // Falls back to ref.toFile() only if files weren't captured (e.g. direct submit).
       let driverSigUrl: string | null = null;
       let customerSigUrl: string | null = null;
 
-      if (driverSigRef.current && driverSigned) {
-        const file = await driverSigRef.current.toFile("driver.png");
+      const driverFile = driverSigFile ?? (driverSigRef.current && driverSigned ? await driverSigRef.current.toFile("driver.png") : null);
+      if (driverFile) {
         const result = await storageService.uploadImage(
-          file,
+          driverFile,
           `jobs/${jobId}/signatures/${type}/driver`
         );
         driverSigUrl = result.url;
       }
 
-      if (customerSigRef.current && customerSigned) {
-        const file = await customerSigRef.current.toFile("customer.png");
+      const customerFile = customerSigFile ?? (customerSigRef.current && customerSigned ? await customerSigRef.current.toFile("customer.png") : null);
+      if (customerFile) {
         const result = await storageService.uploadImage(
-          file,
+          customerFile,
           `jobs/${jobId}/signatures/${type}/customer`
         );
         customerSigUrl = result.url;
       }
 
-      // ── 2) Build damage items payload (photos queued, not blocking) ──
+      // ── 2) Build damage items payload ──
       const damageItemsPayload: any[] = [];
       for (const d of formState.damages) {
-        // Queue damage photo to background — don't block submission
-        if (d.photo) {
-          try {
-            await addPendingUpload(d.photo, {
-              jobId,
-              inspectionType: type,
-              photoType: "damage_close_up",
-              label: null,
-            });
-            toast({ title: "Photo saved offline", description: "We'll upload it when you're online." });
-          } catch (err) {
-            const msg = String(err).toLowerCase();
-            const isStorageError = msg.includes("storage") || msg.includes("quota") || msg.includes("localstorage");
-            toast({
-              title: isStorageError ? "Photo not saved – storage issue" : "Photo could not be saved",
-              description: isStorageError ? "Your device storage is full or blocked. Clear space and try again." : "Please try again.",
-              variant: "destructive",
-            });
-          }
-        }
         damageItemsPayload.push({
           x: d.x,
           y: d.y,
@@ -602,12 +592,36 @@ export const InspectionFlow = () => {
         });
       }
 
-      await submitMutation.mutateAsync({
+      const submitResult = await submitMutation.mutateAsync({
         jobId,
         type,
         inspectionPayload: inspPayload as any,
         damageItems: damageItemsPayload,
       });
+
+      // ── 3b) Queue damage photos AFTER submission (so we have damage_item IDs) ──
+      const damageItemIds: string[] = (submitResult as any)?.damageItemIds ?? [];
+      for (let i = 0; i < formState.damages.length; i++) {
+        const d = formState.damages[i];
+        if (!d.photo) continue;
+        try {
+          await addPendingUpload(d.photo, {
+            jobId,
+            inspectionType: type,
+            photoType: "damage_close_up",
+            label: null,
+            damageItemId: damageItemIds[i] ?? null,
+          });
+        } catch (err) {
+          const msg = String(err).toLowerCase();
+          const isStorageError = msg.includes("storage") || msg.includes("quota") || msg.includes("localstorage");
+          toast({
+            title: isStorageError ? "Photo not saved – storage issue" : "Photo could not be saved",
+            description: isStorageError ? "Your device storage is full or blocked. Clear space and try again." : "Please try again.",
+            variant: "destructive",
+          });
+        }
+      }
 
       // ── 4) Queue ALL photos to background upload (fire-and-forget) ──
       let pendingCount = 0;
@@ -684,8 +698,11 @@ export const InspectionFlow = () => {
     );
   }
 
-  const nextStep = () => {
-    if (currentStep >= totalSteps) return;
+  // Determine which step is the signature step
+  const signatureStepNumber = type === "pickup" ? 5 : 4;
+
+  const nextStep = async () => {
+    if (currentStep >= totalSteps || capturing) return;
     const missing = validateStep(currentStep);
     if (missing.length > 0) {
       toast({
@@ -694,6 +711,28 @@ export const InspectionFlow = () => {
       });
       return;
     }
+
+    // Eagerly capture signature files BEFORE the canvas unmounts
+    if (currentStep === signatureStepNumber) {
+      setCapturing(true);
+      try {
+        if (driverSigRef.current && driverSigned) {
+          const file = await driverSigRef.current.toFile("driver.png");
+          setDriverSigFile(file);
+        }
+        if (customerSigRef.current && customerSigned) {
+          const file = await customerSigRef.current.toFile("customer.png");
+          setCustomerSigFile(file);
+        }
+      } catch (e) {
+        console.error("Signature capture failed:", e);
+        toast({ title: "Could not capture signatures. Please try again.", variant: "destructive" });
+        setCapturing(false);
+        return;
+      }
+      setCapturing(false);
+    }
+
     setCurrentStep((s) => s + 1);
   };
   const prevStep = () => {
@@ -1527,12 +1566,6 @@ export const InspectionFlow = () => {
           </Card>
         ) : (
           <>
-            {/* Keep signature step mounted (hidden) on review step so canvas refs stay alive */}
-            {currentStep === totalSteps && (
-              <div className="hidden" aria-hidden="true">
-                {renderSignaturesStep()}
-              </div>
-            )}
             {renderCurrentStep()}
           </>
         )}
@@ -1548,9 +1581,15 @@ export const InspectionFlow = () => {
             Previous
           </Button>
           {currentStep < totalSteps && (
-            <Button onClick={nextStep} className="gap-2">
-              Next
-              <ChevronRight className="h-4 w-4" />
+            <Button onClick={nextStep} disabled={capturing} className="gap-2">
+              {capturing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </>
+              )}
             </Button>
           )}
         </div>

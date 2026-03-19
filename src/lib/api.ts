@@ -225,7 +225,7 @@ export async function submitInspection(
   type: InspectionType,
   inspectionPayload: Partial<Inspection>,
   damageItems: Array<Omit<DamageItem, 'id' | 'inspection_id' | 'created_at'>>,
-): Promise<void> {
+): Promise<{ inspectionId: string; damageItemIds: string[] }> {
   // J: Guard against accidental resubmission overwriting existing inspection
   const existingInspection = await getInspection(jobId, type);
   if (existingInspection?.inspected_at) {
@@ -243,11 +243,13 @@ export async function submitInspection(
   });
 
   await supabase.from('damage_items').delete().eq('inspection_id', inspection.id);
+  let damageItemIds: string[] = [];
   if (damageItems.length > 0) {
     const orgId = await getOrgId();
     const items = damageItems.map((d) => ({ ...d, inspection_id: inspection.id, org_id: orgId }));
-    const { error } = await supabase.from('damage_items').insert(items as any);
+    const { data: insertedDamage, error } = await supabase.from('damage_items').insert(items as any).select('id');
     if (error) throw error;
+    damageItemIds = (insertedDamage ?? []).map((d: any) => d.id);
   }
 
   const job = await getJob(jobId);
@@ -276,6 +278,8 @@ export async function submitInspection(
   if (await isFeatureEnabled("AUTO_SHEET_SYNC_ON_JOB_UPDATE")) {
     void syncJobToSheetIfEnabled(jobId);
   }
+
+  return { inspectionId: inspection.id, damageItemIds };
 }
 
 // ─── Photos ──────────────────────────────────────────────────────────
