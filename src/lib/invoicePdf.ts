@@ -31,14 +31,14 @@ const POS = {
   },
 
   rightCard: {
-    line1: { x: 112.8, y: 76.5, maxW: 74 },
-    line2: { x: 112.8, y: 82.7, maxW: 74 },
-    line3: { x: 112.8, y: 88.9, maxW: 74 },
-    line4: { x: 112.8, y: 95.1, maxW: 74 },
+    line1: { x: 112.8, y: 79.5, maxW: 74 },
+    line2: { x: 112.8, y: 85.7, maxW: 74 },
+    line3: { x: 112.8, y: 91.9, maxW: 74 },
+    line4: { x: 112.8, y: 98.1, maxW: 74 },
   },
 
   table: {
-    startY: 109.6,
+    startY: 113.0,
     rowGap: 7.3,
     description: { x: 25.0, maxW: 101 },
     qty: { x: 139.2 },
@@ -48,22 +48,22 @@ const POS = {
   },
 
   totals: {
-    subtotal: { x: 189.4, y: 145.0 },
-    vat: { x: 189.4, y: 153.0 },
-    total: { x: 189.4, y: 164.3 },
+    subtotal: { x: 189.4, y: 148.0 },
+    vat: { x: 189.4, y: 156.0 },
+    total: { x: 189.4, y: 167.0 },
   },
 
   payment: {
-    bank: { x: 39.2, y: 183.3, maxW: 80 },
-    accountName: { x: 54.5, y: 190.8, maxW: 132 },
-    sortCode: { x: 39.2, y: 198.1, maxW: 80 },
-    accountNumber: { x: 51.9, y: 205.4, maxW: 80 },
-    terms: { x: 17.8, y: 213.3, maxW: 175 },
+    bank: { x: 39.2, y: 186.0, maxW: 80 },
+    accountName: { x: 54.5, y: 193.5, maxW: 160 },
+    sortCode: { x: 39.2, y: 200.8, maxW: 80 },
+    accountNumber: { x: 51.9, y: 208.1, maxW: 80 },
+    terms: { x: 17.8, y: 216.0, maxW: 175 },
   },
 
   notes: {
-    title: { x: 16.0, y: 224.0 },
-    body: { x: 16.0, y: 229.0, maxW: 178, lineH: 4.2, maxLines: 8 },
+    title: { x: 16.0, y: 227.0 },
+    body: { x: 16.0, y: 232.0, maxW: 178, lineH: 4.2, maxLines: 8 },
   },
 } as const;
 
