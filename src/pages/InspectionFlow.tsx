@@ -692,8 +692,11 @@ export const InspectionFlow = () => {
     );
   }
 
-  const nextStep = () => {
-    if (currentStep >= totalSteps) return;
+  // Determine which step is the signature step
+  const signatureStepNumber = type === "pickup" ? 5 : 4;
+
+  const nextStep = async () => {
+    if (currentStep >= totalSteps || capturing) return;
     const missing = validateStep(currentStep);
     if (missing.length > 0) {
       toast({
@@ -702,6 +705,28 @@ export const InspectionFlow = () => {
       });
       return;
     }
+
+    // Eagerly capture signature files BEFORE the canvas unmounts
+    if (currentStep === signatureStepNumber) {
+      setCapturing(true);
+      try {
+        if (driverSigRef.current && driverSigned) {
+          const file = await driverSigRef.current.toFile("driver.png");
+          setDriverSigFile(file);
+        }
+        if (customerSigRef.current && customerSigned) {
+          const file = await customerSigRef.current.toFile("customer.png");
+          setCustomerSigFile(file);
+        }
+      } catch (e) {
+        console.error("Signature capture failed:", e);
+        toast({ title: "Could not capture signatures. Please try again.", variant: "destructive" });
+        setCapturing(false);
+        return;
+      }
+      setCapturing(false);
+    }
+
     setCurrentStep((s) => s + 1);
   };
   const prevStep = () => {
