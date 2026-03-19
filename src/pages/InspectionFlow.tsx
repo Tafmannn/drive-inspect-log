@@ -538,29 +538,9 @@ export const InspectionFlow = () => {
         customerSigUrl = result.url;
       }
 
-      // ── 2) Build damage items payload (photos queued, not blocking) ──
+      // ── 2) Build damage items payload ──
       const damageItemsPayload: any[] = [];
       for (const d of formState.damages) {
-        // Queue damage photo to background — don't block submission
-        if (d.photo) {
-          try {
-            await addPendingUpload(d.photo, {
-              jobId,
-              inspectionType: type,
-              photoType: "damage_close_up",
-              label: null,
-            });
-            toast({ title: "Photo saved offline", description: "We'll upload it when you're online." });
-          } catch (err) {
-            const msg = String(err).toLowerCase();
-            const isStorageError = msg.includes("storage") || msg.includes("quota") || msg.includes("localstorage");
-            toast({
-              title: isStorageError ? "Photo not saved – storage issue" : "Photo could not be saved",
-              description: isStorageError ? "Your device storage is full or blocked. Clear space and try again." : "Please try again.",
-              variant: "destructive",
-            });
-          }
-        }
         damageItemsPayload.push({
           x: d.x,
           y: d.y,
@@ -612,12 +592,36 @@ export const InspectionFlow = () => {
         });
       }
 
-      await submitMutation.mutateAsync({
+      const submitResult = await submitMutation.mutateAsync({
         jobId,
         type,
         inspectionPayload: inspPayload as any,
         damageItems: damageItemsPayload,
       });
+
+      // ── 3b) Queue damage photos AFTER submission (so we have damage_item IDs) ──
+      const damageItemIds: string[] = (submitResult as any)?.damageItemIds ?? [];
+      for (let i = 0; i < formState.damages.length; i++) {
+        const d = formState.damages[i];
+        if (!d.photo) continue;
+        try {
+          await addPendingUpload(d.photo, {
+            jobId,
+            inspectionType: type,
+            photoType: "damage_close_up",
+            label: null,
+            damageItemId: damageItemIds[i] ?? null,
+          });
+        } catch (err) {
+          const msg = String(err).toLowerCase();
+          const isStorageError = msg.includes("storage") || msg.includes("quota") || msg.includes("localstorage");
+          toast({
+            title: isStorageError ? "Photo not saved – storage issue" : "Photo could not be saved",
+            description: isStorageError ? "Your device storage is full or blocked. Clear space and try again." : "Please try again.",
+            variant: "destructive",
+          });
+        }
+      }
 
       // ── 4) Queue ALL photos to background upload (fire-and-forget) ──
       let pendingCount = 0;
