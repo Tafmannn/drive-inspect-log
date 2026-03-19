@@ -210,24 +210,32 @@ export const PodReport = () => {
         return;
       }
 
-      // Resolve photos in parallel
-      await Promise.all(
-        (job.photos ?? []).map(async (photo) => {
-          const resolved = await resolveMediaUrlAsync(photo.url);
-          if (resolved && !cancelled) {
-            nextPhotos[photo.id] = resolved;
-          }
-        })
-      );
-
+      // Commit signatures immediately — don't wait for photos
       if (!cancelled) {
-        console.info("[POD-Sig] committing state", {
+        console.info("[POD-Sig] committing signatures", {
           effectId,
           slots: Object.fromEntries(
             Object.entries(nextSignatures).map(([k, v]) => [k, v ? "https://..." : null])
           ),
         });
         setResolvedSignatures(nextSignatures);
+      }
+
+      // Resolve photos independently via Promise.allSettled
+      const photoResults = await Promise.allSettled(
+        (job.photos ?? []).map(async (photo) => {
+          const resolved = await resolveMediaUrlAsync(photo.url);
+          return { id: photo.id, resolved };
+        })
+      );
+
+      for (const result of photoResults) {
+        if (result.status === "fulfilled" && result.value.resolved && !cancelled) {
+          nextPhotos[result.value.id] = result.value.resolved;
+        }
+      }
+
+      if (!cancelled) {
         setResolvedPhotos(nextPhotos);
       }
     }
