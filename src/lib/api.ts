@@ -243,11 +243,13 @@ export async function submitInspection(
   });
 
   await supabase.from('damage_items').delete().eq('inspection_id', inspection.id);
+  let damageItemIds: string[] = [];
   if (damageItems.length > 0) {
     const orgId = await getOrgId();
     const items = damageItems.map((d) => ({ ...d, inspection_id: inspection.id, org_id: orgId }));
-    const { error } = await supabase.from('damage_items').insert(items as any);
+    const { data: insertedDamage, error } = await supabase.from('damage_items').insert(items as any).select('id');
     if (error) throw error;
+    damageItemIds = (insertedDamage ?? []).map((d: any) => d.id);
   }
 
   const job = await getJob(jobId);
