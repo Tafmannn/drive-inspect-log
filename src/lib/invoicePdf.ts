@@ -54,11 +54,11 @@ const POS = {
   },
 
   payment: {
-    bank: { x: 39.2, y: 183.3, maxW: 80 },
-    accountName: { x: 54.5, y: 190.8, maxW: 132 },
-    sortCode: { x: 39.2, y: 198.1, maxW: 80 },
-    accountNumber: { x: 51.9, y: 205.4, maxW: 80 },
-    terms: { x: 17.8, y: 213.3, maxW: 175 },
+    bank: { x: 39.2, y: 186.0, maxW: 80 },
+    accountName: { x: 54.5, y: 193.5, maxW: 160 },
+    sortCode: { x: 39.2, y: 200.8, maxW: 80 },
+    accountNumber: { x: 51.9, y: 208.1, maxW: 80 },
+    terms: { x: 17.8, y: 216.0, maxW: 175 },
   },
 
   notes: {
