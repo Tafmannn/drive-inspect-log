@@ -1,78 +1,41 @@
+## Invoice PDF Overlay Coordinate Tuning
 
+**Confirmed preconditions:**
 
-## End-to-End Fix Plan: Broken Integrations
+- Active renderer is the template-overlay path (loads `/invoice-template.png` as background, overlays text via jsPDF).
+- Template image contains only static design elements; all dynamic values are overlaid in code.
+- Template renders at full A4 (210×297mm) with no scaling drift.
+- Keep current bank details
 
-### Root Causes Identified
+**2. `POS.rightCard` — lower Bill To lines by ~3mm so first line sits below the BILL TO heading/divider**
 
-**Issue 1 — CORS blocks all edge function calls from the preview domain**
+- line1.y: 76.5 → 79.5
+- line2.y: 82.7 → 85.7
+- line3.y: 88.9 → 91.9
+- line4.y: 95.1 → 98.1
 
-Every single edge function (11 functions) uses a hardcoded `ALLOWED_ORIGINS` list containing only `localhost:5173`, `*.lovable.app`, and `axentra.lovable.app`. The actual preview runs on `*.lovableproject.com`, which is NOT in this list. When the origin doesn't match, the function returns `Access-Control-Allow-Origin: http://localhost:5173`, which the browser rejects. This silently breaks DVLA lookup, company search, postcode lookup, maps directions, GCS upload/proxy, vision OCR, sheet sync, and all admin functions.
+**3. `POS.table.startY` — lower line-item baseline by ~3mm into the body row**
 
-**Issue 2 — Client APIs send anon key instead of user session token**
+- startY: 109.6 → 113.0
 
-Four client-side API modules (`businessSearchApi.ts`, `postcodeApi.ts`, `mapsApi.ts`, `sheetSyncApi.ts`) use raw `fetch()` with `Authorization: Bearer ${ANON_KEY}`. The edge functions then call `supabase.auth.getUser()` which returns null for anon keys, causing a 401 UNAUTHENTICATED response. Only `vehicleLookupApi.ts`, `adminApi.ts`, `visionApi.ts`, and `gcsStorageService.ts` correctly use `supabase.functions.invoke()` which sends the real user token.
+**4. `POS.totals` — shift down proportionally to match lowered table**
 
----
+- subtotal.y: 145.0 → 148.0
+- vat.y: 153.0 → 156.0
+- total.y: 164.3 → 167.0
 
-### Fix Plan
+**5. `POS.payment` — shift down to follow adjusted totals and match template lines**
 
-#### Part 1: Fix CORS in all 11 edge functions
+- bank.y: 183.3 → 186.0
+- accountName.y: 190.8 → 193.5
+- sortCode.y: 198.1 → 200.8
+- accountNumber.y: 205.4 → 208.1
+- terms.y: 213.3 → 216.0
+- accountName.maxW: 132 → 160 (longer name needs more room)
 
-Replace the restrictive `ALLOWED_ORIGINS` + `cors()` function in every edge function with the standard Lovable CORS pattern:
+**6. `POS.notes` — shift down to follow payment**
 
-```javascript
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-```
+- title.y: 224.0 → 227.0
+- body.y: 229.0 → 232.0
 
-**Files to update (CORS block, lines 4-16 in each):**
-- `supabase/functions/vehicle-lookup/index.ts`
-- `supabase/functions/business-search/index.ts`
-- `supabase/functions/place-details/index.ts`
-- `supabase/functions/postcode-lookup/index.ts`
-- `supabase/functions/maps-directions/index.ts`
-- `supabase/functions/gcs-upload/index.ts`
-- `supabase/functions/gcs-proxy/index.ts`
-- `supabase/functions/gcs-fix-acl/index.ts`
-- `supabase/functions/vision-ocr/index.ts`
-- `supabase/functions/promote-admin/index.ts`
-- `supabase/functions/assign-driver/index.ts`
-- `supabase/functions/get-org-users/index.ts`
-- `supabase/functions/google-sheets-sync/index.ts` (same pattern, slightly different location)
-
-Also replace `cors(req.headers.get("Origin"))` in catch blocks with just `corsHeaders`.
-
-#### Part 2: Switch client APIs to use `supabase.functions.invoke()`
-
-**`src/lib/businessSearchApi.ts`** — Replace raw fetch calls with `supabase.functions.invoke('business-search', ...)` and `supabase.functions.invoke('place-details', ...)`. This sends the user's real auth token.
-
-**`src/lib/postcodeApi.ts`** — Replace raw fetch with `supabase.functions.invoke('postcode-lookup', ...)`.
-
-**`src/lib/mapsApi.ts`** — Replace raw fetch with `supabase.functions.invoke('maps-directions', ...)`.
-
-**`src/lib/sheetSyncApi.ts`** — Replace raw fetch `callSync` function with `supabase.functions.invoke('google-sheets-sync', ...)`.
-
-#### Part 3: Deploy all edge functions
-
-All 13 edge functions must be redeployed after CORS fixes.
-
----
-
-### Summary of what this fixes
-
-| Feature | Broken because | Fix |
-|---|---|---|
-| DVLA Lookup | CORS block | Fix CORS headers |
-| Company Search | CORS + anon key auth | Fix CORS + use `supabase.functions.invoke` |
-| Postcode Lookup | CORS + anon key auth | Fix CORS + use `supabase.functions.invoke` |
-| Maps/Route Calc | CORS + anon key auth | Fix CORS + use `supabase.functions.invoke` |
-| Google Sheets Sync | CORS + anon key auth | Fix CORS + use `supabase.functions.invoke` |
-| GCS Photo Upload | CORS block | Fix CORS headers |
-| GCS Photo Proxy | CORS block | Fix CORS headers |
-| Vision OCR | CORS block | Fix CORS headers |
-| Admin user mgmt | CORS block | Fix CORS headers |
-
-No database, RLS, routing, or business logic changes needed.
-
+**No changes** to typography sizes, font family, draw functions logic, template path, totals math, VAT logic, or rendering pipeline. All existing clipping, alignment, and style rules preserved.
