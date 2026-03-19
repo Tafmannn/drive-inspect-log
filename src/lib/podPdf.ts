@@ -894,7 +894,7 @@ export async function generatePodPdf(
       },
       {
         label: "Delivery Driver",
-        name: clean(delivery?.inspected_by_name),
+        name: clean(delivery?.inspected_by_name && delivery.inspected_by_name !== "Driver" ? delivery.inspected_by_name : (job.resolvedDriverName || job.driver_name)),
         url: delivery?.driver_signature_url,
       },
       {
