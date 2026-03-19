@@ -884,7 +884,7 @@ export async function generatePodPdf(
     [
       {
         label: "Pickup Driver",
-        name: clean(pickup?.inspected_by_name && pickup.inspected_by_name !== "Driver" ? pickup.inspected_by_name : (job.resolvedDriverName || job.driver_name)),
+        name: clean(pickup?.inspected_by_name && !/^\s*driver\s*$/i.test(pickup.inspected_by_name) ? pickup.inspected_by_name : (job.resolvedDriverName || job.driver_name)),
         url: pickup?.driver_signature_url,
       },
       {
