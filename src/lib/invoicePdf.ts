@@ -26,19 +26,19 @@ const POS = {
   invoiceNoTopRight: { x: 186.0, y: 55.0, maxW: 34 },
 
   leftCard: {
-    invoiceNo: { x: 48.0, y: 75.0, maxW: 38 },
-    date: { x: 34.0, y: 82.0, maxW: 38 },
+    invoiceNo: { x: 48.0, y: 76.5, maxW: 38 },
+    date: { x: 34.0, y: 83.5, maxW: 38 },
   },
 
   rightCard: {
-    line1: { x: 112.8, y: 78.0, maxW: 74 },
-    line2: { x: 112.8, y: 84.0, maxW: 74 },
-    line3: { x: 112.8, y: 90.0, maxW: 74 },
-    line4: { x: 112.8, y: 96.0, maxW: 74 },
+    line1: { x: 112.8, y: 83.0, maxW: 74 },
+    line2: { x: 112.8, y: 89.0, maxW: 74 },
+    line3: { x: 112.8, y: 95.0, maxW: 74 },
+    line4: { x: 112.8, y: 101.0, maxW: 74 },
   },
 
   table: {
-    startY: 117.0,
+    startY: 121.0,
     rowGap: 8.0,
     description: { x: 25.0, maxW: 101 },
     qty: { x: 139.2 },
@@ -48,9 +48,9 @@ const POS = {
   },
 
   totals: {
-    subtotal: { x: 189.4, y: 156.0 },
-    vat: { x: 189.4, y: 163.0 },
-    total: { x: 189.4, y: 174.0 },
+    subtotal: { x: 189.4, y: 160.0 },
+    vat: { x: 189.4, y: 167.0 },
+    total: { x: 189.4, y: 178.0 },
   },
 
   payment: {
