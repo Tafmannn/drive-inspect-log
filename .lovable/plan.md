@@ -2,57 +2,47 @@
 
 ## Fix Invoice PDF Overlay Alignment
 
-### Problem Analysis
+### Problem Analysis (comparing template vs generated PDF)
 
-Comparing the template image against the generated PDF reveals these misalignments:
+1. **Top-right invoice number overlaps "INVOICE" heading**: The white `INV-AX26-1003` text at y:47 is rendering directly ON TOP of the template's static "INVOICE" text (~y:36-45). It needs to sit below the underline, around y:52.
 
-1. **Left card values too high**: Invoice No value (y:75.6) lands above the "Invoice No:" label; Date value (y:85.2) lands between the two labels instead of next to "Date:"
-2. **Bill To lines overlap heading**: First line (y:79.5) collides with the static "BILL TO" text — needs to start ~8mm lower
-3. **Table data overlaps header row**: startY:113 places the first data row on top of the "Description | Qty | Rate | Total" header; needs ~124
-4. **Totals too high**: Follow-on from table shift
-5. **Payment section double-rendered**: The template PNG already contains ALL payment info (Bank, Account Name, Sort Code, Account Number, terms) as static text. The overlay draws it again at wrong coordinates, producing duplicate/overlapping text
-6. **Top-right invoice number**: Slightly high at y:30; "INVOICE" heading on template sits around y:42
+2. **Left card "Invoice No:" value misaligned**: The template's "Invoice No:" label baseline is at ~68mm. The value at y:77.5 sits a full line below instead of on the same baseline. Should be ~y:69.
+
+3. **Left card "Date:" value misaligned**: Same issue — the "Date:" label is at ~76mm, value at y:87.5 is too low. Should be ~y:77.
+
+4. **Bill To lines**: With the left card fixes, the right card lines also need to come up slightly. First line at y:86.5 is a touch low below "BILL TO" heading (~y:64). Adjusting to start at ~y:72 with 6mm spacing.
+
+5. **Table startY too low**: Template header row baseline is at ~100mm. With startY:124 the first data row is 24mm below the header — too much gap. Should be ~108-110.
+
+6. **Totals drift**: Follow the table shift upward proportionally.
+
+7. **Payment section**: Template already contains ALL payment text as static pixels. `drawPaymentDetails` is correctly not called. No change needed.
 
 ### Coordinate Corrections (POS object only)
 
 ```
-invoiceNoTopRight.y:  30.0  →  47.0   (below INVOICE heading)
+invoiceNoTopRight.y:    47.0  →  52.0    (below INVOICE underline)
 
-leftCard.invoiceNo:   x:69, y:75.6  →  x:48, y:77.5  (after "Invoice No:" label)
-leftCard.date:        x:69, y:85.2  →  x:34, y:87.5  (after "Date:" label)
+leftCard.invoiceNo:     x:48, y:77.5  →  x:48, y:69.0   (same baseline as label)
+leftCard.date:          x:34, y:87.5  →  x:34, y:77.0   (same baseline as label)
 
-rightCard.line1.y:    79.5  →  86.5   (below BILL TO heading + divider)
-rightCard.line2.y:    85.7  →  92.5
-rightCard.line3.y:    91.9  →  98.5
-rightCard.line4.y:    98.1  →  104.5
+rightCard.line1.y:      86.5  →  72.0   (below BILL TO + padding)
+rightCard.line2.y:      92.5  →  78.0
+rightCard.line3.y:      98.5  →  84.0
+rightCard.line4.y:      104.5 →  90.0
 
-table.startY:         113.0  →  124.0  (first body row, below header)
-table.rowGap:         7.3    →  8.5    (match template row spacing)
+table.startY:           124.0  →  109.0  (first body row, just below header)
+table.rowGap:           8.5    →  8.0
 
-totals.subtotal.y:    148.0  →  158.0
-totals.vat.y:         156.0  →  166.0
-totals.total.y:       167.0  →  178.0
+totals.subtotal.y:      158.0  →  148.0
+totals.vat.y:           166.0  →  155.0
+totals.total.y:         178.0  →  166.0
 
-notes.title.y:        227.0  →  260.0  (below payment section)
-notes.body.y:         232.0  →  265.0
+notes.title.y:          260.0  →  230.0  (below totals, above payment)
+notes.body.y:           265.0  →  235.0
 ```
 
-### Payment Section — Remove Overlay
+### Summary
 
-The template PNG **already contains** all payment details as static burned-in text:
-- "Payment Information" heading
-- "Bank : Monzo Bank"
-- "Account Name: Terrence Tapfumaneyi trading as Axentra Vehicle Logistics"
-- "Sort Code: 04-00-03"
-- "Account Number: 24861835"
-- "Payable within 7 days. Please use invoice number as payment reference."
-
-The `drawPaymentDetails()` call in `generateInvoicePdf()` must be **removed** to stop double-rendering. The function itself can stay but simply won't be called.
-
-### Summary of File Changes
-
-**`src/lib/invoicePdf.ts`** — coordinates + one call removal:
-1. Update `POS` coordinate values as listed above
-2. Remove the `drawPaymentDetails(doc, data);` call from `generateInvoicePdf()`
-3. No changes to typography sizes, font family, draw function logic, totals math, VAT logic, or template path
-
+**File**: `src/lib/invoicePdf.ts`
+- Update
