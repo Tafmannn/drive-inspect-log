@@ -1577,9 +1577,15 @@ export const InspectionFlow = () => {
             Previous
           </Button>
           {currentStep < totalSteps && (
-            <Button onClick={nextStep} className="gap-2">
-              Next
-              <ChevronRight className="h-4 w-4" />
+            <Button onClick={nextStep} disabled={capturing} className="gap-2">
+              {capturing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </>
+              )}
             </Button>
           )}
         </div>
