@@ -572,7 +572,7 @@ export const PodReport = () => {
                   label="Fuel"
                   value={fuelLabel(pickup?.fuel_level_percent ?? null)}
                 />
-                <DetailRow label="Driver" value={pickup?.inspected_by_name && pickup.inspected_by_name !== "Driver" ? pickup.inspected_by_name : (job.resolvedDriverName || job.driver_name || "—")} />
+                <DetailRow label="Driver" value={pickup?.inspected_by_name && !/^\s*driver\s*$/i.test(pickup.inspected_by_name) ? pickup.inspected_by_name : (job.resolvedDriverName || job.driver_name || "—")} />
                 <DetailRow label="Customer" value={pickup?.customer_name || "—"} />
                 <DetailRow label="Damages" value={String(pickupDamages.length)} />
                 <DetailRow label="Photos" value={String(pickupPhotos.length)} />
