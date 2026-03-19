@@ -216,6 +216,7 @@ export async function addPendingUpload(
     inspectionId?: string | null;
     jobNumber?: string | null;
     vehicleReg?: string | null;
+    damageItemId?: string | null;
   },
 ): Promise<PendingUpload> {
   const fileDataUrl = await compressAndConvertToDataUrl(file);
