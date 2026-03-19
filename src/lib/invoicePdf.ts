@@ -62,8 +62,8 @@ const POS = {
   },
 
   notes: {
-    title: { x: 16.0, y: 224.0 },
-    body: { x: 16.0, y: 229.0, maxW: 178, lineH: 4.2, maxLines: 8 },
+    title: { x: 16.0, y: 227.0 },
+    body: { x: 16.0, y: 232.0, maxW: 178, lineH: 4.2, maxLines: 8 },
   },
 } as const;
 
