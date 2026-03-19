@@ -1,7 +1,7 @@
 /**
  * Simple signature URL resolver.
- * Tries Supabase signed URL first; falls back to GCS tokenized proxy URL
- * for files uploaded via gcsStorageService.
+ * GCS bare paths (jobs/.../signatures/...) go directly to tokenized proxy URL.
+ * Supabase-sig:// references try Supabase signed URL first, then GCS proxy fallback.
  *
  * No edge function dependency for resolution. Returns a URL the browser
  * can use directly (no redirect: manual fetch).
@@ -37,12 +37,29 @@ function extractPath(raw: string): string | null {
   return null;
 }
 
-async function getToken(): Promise<string | null> {
-  const { data } = await supabase.auth.getSession();
-  if (data.session?.access_token) return data.session.access_token;
+/**
+ * Detect if this is a bare GCS path (not a supabase-sig:// or legacy URL).
+ * These should skip Supabase storage entirely and go straight to GCS proxy.
+ */
+function isBarePath(raw: string): boolean {
+  const trimmed = raw.trim();
+  return /^jobs\/[^/]+\/signatures\//.test(trimmed);
+}
 
-  const { data: refreshed } = await supabase.auth.refreshSession();
-  return refreshed.session?.access_token ?? null;
+async function getToken(): Promise<string | null> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    if (data.session?.access_token) return data.session.access_token;
+
+    const { data: refreshed } = await supabase.auth.refreshSession();
+    return refreshed.session?.access_token ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function buildProxyUrl(path: string, token: string): string {
+  return `${GCS_PROXY}?path=${encodeURIComponent(path)}&token=${encodeURIComponent(token)}`;
 }
 
 export async function resolveSignatureUrlSimple(
@@ -56,9 +73,28 @@ export async function resolveSignatureUrlSimple(
     return null;
   }
 
-  console.info('[SigSimple] resolving', { path: path.slice(0, 120) });
+  // ─── FAST PATH: bare GCS paths skip Supabase entirely ───
+  if (isBarePath(raw.trim())) {
+    try {
+      const token = await getToken();
+      if (!token) {
+        console.error('[SigSimple] no auth token for GCS proxy');
+        return null;
+      }
+      const url = buildProxyUrl(path, token);
+      console.info('[SigSimple] GCS direct proxy URL', { path: path.slice(0, 80) });
+      return url;
+    } catch (err) {
+      console.error('[SigSimple] GCS proxy URL build failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
 
-  // 1) Try Supabase storage signed URL
+  // ─── LEGACY PATH: supabase-sig:// or Supabase URLs — try Supabase first ───
+  console.info('[SigSimple] resolving via Supabase', { path: path.slice(0, 120) });
+
   try {
     const { data, error } = await supabase.storage
       .from(BUCKET)
@@ -79,19 +115,18 @@ export async function resolveSignatureUrlSimple(
     });
   }
 
-  // 2) GCS proxy fallback — return tokenized URL directly (no fetch/redirect)
+  // Fallback to GCS proxy
   try {
     const token = await getToken();
     if (!token) {
-      console.error('[SigSimple] no auth token for GCS proxy');
+      console.error('[SigSimple] no auth token for GCS proxy fallback');
       return null;
     }
-
-    const url = `${GCS_PROXY}?path=${encodeURIComponent(path)}&token=${encodeURIComponent(token)}`;
-    console.info('[SigSimple] GCS proxy tokenized URL built', { path: path.slice(0, 80) });
+    const url = buildProxyUrl(path, token);
+    console.info('[SigSimple] GCS proxy fallback URL built', { path: path.slice(0, 80) });
     return url;
   } catch (err) {
-    console.error('[SigSimple] GCS proxy URL build threw', {
+    console.error('[SigSimple] GCS proxy fallback threw', {
       error: err instanceof Error ? err.message : String(err),
     });
     return null;

@@ -31,18 +31,26 @@ function isSignatureReference(url: string): boolean {
  * No fetch/redirect dance — just a URL the edge function will serve.
  */
 async function getTokenizedProxyUrl(objectPath: string): Promise<string | null> {
-  const { data } = await supabase.auth.getSession();
-  let token = data.session?.access_token;
-  if (!token) {
-    const { data: refreshed } = await supabase.auth.refreshSession();
-    token = refreshed.session?.access_token ?? null;
-  }
-  if (!token) {
-    console.warn('[MediaResolver] No auth token for GCS proxy', { objectPath: objectPath.slice(0, 50) });
+  try {
+    const { data } = await supabase.auth.getSession();
+    let token = data.session?.access_token;
+    if (!token) {
+      const { data: refreshed } = await supabase.auth.refreshSession();
+      token = refreshed.session?.access_token ?? null;
+    }
+    if (!token) {
+      console.warn('[MediaResolver] No auth token for GCS proxy', { objectPath: objectPath.slice(0, 50) });
+      return null;
+    }
+
+    return `${GCS_PROXY_ENDPOINT}?path=${encodeURIComponent(objectPath)}&token=${encodeURIComponent(token)}`;
+  } catch (err) {
+    console.error('[MediaResolver] getTokenizedProxyUrl failed', {
+      objectPath: objectPath.slice(0, 50),
+      error: err instanceof Error ? err.message : String(err),
+    });
     return null;
   }
-
-  return `${GCS_PROXY_ENDPOINT}?path=${encodeURIComponent(objectPath)}&token=${encodeURIComponent(token)}`;
 }
 
 export async function resolveMediaUrlAsync(

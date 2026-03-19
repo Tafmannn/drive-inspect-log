@@ -210,24 +210,32 @@ export const PodReport = () => {
         return;
       }
 
-      // Resolve photos in parallel
-      await Promise.all(
-        (job.photos ?? []).map(async (photo) => {
-          const resolved = await resolveMediaUrlAsync(photo.url);
-          if (resolved && !cancelled) {
-            nextPhotos[photo.id] = resolved;
-          }
-        })
-      );
-
+      // Commit signatures immediately — don't wait for photos
       if (!cancelled) {
-        console.info("[POD-Sig] committing state", {
+        console.info("[POD-Sig] committing signatures", {
           effectId,
           slots: Object.fromEntries(
             Object.entries(nextSignatures).map(([k, v]) => [k, v ? "https://..." : null])
           ),
         });
         setResolvedSignatures(nextSignatures);
+      }
+
+      // Resolve photos independently via Promise.allSettled
+      const photoResults = await Promise.allSettled(
+        (job.photos ?? []).map(async (photo) => {
+          const resolved = await resolveMediaUrlAsync(photo.url);
+          return { id: photo.id, resolved };
+        })
+      );
+
+      for (const result of photoResults) {
+        if (result.status === "fulfilled" && result.value.resolved && !cancelled) {
+          nextPhotos[result.value.id] = result.value.resolved;
+        }
+      }
+
+      if (!cancelled) {
         setResolvedPhotos(nextPhotos);
       }
     }
@@ -564,7 +572,7 @@ export const PodReport = () => {
                   label="Fuel"
                   value={fuelLabel(pickup?.fuel_level_percent ?? null)}
                 />
-                <DetailRow label="Driver" value={pickup?.inspected_by_name && pickup.inspected_by_name !== "Driver" ? pickup.inspected_by_name : (job.resolvedDriverName || job.driver_name || "—")} />
+                <DetailRow label="Driver" value={pickup?.inspected_by_name && !/^\s*driver\s*$/i.test(pickup.inspected_by_name) ? pickup.inspected_by_name : (job.resolvedDriverName || job.driver_name || "—")} />
                 <DetailRow label="Customer" value={pickup?.customer_name || "—"} />
                 <DetailRow label="Damages" value={String(pickupDamages.length)} />
                 <DetailRow label="Photos" value={String(pickupPhotos.length)} />
@@ -623,7 +631,7 @@ export const PodReport = () => {
                   label="Fuel"
                   value={fuelLabel(delivery?.fuel_level_percent ?? null)}
                 />
-                <DetailRow label="Driver" value={delivery?.inspected_by_name && delivery.inspected_by_name !== "Driver" ? delivery.inspected_by_name : (job.resolvedDriverName || job.driver_name || "—")} />
+                <DetailRow label="Driver" value={delivery?.inspected_by_name && !/^\s*driver\s*$/i.test(delivery.inspected_by_name) ? delivery.inspected_by_name : (job.resolvedDriverName || job.driver_name || "—")} />
                 <DetailRow label="Customer" value={delivery?.customer_name || "—"} />
                 <DetailRow label="Damages" value={String(deliveryDamages.length)} />
                 <DetailRow label="Photos" value={String(deliveryPhotos.length)} />
@@ -749,7 +757,7 @@ export const PodReport = () => {
                 <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
                   <SignatureCard
                     label="Pickup Driver"
-                    name={pickup?.inspected_by_name && pickup.inspected_by_name !== "Driver" ? pickup.inspected_by_name : (job.resolvedDriverName || job.driver_name)}
+                    name={pickup?.inspected_by_name && !/^\s*driver\s*$/i.test(pickup.inspected_by_name) ? pickup.inspected_by_name : (job.resolvedDriverName || job.driver_name)}
                     url={resolvedSignatures["pickup_driver"] ?? null}
                     slot="pickup_driver"
                   />
@@ -761,7 +769,7 @@ export const PodReport = () => {
                   />
                   <SignatureCard
                     label="Delivery Driver"
-                    name={delivery?.inspected_by_name && delivery.inspected_by_name !== "Driver" ? delivery.inspected_by_name : (job.resolvedDriverName || job.driver_name)}
+                    name={delivery?.inspected_by_name && !/^\s*driver\s*$/i.test(delivery.inspected_by_name) ? delivery.inspected_by_name : (job.resolvedDriverName || job.driver_name)}
                     url={resolvedSignatures["delivery_driver"] ?? null}
                     slot="delivery_driver"
                   />
