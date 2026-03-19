@@ -757,7 +757,7 @@ export const PodReport = () => {
                 <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
                   <SignatureCard
                     label="Pickup Driver"
-                    name={pickup?.inspected_by_name && pickup.inspected_by_name !== "Driver" ? pickup.inspected_by_name : (job.resolvedDriverName || job.driver_name)}
+                    name={pickup?.inspected_by_name && !/^\s*driver\s*$/i.test(pickup.inspected_by_name) ? pickup.inspected_by_name : (job.resolvedDriverName || job.driver_name)}
                     url={resolvedSignatures["pickup_driver"] ?? null}
                     slot="pickup_driver"
                   />
