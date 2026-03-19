@@ -102,7 +102,6 @@ export const PhotoViewer = ({ photos, title }: PhotoViewerProps) => {
               alt={photo.label || `Photo ${idx + 1}`}
               className="w-full h-full object-cover"
               loading="lazy"
-              crossOrigin="anonymous"
               onError={(e) => {
                 const target = e.currentTarget;
                 target.style.display = 'none';
@@ -153,7 +152,6 @@ export const PhotoViewer = ({ photos, title }: PhotoViewerProps) => {
                   className="max-w-full max-h-full object-contain transition-transform duration-200"
                   style={{ transform: `scale(${zoom})` }}
                   draggable={false}
-                  crossOrigin="anonymous"
                   onError={(e) => {
                     const target = e.currentTarget;
                     target.style.display = 'none';

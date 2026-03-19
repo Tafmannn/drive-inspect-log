@@ -92,10 +92,11 @@ export function generatePodEmailBody(
   lines.push("Note: Full-resolution images are held within the Axentra system and can be provided on request.");
   lines.push("");
 
+  const driverFallback = job.resolvedDriverName || job.driver_name || "—";
   const pickupCustomerName = pickup?.customer_name || job.delivery_contact_name;
-  const pickupDriver = pickup?.inspected_by_name || "Driver";
+  const pickupDriver = (pickup?.inspected_by_name && pickup.inspected_by_name !== "Driver") ? pickup.inspected_by_name : driverFallback;
   const deliveryCustomerName = delivery?.customer_name || job.delivery_contact_name;
-  const deliveryDriver = delivery?.inspected_by_name || pickupDriver;
+  const deliveryDriver = (delivery?.inspected_by_name && delivery.inspected_by_name !== "Driver") ? delivery.inspected_by_name : driverFallback;
 
   lines.push("SIGNATURES");
   lines.push(`Pickup – Driver: ${pickupDriver} | Customer: ${pickupCustomerName || "N/A"}`);

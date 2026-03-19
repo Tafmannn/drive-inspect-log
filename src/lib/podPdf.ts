@@ -799,7 +799,7 @@ export async function generatePodPdf(
     ["Date / Time", pickup ? safeDate(pickup.inspected_at) : "—"],
     ["Odometer", pickup?.odometer != null ? pickup.odometer.toLocaleString("en-GB") : "—"],
     ["Fuel", fuelLabel(pickup?.fuel_level_percent ?? null)],
-    ["Driver", clean(pickup?.inspected_by_name)],
+    ["Driver", clean(pickup?.inspected_by_name && pickup.inspected_by_name !== "Driver" ? pickup.inspected_by_name : (job.resolvedDriverName || job.driver_name))],
     ["Customer", clean(pickup?.customer_name)],
     ["Damages", String(pickupDamages.length)],
     ["Photos", String(pickupPhotos.length)],
@@ -815,7 +815,7 @@ export async function generatePodPdf(
     ["Date / Time", delivery ? safeDate(delivery.inspected_at) : "—"],
     ["Odometer", delivery?.odometer != null ? delivery.odometer.toLocaleString("en-GB") : "—"],
     ["Fuel", fuelLabel(delivery?.fuel_level_percent ?? null)],
-    ["Driver", clean(delivery?.inspected_by_name)],
+    ["Driver", clean(delivery?.inspected_by_name && delivery.inspected_by_name !== "Driver" ? delivery.inspected_by_name : (job.resolvedDriverName || job.driver_name))],
     ["Customer", clean(delivery?.customer_name)],
     ["Damages", String(deliveryDamages.length)],
     ["Photos", String(deliveryPhotos.length)],
@@ -884,7 +884,7 @@ export async function generatePodPdf(
     [
       {
         label: "Pickup Driver",
-        name: clean(pickup?.inspected_by_name),
+        name: clean(pickup?.inspected_by_name && pickup.inspected_by_name !== "Driver" ? pickup.inspected_by_name : (job.resolvedDriverName || job.driver_name)),
         url: pickup?.driver_signature_url,
       },
       {
@@ -894,7 +894,7 @@ export async function generatePodPdf(
       },
       {
         label: "Delivery Driver",
-        name: clean(delivery?.inspected_by_name),
+        name: clean(delivery?.inspected_by_name && delivery.inspected_by_name !== "Driver" ? delivery.inspected_by_name : (job.resolvedDriverName || job.driver_name)),
         url: delivery?.driver_signature_url,
       },
       {

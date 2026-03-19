@@ -564,7 +564,7 @@ export const PodReport = () => {
                   label="Fuel"
                   value={fuelLabel(pickup?.fuel_level_percent ?? null)}
                 />
-                <DetailRow label="Driver" value={pickup?.inspected_by_name || "—"} />
+                <DetailRow label="Driver" value={pickup?.inspected_by_name && pickup.inspected_by_name !== "Driver" ? pickup.inspected_by_name : (job.resolvedDriverName || job.driver_name || "—")} />
                 <DetailRow label="Customer" value={pickup?.customer_name || "—"} />
                 <DetailRow label="Damages" value={String(pickupDamages.length)} />
                 <DetailRow label="Photos" value={String(pickupPhotos.length)} />
@@ -623,7 +623,7 @@ export const PodReport = () => {
                   label="Fuel"
                   value={fuelLabel(delivery?.fuel_level_percent ?? null)}
                 />
-                <DetailRow label="Driver" value={delivery?.inspected_by_name || "—"} />
+                <DetailRow label="Driver" value={delivery?.inspected_by_name && delivery.inspected_by_name !== "Driver" ? delivery.inspected_by_name : (job.resolvedDriverName || job.driver_name || "—")} />
                 <DetailRow label="Customer" value={delivery?.customer_name || "—"} />
                 <DetailRow label="Damages" value={String(deliveryDamages.length)} />
                 <DetailRow label="Photos" value={String(deliveryPhotos.length)} />
@@ -749,7 +749,7 @@ export const PodReport = () => {
                 <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
                   <SignatureCard
                     label="Pickup Driver"
-                    name={pickup?.inspected_by_name}
+                    name={pickup?.inspected_by_name && pickup.inspected_by_name !== "Driver" ? pickup.inspected_by_name : (job.resolvedDriverName || job.driver_name)}
                     url={resolvedSignatures["pickup_driver"] ?? null}
                     slot="pickup_driver"
                   />
@@ -761,7 +761,7 @@ export const PodReport = () => {
                   />
                   <SignatureCard
                     label="Delivery Driver"
-                    name={delivery?.inspected_by_name}
+                    name={delivery?.inspected_by_name && delivery.inspected_by_name !== "Driver" ? delivery.inspected_by_name : (job.resolvedDriverName || job.driver_name)}
                     url={resolvedSignatures["delivery_driver"] ?? null}
                     slot="delivery_driver"
                   />

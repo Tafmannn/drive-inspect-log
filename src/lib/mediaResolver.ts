@@ -26,46 +26,32 @@ function isSignatureReference(url: string): boolean {
   return false;
 }
 
-async function resolveGcsViaAuthenticatedFetch(objectPath: string): Promise<string | null> {
+/**
+ * Build a tokenized proxy URL that the browser can use directly in <img> tags.
+ * No fetch/redirect dance — just a URL the edge function will serve.
+ */
+async function getTokenizedProxyUrl(objectPath: string): Promise<string | null> {
   const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
+  let token = data.session?.access_token;
+  if (!token) {
+    const { data: refreshed } = await supabase.auth.refreshSession();
+    token = refreshed.session?.access_token ?? null;
+  }
   if (!token) {
     console.warn('[MediaResolver] No auth token for GCS proxy', { objectPath: objectPath.slice(0, 50) });
     return null;
   }
 
-  const res = await fetch(`${GCS_PROXY_ENDPOINT}?path=${encodeURIComponent(objectPath)}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    redirect: "manual",
-  });
-
-  if (res.status === 302 || res.status === 301) {
-    return res.headers.get("Location") || null;
-  }
-
-  if (res.ok) {
-    return `${GCS_PROXY_ENDPOINT}?path=${encodeURIComponent(objectPath)}&token=${encodeURIComponent(token)}`;
-  }
-
-  console.warn('[MediaResolver] GCS proxy failed', { objectPath: objectPath.slice(0, 50), status: res.status });
-  return null;
+  return `${GCS_PROXY_ENDPOINT}?path=${encodeURIComponent(objectPath)}&token=${encodeURIComponent(token)}`;
 }
 
 export async function resolveMediaUrlAsync(
   url: string | null | undefined
 ): Promise<string | null> {
-  if (!url) {
-    console.error("[MediaResolver] Empty URL input");
-    return null;
-  }
+  if (!url) return null;
 
   const normalizedUrl = typeof url === "string" ? url.trim() : "";
-  if (!normalizedUrl) {
-    console.error("[MediaResolver] URL became empty after trim");
-    return null;
-  }
+  if (!normalizedUrl) return null;
 
   if (normalizedUrl.startsWith("data:") || normalizedUrl.startsWith("blob:")) {
     return normalizedUrl;
@@ -81,27 +67,15 @@ export async function resolveMediaUrlAsync(
     return null;
   }
 
-  // ─── GCS full URLs — route through authenticated proxy ───
+  // ─── GCS full URLs — build tokenized proxy URL directly ───
   if (normalizedUrl.startsWith(GCS_PUBLIC_PREFIX)) {
     const objectPath = normalizedUrl.slice(GCS_PUBLIC_PREFIX.length);
-    const proxied = await resolveGcsViaAuthenticatedFetch(objectPath);
-    if (!proxied) {
-      console.error("[MediaResolver] GCS public URL proxy resolution failed", {
-        objectPath: objectPath.slice(0, 160),
-      });
-    }
-    return proxied;
+    return getTokenizedProxyUrl(objectPath);
   }
 
-  // ─── Bare non-signature paths → GCS ───
+  // ─── Bare non-signature paths → GCS proxy ───
   if (isBareObjectPath(normalizedUrl)) {
-    const gcsResolved = await resolveGcsViaAuthenticatedFetch(normalizedUrl);
-    if (!gcsResolved) {
-      console.error("[MediaResolver] Non-signature bare path failed GCS resolution", {
-        rawInput: normalizedUrl.slice(0, 180),
-      });
-    }
-    return gcsResolved;
+    return getTokenizedProxyUrl(normalizedUrl);
   }
 
   return normalizedUrl;
