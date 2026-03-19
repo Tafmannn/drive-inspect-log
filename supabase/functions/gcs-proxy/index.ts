@@ -45,8 +45,6 @@ serve(async (req) => {
     }
 
     // ─── Auth: Authorization header OR ?token= query param ───
-    // The token param allows <img> tags and other contexts that
-    // cannot set custom headers to authenticate.
     let authHeader = req.headers.get("Authorization") ?? "";
     const tokenParam = url.searchParams.get("token");
     if (!authHeader && tokenParam) {
@@ -65,7 +63,7 @@ serve(async (req) => {
       });
     }
 
-    // Role-based superadmin check (no email whitelist)
+    // Role-based superadmin check
     const directRole = String(
       authData.user.user_metadata?.role ?? authData.user.app_metadata?.role ?? ""
     ).toLowerCase();
@@ -93,7 +91,7 @@ serve(async (req) => {
       }
     }
 
-    // ─── Generate GCS V4 signed URL and redirect ───
+    // ─── Generate GCS V4 signed URL ───
     const serviceAccountJson = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_JSON");
     if (!serviceAccountJson) {
       return new Response(
@@ -104,13 +102,30 @@ serve(async (req) => {
 
     const sa = JSON.parse(serviceAccountJson);
     const bucket = "axentra_db";
-    const signedUrl = await generateV4SignedUrl(sa, bucket, objectPath, 900); // 15 min
+    const signedUrl = await generateV4SignedUrl(sa, bucket, objectPath, 900);
 
-    return new Response(null, {
-      status: 302,
+    // ─── Stream content directly instead of 302 redirect ───
+    // This avoids cross-origin redirect issues with <img> tags
+    const gcsResponse = await fetch(signedUrl);
+    if (!gcsResponse.ok) {
+      console.error("[gcs-proxy] GCS fetch failed", {
+        status: gcsResponse.status,
+        path: objectPath.slice(0, 120),
+      });
+      return new Response(
+        JSON.stringify({ error: "GCS_FETCH_FAILED", status: gcsResponse.status }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const contentType = gcsResponse.headers.get("Content-Type") || "application/octet-stream";
+    const body = gcsResponse.body;
+
+    return new Response(body, {
+      status: 200,
       headers: {
         ...corsHeaders,
-        Location: signedUrl,
+        "Content-Type": contentType,
         "Cache-Control": "private, max-age=600",
       },
     });
@@ -147,7 +162,6 @@ async function generateV4SignedUrl(
   params.set("X-Goog-Expires", String(expiresInSeconds));
   params.set("X-Goog-SignedHeaders", "host");
 
-  // Sort params for canonical query string
   const sortedParams = new URLSearchParams([...params.entries()].sort());
   const canonicalQueryString = sortedParams.toString();
 
