@@ -48,9 +48,9 @@ const POS = {
   },
 
   totals: {
-    subtotal: { x: 189.4, y: 145.0 },
-    vat: { x: 189.4, y: 153.0 },
-    total: { x: 189.4, y: 164.3 },
+    subtotal: { x: 189.4, y: 148.0 },
+    vat: { x: 189.4, y: 156.0 },
+    total: { x: 189.4, y: 167.0 },
   },
 
   payment: {
