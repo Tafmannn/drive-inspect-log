@@ -102,7 +102,6 @@ export const PhotoViewer = ({ photos, title }: PhotoViewerProps) => {
               alt={photo.label || `Photo ${idx + 1}`}
               className="w-full h-full object-cover"
               loading="lazy"
-              crossOrigin="anonymous"
               onError={(e) => {
                 const target = e.currentTarget;
                 target.style.display = 'none';
