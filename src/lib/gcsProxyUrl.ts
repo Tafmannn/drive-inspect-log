@@ -53,6 +53,7 @@ function isBareObjectPath(url: string): boolean {
     !url.startsWith('data:') &&
     !url.startsWith('blob:') &&
     !url.startsWith('supabase-sig://') &&
+    !url.startsWith('/') &&
     url.length > 0
   );
 }
