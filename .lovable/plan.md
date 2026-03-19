@@ -1,41 +1,58 @@
-## Invoice PDF Overlay Coordinate Tuning
 
-**Confirmed preconditions:**
 
-- Active renderer is the template-overlay path (loads `/invoice-template.png` as background, overlays text via jsPDF).
-- Template image contains only static design elements; all dynamic values are overlaid in code.
-- Template renders at full A4 (210×297mm) with no scaling drift.
-- Keep current bank details
+## Fix Invoice PDF Overlay Alignment
 
-**2. `POS.rightCard` — lower Bill To lines by ~3mm so first line sits below the BILL TO heading/divider**
+### Problem Analysis
 
-- line1.y: 76.5 → 79.5
-- line2.y: 82.7 → 85.7
-- line3.y: 88.9 → 91.9
-- line4.y: 95.1 → 98.1
+Comparing the template image against the generated PDF reveals these misalignments:
 
-**3. `POS.table.startY` — lower line-item baseline by ~3mm into the body row**
+1. **Left card values too high**: Invoice No value (y:75.6) lands above the "Invoice No:" label; Date value (y:85.2) lands between the two labels instead of next to "Date:"
+2. **Bill To lines overlap heading**: First line (y:79.5) collides with the static "BILL TO" text — needs to start ~8mm lower
+3. **Table data overlaps header row**: startY:113 places the first data row on top of the "Description | Qty | Rate | Total" header; needs ~124
+4. **Totals too high**: Follow-on from table shift
+5. **Payment section double-rendered**: The template PNG already contains ALL payment info (Bank, Account Name, Sort Code, Account Number, terms) as static text. The overlay draws it again at wrong coordinates, producing duplicate/overlapping text
+6. **Top-right invoice number**: Slightly high at y:30; "INVOICE" heading on template sits around y:42
 
-- startY: 109.6 → 113.0
+### Coordinate Corrections (POS object only)
 
-**4. `POS.totals` — shift down proportionally to match lowered table**
+```
+invoiceNoTopRight.y:  30.0  →  47.0   (below INVOICE heading)
 
-- subtotal.y: 145.0 → 148.0
-- vat.y: 153.0 → 156.0
-- total.y: 164.3 → 167.0
+leftCard.invoiceNo:   x:69, y:75.6  →  x:48, y:77.5  (after "Invoice No:" label)
+leftCard.date:        x:69, y:85.2  →  x:34, y:87.5  (after "Date:" label)
 
-**5. `POS.payment` — shift down to follow adjusted totals and match template lines**
+rightCard.line1.y:    79.5  →  86.5   (below BILL TO heading + divider)
+rightCard.line2.y:    85.7  →  92.5
+rightCard.line3.y:    91.9  →  98.5
+rightCard.line4.y:    98.1  →  104.5
 
-- bank.y: 183.3 → 186.0
-- accountName.y: 190.8 → 193.5
-- sortCode.y: 198.1 → 200.8
-- accountNumber.y: 205.4 → 208.1
-- terms.y: 213.3 → 216.0
-- accountName.maxW: 132 → 160 (longer name needs more room)
+table.startY:         113.0  →  124.0  (first body row, below header)
+table.rowGap:         7.3    →  8.5    (match template row spacing)
 
-**6. `POS.notes` — shift down to follow payment**
+totals.subtotal.y:    148.0  →  158.0
+totals.vat.y:         156.0  →  166.0
+totals.total.y:       167.0  →  178.0
 
-- title.y: 224.0 → 227.0
-- body.y: 229.0 → 232.0
+notes.title.y:        227.0  →  260.0  (below payment section)
+notes.body.y:         232.0  →  265.0
+```
 
-**No changes** to typography sizes, font family, draw functions logic, template path, totals math, VAT logic, or rendering pipeline. All existing clipping, alignment, and style rules preserved.
+### Payment Section — Remove Overlay
+
+The template PNG **already contains** all payment details as static burned-in text:
+- "Payment Information" heading
+- "Bank : Monzo Bank"
+- "Account Name: Terrence Tapfumaneyi trading as Axentra Vehicle Logistics"
+- "Sort Code: 04-00-03"
+- "Account Number: 24861835"
+- "Payable within 7 days. Please use invoice number as payment reference."
+
+The `drawPaymentDetails()` call in `generateInvoicePdf()` must be **removed** to stop double-rendering. The function itself can stay but simply won't be called.
+
+### Summary of File Changes
+
+**`src/lib/invoicePdf.ts`** — coordinates + one call removal:
+1. Update `POS` coordinate values as listed above
+2. Remove the `drawPaymentDetails(doc, data);` call from `generateInvoicePdf()`
+3. No changes to typography sizes, font family, draw function logic, totals math, VAT logic, or template path
+
