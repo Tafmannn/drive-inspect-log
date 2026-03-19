@@ -1,18 +1,25 @@
 import jsPDF from "jspdf";
 
-const PAGE_BG = [243, 243, 243] as const;
-const WHITE = [255, 255, 255] as const;
-const NAVY = [8, 31, 79] as const;
-const NAVY_RIGHT = [11, 36, 87] as const;
-const DARK = [24, 33, 53] as const;
-const MID = [78, 89, 110] as const;
-const LINE = [221, 226, 232] as const;
-const SOFT = [245, 247, 250] as const;
-const TOTAL_BLUE = [17, 42, 102] as const;
+const TEMPLATE_PATH = "/invoice-template.png";
 
-const PAGE_MARGIN = 6;
-const INNER_X = 16;
-const FOOTER_Y_OFFSET = 8;
+// A4 portrait in mm
+const PAGE_W = 210;
+const PAGE_H = 297;
+
+// Theme
+const DARK: [number, number, number] = [24, 33, 53];
+const MID: [number, number, number] = [78, 89, 110];
+const BLUE: [number, number, number] = [17, 42, 102];
+const WHITE: [number, number, number] = [255, 255, 255];
+
+// Bank details locked to your preferred values
+const AXENTRA_BANK = {
+  bankName: "Monzo Bank",
+  accountName: "Terrence Tapfumaneyi trading as Axentra Vehicle Logistics",
+  sortCode: "04-00-03",
+  accountNumber: "24861835",
+  paymentTermsText: "Payable within 7 days. Please use invoice number as payment reference.",
+} as const;
 
 export interface InvoiceLineItem {
   description: string;
@@ -38,6 +45,58 @@ export interface InvoiceData {
   vatRate?: number;
 }
 
+// Tuned for your locked template.
+// These positions assume your approved template image is used as the PDF background.
+const POS = {
+  invoiceNoTopRight: { x: 186.0, y: 29.8, maxW: 34 },
+
+  leftCard: {
+    invoiceNo: { x: 68.5, y: 75.4, maxW: 38 },
+    date: { x: 68.5, y: 84.9, maxW: 38 },
+  },
+
+  rightCard: {
+    line1: { x: 112.4, y: 74.9, maxW: 77 },
+    line2: { x: 112.4, y: 80.8, maxW: 77 },
+    line3: { x: 112.4, y: 86.7, maxW: 77 },
+    line4: { x: 112.4, y: 92.6, maxW: 77 },
+  },
+
+  table: {
+    startY: 111.0,
+    rowGap: 7.3,
+    description: { x: 20.2, maxW: 103 },
+    qty: { x: 138.8 },
+    rate: { x: 164.8 },
+    total: { x: 189.6 },
+    maxRows: 4,
+  },
+
+  totals: {
+    subtotal: { x: 189.6, y: 145.2 },
+    vat: { x: 189.6, y: 153.2 },
+    total: { x: 189.6, y: 164.5 },
+  },
+
+  payment: {
+    bank: { x: 39.2, y: 183.2, maxW: 80 },
+    accountName: { x: 54.4, y: 190.7, maxW: 135 },
+    sortCode: { x: 39.2, y: 198.0, maxW: 80 },
+    accountNumber: { x: 51.8, y: 205.3, maxW: 80 },
+    terms: { x: 17.8, y: 213.0, maxW: 175 },
+  },
+
+  notes: {
+    title: { x: 16.0, y: 224.0 },
+    body: { x: 16.0, y: 229.0, maxW: 178, lineH: 4.2, maxLines: 8 },
+  },
+} as const;
+
+function clean(value: string | null | undefined, fallback = "—"): string {
+  const text = String(value ?? "").trim();
+  return text || fallback;
+}
+
 function money(value: number): string {
   return `£${value.toFixed(2)}`;
 }
@@ -53,20 +112,92 @@ function safeDate(iso: string | null | undefined): string {
   });
 }
 
-function clean(value: string | null | undefined): string {
-  const text = String(value ?? "").trim();
-  return text || "—";
+function addDays(dateIso: string | null | undefined, days: number): string {
+  if (!dateIso) return "—";
+  const d = new Date(dateIso);
+  if (Number.isNaN(d.getTime())) return "—";
+  d.setDate(d.getDate() + days);
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function setText(
+  doc: jsPDF,
+  opts: {
+    size: number;
+    style?: "normal" | "bold" | "italic" | "bolditalic";
+    color?: [number, number, number];
+  }
+): void {
+  doc.setFont("helvetica", opts.style ?? "normal");
+  doc.setFontSize(opts.size);
+  const color = opts.color ?? DARK;
+  doc.setTextColor(color[0], color[1], color[2]);
+}
+
+function fitSingleLine(
+  doc: jsPDF,
+  text: string,
+  maxWidth: number,
+  opts: {
+    size: number;
+    style?: "normal" | "bold";
+    color?: [number, number, number];
+  }
+): string {
+  setText(doc, opts);
+  if (doc.getTextWidth(text) <= maxWidth) return text;
+
+  let out = text;
+  while (out.length > 0 && doc.getTextWidth(`${out}…`) > maxWidth) {
+    out = out.slice(0, -1);
+  }
+  return out ? `${out}…` : "";
+}
+
+function splitAddressLines(address?: string): string[] {
+  if (!address?.trim()) return [];
+  const parts = address
+    .split(/\n|,/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return parts;
+}
+
+function clipLines(
+  doc: jsPDF,
+  text: string,
+  maxWidth: number,
+  maxLines: number,
+  opts: {
+    size: number;
+    style?: "normal" | "bold";
+    color?: [number, number, number];
+  }
+): string[] {
+  setText(doc, opts);
+  const raw = doc.splitTextToSize(text, maxWidth) as string[];
+  if (raw.length <= maxLines) return raw;
+
+  const clipped = raw.slice(0, maxLines);
+  clipped[maxLines - 1] = fitSingleLine(doc, clipped[maxLines - 1], maxWidth, opts);
+  return clipped;
 }
 
 async function loadImageAsBase64(url: string): Promise<string | null> {
   try {
-    const r = await fetch(url, { mode: "cors" });
-    if (!r.ok) return null;
-    const blob = await r.blob();
+    const response = await fetch(url, { mode: "cors" });
+    if (!response.ok) return null;
+
+    const blob = await response.blob();
     return await new Promise<string | null>((resolve) => {
       const reader = new FileReader();
-      reader.onloadend = () =>
+      reader.onloadend = () => {
         resolve(typeof reader.result === "string" ? reader.result : null);
+      };
       reader.onerror = () => resolve(null);
       reader.readAsDataURL(blob);
     });
@@ -75,354 +206,273 @@ async function loadImageAsBase64(url: string): Promise<string | null> {
   }
 }
 
-function setText(
-  doc: jsPDF,
-  size: number,
-  style: "normal" | "bold" = "normal",
-  color: readonly [number, number, number] = DARK
-) {
-  doc.setFont("helvetica", style);
-  doc.setFontSize(size);
-  doc.setTextColor(color[0], color[1], color[2]);
+function addTemplateBackground(doc: jsPDF, templateData: string): void {
+  doc.addImage(templateData, "PNG", 0, 0, PAGE_W, PAGE_H);
 }
 
-function fitSingleLine(
-  doc: jsPDF,
-  text: string,
-  maxWidth: number,
-  fontSize: number,
-  style: "normal" | "bold" = "normal"
-): string {
-  setText(doc, fontSize, style, DARK);
-  if (doc.getTextWidth(text) <= maxWidth) return text;
+function getVisibleItems(data: InvoiceData): InvoiceLineItem[] {
+  if (data.lineItems.length > 0) return data.lineItems.slice(0, POS.table.maxRows);
 
-  let t = text;
-  while (t.length > 0 && doc.getTextWidth(`${t}…`) > maxWidth) {
-    t = t.slice(0, -1);
-  }
-  return t ? `${t}…` : "";
+  return [
+    {
+      description: getFallbackDescription(data),
+      quantity: 1,
+      unitPrice: 0,
+    },
+  ];
 }
 
-function splitAddressLines(address?: string): string[] {
-  if (!address?.trim()) return [];
-  const parts = address
-    .split(/\n|,/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-  return parts.length ? parts : [address];
+function getFallbackDescription(data: InvoiceData): string {
+  const parts = [
+    "Vehicle transportation",
+    data.vehicleReg ? `– ${data.vehicleReg}` : "",
+    data.route ? `– ${data.route}` : "",
+    data.jobRef ? `– Job ${data.jobRef}` : "",
+  ].filter(Boolean);
+
+  return parts.join(" ");
 }
 
-function drawPageShell(doc: jsPDF) {
-  const pageW = doc.internal.pageSize.getWidth();
-  const pageH = doc.internal.pageSize.getHeight();
-
-  doc.setFillColor(PAGE_BG[0], PAGE_BG[1], PAGE_BG[2]);
-  doc.rect(0, 0, pageW, pageH, "F");
-
-  const sheetX = PAGE_MARGIN;
-  const sheetY = PAGE_MARGIN;
-  const sheetW = pageW - PAGE_MARGIN * 2;
-  const sheetH = pageH - PAGE_MARGIN * 2 - 5;
-
-  doc.setFillColor(WHITE[0], WHITE[1], WHITE[2]);
-  doc.setDrawColor(227, 231, 236);
-  doc.setLineWidth(0.2);
-  doc.roundedRect(sheetX, sheetY, sheetW, sheetH, 1, 1, "FD");
-
-  return { pageW, pageH, sheetX, sheetY, sheetW, sheetH };
+function getSubtotal(data: InvoiceData): number {
+  return data.lineItems.reduce((sum, item) => {
+    const qty = Number(item.quantity) || 0;
+    const unitPrice = Number(item.unitPrice) || 0;
+    return sum + qty * unitPrice;
+  }, 0);
 }
 
-function drawHeader(doc: jsPDF, pageW: number, invoiceNumber: string, logo: string | null) {
-  const x = PAGE_MARGIN;
-  const y = PAGE_MARGIN;
-  const w = pageW - PAGE_MARGIN * 2;
-  const h = 40;
-
-  doc.setFillColor(NAVY[0], NAVY[1], NAVY[2]);
-  doc.rect(x, y, w, h, "F");
-
-  doc.setFillColor(NAVY_RIGHT[0], NAVY_RIGHT[1], NAVY_RIGHT[2]);
-  doc.rect(x + w * 0.56, y, w * 0.44, h, "F");
-
-  if (logo) {
-    try {
-      doc.addImage(logo, "PNG", 14, 11.5, 54, 27.5);
-    } catch {
-      // ignore
-    }
-  }
-
-  setText(doc, 24, "bold", WHITE);
-  doc.text("INVOICE", pageW - 18, 21, { align: "right" });
-
-  setText(doc, 10.8, "bold", WHITE);
-  doc.text(invoiceNumber, pageW - 18, 29.6, { align: "right" });
-
-  return 58;
+function getVatRate(data: InvoiceData): number {
+  if (typeof data.vatRate === "number") return data.vatRate;
+  const itemVat = data.lineItems.find((i) => typeof i.vatRate === "number")?.vatRate;
+  return typeof itemVat === "number" ? itemVat : 0;
 }
 
-function drawCards(doc: jsPDF, pageW: number, data: InvoiceData) {
-  const gap = 4;
-  const cardX = INNER_X;
-  const totalInnerW = pageW - INNER_X * 2;
-  const cardW = (totalInnerW - gap) / 2;
-  const leftX = cardX;
-  const rightX = leftX + cardW + gap;
-  const topY = 58;
-  const cardH = 27;
-
-  doc.setFillColor(SOFT[0], SOFT[1], SOFT[2]);
-  doc.setDrawColor(LINE[0], LINE[1], LINE[2]);
-  doc.setLineWidth(0.2);
-  doc.roundedRect(leftX, topY, cardW, cardH, 1.2, 1.2, "FD");
-  doc.roundedRect(rightX, topY, cardW, cardH, 1.2, 1.2, "FD");
-
-  // left card
-  setText(doc, 8.6, "normal", MID);
-  doc.text("Invoice No:", leftX + 4, topY + 9.5);
-  doc.text("Date:", leftX + 4, topY + 19.2);
-
-  doc.setDrawColor(LINE[0], LINE[1], LINE[2]);
-  doc.setLineWidth(0.18);
-  doc.line(leftX + 4, topY + 12.6, leftX + cardW - 4, topY + 12.6);
-
-  setText(doc, 9.6, "normal", DARK);
-  doc.text(
-    fitSingleLine(doc, clean(data.invoiceNumber), 46, 9.6, "normal"),
-    leftX + 36,
-    topY + 9.5
-  );
-  doc.text(
-    fitSingleLine(doc, safeDate(data.issueDate), 46, 9.6, "normal"),
-    leftX + 36,
-    topY + 19.2
-  );
-
-  // right card
-  setText(doc, 8.7, "bold", DARK);
-  doc.text("BILL TO", rightX + 4, topY + 9);
-
-  doc.line(rightX + 4, topY + 12.6, rightX + cardW - 4, topY + 12.6);
-
+function buildBillToLines(data: InvoiceData): string[] {
   const lines: string[] = [];
-  if (data.clientName) lines.push(data.clientName);
-  if (data.clientCompany) lines.push(data.clientCompany);
-  lines.push(...splitAddressLines(data.clientAddress));
+  if (data.clientName?.trim()) lines.push(data.clientName.trim());
+  if (data.clientCompany?.trim()) lines.push(data.clientCompany.trim());
 
-  let y = topY + 17.5;
-  for (let i = 0; i < Math.min(lines.length, 3); i++) {
-    setText(doc, 9.5, i === 0 ? "bold" : "normal", DARK);
-    doc.text(
-      fitSingleLine(doc, lines[i], cardW - 8, 9.5, i === 0 ? "bold" : "normal"),
-      rightX + 4,
-      y
-    );
-    y += 5.7;
-  }
+  const addressLines = splitAddressLines(data.clientAddress);
+  lines.push(...addressLines);
 
-  return topY + cardH + 8;
+  return lines.slice(0, 4);
 }
 
-function drawTable(doc: jsPDF, pageW: number, startY: number, data: InvoiceData) {
-  const x = INNER_X;
-  const w = pageW - INNER_X * 2;
+function drawInvoiceMeta(doc: jsPDF, data: InvoiceData): void {
+  setText(doc, { size: 10.8, style: "bold", color: WHITE });
+  doc.text(
+    fitSingleLine(doc, clean(data.invoiceNumber), POS.invoiceNoTopRight.maxW, {
+      size: 10.8,
+      style: "bold",
+      color: WHITE,
+    }),
+    POS.invoiceNoTopRight.x,
+    POS.invoiceNoTopRight.y,
+    { align: "right" }
+  );
 
-  const descW = 107;
-  const qtyW = 16;
-  const rateW = 22;
-  const totalW = w - descW - qtyW - rateW;
+  setText(doc, { size: 9.5, style: "normal", color: DARK });
+  doc.text(
+    fitSingleLine(doc, clean(data.invoiceNumber), POS.leftCard.invoiceNo.maxW, {
+      size: 9.5,
+      style: "normal",
+    }),
+    POS.leftCard.invoiceNo.x,
+    POS.leftCard.invoiceNo.y
+  );
 
-  const xDesc = x;
-  const xQty = xDesc + descW;
-  const xRate = xQty + qtyW;
-  const xTotal = xRate + rateW;
-
-  const headH = 9;
-  const rowH = 10.6;
-
-  doc.setFillColor(SOFT[0], SOFT[1], SOFT[2]);
-  doc.setDrawColor(LINE[0], LINE[1], LINE[2]);
-  doc.setLineWidth(0.2);
-  doc.rect(x, startY, w, headH, "FD");
-
-  setText(doc, 8.7, "bold", DARK);
-  doc.text("Description", xDesc + 4, startY + 5.8);
-  doc.text("Qty", xQty + qtyW / 2, startY + 5.8, { align: "center" });
-  doc.text("Rate", xRate + rateW / 2, startY + 5.8, { align: "center" });
-  doc.text("Total", xTotal + totalW / 2, startY + 5.8, { align: "center" });
-
-  const item = data.lineItems[0];
-  const subtotal = data.lineItems.reduce((s, li) => s + li.quantity * li.unitPrice, 0);
-
-  const desc = item
-    ? item.description
-    : [data.vehicleReg, data.route].filter(Boolean).join(" — ") || "Vehicle transportation";
-
-  setText(doc, 8.9, "normal", DARK);
-  doc.text(fitSingleLine(doc, desc, descW - 8, 8.9, "normal"), xDesc + 4, startY + headH + 6.2);
-
-  setText(doc, 8.9, "bold", DARK);
-  doc.text(String(item?.quantity ?? 1), xQty + qtyW / 2, startY + headH + 6.2, { align: "center" });
-  doc.text(money(item?.unitPrice ?? subtotal), xRate + rateW - 4, startY + headH + 6.2, { align: "right" });
-  doc.text(money(item ? item.quantity * item.unitPrice : subtotal), xTotal + totalW - 4, startY + headH + 6.2, {
-    align: "right",
-  });
-
-  doc.setDrawColor(LINE[0], LINE[1], LINE[2]);
-  doc.setLineWidth(0.2);
-  doc.line(x, startY + headH + rowH, x + w, startY + headH + rowH);
-
-  return startY + headH + rowH + 14;
+  doc.text(
+    fitSingleLine(doc, safeDate(data.issueDate), POS.leftCard.date.maxW, {
+      size: 9.5,
+      style: "normal",
+    }),
+    POS.leftCard.date.x,
+    POS.leftCard.date.y
+  );
 }
 
-function drawTotals(doc: jsPDF, pageW: number, y: number, data: InvoiceData) {
-  const vatRate = data.vatRate ?? 0;
-  const subtotal = data.lineItems.reduce((s, li) => s + li.quantity * li.unitPrice, 0);
-  const vat = subtotal * (vatRate / 100);
-  const total = subtotal + vat;
+function drawBillTo(doc: jsPDF, data: InvoiceData): void {
+  const lines = buildBillToLines(data);
 
-  const boxW = 58;
-  const boxX = pageW - INNER_X - boxW;
-  const rightX = pageW - INNER_X - 5;
-  const labelX = boxX + 7;
-
-  doc.setDrawColor(LINE[0], LINE[1], LINE[2]);
-  doc.setLineWidth(0.2);
-  doc.line(INNER_X, y, pageW - INNER_X, y);
-
-  y += 8.5;
-
-  setText(doc, 9, "normal", MID);
-  doc.text("Subtotal", labelX, y);
-  setText(doc, 9, "bold", DARK);
-  doc.text(money(subtotal), rightX, y, { align: "right" });
-
-  y += 8;
-  setText(doc, 9, "normal", MID);
-  doc.text(`VAT (${vatRate}%)`, labelX, y);
-  setText(doc, 9, "bold", DARK);
-  doc.text(money(vat), rightX, y, { align: "right" });
-
-  y += 6;
-  doc.setDrawColor(LINE[0], LINE[1], LINE[2]);
-  doc.line(boxX, y, pageW - INNER_X, y);
-
-  y += 3.5;
-
-  doc.setFillColor(SOFT[0], SOFT[1], SOFT[2]);
-  doc.setDrawColor(182, 190, 201);
-  doc.rect(boxX, y, boxW, 11, "FD");
-
-  setText(doc, 10.2, "bold", DARK);
-  doc.text("Total:", labelX, y + 7);
-
-  setText(doc, 13, "bold", TOTAL_BLUE);
-  doc.text(money(total), rightX, y + 7, { align: "right" });
-
-  return y + 17;
-}
-
-function drawPayment(doc: jsPDF, pageW: number, y: number) {
-  doc.setDrawColor(LINE[0], LINE[1], LINE[2]);
-  doc.setLineWidth(0.2);
-  doc.line(INNER_X, y, pageW - INNER_X, y);
-
-  y += 7.5;
-  setText(doc, 10, "bold", DARK);
-  doc.text("Payment Information", INNER_X + 2, y);
-
-  y += 4.5;
-  doc.line(INNER_X + 2, y, pageW - INNER_X, y);
-
-  const rows: Array<[string, string, "normal" | "bold"]> = [
-    ["Bank :", "Lloyds Bank", "normal"],
-    ["Account Name:", "Terrence Tapfumaneyi trading as Axentra Vehicle Logistics", "bold"],
-    ["Sort Code:", "04-00-03", "bold"],
-    ["Account Number:", "24861835", "normal"],
+  const targets = [
+    POS.rightCard.line1,
+    POS.rightCard.line2,
+    POS.rightCard.line3,
+    POS.rightCard.line4,
   ];
 
-  y += 6.5;
+  lines.forEach((line, idx) => {
+    const target = targets[idx];
+    if (!target) return;
 
-  for (const [label, value, style] of rows) {
-    setText(doc, 9, "normal", DARK);
-    doc.text(label, INNER_X + 2, y);
+    const isFirst = idx === 0;
+    doc.setFont("helvetica", isFirst ? "bold" : "normal");
+    doc.setFontSize(isFirst ? 9.5 : 9.3);
+    doc.setTextColor(DARK[0], DARK[1], DARK[2]);
 
-    const labelW = doc.getTextWidth(label) + 2;
-    setText(doc, 9, style, DARK);
     doc.text(
-      fitSingleLine(doc, value, pageW - INNER_X - (INNER_X + 2 + labelW), 9, style),
-      INNER_X + 2 + labelW,
+      fitSingleLine(doc, line, target.maxW, {
+        size: isFirst ? 9.5 : 9.3,
+        style: isFirst ? "bold" : "normal",
+      }),
+      target.x,
+      target.y
+    );
+  });
+}
+
+function drawLineItems(doc: jsPDF, data: InvoiceData): void {
+  const items = getVisibleItems(data);
+
+  items.forEach((item, idx) => {
+    const y = POS.table.startY + idx * POS.table.rowGap;
+    const lineTotal = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0);
+
+    setText(doc, { size: 8.8, style: "normal", color: DARK });
+    doc.text(
+      fitSingleLine(doc, clean(item.description, getFallbackDescription(data)), POS.table.description.maxW, {
+        size: 8.8,
+        style: "normal",
+      }),
+      POS.table.description.x,
       y
     );
 
-    y += 7;
-    doc.setDrawColor(232, 236, 241);
-    doc.setLineWidth(0.15);
-    doc.line(INNER_X + 2, y - 2.2, pageW - INNER_X, y - 2.2);
-  }
-
-  y += 3;
-  setText(doc, 8.2, "normal", MID);
-  doc.text("Please use invoice number as payment reference.", INNER_X + 2, y);
-
-  return y + 2;
+    setText(doc, { size: 8.8, style: "bold", color: DARK });
+    doc.text(String(Number(item.quantity) || 0), POS.table.qty.x, y, { align: "center" });
+    doc.text(money(Number(item.unitPrice) || 0), POS.table.rate.x, y, { align: "right" });
+    doc.text(money(lineTotal), POS.table.total.x, y, { align: "right" });
+  });
 }
 
-function drawNotes(doc: jsPDF, pageW: number, y: number, notes?: string) {
-  if (!notes?.trim()) return y;
+function drawTotals(doc: jsPDF, data: InvoiceData): void {
+  const subtotal = getSubtotal(data);
+  const vatRate = getVatRate(data);
+  const vatAmount = subtotal * (vatRate / 100);
+  const total = subtotal + vatAmount;
 
-  y += 8;
-  setText(doc, 9, "bold", DARK);
-  doc.text("Notes", INNER_X, y);
+  setText(doc, { size: 9.0, style: "bold", color: DARK });
+  doc.text(money(subtotal), POS.totals.subtotal.x, POS.totals.subtotal.y, { align: "right" });
+  doc.text(money(vatAmount), POS.totals.vat.x, POS.totals.vat.y, { align: "right" });
 
-  y += 5;
-  setText(doc, 8.2, "normal", MID);
-  const lines = doc.splitTextToSize(notes, pageW - INNER_X * 2);
-  doc.text(lines, INNER_X, y);
-
-  return y + lines.length * 4.2;
+  setText(doc, { size: 13.0, style: "bold", color: BLUE });
+  doc.text(money(total), POS.totals.total.x, POS.totals.total.y, { align: "right" });
 }
 
-function drawFooter(doc: jsPDF, pageW: number) {
-  const totalPages = doc.getNumberOfPages();
+function drawPaymentDetails(doc: jsPDF, data: InvoiceData): void {
+  setText(doc, { size: 9.0, style: "normal", color: DARK });
+  doc.text(
+    fitSingleLine(doc, AXENTRA_BANK.bankName, POS.payment.bank.maxW, {
+      size: 9.0,
+      style: "normal",
+    }),
+    POS.payment.bank.x,
+    POS.payment.bank.y
+  );
 
-  for (let p = 1; p <= totalPages; p++) {
-    doc.setPage(p);
-    const pageH = doc.internal.pageSize.getHeight();
+  setText(doc, { size: 9.0, style: "bold", color: DARK });
+  doc.text(
+    fitSingleLine(doc, AXENTRA_BANK.accountName, POS.payment.accountName.maxW, {
+      size: 9.0,
+      style: "bold",
+    }),
+    POS.payment.accountName.x,
+    POS.payment.accountName.y
+  );
 
-    setText(doc, 7, "normal", [155, 163, 175]);
-    doc.text(
-      "Axentra Vehicle Logistics · axentravehicles.com · info@axentravehicles.com",
-      pageW / 2,
-      pageH - FOOTER_Y_OFFSET,
-      { align: "center" }
-    );
-    doc.text(`Page ${p}/${totalPages}`, pageW - INNER_X, pageH - FOOTER_Y_OFFSET, {
-      align: "right",
-    });
+  doc.text(
+    fitSingleLine(doc, AXENTRA_BANK.sortCode, POS.payment.sortCode.maxW, {
+      size: 9.0,
+      style: "bold",
+    }),
+    POS.payment.sortCode.x,
+    POS.payment.sortCode.y
+  );
+
+  setText(doc, { size: 9.0, style: "normal", color: DARK });
+  doc.text(
+    fitSingleLine(doc, AXENTRA_BANK.accountNumber, POS.payment.accountNumber.maxW, {
+      size: 9.0,
+      style: "normal",
+    }),
+    POS.payment.accountNumber.x,
+    POS.payment.accountNumber.y
+  );
+
+  const termsText =
+    data.paymentTerms?.trim()
+      ? `${data.paymentTerms.trim()} Please use invoice number as payment reference.`
+      : AXENTRA_BANK.paymentTermsText;
+
+  const termsLines = clipLines(doc, termsText, POS.payment.terms.maxW, 2, {
+    size: 8.6,
+    style: "normal",
+    color: DARK,
+  });
+
+  if (termsLines.length > 0) {
+    setText(doc, { size: 8.6, style: "bold", color: DARK });
+    const firstLine = termsLines[0];
+    const prefix = "Payable within 7 days.";
+    if (firstLine.startsWith(prefix)) {
+      doc.text(prefix, POS.payment.terms.x, POS.payment.terms.y);
+      setText(doc, { size: 8.6, style: "normal", color: DARK });
+      const rest = firstLine.slice(prefix.length).trim();
+      if (rest) {
+        doc.text(rest, POS.payment.terms.x + 40.5, POS.payment.terms.y);
+      }
+    } else {
+      setText(doc, { size: 8.6, style: "normal", color: DARK });
+      doc.text(firstLine, POS.payment.terms.x, POS.payment.terms.y);
+    }
+
+    if (termsLines[1]) {
+      setText(doc, { size: 8.6, style: "normal", color: DARK });
+      doc.text(termsLines[1], POS.payment.terms.x, POS.payment.terms.y + 4.2);
+    }
   }
+}
+
+function drawNotes(doc: jsPDF, notes?: string): void {
+  if (!notes?.trim()) return;
+
+  setText(doc, { size: 9.0, style: "bold", color: DARK });
+  doc.text("Notes", POS.notes.title.x, POS.notes.title.y);
+
+  const lines = clipLines(doc, notes.trim(), POS.notes.body.maxW, POS.notes.body.maxLines, {
+    size: 8.2,
+    style: "normal",
+    color: MID,
+  });
+
+  setText(doc, { size: 8.2, style: "normal", color: MID });
+  doc.text(lines, POS.notes.body.x, POS.notes.body.y, {
+    lineHeightFactor: 1.0,
+  });
 }
 
 export async function generateInvoicePdf(data: InvoiceData): Promise<Blob> {
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const { pageW } = drawPageShell(doc);
+  const doc = new jsPDF({
+    unit: "mm",
+    format: "a4",
+    compress: true,
+  });
 
-  const logoData =
-    (await loadImageAsBase64("/axentra-logo-white.png")) ||
-    (await loadImageAsBase64("/axentra-logo-dark.png")) ||
-    (await loadImageAsBase64("/axentra-logo.png"));
-
-  let y = drawHeader(doc, pageW, clean(data.invoiceNumber), logoData);
-  y = drawCards(doc, pageW, data);
-  y = drawTable(doc, pageW, y, data);
-  y = drawTotals(doc, pageW, y, data);
-  y = drawPayment(doc, pageW, y);
-
-  if (data.notes) {
-    y = drawNotes(doc, pageW, y, data.notes);
+  const templateData = await loadImageAsBase64(TEMPLATE_PATH);
+  if (!templateData) {
+    throw new Error(
+      `Missing invoice template. Add the approved file to ${TEMPLATE_PATH}`
+    );
   }
 
-  drawFooter(doc, pageW);
+  addTemplateBackground(doc, templateData);
+  drawInvoiceMeta(doc, data);
+  drawBillTo(doc, data);
+  drawLineItems(doc, data);
+  drawTotals(doc, data);
+  drawPaymentDetails(doc, data);
+  drawNotes(doc, data.notes);
+
   return doc.output("blob");
 }
 
@@ -433,7 +483,7 @@ export async function downloadInvoicePdf(data: InvoiceData): Promise<void> {
   try {
     const a = document.createElement("a");
     a.href = url;
-    a.download = `AXENTRA_INV_${data.invoiceNumber}.pdf`;
+    a.download = `AXENTRA_INV_${clean(data.invoiceNumber, "INVOICE")}.pdf`;
     a.click();
   } finally {
     URL.revokeObjectURL(url);
