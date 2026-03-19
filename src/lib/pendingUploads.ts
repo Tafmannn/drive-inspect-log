@@ -250,6 +250,7 @@ export async function addPendingUpload(
     inspectionId: args.inspectionId ?? null,
     jobNumber: args.jobNumber ?? null,
     vehicleReg: args.vehicleReg ?? null,
+    damageItemId: args.damageItemId ?? null,
   };
 
   const all = loadAll();
