@@ -152,7 +152,6 @@ export const PhotoViewer = ({ photos, title }: PhotoViewerProps) => {
                   className="max-w-full max-h-full object-contain transition-transform duration-200"
                   style={{ transform: `scale(${zoom})` }}
                   draggable={false}
-                  crossOrigin="anonymous"
                   onError={(e) => {
                     const target = e.currentTarget;
                     target.style.display = 'none';

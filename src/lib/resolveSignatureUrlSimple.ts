@@ -1,9 +1,10 @@
 /**
  * Simple signature URL resolver.
- * Tries Supabase signed URL first; falls back to GCS proxy for
- * files uploaded via gcsStorageService.
+ * Tries Supabase signed URL first; falls back to GCS tokenized proxy URL
+ * for files uploaded via gcsStorageService.
  *
- * No edge function dependency. Single active resolution path.
+ * No edge function dependency for resolution. Returns a URL the browser
+ * can use directly (no redirect: manual fetch).
  */
 import { supabase } from '@/integrations/supabase/client';
 
@@ -78,7 +79,7 @@ export async function resolveSignatureUrlSimple(
     });
   }
 
-  // 2) GCS proxy fallback — file was uploaded via gcsStorageService
+  // 2) GCS proxy fallback — return tokenized URL directly (no fetch/redirect)
   try {
     const token = await getToken();
     if (!token) {
@@ -86,30 +87,11 @@ export async function resolveSignatureUrlSimple(
       return null;
     }
 
-    const proxyUrl = `${GCS_PROXY}?path=${encodeURIComponent(path)}`;
-    const res = await fetch(proxyUrl, {
-      headers: { Authorization: `Bearer ${token}` },
-      redirect: 'manual',
-    });
-
-    if (res.status === 302 || res.status === 301) {
-      const location = res.headers.get('Location');
-      if (location) {
-        console.info('[SigSimple] GCS proxy redirect OK', { path: path.slice(0, 80) });
-        return location;
-      }
-    }
-
-    if (res.ok) {
-      const url = `${proxyUrl}&token=${encodeURIComponent(token)}`;
-      console.info('[SigSimple] GCS proxy direct OK', { path: path.slice(0, 80) });
-      return url;
-    }
-
-    console.error('[SigSimple] GCS proxy failed', { status: res.status, path: path.slice(0, 80) });
-    return null;
+    const url = `${GCS_PROXY}?path=${encodeURIComponent(path)}&token=${encodeURIComponent(token)}`;
+    console.info('[SigSimple] GCS proxy tokenized URL built', { path: path.slice(0, 80) });
+    return url;
   } catch (err) {
-    console.error('[SigSimple] GCS proxy threw', {
+    console.error('[SigSimple] GCS proxy URL build threw', {
       error: err instanceof Error ? err.message : String(err),
     });
     return null;

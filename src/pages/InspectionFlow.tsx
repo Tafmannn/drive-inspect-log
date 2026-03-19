@@ -302,7 +302,7 @@ export const InspectionFlow = () => {
     setFormState(prev => ({
       ...prev,
       customerName: prev.customerName || contactName || "",
-      driverName: prev.driverName || "Driver",
+      driverName: prev.driverName || job.resolvedDriverName || job.driver_name || "",
     }));
   }, [job, type]);
 
