@@ -23,22 +23,22 @@ const AXENTRA_BANK = {
 
 // Locked overlay coordinates tuned for your template
 const POS = {
-  invoiceNoTopRight: { x: 186.0, y: 52.0, maxW: 34 },
+  invoiceNoTopRight: { x: 186.0, y: 55.0, maxW: 34 },
 
   leftCard: {
-    invoiceNo: { x: 48.0, y: 69.0, maxW: 38 },
-    date: { x: 34.0, y: 77.0, maxW: 38 },
+    invoiceNo: { x: 48.0, y: 75.0, maxW: 38 },
+    date: { x: 34.0, y: 82.0, maxW: 38 },
   },
 
   rightCard: {
-    line1: { x: 112.8, y: 72.0, maxW: 74 },
-    line2: { x: 112.8, y: 78.0, maxW: 74 },
-    line3: { x: 112.8, y: 84.0, maxW: 74 },
-    line4: { x: 112.8, y: 90.0, maxW: 74 },
+    line1: { x: 112.8, y: 78.0, maxW: 74 },
+    line2: { x: 112.8, y: 84.0, maxW: 74 },
+    line3: { x: 112.8, y: 90.0, maxW: 74 },
+    line4: { x: 112.8, y: 96.0, maxW: 74 },
   },
 
   table: {
-    startY: 109.0,
+    startY: 117.0,
     rowGap: 8.0,
     description: { x: 25.0, maxW: 101 },
     qty: { x: 139.2 },
@@ -48,9 +48,9 @@ const POS = {
   },
 
   totals: {
-    subtotal: { x: 189.4, y: 148.0 },
-    vat: { x: 189.4, y: 155.0 },
-    total: { x: 189.4, y: 166.0 },
+    subtotal: { x: 189.4, y: 156.0 },
+    vat: { x: 189.4, y: 163.0 },
+    total: { x: 189.4, y: 174.0 },
   },
 
   payment: {
@@ -62,8 +62,8 @@ const POS = {
   },
 
   notes: {
-    title: { x: 16.0, y: 230.0 },
-    body: { x: 16.0, y: 235.0, maxW: 178, lineH: 4.2, maxLines: 8 },
+    title: { x: 16.0, y: 248.0 },
+    body: { x: 16.0, y: 253.0, maxW: 178, lineH: 4.2, maxLines: 8 },
   },
 } as const;
 
