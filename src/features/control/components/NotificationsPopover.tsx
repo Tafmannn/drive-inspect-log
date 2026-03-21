@@ -79,7 +79,7 @@ export function NotificationsPopover() {
                 >
                   <p className="text-xs font-medium truncate">{ex.title}</p>
                   <p className="text-[11px] text-muted-foreground truncate mt-0.5">
-                    {ex.description}
+                    {ex.detail}
                   </p>
                   <div className="flex items-center gap-2 mt-1">
                     <Badge
