@@ -1,48 +1,92 @@
 
 
-## Fix Invoice PDF Overlay Alignment
+## Complete Control Centre Unfinished Surfaces
 
-### Problem Analysis (comparing template vs generated PDF)
+Five distinct gaps in the Control Centre need resolution, ordered by dependency.
 
-1. **Top-right invoice number overlaps "INVOICE" heading**: The white `INV-AX26-1003` text at y:47 is rendering directly ON TOP of the template's static "INVOICE" text (~y:36-45). It needs to sit below the underline, around y:52.
+---
 
-2. **Left card "Invoice No:" value misaligned**: The template's "Invoice No:" label baseline is at ~68mm. The value at y:77.5 sits a full line below instead of on the same baseline. Should be ~y:69.
+### 1. Compliance Data Flow (`/control/compliance`)
 
-3. **Left card "Date:" value misaligned**: Same issue — the "Date:" label is at ~76mm, value at y:87.5 is too low. Should be ~y:77.
+**Problem**: Page renders permanent loading skeletons with no data hook.
 
-4. **Bill To lines**: With the left card fixes, the right card lines also need to come up slightly. First line at y:86.5 is a touch low below "BILL TO" heading (~y:64). Adjusting to start at ~y:72 with 6mm spacing.
+**Solution**: Create `useControlComplianceData.ts` hook querying:
+- `inspections` table: count last 30 days, grouped by type (pickup/delivery)
+- `damage_items` table: count where no resolution (unresolved = all, since there's no resolution column -- count open damage reports)
+- Compliance rate = jobs with both pickup + delivery inspection / total completed jobs (last 30d)
 
-5. **Table startY too low**: Template header row baseline is at ~100mm. With startY:124 the first data row is 24mm below the header — too much gap. Should be ~108-110.
+Recent inspections table: last 20 inspections joined with job `vehicle_reg`, showing type, date, has_damage flag.
 
-6. **Totals drift**: Follow the table shift upward proportionally.
+Outstanding issues table: damage items with inspection details, ordered by recency.
 
-7. **Payment section**: Template already contains ALL payment text as static pixels. `drawPaymentDetails` is correctly not called. No change needed.
+**Files**:
+- New: `src/features/control/hooks/useControlComplianceData.ts` -- three react-query hooks (`useComplianceKpis`, `useRecentInspections`, `useOutstandingDamage`)
+- Edit: `src/features/control/pages/ControlCompliance.tsx` -- replace skeleton UI with KpiStrip + two CompactTable sections using ControlShell pattern (matching other control pages)
 
-### Coordinate Corrections (POS object only)
+---
 
-```
-invoiceNoTopRight.y:    47.0  →  52.0    (below INVOICE underline)
+### 2. Super Admin Quick Action Routing
 
-leftCard.invoiceNo:     x:48, y:77.5  →  x:48, y:69.0   (same baseline as label)
-leftCard.date:          x:34, y:87.5  →  x:34, y:77.0   (same baseline as label)
+**Problem**: All quick actions navigate to `/super-admin` instead of specific sub-pages.
 
-rightCard.line1.y:      86.5  →  72.0   (below BILL TO + padding)
-rightCard.line2.y:      92.5  →  78.0
-rightCard.line3.y:      98.5  →  84.0
-rightCard.line4.y:      104.5 →  90.0
+**Solution**: Fix the `quickActions` array in `ControlSuperAdmin.tsx`:
 
-table.startY:           124.0  →  109.0  (first body row, just below header)
-table.rowGap:           8.5    →  8.0
+| Action | Current Target | Correct Target |
+|---|---|---|
+| Create Org | `/super-admin` | `/super-admin/orgs` |
+| Manage Users | `/super-admin` | `/super-admin/users` |
+| Review Audit | `/super-admin` | `/super-admin/audit` |
+| Review Exceptions | `/super-admin` | `/super-admin/attention` |
+| Export Report | no-op, disabled | Implement CSV export of orgs+users summary, or keep disabled with tooltip |
 
-totals.subtotal.y:      158.0  →  148.0
-totals.vat.y:           166.0  →  155.0
-totals.total.y:         178.0  →  166.0
+**Files**:
+- Edit: `src/features/control/pages/ControlSuperAdmin.tsx` -- fix 4 navigate targets (lines 63-67), implement basic export or add descriptive tooltip
 
-notes.title.y:          260.0  →  230.0  (below totals, above payment)
-notes.body.y:           265.0  →  235.0
-```
+---
 
-### Summary
+### 3. Control Topbar Search (Command Palette)
 
-**File**: `src/lib/invoicePdf.ts`
-- Update
+**Problem**: Search button has no onClick, no state, no command palette.
+
+**Solution**: Build a `⌘K` command palette dialog using the existing `Command` component (`src/components/ui/command.tsx`):
+- Opens on button click or `⌘K` / `Ctrl+K`
+- Searches control nav items (from `CONTROL_NAV` config) for quick page navigation
+- Searches jobs by reg/ref (debounced query against `jobs` table, limit 5)
+- Each result navigates on select
+
+**Files**:
+- New: `src/features/control/components/CommandPalette.tsx` -- dialog with cmdk search, nav items + job search
+- Edit: `src/features/control/components/ControlTopbar.tsx` -- add state, onClick to search button, keyboard listener, render CommandPalette
+
+---
+
+### 4. Control Topbar Notifications
+
+**Problem**: Bell button has no state, no source, no popover.
+
+**Solution**: Wire the bell to show a popover/dropdown with the top 5 active attention exceptions (reusing `useAttentionData`). Show unread count badge from exception count.
+
+**Files**:
+- New: `src/features/control/components/NotificationsPopover.tsx` -- Popover with compact exception list, "View all" link to `/control` overview
+- Edit: `src/features/control/components/ControlTopbar.tsx` -- replace static Bell button with NotificationsPopover
+
+---
+
+### 5. Admin Page Migration into Control Shell
+
+**Problem**: `/control/admin` is a redirect shim with a "future update" note.
+
+**Solution**: Embed the `UserIndex` component (already built) directly into ControlAdmin, plus inline `UserDetailEditor` via a slide-out panel or in-page view. Remove the "will be migrated" note.
+
+**Files**:
+- Edit: `src/features/control/pages/ControlAdmin.tsx` -- embed `UserIndex` + `UserDetailEditor` + `CreateUserModal` directly (same pattern as `AdminUsers.tsx` but within ControlShell), keep the org-settings quick link as secondary
+
+---
+
+### Technical Notes
+
+- All data queries use existing Supabase tables (`inspections`, `damage_items`, `jobs`, `attention_acknowledgements`) with existing RLS policies -- no migrations needed.
+- Compliance KPIs use org-scoped queries (RLS handles filtering via `user_org_id()`).
+- Command palette reuses the existing `cmdk`-based Command component already in the project.
+- No new Supabase tables, edge functions, or secrets required.
+
