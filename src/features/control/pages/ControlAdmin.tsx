@@ -1,24 +1,35 @@
 /**
  * Admin page within the Control Centre — /control/admin
- * Provides user management and org settings links.
+ * Embeds full user management directly in the Control shell.
  */
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ControlShell, ControlHeader, ControlSection } from "../components/shared/ControlShell";
 import { QuickActionsBar } from "../components/shared/QuickActionsBar";
 import { useControlAccess } from "../hooks/useControlAccess";
-import { Users, Settings, Building2 } from "lucide-react";
+import { UserIndex } from "@/features/users/components/UserIndex";
+import { UserDetailEditor } from "@/features/users/components/UserDetailEditor";
+import { CreateUserModal } from "@/features/users/components/CreateUserModal";
+import { Building2, Settings } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export function ControlAdmin() {
   const navigate = useNavigate();
   const { canAccessSuperAdmin } = useControlAccess();
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
 
-  const actions = [
-    { label: "User Management", icon: Users, onClick: () => navigate("/admin/users") },
-    { label: "Organisation Settings", icon: Building2, onClick: () => navigate("/admin") },
+  const secondaryActions = [
+    { label: "Organisation Settings", icon: Building2, onClick: () => navigate("/admin"), variant: "outline" as const },
   ];
 
   if (canAccessSuperAdmin) {
-    actions.push({ label: "Super Admin Panel", icon: Settings, onClick: () => navigate("/super-admin") });
+    secondaryActions.push({
+      label: "Super Admin Panel",
+      icon: Settings,
+      onClick: () => navigate("/super-admin"),
+      variant: "outline" as const,
+    });
   }
 
   return (
@@ -26,19 +37,33 @@ export function ControlAdmin() {
       <ControlHeader
         title="Administration"
         subtitle="User management, role assignments, and organisation settings"
+        actions={
+          selectedUserId ? (
+            <Button variant="outline" size="sm" onClick={() => setSelectedUserId(null)}>
+              ← Back to list
+            </Button>
+          ) : undefined
+        }
       />
 
-      <ControlSection title="Quick Access" description="Jump to administration tools">
-        <QuickActionsBar actions={actions} />
+      {/* Secondary quick links */}
+      <QuickActionsBar actions={secondaryActions} />
+
+      {/* Embedded user management */}
+      <ControlSection title="User Management" description="Create, edit, and manage user accounts" flush>
+        <div className="p-4">
+          {selectedUserId ? (
+            <UserDetailEditor userId={selectedUserId} onBack={() => setSelectedUserId(null)} />
+          ) : (
+            <UserIndex
+              onSelectUser={(id) => setSelectedUserId(id)}
+              onCreateUser={() => setCreateOpen(true)}
+            />
+          )}
+        </div>
       </ControlSection>
 
-      <ControlSection title="Note" description="Full admin functionality">
-        <p className="text-xs text-muted-foreground">
-          Detailed user management, role changes, and organisation settings are available via the
-          existing Admin and Super Admin dashboards. Use the quick links above to navigate there.
-          These will be migrated into the Control Centre in a future update.
-        </p>
-      </ControlSection>
+      <CreateUserModal open={createOpen} onOpenChange={setCreateOpen} />
     </ControlShell>
   );
 }
