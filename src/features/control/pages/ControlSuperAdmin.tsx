@@ -60,10 +60,10 @@ export function ControlSuperAdmin() {
   ];
 
   const quickActions = [
-    { label: "Create Org", icon: Plus, onClick: () => navigate("/super-admin"), variant: "outline" as const },
-    { label: "Manage Users", icon: UserPlus, onClick: () => navigate("/super-admin"), variant: "outline" as const },
-    { label: "Review Audit", icon: ScrollText, onClick: () => navigate("/super-admin"), variant: "outline" as const },
-    { label: "Review Exceptions", icon: AlertTriangle, onClick: () => navigate("/super-admin"), variant: "outline" as const },
+    { label: "Create Org", icon: Plus, onClick: () => navigate("/super-admin/orgs"), variant: "outline" as const },
+    { label: "Manage Users", icon: UserPlus, onClick: () => navigate("/super-admin/users"), variant: "outline" as const },
+    { label: "Review Audit", icon: ScrollText, onClick: () => navigate("/super-admin/audit"), variant: "outline" as const },
+    { label: "Review Exceptions", icon: AlertTriangle, onClick: () => navigate("/super-admin/attention"), variant: "outline" as const },
     { label: "Export Report", icon: FileDown, onClick: () => {}, variant: "outline" as const, disabled: true },
   ];
 
