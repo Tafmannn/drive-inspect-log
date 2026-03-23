@@ -26,6 +26,7 @@ import { getPlaceDetails, type BusinessResult } from "@/lib/businessSearchApi";
 import { logClientEvent } from "@/lib/logger";
 import { supabase } from "@/integrations/supabase/client";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ClientPickerCombobox } from "@/features/clients/components/ClientPickerCombobox";
 type ErrorMap = Record<string, string>;
 
 interface JobFormDraft {
@@ -66,6 +67,9 @@ export const JobForm = () => {
   const [selectedDriverName, setSelectedDriverName] = useState<string | null>(null);
   const [driverPickerOpen, setDriverPickerOpen] = useState(false);
   const [driverSearch, setDriverSearch] = useState("");
+
+  // Client linking state
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
 
   // Fetch active drivers for picker
   const { data: activeDrivers } = useQuery({
@@ -485,12 +489,20 @@ export const JobForm = () => {
     try {
       if (isEdit && jobId) {
         await updateMutation.mutateAsync({ jobId, input: payload });
+        if (selectedClientId) {
+          const { linkJobToClient } = await import("@/lib/clientApi");
+          await linkJobToClient(jobId, selectedClientId).catch(() => {});
+        }
         const updRef = payload.external_job_number || jobId.slice(0, 8);
         toast({ title: `Job ${updRef} updated.` });
         navigate(`/jobs/${jobId}`);
       } else {
         if (dk) clearDraft(dk);
         const job = await createMutation.mutateAsync(payload);
+        if (selectedClientId) {
+          const { linkJobToClient } = await import("@/lib/clientApi");
+          await linkJobToClient(job.id, selectedClientId).catch(() => {});
+        }
         const newRef = job.external_job_number || job.id.slice(0, 8);
         toast({ title: `Job ${newRef} created.` });
         navigate(`/jobs/${job.id}`);
@@ -550,6 +562,16 @@ export const JobForm = () => {
             void handleSubmit();
           }}
         >
+          {/* CLIENT PROFILE (optional) */}
+          <div className="space-y-3">
+            <h3 className="font-semibold text-lg">Client Profile</h3>
+            <p className="text-xs text-muted-foreground">Optional — link a billing client to this job.</p>
+            <ClientPickerCombobox
+              value={selectedClientId}
+              onSelect={(id) => setSelectedClientId(id)}
+            />
+          </div>
+
           {/* VEHICLE DETAILS */}
           <div className="space-y-4">
             <h3 className="font-semibold text-lg">

@@ -30,6 +30,7 @@ export const CONTROL_NAV: NavGroup[] = [
     label: "Finance",
     items: [
       { label: "Finance", path: "/control/finance", icon: "PoundSterling" },
+      { label: "Clients", path: "/control/clients", icon: "Building2" },
     ],
   },
   {
