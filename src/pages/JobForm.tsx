@@ -554,6 +554,16 @@ export const JobForm = () => {
             void handleSubmit();
           }}
         >
+          {/* CLIENT PROFILE (optional) */}
+          <div className="space-y-3">
+            <h3 className="font-semibold text-lg">Client Profile</h3>
+            <p className="text-xs text-muted-foreground">Optional — link a billing client to this job.</p>
+            <ClientPickerCombobox
+              value={selectedClientId}
+              onSelect={(id) => setSelectedClientId(id)}
+            />
+          </div>
+
           {/* VEHICLE DETAILS */}
           <div className="space-y-4">
             <h3 className="font-semibold text-lg">
