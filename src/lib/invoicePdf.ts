@@ -226,12 +226,18 @@ function drawHeaderBanner(
   const invNum = sanitize(data.invoiceNumber, "");
   doc.text(invNum, PAGE_W - MARGIN, centerY + 6, { align: "right" });
 
-  // Job ref underneath if present — lighter
+  // Job ref or job count underneath
   if (data.jobRef) {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.5);
     doc.setTextColor(...THEME.headerText);
-    doc.text(`Ref: ${sanitize(data.jobRef)}`, PAGE_W - MARGIN, centerY + 12, { align: "right" });
+    var refLabel = "Ref: " + sanitize(data.jobRef);
+    doc.text(refLabel, PAGE_W - MARGIN, centerY + 12, { align: "right" });
+  } else if (data.lineItems.length > 1) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...THEME.headerText);
+    doc.text(String(data.lineItems.length) + " items", PAGE_W - MARGIN, centerY + 12, { align: "right" });
   }
 
   // Accent line at bottom
