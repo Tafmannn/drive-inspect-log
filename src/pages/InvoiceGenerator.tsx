@@ -167,7 +167,7 @@ export function InvoiceGenerator() {
             setClientCompany(j.delivery_company || j.client_company || "");
             setClientEmail(j.client_email || "");
             setClientAddress(`${j.delivery_address_line1}, ${j.delivery_city} ${j.delivery_postcode}`);
-            const desc = `Vehicle transportation – ${j.vehicle_reg} (${j.vehicle_make} ${j.vehicle_model}) – ${j.pickup_city || "—"} → ${j.delivery_city || "—"}`;
+            const desc = `Vehicle transportation - ${j.vehicle_reg} (${j.vehicle_make} ${j.vehicle_model}) - ${j.pickup_city || "-"} to ${j.delivery_city || "-"}`;
             const price = j.admin_rate || j.total_price || 0;
             setLineItems([{ id: crypto.randomUUID(), description: desc, quantity: 1, unitPrice: Number(price) }]);
 
@@ -220,7 +220,7 @@ export function InvoiceGenerator() {
     notes: notes || undefined,
     jobRef: job?.external_job_number || undefined,
     vehicleReg: job?.vehicle_reg || undefined,
-    route: job ? `${job.pickup_city || "—"} → ${job.delivery_city || "—"}` : undefined,
+    route: job ? `${job.pickup_city || "-"} to ${job.delivery_city || "-"}` : undefined,
   });
 
   const handleGeneratePdf = async () => {

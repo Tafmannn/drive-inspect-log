@@ -141,12 +141,13 @@ function drawHeaderBanner(
   // Logo on left — fit within box
   if (logo) {
     try {
-      const maxW = 38;
-      const maxH = 22;
+      const maxW = 44;
+      const maxH = 30;
       const scale = Math.min(maxW / logo.w, maxH / logo.h);
       const rw = logo.w * scale;
       const rh = logo.h * scale;
-      doc.addImage(logo.dataUrl, logo.format, MARGIN, 8, rw, rh);
+      const logoY = (bannerH - rh) / 2; // vertically center
+      doc.addImage(logo.dataUrl, logo.format, MARGIN, logoY, rw, rh);
     } catch { /* graceful */ }
   }
 
@@ -290,6 +291,7 @@ function buildChargesTable(doc: jsPDF, items: InvoiceLineItem[], y: number): num
       2: { cellWidth: 28, halign: "right" },
       3: { cellWidth: 30, halign: "right" },
     },
+    showHead: "everyPage",
     head: [["Description", "Qty", "Rate", "Total"]],
     body: items.map(item => {
       const qty = Number(item.quantity ?? 1);
@@ -386,7 +388,7 @@ function drawNotes(doc: jsPDF, notes: string | undefined, y: number): number {
 /* ------------------------------------------------------------------ */
 
 function drawPaymentInfo(doc: jsPDF, data: InvoiceData, y: number): number {
-  y = ensureSpace(doc, y, 40);
+  y = ensureSpace(doc, y, 50);
 
   // Title with underline
   doc.setFont("helvetica", "bold");
