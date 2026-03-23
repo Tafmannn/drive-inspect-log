@@ -516,21 +516,41 @@ export function InvoicePrepScreen() {
                 </div>
               </div>
 
-              {/* Info strip */}
-              <div className="flex items-center gap-4 pt-2 text-xs text-muted-foreground">
-                <div className="flex items-center gap-1">
-                  <FileText className="h-3.5 w-3.5" />
-                  {preview.jobCount} job{preview.jobCount !== 1 ? "s" : ""}
+              {/* Info strip + Create button */}
+              <div className="flex items-center justify-between pt-2">
+                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1">
+                    <FileText className="h-3.5 w-3.5" />
+                    {preview.jobCount} job{preview.jobCount !== 1 ? "s" : ""}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Receipt className="h-3.5 w-3.5" />
+                    {preview.receiptCount} receipt{preview.receiptCount !== 1 ? "s" : ""}
+                  </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <Receipt className="h-3.5 w-3.5" />
-                  {preview.receiptCount} receipt{preview.receiptCount !== 1 ? "s" : ""}
-                </div>
-                <div className="flex items-center gap-1">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-success" />
-                  Read-only preview
-                </div>
+                <Button
+                  onClick={handleCreateInvoice}
+                  disabled={createInvoice.isPending || preview.jobCount === 0}
+                  className="gap-2"
+                >
+                  {createInvoice.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                  Create Invoice
+                </Button>
               </div>
+
+              {/* Success banner */}
+              {createdInvoiceNumber && (
+                <div className="flex items-center gap-2.5 p-3 rounded-lg border border-success/30 bg-success/5">
+                  <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
+                  <p className="text-sm text-success font-medium">
+                    Invoice {createdInvoiceNumber} created successfully.
+                  </p>
+                </div>
+              )}
             </div>
           </ControlSection>
         </>
