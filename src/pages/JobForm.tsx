@@ -26,6 +26,7 @@ import { getPlaceDetails, type BusinessResult } from "@/lib/businessSearchApi";
 import { logClientEvent } from "@/lib/logger";
 import { supabase } from "@/integrations/supabase/client";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ClientPickerCombobox } from "@/features/clients/components/ClientPickerCombobox";
 type ErrorMap = Record<string, string>;
 
 interface JobFormDraft {
