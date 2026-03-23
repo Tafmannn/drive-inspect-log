@@ -1,0 +1,173 @@
+/**
+ * Hook: useInvoicePrepData
+ * Fetches eligible (completed, uninvoiced) jobs for a given client.
+ * A job is "eligible" when:
+ *   1. status is a terminal state (completed, pod_ready, delivery_complete)
+ *   2. is_hidden = false
+ *   3. not already linked to an invoice_items row
+ *   4. client_company or client_name matches the selected client
+ */
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import type { Client } from "@/lib/clientApi";
+
+export interface EligibleJob {
+  id: string;
+  external_job_number: string | null;
+  vehicle_reg: string;
+  vehicle_make: string;
+  vehicle_model: string;
+  job_date: string | null;
+  completed_at: string | null;
+  total_price: number | null;
+  distance_miles: number | null;
+  client_company: string | null;
+  client_name: string | null;
+  client_email: string | null;
+  status: string;
+  // receipt count from expenses
+  receiptCount?: number;
+}
+
+const TERMINAL_STATUSES = ["completed", "pod_ready", "delivery_complete"];
+
+export function useEligibleJobs(
+  client: Client | null,
+  opts?: { dateFrom?: string; dateTo?: string }
+) {
+  return useQuery({
+    queryKey: [
+      "invoice-prep-eligible",
+      client?.id ?? null,
+      opts?.dateFrom,
+      opts?.dateTo,
+    ],
+    queryFn: async (): Promise<EligibleJob[]> => {
+      if (!client) return [];
+
+      // 1. Get all completed, visible jobs
+      let query = supabase
+        .from("jobs")
+        .select(
+          "id, external_job_number, vehicle_reg, vehicle_make, vehicle_model, job_date, completed_at, total_price, distance_miles, client_company, client_name, client_email, status"
+        )
+        .eq("is_hidden", false)
+        .in("status", TERMINAL_STATUSES)
+        .order("completed_at", { ascending: false });
+
+      // Date range filters
+      if (opts?.dateFrom) {
+        query = query.gte("completed_at", opts.dateFrom);
+      }
+      if (opts?.dateTo) {
+        // Add a day to make "to" inclusive
+        const toDate = new Date(opts.dateTo);
+        toDate.setDate(toDate.getDate() + 1);
+        query = query.lt("completed_at", toDate.toISOString());
+      }
+
+      const { data: jobs, error } = await query;
+      if (error) throw error;
+      if (!jobs?.length) return [];
+
+      // 2. Filter to jobs matching this client (by name or company)
+      const clientJobs = (jobs as EligibleJob[]).filter((j) => {
+        const jClient = (j.client_company || j.client_name || "").toLowerCase();
+        const cName = client.name.toLowerCase();
+        const cCompany = (client.company || "").toLowerCase();
+        return (
+          jClient === cName ||
+          jClient === cCompany ||
+          (cCompany && jClient.includes(cCompany)) ||
+          jClient.includes(cName)
+        );
+      });
+
+      if (!clientJobs.length) return [];
+
+      // 3. Exclude jobs already in invoice_items
+      const jobIds = clientJobs.map((j) => j.id);
+      const { data: invoiced } = await supabase
+        .from("invoice_items")
+        .select("job_id")
+        .in("job_id", jobIds);
+
+      const invoicedIds = new Set((invoiced ?? []).map((r: any) => r.job_id));
+      const eligible = clientJobs.filter((j) => !invoicedIds.has(j.id));
+
+      // 4. Get receipt counts from expenses
+      if (eligible.length > 0) {
+        const eligibleIds = eligible.map((j) => j.id);
+        const { data: expenses } = await supabase
+          .from("expenses")
+          .select("job_id")
+          .in("job_id", eligibleIds)
+          .eq("is_hidden", false);
+
+        const countMap = new Map<string, number>();
+        (expenses ?? []).forEach((e: any) => {
+          countMap.set(e.job_id, (countMap.get(e.job_id) ?? 0) + 1);
+        });
+        eligible.forEach((j) => {
+          j.receiptCount = countMap.get(j.id) ?? 0;
+        });
+      }
+
+      return eligible;
+    },
+    enabled: !!client,
+    staleTime: 15_000,
+  });
+}
+
+/** Compute invoice preview totals from selected jobs */
+export function computePreviewTotals(
+  jobs: EligibleJob[],
+  vatRate: number = 20
+): {
+  subtotal: number;
+  vatAmount: number;
+  total: number;
+  receiptCount: number;
+  jobCount: number;
+  warnings: string[];
+} {
+  const warnings: string[] = [];
+  let subtotal = 0;
+  let receiptCount = 0;
+
+  // Check for mixed clients
+  const clientNames = new Set<string>();
+  jobs.forEach((j) => {
+    const cn = (j.client_company || j.client_name || "Unknown").toLowerCase();
+    clientNames.add(cn);
+  });
+  if (clientNames.size > 1) {
+    warnings.push("Selected jobs have mixed client names — review before invoicing.");
+  }
+
+  // Check for missing prices
+  const noPriceJobs = jobs.filter((j) => !j.total_price || j.total_price <= 0);
+  if (noPriceJobs.length > 0) {
+    warnings.push(
+      `${noPriceJobs.length} job(s) have no price set — total may be inaccurate.`
+    );
+  }
+
+  jobs.forEach((j) => {
+    subtotal += j.total_price ?? 0;
+    receiptCount += j.receiptCount ?? 0;
+  });
+
+  const vatAmount = subtotal * (vatRate / 100);
+  const total = subtotal + vatAmount;
+
+  return {
+    subtotal,
+    vatAmount,
+    total,
+    receiptCount,
+    jobCount: jobs.length,
+    warnings,
+  };
+}

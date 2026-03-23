@@ -31,6 +31,7 @@ export const CONTROL_NAV: NavGroup[] = [
     items: [
       { label: "Finance", path: "/control/finance", icon: "PoundSterling" },
       { label: "Clients", path: "/control/clients", icon: "Building2" },
+      { label: "Invoice Prep", path: "/control/invoice-prep", icon: "FileText" },
     ],
   },
   {
