@@ -190,20 +190,19 @@ function drawHeaderBanner(
   data: InvoiceData,
   logo: CachedImage | null,
 ): number {
-  const bannerH = 44;
+  const bannerH = 46;
 
-  // Subtle depth — darker base then navy overlay
-  doc.setFillColor(...THEME.navyDeep);
-  doc.rect(0, 0, PAGE_W, bannerH, "F");
+  // Solid navy banner
   doc.setFillColor(...THEME.navy);
   doc.rect(0, 0, PAGE_W, bannerH, "F");
 
-  // --- Left side: logo image scaled to fill banner height ---
+  // --- Left side: logo at ~45% of content width ---
+  const contentW = PAGE_W - MARGIN * 2;
   if (logo) {
     try {
       const padY = 2;
       const maxLogoH = bannerH - padY * 2;
-      const maxLogoW = 110;
+      const maxLogoW = contentW * 0.48; // ~45-48% of content width
       const scale = Math.min(maxLogoW / logo.w, maxLogoH / logo.h);
       const rw = logo.w * scale;
       const rh = logo.h * scale;
@@ -213,23 +212,31 @@ function drawHeaderBanner(
     } catch { /* graceful fallback */ }
   }
 
-  // --- Right side: INVOICE title ---
+  // --- Right side: INVOICE title + prominent number ---
   const centerY = bannerH / 2;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(24);
+  doc.setFontSize(26);
   doc.setTextColor(...THEME.white);
-  doc.text("INVOICE", PAGE_W - MARGIN, centerY - 2, { align: "right" });
+  doc.text("INVOICE", PAGE_W - MARGIN, centerY - 4, { align: "right" });
 
-  // Invoice number — smaller, muted
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-  doc.setTextColor(...THEME.headerText);
+  // Invoice number — prominent white, not muted
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(255, 255, 255);
   const invNum = sanitize(data.invoiceNumber, "");
   doc.text(invNum, PAGE_W - MARGIN, centerY + 6, { align: "right" });
 
-  // Thin accent line at bottom of banner
+  // Job ref underneath if present — lighter
+  if (data.jobRef) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...THEME.headerText);
+    doc.text(`Ref: ${sanitize(data.jobRef)}`, PAGE_W - MARGIN, centerY + 12, { align: "right" });
+  }
+
+  // Accent line at bottom
   doc.setDrawColor(...THEME.accent);
-  doc.setLineWidth(0.6);
+  doc.setLineWidth(0.8);
   doc.line(0, bannerH, PAGE_W, bannerH);
 
   return bannerH + 8;
