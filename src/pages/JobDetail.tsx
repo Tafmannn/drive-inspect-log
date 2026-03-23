@@ -563,6 +563,8 @@ export const JobDetail = () => {
               )}
               <PhotoViewer
                 title="Collection"
+                totalExpected={job.photos.filter((p: any) => p.type.startsWith("pickup_")).length}
+                onRetry={handleRetryPhotos}
                 photos={job.photos
                   .filter((p: any) => p.type.startsWith("pickup_"))
                   .map((p: any) => ({
@@ -573,6 +575,8 @@ export const JobDetail = () => {
               />
               <PhotoViewer
                 title="Delivery"
+                totalExpected={job.photos.filter((p: any) => p.type.startsWith("delivery_")).length}
+                onRetry={handleRetryPhotos}
                 photos={job.photos
                   .filter((p: any) => p.type.startsWith("delivery_"))
                   .map((p: any) => ({
@@ -583,6 +587,8 @@ export const JobDetail = () => {
               />
               <PhotoViewer
                 title="Damage"
+                totalExpected={job.photos.filter((p: any) => p.type === "damage_close_up").length}
+                onRetry={handleRetryPhotos}
                 photos={job.photos
                   .filter((p: any) => p.type === "damage_close_up")
                   .map((p: any) => ({
