@@ -231,6 +231,7 @@ const App = () => {
                   <Route path="drivers" element={<ControlDrivers />} />
                   <Route path="compliance" element={<ControlCompliance />} />
                   <Route path="finance" element={<ControlFinance />} />
+                  <Route path="clients" element={<ControlClients />} />
                   <Route path="admin" element={<ControlAdmin />} />
                   <Route
                     path="super-admin"
