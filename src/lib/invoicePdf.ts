@@ -356,22 +356,26 @@ function buildChargesTable(doc: jsPDF, items: InvoiceLineItem[], y: number): num
     theme: "plain",
     styles: {
       fontSize: 8.5,
-      cellPadding: { top: 3, bottom: 3, left: 4, right: 4 },
+      cellPadding: { top: 3.5, bottom: 3.5, left: 5, right: 5 },
       overflow: "linebreak",
       valign: "middle",
       lineColor: THEME.lightBorder,
-      lineWidth: 0.2,
+      lineWidth: 0.15,
       textColor: THEME.text,
     },
     headStyles: {
       fillColor: THEME.navy,
       textColor: THEME.white,
       fontStyle: "bold",
-      fontSize: 8,
-      cellPadding: { top: 3.5, bottom: 3.5, left: 4, right: 4 },
+      fontSize: 7.5,
+      cellPadding: { top: 4, bottom: 4, left: 5, right: 5 },
     },
     alternateRowStyles: {
       fillColor: THEME.tableStripe,
+    },
+    bodyStyles: {
+      lineColor: THEME.lightBorder,
+      lineWidth: 0.15,
     },
     columnStyles: {
       0: { cellWidth: descW },
@@ -380,7 +384,7 @@ function buildChargesTable(doc: jsPDF, items: InvoiceLineItem[], y: number): num
       3: { cellWidth: totalW, halign: "right", fontStyle: "bold" },
     },
     showHead: "everyPage",
-    head: [["Description", "Qty", "Rate", "Total"]],
+    head: [["DESCRIPTION", "QTY", "RATE", "TOTAL"]],
     body: items.map(item => {
       const qty = Number(item.quantity ?? 1);
       const price = Number(item.unitPrice ?? 0);
@@ -393,7 +397,7 @@ function buildChargesTable(doc: jsPDF, items: InvoiceLineItem[], y: number): num
     }),
   });
 
-  return lastY(doc) + 6;
+  return lastY(doc) + 8;
 }
 
 /* ------------------------------------------------------------------ */
