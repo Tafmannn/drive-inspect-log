@@ -405,10 +405,11 @@ function buildChargesTable(doc: jsPDF, items: InvoiceLineItem[], y: number): num
 /* ------------------------------------------------------------------ */
 
 function buildTotalsBlock(doc: jsPDF, data: InvoiceData, y: number): number {
-  y = ensureSpace(doc, y, 30);
+  y = ensureSpace(doc, y, 34);
 
   const rightEdge = PAGE_W - MARGIN;
-  const labelX = rightEdge - 64;
+  const blockW = 72;
+  const labelX = rightEdge - blockW;
 
   const subtotal = data.lineItems.reduce(
     (s, item) => s + Number(item.quantity ?? 1) * Number(item.unitPrice ?? 0), 0,
@@ -417,38 +418,41 @@ function buildTotalsBlock(doc: jsPDF, data: InvoiceData, y: number): number {
   const vatAmount = subtotal * (vatRate / 100);
   const total = subtotal + vatAmount;
 
-  // Thin separator line
-  doc.setDrawColor(...THEME.lightBorder);
-  doc.setLineWidth(0.2);
-  doc.line(labelX, y - 2, rightEdge, y - 2);
-
   // Subtotal
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
-  doc.setTextColor(...THEME.text);
+  doc.setTextColor(...THEME.muted);
   doc.text("Subtotal", labelX, y + 2);
+  doc.setTextColor(...THEME.text);
   doc.text(fmt(subtotal), rightEdge, y + 2, { align: "right" });
-  y += 6;
+  y += 6.5;
 
   // VAT
+  doc.setTextColor(...THEME.muted);
   doc.text(`VAT (${vatRate}%)`, labelX, y + 2);
+  doc.setTextColor(...THEME.text);
   doc.text(fmt(vatAmount), rightEdge, y + 2, { align: "right" });
-  y += 8;
+  y += 7;
 
-  // Total row — navy pill
-  const totalRowH = 10;
-  const totalRowW = 66;
-  const totalRowX = rightEdge - totalRowW;
+  // Separator
+  doc.setDrawColor(...THEME.lightBorder);
+  doc.setLineWidth(0.3);
+  doc.line(labelX, y - 1, rightEdge, y - 1);
+  y += 3;
+
+  // Total row — navy rounded pill
+  const totalRowH = 11;
+  const totalRowX = labelX;
   doc.setFillColor(...THEME.navy);
-  doc.roundedRect(totalRowX, y - 5, totalRowW, totalRowH, 1.5, 1.5, "F");
+  doc.roundedRect(totalRowX, y - 5, blockW, totalRowH, 2, 2, "F");
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
+  doc.setFontSize(10.5);
   doc.setTextColor(...THEME.white);
-  doc.text("Total:", totalRowX + 4, y + 1);
-  doc.text(fmt(total), rightEdge - 3, y + 1, { align: "right" });
+  doc.text("TOTAL", totalRowX + 5, y + 1.5);
+  doc.text(fmt(total), rightEdge - 4, y + 1.5, { align: "right" });
 
-  return y + totalRowH + 8;
+  return y + totalRowH + 10;
 }
 
 /* ------------------------------------------------------------------ */
