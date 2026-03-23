@@ -142,6 +142,40 @@ export function InvoicePrepScreen() {
   const handleClientChange = (id: string | null) => {
     setSelectedClientId(id);
     setSelectedJobIds(new Set());
+    setCreatedInvoiceNumber(null);
+  };
+
+  // Create invoice handler
+  const handleCreateInvoice = async () => {
+    if (!selectedClient || selectedJobs.length === 0) return;
+    // Get org_id from the user's metadata
+    const { data: { user: authUser } } = await (await import("@/integrations/supabase/client")).supabase.auth.getUser();
+    const orgId = authUser?.app_metadata?.org_id || authUser?.user_metadata?.org_id;
+    if (!orgId) {
+      toast({ title: "Error", description: "Unable to determine organisation.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      const result = await createInvoice.mutateAsync({
+        client: selectedClient,
+        jobs: selectedJobs,
+        vatRate,
+        orgId,
+      });
+      setCreatedInvoiceNumber(result.invoiceNumber);
+      setSelectedJobIds(new Set());
+      toast({
+        title: "Invoice Created",
+        description: `${result.invoiceNumber} — ${result.jobCount} job${result.jobCount !== 1 ? "s" : ""} invoiced.`,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Invoice Creation Failed",
+        description: err.message || "Something went wrong.",
+        variant: "destructive",
+      });
+    }
   };
 
   // KPIs
