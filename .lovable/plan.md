@@ -1,42 +1,33 @@
-## Redesign Invoice PDF to Match Branded Reference
 
-The reference image shows a significantly different visual design from the current generator. This is still programmatic jsPDF — no template images — but with a branded layout.
 
-### Key visual differences from current code
+## Fix Invoice PDF: Correct Logo + Polish Layout + Multi-Row Support
 
-1. **Dark navy header banner** — full-width filled rectangle spanning top ~55mm. White logo on left with "AXENTRA VEHICLES" + "Precision in Every Move" tagline. "INVOICE" in large white text on right, invoice number below it in smaller white text.
-2. **Two side-by-side bordered boxes** below header — Left box: "Invoice No:" and "Date:" key-value pairs. Right box: dark "BILL TO" header bar with white text, then customer name (bold), company, address lines below.
-3. **Charges table** — thin navy header with white text columns: "Description", "Qty", "Rate", "Total". No "Charges" section title. Column headers use "Rate" not "Unit Price", "Total" not "Amount".
-4. **Totals block** — right-aligned: "Subtotal" + value, "VAT (0%)" + value, then a dark filled row with "Total:" label and bold amount in navy/accent color.
-5. **Payment Information** — bold section title with underline, then "Bank : Lloyds Bank", "Account Name: Terrence Tapfumaneyi trading as Axentra Vehicle Logistics", "Sort Code: 04-00-03", "Account Number: 24861835". Italic note at bottom.
-6. **No footer bar** visible in the reference.
+### Problems identified from the current PDF output
 
-### File: `src/lib/invoicePdf.ts` — full rewrite
+1. **Wrong/broken logo** — the logo rendered in the navy header is tiny and distorted (appears as a small unreadable thumbnail). The uploaded Axentra logo needs to replace `public/axentra-logo-white.png`.
+2. **Logo too small** — `maxW=38, maxH=22` makes it a postage stamp. Should be ~44x30mm.
+3. **Description text garbled** — long descriptions with arrow characters (`→`) render as `!'` in Helvetica. The `buildInvoiceData()` in InvoiceGenerator.tsx uses `→` which jsPDF's Helvetica cannot render.
+4. **Multi-row page breaks** — when many line items exist, no explicit handling ensures the table + totals + payment info flow across pages cleanly. `autoTable` handles this natively but the totals/payment sections after need `ensureSpace` (already present but needs verification).
 
-**Constants updates:**
+### Changes
 
-- `AXENTRA_BANK.bankName` → "Monzo"
-- `AXENTRA_BANK.accountName` → "Terrence Tapfumaneyi trading as Axentra Vehicle Logistics"
-- Add `THEME.navy` = `[17, 29, 58]` (dark header background)
+**File: `public/axentra-logo-white.png`** — replace with user-uploaded logo via `create_asset` + reference in code. Since the logo has a dark background, it sits perfectly on the navy banner.
 
-**New section functions:**
+**File: `src/lib/invoicePdf.ts`** — targeted fixes:
 
-- `drawHeaderBanner(doc, data, logo)` — draws a full-width navy filled rect (~55mm tall). Places white logo (using `axentra-logo-white.png`) on left. Draws "AXENTRA VEHICLES" + tagline in white. "INVOICE" large right-aligned in white, invoice number below.
-- `drawMetaAndBillTo(doc, data, y)` — draws two side-by-side bordered boxes. Left box (~half width): Invoice No + Date as label/value rows. Right box: dark "BILL TO" header strip, then client name (bold), company, address lines.
-- `buildChargesTable(doc, items, y)` — autoTable with navy header, columns renamed to "Description", "Qty", "Rate", "Total". Right-aligned numeric columns.
-- `buildTotalsBlock(doc, data, y)` — right-aligned Subtotal + VAT rows, then a dark filled rectangle row for "Total:" with bold amount.
-- `drawPaymentInfo(doc, y)` — "Payment Information" bold title with underline, then label: value pairs rendered as plain text lines (not autoTable), italic reference note at bottom.
+1. **Logo sizing** — increase `maxW` to 44, `maxH` to 30, and vertically center in the banner
+2. **Logo URL** — reference the asset URL from the `.asset.json` pointer instead of `/axentra-logo-white.png`
+3. **Arrow character fix** — in `drawHeaderBanner` and `buildChargesTable`, no change needed in the PDF generator itself; the fix goes in `InvoiceGenerator.tsx` where `→` is used in the description string — replace with `->` or `-`
+4. **Table page-break** — `autoTable` already handles page breaks for rows. Add `showHead: 'everyPage'` to ensure header repeats on overflow pages.
+5. **Post-table sections** — `ensureSpace` calls already guard payment info and notes. Increase the guard for payment info from 40mm to 50mm to account for the full block.
 
-**Removed:**
+**File: `src/pages/InvoiceGenerator.tsx`** — one-line fix:
+- Line 170: replace `→` with `->` in the route description string to avoid glyph issues in the PDF
 
-- `drawSectionTitle` underline-only style (replaced with specific per-section styling)
-- `drawJobDetails` section (not shown in reference — job info is embedded in line item description)
-- `drawNotes` section (not visible in reference, but keep as conditional)
-- `buildFooter` (not visible in reference)
-- `drawKeyValueRows` generic autoTable for metadata (replaced with custom box layout)
+### Technical details
 
-**Logo:** Uses `axentra-logo-white.png` (already exists in `/public/`) for the dark banner header. Falls back gracefully if missing.
+- The uploaded logo (`2F3CD4B1-...png`) will be created as an asset via `create_asset` at `public/axentra-logo-white.png`
+- The asset URL from the `.asset.json` will be used as the default logo URL in the generator
+- `autoTable`'s built-in pagination already splits rows across pages; adding `showHead: 'everyPage'` ensures column headers repeat
+- No structural changes to the section flow or data contract
 
-### File: `src/pages/InvoiceGenerator.tsx` — no changes needed
-
-The page already builds `InvoiceData` and calls `downloadInvoicePdf()`. The interface stays compatible.
