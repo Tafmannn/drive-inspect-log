@@ -220,7 +220,7 @@ export function InvoiceGenerator() {
     notes: notes || undefined,
     jobRef: job?.external_job_number || undefined,
     vehicleReg: job?.vehicle_reg || undefined,
-    route: job ? `${job.pickup_city || "—"} → ${job.delivery_city || "—"}` : undefined,
+    route: job ? `${job.pickup_city || "-"} to ${job.delivery_city || "-"}` : undefined,
   });
 
   const handleGeneratePdf = async () => {
