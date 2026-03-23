@@ -5,17 +5,19 @@ import autoTable from "jspdf-autotable";
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
 
-const MARGIN = 16;
+const MARGIN = 14;
 const PAGE_W = 210; // A4 mm
 
 const THEME = {
   navy:        [17, 29, 58]   as [number, number, number],
+  navyDeep:    [12, 20, 45]   as [number, number, number],
   white:       [255, 255, 255] as [number, number, number],
-  text:        [40, 40, 48]   as [number, number, number],
-  muted:       [110, 115, 125] as [number, number, number],
-  lightBorder: [210, 212, 218] as [number, number, number],
-  tableStripe: [246, 247, 250] as [number, number, number],
-  headerText:  [220, 225, 235] as [number, number, number],
+  text:        [35, 35, 42]   as [number, number, number],
+  muted:       [100, 105, 115] as [number, number, number],
+  lightBorder: [215, 218, 225] as [number, number, number],
+  tableStripe: [248, 249, 252] as [number, number, number],
+  headerText:  [180, 190, 210] as [number, number, number],
+  accent:      [45, 120, 220]  as [number, number, number],
 };
 
 const AXENTRA_BANK = {
@@ -185,17 +187,20 @@ function drawHeaderBanner(
   data: InvoiceData,
   logo: CachedImage | null,
 ): number {
-  const bannerH = 56;
+  const bannerH = 38;
 
-  // Full-width navy fill
+  // Subtle depth — darker base then navy overlay
+  doc.setFillColor(...THEME.navyDeep);
+  doc.rect(0, 0, PAGE_W, bannerH, "F");
   doc.setFillColor(...THEME.navy);
   doc.rect(0, 0, PAGE_W, bannerH, "F");
 
-  // --- Left side: full logo image (contains icon + AXENTRA + tagline) ---
+  // --- Left side: logo image scaled to fill banner height ---
   if (logo) {
     try {
-      const maxLogoH = 46;
-      const maxLogoW = 65;
+      const padY = 3;
+      const maxLogoH = bannerH - padY * 2;
+      const maxLogoW = 80;
       const scale = Math.min(maxLogoW / logo.w, maxLogoH / logo.h);
       const rw = logo.w * scale;
       const rh = logo.h * scale;
@@ -208,18 +213,23 @@ function drawHeaderBanner(
   // --- Right side: INVOICE title ---
   const centerY = bannerH / 2;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(28);
+  doc.setFontSize(24);
   doc.setTextColor(...THEME.white);
-  doc.text("INVOICE", PAGE_W - MARGIN, centerY - 4, { align: "right" });
+  doc.text("INVOICE", PAGE_W - MARGIN, centerY - 2, { align: "right" });
 
-  // Invoice number below title
+  // Invoice number — smaller, muted
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
+  doc.setFontSize(8.5);
   doc.setTextColor(...THEME.headerText);
   const invNum = sanitize(data.invoiceNumber, "");
-  doc.text(invNum, PAGE_W - MARGIN, centerY + 8, { align: "right" });
+  doc.text(invNum, PAGE_W - MARGIN, centerY + 6, { align: "right" });
 
-  return bannerH + 10;
+  // Thin accent line at bottom of banner
+  doc.setDrawColor(...THEME.accent);
+  doc.setLineWidth(0.6);
+  doc.line(0, bannerH, PAGE_W, bannerH);
+
+  return bannerH + 8;
 }
 
 /* ------------------------------------------------------------------ */
@@ -228,10 +238,11 @@ function drawHeaderBanner(
 
 function drawMetaAndBillTo(doc: jsPDF, data: InvoiceData, y: number): number {
   const contentW = PAGE_W - MARGIN * 2;
-  const gap = 8;
+  const gap = 6;
   const boxW = (contentW - gap) / 2;
   const leftX = MARGIN;
   const rightX = MARGIN + boxW + gap;
+  const radius = 1.5;
 
   // Determine dynamic height based on content
   const metaLines: Array<[string, string]> = [
@@ -250,54 +261,57 @@ function drawMetaAndBillTo(doc: jsPDF, data: InvoiceData, y: number): number {
   }
   if (data.clientEmail?.trim()) clientLines.push(data.clientEmail.trim());
 
-  const stripH = 8;
-  const clientContentH = stripH + 6 + clientLines.length * 5 + 4;
-  const metaContentH = 8 + metaLines.length * 7 + 4;
-  const boxH = Math.max(metaContentH, clientContentH, 38);
+  const stripH = 7;
+  const clientContentH = stripH + 5 + clientLines.length * 4.8 + 4;
+  const metaContentH = 7 + metaLines.length * 6.5 + 4;
+  const boxH = Math.max(metaContentH, clientContentH, 34);
 
-  // --- Left box: Invoice details ---
+  // --- Left box: Invoice details (rounded) ---
   doc.setDrawColor(...THEME.lightBorder);
-  doc.setLineWidth(0.35);
-  doc.rect(leftX, y, boxW, boxH);
+  doc.setLineWidth(0.25);
+  doc.roundedRect(leftX, y, boxW, boxH, radius, radius);
 
-  let ly = y + 9;
-  const labelColX = leftX + 6;
-  const valueColX = leftX + 32;
+  let ly = y + 8;
+  const labelColX = leftX + 5;
+  const valueColX = leftX + 30;
 
   for (const [label, value] of metaLines) {
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
+    doc.setFontSize(8.5);
     doc.setTextColor(...THEME.text);
     doc.text(label, labelColX, ly);
     doc.setFont("helvetica", "normal");
     doc.text(sanitize(value), valueColX, ly);
-    ly += 7;
+    ly += 6.5;
   }
 
-  // --- Right box: Bill To ---
+  // --- Right box: Bill To (rounded with navy header) ---
   doc.setDrawColor(...THEME.lightBorder);
-  doc.setLineWidth(0.35);
-  doc.rect(rightX, y, boxW, boxH);
+  doc.setLineWidth(0.25);
+  doc.roundedRect(rightX, y, boxW, boxH, radius, radius);
 
-  // Dark header strip
+  // Dark header strip with clipped top corners
   doc.setFillColor(...THEME.navy);
-  doc.rect(rightX, y, boxW, stripH, "F");
+  doc.roundedRect(rightX, y, boxW, stripH, radius, radius, "F");
+  // Fill bottom of strip to square off the corners
+  doc.rect(rightX, y + stripH - radius, boxW, radius, "F");
+
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.setTextColor(...THEME.white);
-  doc.text("BILL TO", rightX + 6, y + 5.5);
+  doc.text("BILL TO", rightX + 5, y + 5);
 
   // Client details
-  let ry = y + stripH + 6;
+  let ry = y + stripH + 5;
   clientLines.forEach((line, i) => {
     doc.setFont("helvetica", i === 0 ? "bold" : "normal");
-    doc.setFontSize(9);
+    doc.setFontSize(8.5);
     doc.setTextColor(...THEME.text);
-    doc.text(sanitize(line), rightX + 6, ry, { maxWidth: boxW - 12 });
-    ry += 5;
+    doc.text(sanitize(line), rightX + 5, ry, { maxWidth: boxW - 10 });
+    ry += 4.8;
   });
 
-  return y + boxH + 10;
+  return y + boxH + 8;
 }
 
 /* ------------------------------------------------------------------ */
@@ -306,9 +320,9 @@ function drawMetaAndBillTo(doc: jsPDF, data: InvoiceData, y: number): number {
 
 function buildChargesTable(doc: jsPDF, items: InvoiceLineItem[], y: number): number {
   const contentW = PAGE_W - MARGIN * 2;
-  const qtyW = 20;
-  const rateW = 28;
-  const totalW = 30;
+  const qtyW = 18;
+  const rateW = 26;
+  const totalW = 28;
   const descW = contentW - qtyW - rateW - totalW;
 
   autoTable(doc, {
@@ -316,20 +330,20 @@ function buildChargesTable(doc: jsPDF, items: InvoiceLineItem[], y: number): num
     margin: { left: MARGIN, right: MARGIN },
     theme: "plain",
     styles: {
-      fontSize: 9,
-      cellPadding: { top: 3.5, bottom: 3.5, left: 5, right: 5 },
+      fontSize: 8.5,
+      cellPadding: { top: 3, bottom: 3, left: 4, right: 4 },
       overflow: "linebreak",
       valign: "middle",
       lineColor: THEME.lightBorder,
-      lineWidth: 0.3,
+      lineWidth: 0.2,
       textColor: THEME.text,
     },
     headStyles: {
       fillColor: THEME.navy,
       textColor: THEME.white,
       fontStyle: "bold",
-      fontSize: 9,
-      cellPadding: { top: 4, bottom: 4, left: 5, right: 5 },
+      fontSize: 8,
+      cellPadding: { top: 3.5, bottom: 3.5, left: 4, right: 4 },
     },
     alternateRowStyles: {
       fillColor: THEME.tableStripe,
@@ -338,7 +352,7 @@ function buildChargesTable(doc: jsPDF, items: InvoiceLineItem[], y: number): num
       0: { cellWidth: descW },
       1: { cellWidth: qtyW, halign: "center" },
       2: { cellWidth: rateW, halign: "right" },
-      3: { cellWidth: totalW, halign: "right" },
+      3: { cellWidth: totalW, halign: "right", fontStyle: "bold" },
     },
     showHead: "everyPage",
     head: [["Description", "Qty", "Rate", "Total"]],
@@ -352,12 +366,9 @@ function buildChargesTable(doc: jsPDF, items: InvoiceLineItem[], y: number): num
         fmt(qty * price),
       ];
     }),
-    didDrawPage: () => {
-      // Optionally re-draw header on new pages if needed
-    },
   });
 
-  return lastY(doc) + 8;
+  return lastY(doc) + 6;
 }
 
 /* ------------------------------------------------------------------ */
@@ -365,10 +376,10 @@ function buildChargesTable(doc: jsPDF, items: InvoiceLineItem[], y: number): num
 /* ------------------------------------------------------------------ */
 
 function buildTotalsBlock(doc: jsPDF, data: InvoiceData, y: number): number {
-  y = ensureSpace(doc, y, 32);
+  y = ensureSpace(doc, y, 30);
 
   const rightEdge = PAGE_W - MARGIN;
-  const labelX = rightEdge - 68;
+  const labelX = rightEdge - 64;
 
   const subtotal = data.lineItems.reduce(
     (s, item) => s + Number(item.quantity ?? 1) * Number(item.unitPrice ?? 0), 0,
@@ -377,33 +388,38 @@ function buildTotalsBlock(doc: jsPDF, data: InvoiceData, y: number): number {
   const vatAmount = subtotal * (vatRate / 100);
   const total = subtotal + vatAmount;
 
+  // Thin separator line
+  doc.setDrawColor(...THEME.lightBorder);
+  doc.setLineWidth(0.2);
+  doc.line(labelX, y - 2, rightEdge, y - 2);
+
   // Subtotal
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setTextColor(...THEME.text);
-  doc.text("Subtotal", labelX, y);
-  doc.text(fmt(subtotal), rightEdge, y, { align: "right" });
+  doc.text("Subtotal", labelX, y + 2);
+  doc.text(fmt(subtotal), rightEdge, y + 2, { align: "right" });
   y += 6;
 
   // VAT
-  doc.text(`VAT (${vatRate}%)`, labelX, y);
-  doc.text(fmt(vatAmount), rightEdge, y, { align: "right" });
-  y += 9;
+  doc.text(`VAT (${vatRate}%)`, labelX, y + 2);
+  doc.text(fmt(vatAmount), rightEdge, y + 2, { align: "right" });
+  y += 8;
 
-  // Total row — premium navy block
-  const totalRowH = 11;
-  const totalRowW = 70;
+  // Total row — navy pill
+  const totalRowH = 10;
+  const totalRowW = 66;
   const totalRowX = rightEdge - totalRowW;
   doc.setFillColor(...THEME.navy);
-  doc.roundedRect(totalRowX, y - 6, totalRowW, totalRowH, 1, 1, "F");
+  doc.roundedRect(totalRowX, y - 5, totalRowW, totalRowH, 1.5, 1.5, "F");
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
+  doc.setFontSize(10);
   doc.setTextColor(...THEME.white);
-  doc.text("Total:", totalRowX + 5, y + 1);
-  doc.text(fmt(total), rightEdge - 4, y + 1, { align: "right" });
+  doc.text("Total:", totalRowX + 4, y + 1);
+  doc.text(fmt(total), rightEdge - 3, y + 1, { align: "right" });
 
-  return y + totalRowH + 10;
+  return y + totalRowH + 8;
 }
 
 /* ------------------------------------------------------------------ */
@@ -412,27 +428,21 @@ function buildTotalsBlock(doc: jsPDF, data: InvoiceData, y: number): number {
 
 function drawNotes(doc: jsPDF, notes: string | undefined, y: number): number {
   if (!notes?.trim()) return y;
-  y = ensureSpace(doc, y, 18);
+  y = ensureSpace(doc, y, 16);
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
+  doc.setFontSize(9);
   doc.setTextColor(...THEME.navy);
   doc.text("Notes", MARGIN, y);
-
-  // Subtle underline
-  const tw = doc.getTextWidth("Notes");
-  doc.setDrawColor(...THEME.navy);
-  doc.setLineWidth(0.4);
-  doc.line(MARGIN, y + 1.2, MARGIN + tw, y + 1.2);
-  y += 7;
+  y += 5;
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setTextColor(...THEME.text);
   const contentW = PAGE_W - MARGIN * 2;
   const lines = doc.splitTextToSize(sanitize(notes), contentW);
   doc.text(lines, MARGIN, y);
-  return y + lines.length * 4.2 + 8;
+  return y + lines.length * 4 + 6;
 }
 
 /* ------------------------------------------------------------------ */
@@ -440,20 +450,16 @@ function drawNotes(doc: jsPDF, notes: string | undefined, y: number): number {
 /* ------------------------------------------------------------------ */
 
 function drawPaymentInfo(doc: jsPDF, data: InvoiceData, y: number): number {
-  y = ensureSpace(doc, y, 52);
+  y = ensureSpace(doc, y, 46);
 
-  // Section title with underline
+  // Section title
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
+  doc.setFontSize(9);
   doc.setTextColor(...THEME.navy);
   doc.text("Payment Information", MARGIN, y);
-  const tw = doc.getTextWidth("Payment Information");
-  doc.setDrawColor(...THEME.navy);
-  doc.setLineWidth(0.4);
-  doc.line(MARGIN, y + 1.2, MARGIN + tw, y + 1.2);
-  y += 9;
+  y += 7;
 
-  // Bank details — label: value pairs
+  // Bank details
   const details: Array<[string, string]> = [
     ["Bank:", AXENTRA_BANK.bankName],
     ["Account Name:", AXENTRA_BANK.accountName],
@@ -461,7 +467,7 @@ function drawPaymentInfo(doc: jsPDF, data: InvoiceData, y: number): number {
     ["Account Number:", AXENTRA_BANK.accountNumber],
   ];
 
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   for (const [label, value] of details) {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...THEME.text);
@@ -470,24 +476,24 @@ function drawPaymentInfo(doc: jsPDF, data: InvoiceData, y: number): number {
     const labelW = doc.getTextWidth(labelText);
     doc.setFont("helvetica", "normal");
     doc.text(value, MARGIN + labelW, y);
-    y += 5.5;
+    y += 5;
   }
 
-  y += 3;
+  y += 2;
 
-  // Reference note — italicized
+  // Reference note
   const refNote = data.paymentTerms?.trim()
     ? `${sanitize(data.paymentTerms)}. Please use invoice number as payment reference.`
     : "Please use invoice number as payment reference.";
 
   doc.setFont("helvetica", "italic");
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setTextColor(...THEME.muted);
   const contentW = PAGE_W - MARGIN * 2;
   const lines = doc.splitTextToSize(refNote, contentW);
   doc.text(lines, MARGIN, y);
 
-  return y + lines.length * 3.5 + 8;
+  return y + lines.length * 3.5 + 6;
 }
 
 /* ------------------------------------------------------------------ */
