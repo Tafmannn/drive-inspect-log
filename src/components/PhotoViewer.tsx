@@ -18,7 +18,7 @@ interface PhotoViewerProps {
   onRetry?: () => void;
 }
 
-export const PhotoViewer = ({ photos, title }: PhotoViewerProps) => {
+export const PhotoViewer = ({ photos, title, totalExpected, onRetry }: PhotoViewerProps) => {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [zoom, setZoom] = useState(1);
   const [downloading, setDownloading] = useState(false);
