@@ -495,33 +495,48 @@ function drawNotes(doc: jsPDF, notes: string | undefined, y: number): number {
 /* ------------------------------------------------------------------ */
 
 function drawPaymentInfo(doc: jsPDF, data: InvoiceData, y: number): number {
-  y = ensureSpace(doc, y, 46);
+  y = ensureSpace(doc, y, 50);
 
-  // Section title
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(...THEME.navy);
-  doc.text("Payment Information", MARGIN, y);
-  y += 7;
+  const contentW = PAGE_W - MARGIN * 2;
 
-  // Bank details
+  // Payment card with accent left border
   const details: Array<[string, string]> = [
     ["Bank:", AXENTRA_BANK.bankName],
     ["Account Name:", AXENTRA_BANK.accountName],
     ["Sort Code:", AXENTRA_BANK.sortCode],
     ["Account Number:", AXENTRA_BANK.accountNumber],
   ];
+  const cardH = 10 + details.length * 5.5 + 10;
 
+  // Card background
+  doc.setFillColor(...THEME.softBg);
+  doc.roundedRect(MARGIN, y - 2, contentW, cardH, 2, 2, "F");
+  doc.setDrawColor(...THEME.lightBorder);
+  doc.setLineWidth(0.2);
+  doc.roundedRect(MARGIN, y - 2, contentW, cardH, 2, 2);
+
+  // Accent left border
+  doc.setFillColor(...THEME.accent);
+  doc.rect(MARGIN, y - 2, 1.2, cardH, "F");
+
+  // Section title
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(...THEME.sectionTitle);
+  doc.text("PAYMENT INFORMATION", MARGIN + 7, y + 4);
+  y += 10;
+
+  // Bank details
   doc.setFontSize(8.5);
   for (const [label, value] of details) {
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(...THEME.text);
-    const labelText = `${label} `;
-    doc.text(labelText, MARGIN, y);
-    const labelW = doc.getTextWidth(labelText);
+    doc.setTextColor(...THEME.muted);
+    doc.text(label, MARGIN + 7, y);
+    const labelW = doc.getTextWidth(`${label} `);
     doc.setFont("helvetica", "normal");
-    doc.text(value, MARGIN + labelW, y);
-    y += 5;
+    doc.setTextColor(...THEME.text);
+    doc.text(value, MARGIN + 7 + labelW, y);
+    y += 5.5;
   }
 
   y += 2;
@@ -532,13 +547,12 @@ function drawPaymentInfo(doc: jsPDF, data: InvoiceData, y: number): number {
     : "Please use invoice number as payment reference.";
 
   doc.setFont("helvetica", "italic");
-  doc.setFontSize(7.5);
+  doc.setFontSize(7);
   doc.setTextColor(...THEME.muted);
-  const contentW = PAGE_W - MARGIN * 2;
-  const lines = doc.splitTextToSize(refNote, contentW);
-  doc.text(lines, MARGIN, y);
+  const lines = doc.splitTextToSize(refNote, contentW - 14);
+  doc.text(lines, MARGIN + 7, y);
 
-  return y + lines.length * 3.5 + 6;
+  return y + lines.length * 3.5 + 8;
 }
 
 /* ------------------------------------------------------------------ */
