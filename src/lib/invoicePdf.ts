@@ -141,12 +141,13 @@ function drawHeaderBanner(
   // Logo on left — fit within box
   if (logo) {
     try {
-      const maxW = 38;
-      const maxH = 22;
+      const maxW = 44;
+      const maxH = 30;
       const scale = Math.min(maxW / logo.w, maxH / logo.h);
       const rw = logo.w * scale;
       const rh = logo.h * scale;
-      doc.addImage(logo.dataUrl, logo.format, MARGIN, 8, rw, rh);
+      const logoY = (bannerH - rh) / 2; // vertically center
+      doc.addImage(logo.dataUrl, logo.format, MARGIN, logoY, rw, rh);
     } catch { /* graceful */ }
   }
 
