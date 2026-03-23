@@ -1,41 +1,62 @@
 
 
-## Fix Invoice PDF Overlay Coordinates
+## Rollback Invoice PDF to Code-Driven Generator
 
-The user provided exact pixel coordinates on a 794×1123px canvas (A4). jsPDF uses mm on 210×297mm. Conversion: `x_mm = x_px × (210/794)`, `y_mm = y_px × (297/1123)`.
+### What changes
 
-### File: `src/lib/invoicePdf.ts`
+**Replace**: `src/lib/invoicePdf.ts` -- complete rewrite from template-overlay to programmatic jsPDF + jspdf-autotable generation.
 
-**Update `POS` coordinates** (all values converted from user's px to mm):
+**Minor edit**: `src/pages/InvoiceGenerator.tsx` -- update the `InvoiceData` interface usage (the page already passes structured data; only the type shape needs alignment with the new generator).
 
-| Field | User px | Converted mm |
-|-------|---------|-------------|
-| invoiceNo | 173, 171 | 45.7, 45.2 |
-| date | 171, 198 | 45.2, 52.4 |
-| billTo line1 | 465, 201 | 123.0, 53.2 |
-| billTo line2 | 465, 229 | 123.0, 60.6 |
-| billTo line3 | 465, 257 | 123.0, 68.0 |
-| billTo line4 | 465, 285 | 123.0, 75.4 |
-| table row1 desc | 93, 341, w445 | 24.6, 90.2, maxW 117.7 |
-| table qty | 567+34 right-align | 159.0 (right edge) |
-| table rate | 642+72 right-align | 188.8 (right edge) |
-| table total | 727+58 right-align | 207.7 (right edge) |
-| subtotal | 692+92 right-align | 207.3, 130.1 |
-| vat | 692+92 right-align | 207.3, 139.1 |
-| grand total | 661+123 right-align | 207.3, 149.4 |
-| payment bank | labels 70/values 150, top 706 | 18.5/39.7, 186.7 |
-| payment acctName | 150, 738 | 39.7, 195.2 |
-| payment sortCode | 150, 771 | 39.7, 203.9 |
-| payment acctNo | 150, 804 | 39.7, 212.6 |
-| payment terms | 70, 838 | 18.5, 221.6 |
+**No other files change.** The page component already handles form state, line items, and calls `downloadInvoicePdf(data)`. The new generator honours that same entry point.
 
-**Behavioral changes**:
-- Remove `invoiceNoTopRight` (user didn't specify a separate header position)
-- Description clamped to single line with ellipsis (already done, verify `maxW` respects column boundary)
-- qty/rate/total use `align: "right"` at right edge of their columns
-- subtotal/VAT/grand total right-aligned at right edge
-- Re-enable `drawPaymentDetails` call in `generateInvoicePdf` (currently missing)
-- Payment uses label+value pattern with separate x positions for labels vs values
+---
 
-No other files change. No migrations needed.
+### New `invoicePdf.ts` architecture
+
+Follows the same engineering pattern as `podPdf.ts`: margin constants, `ensureSpace`, `setTextStyle`, `autoTable` for tabular data, flow-layout with a cursor `y` that advances section by section.
+
+**Sections rendered top-to-bottom:**
+
+1. **Header** -- "INVOICE" title (large, right-aligned), "AXENTRA VEHICLE LOGISTICS" + website (left-aligned), optional logo (loaded from `/axentra-logo.png`, gracefully skipped if missing)
+2. **Invoice metadata** -- key-value pairs: Invoice No, Issue Date, Due Date, Payment Terms, Job Ref
+3. **Bill To** -- client name (bold), company, address lines (split on comma/newline)
+4. **Job Details** -- Vehicle, Registration, Route (only rendered if data present)
+5. **Charges table** -- `autoTable` with columns: Description, Qty, Unit Price, Amount. Right-aligned numeric columns.
+6. **Totals block** -- Subtotal, VAT line, Total Due (bold, larger font)
+7. **Notes** -- wrapped text, only if present
+8. **Payment Information** -- key-value block: Bank (Monzo Bank), Account Name, Sort Code, Account Number, payment reference note
+9. **Footer** -- centered: "Axentra Vehicle Logistics - axentravehicles.com - info@axentravehicles.com"
+
+**Helper functions created:**
+- `formatCurrency(n)` -- safe GBP formatting
+- `safeText(val, fallback)` -- null-safe string
+- `drawSectionTitle(doc, title, y)` -- bold underlined section heading with `ensureSpace`
+- `drawKeyValueRows(doc, rows, y)` -- plain autoTable for label/value pairs
+- `ensureSpace(doc, y, needed)` -- page-break guard
+- `renderLogoIfAvailable(doc, y)` -- async logo load, returns adjusted y
+- `buildChargesTable(doc, items, y)` -- striped autoTable
+- `buildTotalsBlock(doc, subtotal, vat, total, y)` -- right-aligned totals
+- `buildFooter(doc)` -- page-numbered footer on all pages
+
+**Data contract** -- keeps the existing `InvoiceData` and `InvoiceLineItem` interfaces but removes `vatRate` from the top-level (computed from line items or defaulted to 0). Adds optional `logoUrl` field.
+
+**Removed:**
+- Template image loading (`/invoice-template.png` dependency)
+- All absolute coordinate constants (`POS` object)
+- `addTemplateBackground` function
+- Pixel-to-mm conversion constants
+
+**No breaking changes to `InvoiceGenerator.tsx`** -- the page calls `downloadInvoicePdf(buildInvoiceData())` which continues to work. The `InvoiceData` shape stays compatible (existing fields preserved, new optional fields added).
+
+---
+
+### Technical notes
+
+- `jspdf-autotable` is already a project dependency (used by `podPdf.ts`)
+- Logo handling mirrors `podPdf.ts` pattern (`loadImage` → `drawImageContain`)
+- Currency uses `£` prefix with `.toFixed(2)`, no Unicode issues
+- Route arrow uses `->` instead of `→` to avoid glyph issues in Helvetica
+- Long descriptions wrap inside autoTable cells (overflow: "linebreak")
+- Footer rendered last across all pages using `doc.getNumberOfPages()` loop
 
