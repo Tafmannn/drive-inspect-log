@@ -138,6 +138,44 @@ async function loadImg(url: string): Promise<CachedImage | null> {
   }
 }
 
+/** Recolor near-black pixels to navy so the logo blends into the banner */
+async function recolorToNavy(img: CachedImage): Promise<CachedImage> {
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = img.w;
+    canvas.height = img.h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return img;
+
+    const el = new Image();
+    el.crossOrigin = "anonymous";
+    await new Promise<void>((resolve, reject) => {
+      el.onload = () => resolve();
+      el.onerror = () => reject();
+      el.src = img.dataUrl;
+    });
+
+    ctx.drawImage(el, 0, 0);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const d = imageData.data;
+    const [navyR, navyG, navyB] = THEME.navy;
+
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i] < 35 && d[i + 1] < 35 && d[i + 2] < 35 && d[i + 3] > 100) {
+        d[i] = navyR;
+        d[i + 1] = navyG;
+        d[i + 2] = navyB;
+      }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    const newDataUrl = canvas.toDataURL("image/png");
+    return { dataUrl: newDataUrl, format: "PNG", w: img.w, h: img.h };
+  } catch {
+    return img;
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /*  1. Header Banner — Premium Seamless                                */
 /* ------------------------------------------------------------------ */
