@@ -1,75 +1,33 @@
 import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
-const TEMPLATE_PATH = "/invoice-template.png";
+/* ------------------------------------------------------------------ */
+/*  Constants                                                          */
+/* ------------------------------------------------------------------ */
 
-// A4 size in mm
-const PAGE_W = 210;
-const PAGE_H = 297;
+const MARGIN = 20;
+const FOOTER_GAP = 8;
 
-// Conversion from 794×1123 px canvas to mm
-const PX_TO_MM_X = PAGE_W / 794;
-const PX_TO_MM_Y = PAGE_H / 1123;
+const THEME = {
+  dark: [33, 37, 41] as [number, number, number],
+  text: [80, 80, 80] as [number, number, number],
+  muted: [130, 130, 130] as [number, number, number],
+  white: [255, 255, 255] as [number, number, number],
+  lightFill: [245, 245, 245] as [number, number, number],
+  lightBorder: [200, 200, 200] as [number, number, number],
+  accent: [17, 42, 102] as [number, number, number],
+};
 
-// Locked colors
-const DARK: [number, number, number] = [24, 33, 53];
-const MID: [number, number, number] = [78, 89, 110];
-const BLUE: [number, number, number] = [17, 42, 102];
-
-// Locked bank details
 const AXENTRA_BANK = {
   bankName: "Monzo Bank",
   accountName: "Axentra Vehicle Logistics",
   sortCode: "04-00-03",
   accountNumber: "24861835",
-  paymentTermsText: "Payable within 7 days. Please use invoice number as payment reference.",
 } as const;
 
-// All coordinates converted from user-provided px on 794×1123 canvas
-const POS = {
-  leftCard: {
-    invoiceNo: { x: 173 * PX_TO_MM_X, y: 171 * PX_TO_MM_Y, maxW: 150 * PX_TO_MM_X },
-    date:      { x: 171 * PX_TO_MM_X, y: 198 * PX_TO_MM_Y, maxW: 150 * PX_TO_MM_X },
-  },
-
-  rightCard: {
-    line1: { x: 465 * PX_TO_MM_X, y: 201 * PX_TO_MM_Y, maxW: 74 },
-    line2: { x: 465 * PX_TO_MM_X, y: 229 * PX_TO_MM_Y, maxW: 74 },
-    line3: { x: 465 * PX_TO_MM_X, y: 257 * PX_TO_MM_Y, maxW: 74 },
-    line4: { x: 465 * PX_TO_MM_X, y: 285 * PX_TO_MM_Y, maxW: 74 },
-  },
-
-  table: {
-    startY: 341 * PX_TO_MM_Y,
-    rowGap: 8.0,
-    description: { x: 93 * PX_TO_MM_X, maxW: 445 * PX_TO_MM_X },
-    qty:   { x: (567 + 34) * PX_TO_MM_X },   // right edge
-    rate:  { x: (642 + 72) * PX_TO_MM_X },   // right edge
-    total: { x: (727 + 58) * PX_TO_MM_X },   // right edge
-    maxRows: 4,
-  },
-
-  totals: {
-    rightEdge: (692 + 92) * PX_TO_MM_X,
-    subtotal: { y: 492 * PX_TO_MM_Y },
-    vat:      { y: 526 * PX_TO_MM_Y },
-    total:    { y: 565 * PX_TO_MM_Y },
-  },
-
-  payment: {
-    labelX: 70 * PX_TO_MM_X,
-    valueX: 150 * PX_TO_MM_X,
-    bank:        { y: 706 * PX_TO_MM_Y },
-    accountName: { y: 738 * PX_TO_MM_Y },
-    sortCode:    { y: 771 * PX_TO_MM_Y },
-    accountNumber: { y: 804 * PX_TO_MM_Y },
-    terms:       { x: 70 * PX_TO_MM_X, y: 838 * PX_TO_MM_Y, maxW: 175 },
-  },
-
-  notes: {
-    title: { x: 16.0, y: 248.0 },
-    body:  { x: 16.0, y: 253.0, maxW: 178, lineH: 4.2, maxLines: 8 },
-  },
-} as const;
+/* ------------------------------------------------------------------ */
+/*  Public types                                                       */
+/* ------------------------------------------------------------------ */
 
 export interface InvoiceLineItem {
   description: string;
@@ -93,346 +51,407 @@ export interface InvoiceData {
   vehicleReg?: string;
   route?: string;
   vatRate?: number;
+  logoUrl?: string;
 }
 
-function clean(value: string | null | undefined, fallback = "—"): string {
-  const text = String(value ?? "").trim();
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
+
+function formatCurrency(n: number): string {
+  return `£${n.toFixed(2)}`;
+}
+
+function safeText(val: string | null | undefined, fallback = "—"): string {
+  const text = String(val ?? "").trim();
   return text || fallback;
-}
-
-function money(value: number): string {
-  return `£${value.toFixed(2)}`;
 }
 
 function safeDate(iso: string | null | undefined): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 }
 
-function setText(
+function getPageWidth(doc: jsPDF): number {
+  return doc.internal.pageSize.getWidth();
+}
+
+function getPageHeight(doc: jsPDF): number {
+  return doc.internal.pageSize.getHeight();
+}
+
+function getContentWidth(doc: jsPDF): number {
+  return getPageWidth(doc) - MARGIN * 2;
+}
+
+function getFooterY(doc: jsPDF): number {
+  return getPageHeight(doc) - FOOTER_GAP;
+}
+
+function lastAutoTableY(doc: jsPDF, fallback = MARGIN): number {
+  const table = (doc as jsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable;
+  return table?.finalY ?? fallback;
+}
+
+function ensureSpace(doc: jsPDF, y: number, needed: number): number {
+  const usableBottom = getFooterY(doc) - 6;
+  if (y + needed > usableBottom) {
+    doc.addPage();
+    return MARGIN;
+  }
+  return y;
+}
+
+function setTextStyle(
   doc: jsPDF,
-  opts: {
-    size: number;
+  opts?: {
+    size?: number;
     style?: "normal" | "bold" | "italic" | "bolditalic";
     color?: [number, number, number];
   }
 ): void {
-  doc.setFont("helvetica", opts.style ?? "normal");
-  doc.setFontSize(opts.size);
-  const color = opts.color ?? DARK;
-  doc.setTextColor(color[0], color[1], color[2]);
+  doc.setFont("helvetica", opts?.style ?? "normal");
+  doc.setFontSize(opts?.size ?? 9);
+  const c = opts?.color ?? THEME.text;
+  doc.setTextColor(c[0], c[1], c[2]);
 }
 
-function fitSingleLine(
-  doc: jsPDF,
-  text: string,
-  maxWidth: number,
-  opts: {
-    size: number;
-    style?: "normal" | "bold";
-    color?: [number, number, number];
-  }
-): string {
-  setText(doc, opts);
-  if (doc.getTextWidth(text) <= maxWidth) return text;
-  let out = text;
-  while (out.length > 0 && doc.getTextWidth(`${out}…`) > maxWidth) {
-    out = out.slice(0, -1);
-  }
-  return out ? `${out}…` : "";
-}
+/* ------------------------------------------------------------------ */
+/*  Logo                                                               */
+/* ------------------------------------------------------------------ */
 
-function clipLines(
-  doc: jsPDF,
-  text: string,
-  maxWidth: number,
-  maxLines: number,
-  opts: {
-    size: number;
-    style?: "normal" | "bold";
-    color?: [number, number, number];
-  }
-): string[] {
-  setText(doc, opts);
-  const lines = doc.splitTextToSize(text, maxWidth) as string[];
-  if (lines.length <= maxLines) return lines;
-  const clipped = lines.slice(0, maxLines);
-  clipped[maxLines - 1] = fitSingleLine(doc, clipped[maxLines - 1], maxWidth, opts);
-  return clipped;
-}
+type CachedImage = { dataUrl: string; format: "PNG" | "JPEG" | "WEBP"; width: number; height: number };
 
-function splitAddressLines(address?: string): string[] {
-  if (!address?.trim()) return [];
-  return address
-    .split(/\n|,/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
-function normalizeLineItem(item: InvoiceLineItem): InvoiceLineItem {
-  return {
-    description: clean(item.description, "Vehicle transportation"),
-    quantity: Number(item.quantity ?? 0),
-    unitPrice: Number(item.unitPrice ?? 0),
-    vatRate: typeof item.vatRate === "number" ? item.vatRate : undefined,
-  };
-}
-
-function getFallbackDescription(data: InvoiceData): string {
-  const parts = [
-    "Vehicle transportation",
-    data.vehicleReg ? `– ${data.vehicleReg}` : "",
-    data.route ? `– ${data.route}` : "",
-    data.jobRef ? `– Job ${data.jobRef}` : "",
-  ].filter(Boolean);
-  return parts.join(" ");
-}
-
-function getVisibleItems(data: InvoiceData): InvoiceLineItem[] {
-  if (data.lineItems.length > 0) {
-    return data.lineItems.slice(0, POS.table.maxRows).map(normalizeLineItem);
-  }
-  return [
-    {
-      description: getFallbackDescription(data),
-      quantity: 1,
-      unitPrice: 0,
-    },
-  ];
-}
-
-function getSubtotal(data: InvoiceData): number {
-  return data.lineItems.reduce((sum, rawItem) => {
-    const item = normalizeLineItem(rawItem);
-    return sum + item.quantity * item.unitPrice;
-  }, 0);
-}
-
-function getVatRate(data: InvoiceData): number {
-  if (typeof data.vatRate === "number") return data.vatRate;
-  const itemVat = data.lineItems.find((i) => typeof i.vatRate === "number")?.vatRate;
-  return typeof itemVat === "number" ? itemVat : 0;
-}
-
-function buildBillToLines(data: InvoiceData): string[] {
-  const lines: string[] = [];
-  if (data.clientName?.trim()) lines.push(data.clientName.trim());
-  if (data.clientCompany?.trim()) lines.push(data.clientCompany.trim());
-  const addressLines = splitAddressLines(data.clientAddress);
-  lines.push(...addressLines);
-  return lines.slice(0, 4);
-}
-
-async function loadImageAsDataUrl(url: string): Promise<string | null> {
+async function loadImageAsDataUrl(url: string): Promise<CachedImage | null> {
   try {
-    const response = await fetch(url, { cache: "no-store" });
-    if (!response.ok) return null;
-    const blob = await response.blob();
-    return await new Promise<string | null>((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        resolve(typeof reader.result === "string" ? reader.result : null);
-      };
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(blob);
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    const dataUrl = await new Promise<string | null>((resolve) => {
+      const r = new FileReader();
+      r.onloadend = () => resolve(typeof r.result === "string" ? r.result : null);
+      r.onerror = () => resolve(null);
+      r.readAsDataURL(blob);
     });
+    if (!dataUrl) return null;
+
+    const format = dataUrl.startsWith("data:image/png") ? "PNG" as const
+      : dataUrl.startsWith("data:image/webp") ? "WEBP" as const
+      : "JPEG" as const;
+
+    // get dimensions
+    const img = await new Promise<HTMLImageElement | null>((resolve) => {
+      const el = new Image();
+      el.crossOrigin = "anonymous";
+      el.onload = () => resolve(el);
+      el.onerror = () => resolve(null);
+      el.src = dataUrl;
+    });
+
+    return { dataUrl, format, width: img?.width ?? 200, height: img?.height ?? 60 };
   } catch {
     return null;
   }
 }
 
-function detectImageFormat(dataUrl: string): "PNG" | "JPEG" | "WEBP" {
-  if (dataUrl.startsWith("data:image/png")) return "PNG";
-  if (dataUrl.startsWith("data:image/webp")) return "WEBP";
-  return "JPEG";
+async function renderLogoIfAvailable(
+  doc: jsPDF,
+  logoUrl: string | undefined
+): Promise<CachedImage | null> {
+  const url = logoUrl || "/axentra-logo.png";
+  return loadImageAsDataUrl(url);
 }
 
-function addTemplateBackground(doc: jsPDF, templateData: string): void {
-  const format = detectImageFormat(templateData);
-  doc.addImage(templateData, format, 0, 0, PAGE_W, PAGE_H);
+function drawImageContain(
+  doc: jsPDF,
+  image: CachedImage,
+  x: number,
+  y: number,
+  boxW: number,
+  boxH: number
+): void {
+  const scale = Math.min(boxW / image.width, boxH / image.height);
+  const rw = image.width * scale;
+  const rh = image.height * scale;
+  doc.addImage(image.dataUrl, image.format, x + (boxW - rw) / 2, y + (boxH - rh) / 2, rw, rh);
 }
 
-function drawInvoiceMeta(doc: jsPDF, data: InvoiceData): void {
-  const displayInvoiceNo = data.invoiceNumber.startsWith("INV-")
-    ? data.invoiceNumber
-    : `INV-${data.invoiceNumber}`;
+/* ------------------------------------------------------------------ */
+/*  Sections                                                           */
+/* ------------------------------------------------------------------ */
 
-  // Invoice number in left card
-  setText(doc, { size: 9.5, style: "normal", color: DARK });
-  doc.text(
-    fitSingleLine(doc, displayInvoiceNo, POS.leftCard.invoiceNo.maxW, {
-      size: 9.5, style: "normal", color: DARK,
-    }),
-    POS.leftCard.invoiceNo.x,
-    POS.leftCard.invoiceNo.y
-  );
-
-  // Date in left card
-  doc.text(
-    fitSingleLine(doc, safeDate(data.issueDate), POS.leftCard.date.maxW, {
-      size: 9.5, style: "normal", color: DARK,
-    }),
-    POS.leftCard.date.x,
-    POS.leftCard.date.y
-  );
+function drawSectionTitle(doc: jsPDF, title: string, y: number): number {
+  y = ensureSpace(doc, y, 14);
+  setTextStyle(doc, { size: 11, style: "bold", color: THEME.dark });
+  doc.text(title, MARGIN, y);
+  const tw = doc.getTextWidth(title);
+  doc.setDrawColor(...THEME.dark);
+  doc.setLineWidth(0.4);
+  doc.line(MARGIN, y + 1, MARGIN + tw, y + 1);
+  return y + 7;
 }
 
-function drawBillTo(doc: jsPDF, data: InvoiceData): void {
-  const lines = buildBillToLines(data);
-  const targets = [
-    POS.rightCard.line1,
-    POS.rightCard.line2,
-    POS.rightCard.line3,
-    POS.rightCard.line4,
+function drawHeader(doc: jsPDF, data: InvoiceData, logo: CachedImage | null): number {
+  const pw = getPageWidth(doc);
+  let y = MARGIN;
+
+  // Logo on the left (if available)
+  if (logo) {
+    try {
+      drawImageContain(doc, logo, MARGIN, y - 4, 40, 18);
+    } catch { /* logo fails gracefully */ }
+  }
+
+  // Company name
+  const companyStartY = logo ? y + 16 : y;
+  setTextStyle(doc, { size: 10, style: "bold", color: THEME.dark });
+  doc.text("AXENTRA VEHICLE LOGISTICS", MARGIN, companyStartY);
+  setTextStyle(doc, { size: 8, style: "normal", color: THEME.muted });
+  doc.text("axentravehicles.com", MARGIN, companyStartY + 5);
+
+  // "INVOICE" title – right-aligned
+  setTextStyle(doc, { size: 24, style: "bold", color: THEME.accent });
+  doc.text("INVOICE", pw - MARGIN, y + 2, { align: "right" });
+
+  return Math.max(companyStartY + 5, y + 10) + 10;
+}
+
+function drawKeyValueRows(
+  doc: jsPDF,
+  rows: Array<[string, string]>,
+  y: number
+): number {
+  const cw = getContentWidth(doc);
+  autoTable(doc, {
+    startY: y,
+    margin: { left: MARGIN, right: MARGIN },
+    theme: "plain",
+    styles: {
+      fontSize: 9,
+      cellPadding: { top: 1.5, bottom: 1.5, left: 2, right: 2 },
+      overflow: "linebreak",
+    },
+    columnStyles: {
+      0: { fontStyle: "bold", cellWidth: 40, textColor: THEME.text },
+      1: { cellWidth: cw - 40 },
+    },
+    body: rows,
+  });
+  return lastAutoTableY(doc) + 4;
+}
+
+function drawInvoiceMeta(doc: jsPDF, data: InvoiceData, y: number): number {
+  const rows: Array<[string, string]> = [
+    ["Invoice No.", safeText(data.invoiceNumber)],
+    ["Issue Date", safeDate(data.issueDate)],
   ];
+  if (data.dueDate) rows.push(["Due Date", safeDate(data.dueDate)]);
+  if (data.paymentTerms) rows.push(["Terms", safeText(data.paymentTerms)]);
+  if (data.jobRef) rows.push(["Job Ref", safeText(data.jobRef)]);
 
-  lines.forEach((line, idx) => {
-    const target = targets[idx];
-    if (!target) return;
-    const isFirst = idx === 0;
-    const opts = {
-      size: isFirst ? 9.3 : 9.1,
-      style: (isFirst ? "bold" : "normal") as "bold" | "normal",
-      color: DARK as [number, number, number],
-    };
-    setText(doc, opts);
-    doc.text(
-      fitSingleLine(doc, line, target.maxW, opts),
-      target.x,
-      target.y
-    );
-  });
+  return drawKeyValueRows(doc, rows, y);
 }
 
-function drawLineItems(doc: jsPDF, data: InvoiceData): void {
-  const items = getVisibleItems(data);
+function drawBillTo(doc: jsPDF, data: InvoiceData, y: number): number {
+  y = drawSectionTitle(doc, "Bill To", y);
 
-  items.forEach((item, idx) => {
-    const y = POS.table.startY + idx * POS.table.rowGap;
-    const qty = Number(item.quantity ?? 0);
-    const unitPrice = Number(item.unitPrice ?? 0);
-    const lineTotal = qty * unitPrice;
+  const lines: string[] = [];
+  if (data.clientName?.trim()) lines.push(data.clientName.trim());
+  if (data.clientCompany?.trim()) lines.push(data.clientCompany.trim());
+  if (data.clientAddress?.trim()) {
+    const parts = data.clientAddress.split(/\n|,/).map(s => s.trim()).filter(Boolean);
+    lines.push(...parts);
+  }
+  if (data.clientEmail?.trim()) lines.push(data.clientEmail.trim());
 
-    // Description: single line, clamped with ellipsis
-    setText(doc, { size: 8.8, style: "normal", color: DARK });
-    doc.text(
-      fitSingleLine(
-        doc,
-        clean(item.description, getFallbackDescription(data)),
-        POS.table.description.maxW,
-        { size: 8.8, style: "normal", color: DARK }
-      ),
-      POS.table.description.x,
-      y
-    );
-
-    // Qty, Rate, Total: right-aligned at right edge of each column
-    setText(doc, { size: 8.8, style: "bold", color: DARK });
-    doc.text(String(qty), POS.table.qty.x, y, { align: "right" });
-    doc.text(money(unitPrice), POS.table.rate.x, y, { align: "right" });
-    doc.text(money(lineTotal), POS.table.total.x, y, { align: "right" });
+  lines.forEach((line, i) => {
+    const isBold = i === 0;
+    setTextStyle(doc, { size: 9, style: isBold ? "bold" : "normal", color: THEME.text });
+    doc.text(line, MARGIN, y);
+    y += 4.5;
   });
+
+  return y + 4;
 }
 
-function drawTotals(doc: jsPDF, data: InvoiceData): void {
-  const subtotal = getSubtotal(data);
-  const vatRate = getVatRate(data);
+function drawJobDetails(doc: jsPDF, data: InvoiceData, y: number): number {
+  const hasDetails = data.vehicleReg || data.route;
+  if (!hasDetails) return y;
+
+  y = drawSectionTitle(doc, "Job Details", y);
+  const rows: Array<[string, string]> = [];
+  if (data.vehicleReg) rows.push(["Registration", safeText(data.vehicleReg)]);
+  if (data.route) rows.push(["Route", safeText(data.route).replace(/→/g, "->")]);
+
+  return drawKeyValueRows(doc, rows, y);
+}
+
+function buildChargesTable(doc: jsPDF, items: InvoiceLineItem[], y: number): number {
+  y = drawSectionTitle(doc, "Charges", y);
+  const cw = getContentWidth(doc);
+  const descW = cw - 24 - 28 - 28;
+
+  autoTable(doc, {
+    startY: y,
+    margin: { left: MARGIN, right: MARGIN },
+    theme: "striped",
+    styles: {
+      fontSize: 9,
+      cellPadding: { top: 2, bottom: 2, left: 3, right: 3 },
+      overflow: "linebreak",
+      valign: "top",
+    },
+    headStyles: {
+      fillColor: THEME.dark,
+      textColor: THEME.white,
+    },
+    columnStyles: {
+      0: { cellWidth: descW },
+      1: { cellWidth: 24, halign: "right" },
+      2: { cellWidth: 28, halign: "right" },
+      3: { cellWidth: 28, halign: "right" },
+    },
+    head: [["Description", "Qty", "Unit Price", "Amount"]],
+    body: items.map(item => {
+      const qty = Number(item.quantity ?? 1);
+      const price = Number(item.unitPrice ?? 0);
+      const amount = qty * price;
+      return [
+        safeText(item.description, "Line item"),
+        String(qty),
+        formatCurrency(price),
+        formatCurrency(amount),
+      ];
+    }),
+  });
+
+  return lastAutoTableY(doc) + 6;
+}
+
+function buildTotalsBlock(
+  doc: jsPDF,
+  data: InvoiceData,
+  y: number
+): number {
+  const pw = getPageWidth(doc);
+  const rightX = pw - MARGIN;
+  const labelX = rightX - 60;
+
+  const subtotal = data.lineItems.reduce(
+    (sum, item) => sum + Number(item.quantity ?? 1) * Number(item.unitPrice ?? 0),
+    0
+  );
+  const vatRate = typeof data.vatRate === "number" ? data.vatRate : 0;
   const vatAmount = subtotal * (vatRate / 100);
   const total = subtotal + vatAmount;
-  const rx = POS.totals.rightEdge;
 
-  setText(doc, { size: 9.0, style: "bold", color: DARK });
-  doc.text(money(subtotal), rx, POS.totals.subtotal.y, { align: "right" });
-  doc.text(money(vatAmount), rx, POS.totals.vat.y, { align: "right" });
+  y = ensureSpace(doc, y, 30);
 
-  setText(doc, { size: 13.0, style: "bold", color: BLUE });
-  doc.text(money(total), rx, POS.totals.total.y, { align: "right" });
+  // Separator line
+  doc.setDrawColor(...THEME.lightBorder);
+  doc.setLineWidth(0.3);
+  doc.line(labelX - 5, y, rightX, y);
+  y += 5;
+
+  // Subtotal
+  setTextStyle(doc, { size: 9, style: "normal", color: THEME.text });
+  doc.text("Subtotal", labelX, y);
+  doc.text(formatCurrency(subtotal), rightX, y, { align: "right" });
+  y += 5;
+
+  // VAT
+  doc.text(`VAT (${vatRate}%)`, labelX, y);
+  doc.text(formatCurrency(vatAmount), rightX, y, { align: "right" });
+  y += 6;
+
+  // Total Due
+  doc.setDrawColor(...THEME.dark);
+  doc.setLineWidth(0.5);
+  doc.line(labelX - 5, y - 1, rightX, y - 1);
+  y += 3;
+
+  setTextStyle(doc, { size: 13, style: "bold", color: THEME.accent });
+  doc.text("TOTAL DUE", labelX, y);
+  doc.text(formatCurrency(total), rightX, y, { align: "right" });
+
+  return y + 10;
 }
 
-function drawPaymentDetails(doc: jsPDF, data: InvoiceData): void {
-  const lx = POS.payment.labelX;
-  const vx = POS.payment.valueX;
+function drawNotes(doc: jsPDF, notes: string | undefined, y: number): number {
+  if (!notes?.trim()) return y;
+  y = drawSectionTitle(doc, "Notes", y);
+  setTextStyle(doc, { size: 9, style: "normal", color: THEME.text });
+  const lines = doc.splitTextToSize(notes.trim(), getContentWidth(doc));
+  doc.text(lines, MARGIN, y);
+  return y + lines.length * 4.2 + 6;
+}
 
-  // Bank
-  setText(doc, { size: 9.0, style: "normal", color: DARK });
-  doc.text("Bank:", lx, POS.payment.bank.y);
-  doc.text(AXENTRA_BANK.bankName, vx, POS.payment.bank.y);
+function drawPaymentInfo(doc: jsPDF, data: InvoiceData, y: number): number {
+  y = drawSectionTitle(doc, "Payment Information", y);
 
-  // Account Name
-  doc.text("Account:", lx, POS.payment.accountName.y);
-  setText(doc, { size: 9.0, style: "bold", color: DARK });
-  doc.text(AXENTRA_BANK.accountName, vx, POS.payment.accountName.y);
+  const rows: Array<[string, string]> = [
+    ["Bank", AXENTRA_BANK.bankName],
+    ["Account Name", AXENTRA_BANK.accountName],
+    ["Sort Code", AXENTRA_BANK.sortCode],
+    ["Account No.", AXENTRA_BANK.accountNumber],
+  ];
 
-  // Sort Code
-  setText(doc, { size: 9.0, style: "normal", color: DARK });
-  doc.text("Sort Code:", lx, POS.payment.sortCode.y);
-  setText(doc, { size: 9.0, style: "bold", color: DARK });
-  doc.text(AXENTRA_BANK.sortCode, vx, POS.payment.sortCode.y);
+  y = drawKeyValueRows(doc, rows, y);
 
-  // Account Number
-  setText(doc, { size: 9.0, style: "normal", color: DARK });
-  doc.text("Account No:", lx, POS.payment.accountNumber.y);
-  doc.text(AXENTRA_BANK.accountNumber, vx, POS.payment.accountNumber.y);
+  // Payment reference note
+  const refNote = data.paymentTerms?.trim()
+    ? `${data.paymentTerms}. Please use invoice number as payment reference.`
+    : "Please use invoice number as payment reference.";
 
-  // Payment terms
-  const termsText = data.paymentTerms?.trim()
-    ? `${data.paymentTerms.trim()} Please use invoice number as payment reference.`
-    : AXENTRA_BANK.paymentTermsText;
+  setTextStyle(doc, { size: 8, style: "italic", color: THEME.muted });
+  const lines = doc.splitTextToSize(refNote, getContentWidth(doc));
+  y = ensureSpace(doc, y, lines.length * 3.5 + 4);
+  doc.text(lines, MARGIN, y);
+  return y + lines.length * 3.5 + 6;
+}
 
-  const lines = clipLines(doc, termsText, POS.payment.terms.maxW, 2, {
-    size: 8.6, style: "normal", color: DARK,
-  });
+function buildFooter(doc: jsPDF): void {
+  const totalPages = doc.getNumberOfPages();
+  const pw = getPageWidth(doc);
+  const footerY = getFooterY(doc);
 
-  if (lines.length > 0) {
-    setText(doc, { size: 8.6, style: "normal", color: DARK });
-    doc.text(lines[0], POS.payment.terms.x, POS.payment.terms.y);
-    if (lines[1]) {
-      doc.text(lines[1], POS.payment.terms.x, POS.payment.terms.y + 4.2);
-    }
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
+
+    // Divider
+    doc.setDrawColor(...THEME.lightBorder);
+    doc.setLineWidth(0.2);
+    doc.line(MARGIN, footerY - 4, pw - MARGIN, footerY - 4);
+
+    setTextStyle(doc, { size: 7, style: "normal", color: THEME.muted });
+    doc.text(
+      "Axentra Vehicle Logistics  •  axentravehicles.com  •  info@axentravehicles.com",
+      pw / 2,
+      footerY,
+      { align: "center" }
+    );
   }
 }
 
-function drawNotes(doc: jsPDF, notes?: string): void {
-  if (!notes?.trim()) return;
-
-  setText(doc, { size: 9.0, style: "bold", color: DARK });
-  doc.text("Notes", POS.notes.title.x, POS.notes.title.y);
-
-  const lines = clipLines(doc, notes.trim(), POS.notes.body.maxW, POS.notes.body.maxLines, {
-    size: 8.2, style: "normal", color: MID,
-  });
-
-  setText(doc, { size: 8.2, style: "normal", color: MID });
-  doc.text(lines, POS.notes.body.x, POS.notes.body.y, {
-    lineHeightFactor: 1.0,
-  });
-}
+/* ------------------------------------------------------------------ */
+/*  Main generator                                                     */
+/* ------------------------------------------------------------------ */
 
 export async function generateInvoicePdf(data: InvoiceData): Promise<Blob> {
-  const doc = new jsPDF({
-    unit: "mm",
-    format: "a4",
-    compress: true,
-  });
+  const doc = new jsPDF({ unit: "mm", format: "a4", compress: true });
+  const logo = await renderLogoIfAvailable(doc, data.logoUrl);
 
-  const templateData = await loadImageAsDataUrl(TEMPLATE_PATH);
-  if (!templateData) {
-    throw new Error(`Missing invoice template at ${TEMPLATE_PATH}`);
-  }
-
-  addTemplateBackground(doc, templateData);
-  drawInvoiceMeta(doc, data);
-  drawBillTo(doc, data);
-  drawLineItems(doc, data);
-  drawTotals(doc, data);
-  drawPaymentDetails(doc, data);
-  drawNotes(doc, data.notes);
+  let y = drawHeader(doc, data, logo);
+  y = drawInvoiceMeta(doc, data, y);
+  y = drawBillTo(doc, data, y);
+  y = drawJobDetails(doc, data, y);
+  y = buildChargesTable(doc, data.lineItems, y);
+  y = buildTotalsBlock(doc, data, y);
+  y = drawNotes(doc, data.notes, y);
+  y = drawPaymentInfo(doc, data, y);
+  buildFooter(doc);
 
   return doc.output("blob");
 }
@@ -440,11 +459,10 @@ export async function generateInvoicePdf(data: InvoiceData): Promise<Blob> {
 export async function downloadInvoicePdf(data: InvoiceData): Promise<void> {
   const blob = await generateInvoicePdf(data);
   const url = URL.createObjectURL(blob);
-
   try {
     const a = document.createElement("a");
     a.href = url;
-    a.download = `AXENTRA_INV_${clean(data.invoiceNumber, "INVOICE")}.pdf`;
+    a.download = `AXENTRA_INV_${safeText(data.invoiceNumber, "INVOICE")}.pdf`;
     a.click();
   } finally {
     URL.revokeObjectURL(url);
