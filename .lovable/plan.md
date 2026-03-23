@@ -1,33 +1,56 @@
 
 
-## Fix Invoice PDF: Correct Logo + Polish Layout + Multi-Row Support
+## Make Banner Match Template 1:1 with Uploaded Logos
 
-### Problems identified from the current PDF output
+### What the template shows
 
-1. **Wrong/broken logo** — the logo rendered in the navy header is tiny and distorted (appears as a small unreadable thumbnail). The uploaded Axentra logo needs to replace `public/axentra-logo-white.png`.
-2. **Logo too small** — `maxW=38, maxH=22` makes it a postage stamp. Should be ~44x30mm.
-3. **Description text garbled** — long descriptions with arrow characters (`→`) render as `!'` in Helvetica. The `buildInvoiceData()` in InvoiceGenerator.tsx uses `→` which jsPDF's Helvetica cannot render.
-4. **Multi-row page breaks** — when many line items exist, no explicit handling ensures the table + totals + payment info flow across pages cleanly. `autoTable` handles this natively but the totals/payment sections after need `ensureSpace` (already present but needs verification).
+The template banner has a dark background with the Axentra logo icon (blue hexagon + grey swooshes) rendered large and centered, with "AXENTRA" text below the icon, and "PRECISION IN EVERY MOVE" tagline beneath that. The dark-background uploaded image (`2F3CD4B1-...-6.png`) already contains this exact composition.
 
-### Changes
+### Problem
 
-**File: `public/axentra-logo-white.png`** — replace with user-uploaded logo via `create_asset` + reference in code. Since the logo has a dark background, it sits perfectly on the navy banner.
+The dark-background logo has a black (#000000) background. The banner uses navy (#111D3A). Placing the image directly would show a visible black rectangle. We need to recolor the black background pixels to navy at render time.
 
-**File: `src/lib/invoicePdf.ts`** — targeted fixes:
+### Plan
 
-1. **Logo sizing** — increase `maxW` to 44, `maxH` to 30, and vertically center in the banner
-2. **Logo URL** — reference the asset URL from the `.asset.json` pointer instead of `/axentra-logo-white.png`
-3. **Arrow character fix** — in `drawHeaderBanner` and `buildChargesTable`, no change needed in the PDF generator itself; the fix goes in `InvoiceGenerator.tsx` where `→` is used in the description string — replace with `->` or `-`
-4. **Table page-break** — `autoTable` already handles page breaks for rows. Add `showHead: 'everyPage'` to ensure header repeats on overflow pages.
-5. **Post-table sections** — `ensureSpace` calls already guard payment info and notes. Increase the guard for payment info from 40mm to 50mm to account for the full block.
+**1. Create two logo assets**
 
-**File: `src/pages/InvoiceGenerator.tsx`** — one-line fix:
-- Line 170: replace `→` with `->` in the route description string to avoid glyph issues in the PDF
+- `public/axentra-logo-dark.png` from `user-uploads://2F3CD4B1-F124-402F-9602-F19140740486-6.png` (dark bg, for banner)
+- `public/axentra-logo-color.png` from `user-uploads://Axentra_Logo_Resized_Under1000px-2.jpeg` (white bg, for other uses)
 
-### Technical details
+**2. Update `src/lib/invoicePdf.ts` — banner overhaul**
 
-- The uploaded logo (`2F3CD4B1-...png`) will be created as an asset via `create_asset` at `public/axentra-logo-white.png`
-- The asset URL from the `.asset.json` will be used as the default logo URL in the generator
-- `autoTable`'s built-in pagination already splits rows across pages; adding `showHead: 'everyPage'` ensures column headers repeat
-- No structural changes to the section flow or data contract
+- Change `LOGO_URL` to point to the dark-background logo asset
+- Add a `recolorBackground()` helper that:
+  - Draws the loaded image onto an offscreen `<canvas>`
+  - Iterates pixel data, replacing near-black pixels (R<35, G<35, B<35) with the navy color (17, 29, 58)
+  - Exports the canvas as a PNG data URL
+  - This makes the logo's black background match the banner navy seamlessly
+- Update `drawHeaderBanner()`:
+  - Remove the manually drawn "AXENTRA" / "VEHICLES" / tagline text (the logo image already contains all of this)
+  - Render the recolored logo large on the left side (~60mm wide, vertically centered)
+  - Keep "INVOICE" title and invoice number on the right side
+  - Result: the logo visually merges into the navy banner with no borders
+
+**3. Generate sample PDF for preview**
+
+After implementation, generate a sample invoice PDF to `/mnt/documents/` for visual comparison.
+
+### Files changed
+
+| File | Change |
+|------|--------|
+| `public/axentra-logo-dark.png` | New asset (dark bg logo) |
+| `public/axentra-logo-color.png` | New asset (color logo) |
+| `src/lib/invoicePdf.ts` | Recolor helper + banner redesign using full logo image |
+
+### Technical detail
+
+The `recolorBackground` function uses a canvas-based pixel manipulation approach:
+```text
+loadImg(url) → draw to canvas → getImageData → 
+for each pixel: if R<35 && G<35 && B<35 → set to (17,29,58) →
+putImageData → canvas.toDataURL("image/png")
+```
+
+This avoids any need to regenerate or redesign the logo — it simply makes the existing black background match the navy banner color at render time.
 
