@@ -745,6 +745,8 @@ export const PodReport = () => {
 
                 <PhotoViewer
                   title="Collection Photos"
+                  totalExpected={pickupPhotos.length}
+                  onRetry={handleRetryPhotos}
                   photos={pickupPhotos
                     .map((p) => ({
                       url: resolvedPhotos[p.id] || "",
@@ -757,6 +759,8 @@ export const PodReport = () => {
 
                 <PhotoViewer
                   title="Delivery Photos"
+                  totalExpected={deliveryPhotos.length}
+                  onRetry={handleRetryPhotos}
                   photos={deliveryPhotos
                     .map((p) => ({
                       url: resolvedPhotos[p.id] || "",
@@ -769,6 +773,8 @@ export const PodReport = () => {
 
                 <PhotoViewer
                   title="Damage Close-ups"
+                  totalExpected={damagePhotos.length}
+                  onRetry={handleRetryPhotos}
                   photos={damagePhotos
                     .map((p) => ({
                       url: resolvedPhotos[p.id] || "",
