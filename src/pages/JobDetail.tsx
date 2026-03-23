@@ -135,28 +135,64 @@ export const JobDetail = () => {
   const [changingStatus, setChangingStatus] = useState(false);
   const [resolvedPhotos, setResolvedPhotos] = useState<Record<string, string>>({});
   const [photosLoading, setPhotosLoading] = useState(false);
+  const [photoRetryCount, setPhotoRetryCount] = useState(0);
 
-  // Resolve photos for admin gallery
+  // Resolve photos for admin gallery — with automatic retry for failures
   useEffect(() => {
     if (!canAdmin || !job?.photos?.length) return;
     let cancelled = false;
     setPhotosLoading(true);
-    Promise.all(
-      job.photos.map(async (p: any) => {
-        try {
-          const resolved = await resolveMediaUrlAsync(p.url);
-          if (!cancelled && resolved) {
-            setResolvedPhotos(prev => ({ ...prev, [p.id]: resolved }));
+
+    const resolveWithRetry = async () => {
+      const allPhotos = job.photos as any[];
+      const failed: any[] = [];
+
+      // First pass
+      await Promise.all(
+        allPhotos.map(async (p: any) => {
+          try {
+            const resolved = await resolveMediaUrlAsync(p.url);
+            if (!cancelled && resolved) {
+              setResolvedPhotos(prev => ({ ...prev, [p.id]: resolved }));
+            } else if (!cancelled) {
+              failed.push(p);
+            }
+          } catch {
+            if (!cancelled) failed.push(p);
           }
-        } catch {
-          // skip unresolvable photos
-        }
-      })
-    ).finally(() => {
+        })
+      );
+
+      // Retry pass after 2s for any failures
+      if (failed.length > 0 && !cancelled) {
+        console.info('[JobDetail] Retrying ' + failed.length + ' failed photos');
+        await new Promise(r => setTimeout(r, 2000));
+        await Promise.all(
+          failed.map(async (p: any) => {
+            try {
+              const resolved = await resolveMediaUrlAsync(p.url);
+              if (!cancelled && resolved) {
+                setResolvedPhotos(prev => ({ ...prev, [p.id]: resolved }));
+              } else if (!cancelled) {
+                console.warn('[JobDetail] Photo failed after retry', { id: p.id, url: (p.url || '').slice(0, 80) });
+              }
+            } catch {
+              if (!cancelled) {
+                console.warn('[JobDetail] Photo exception after retry', { id: p.id });
+              }
+            }
+          })
+        );
+      }
+
       if (!cancelled) setPhotosLoading(false);
-    });
+    };
+
+    void resolveWithRetry();
     return () => { cancelled = true; };
-  }, [job?.photos, canAdmin]);
+  }, [job?.photos, canAdmin, photoRetryCount]);
+
+  const handleRetryPhotos = () => setPhotoRetryCount(c => c + 1);
 
   const handleDeleteJob = async () => {
     if (!jobId) return;
