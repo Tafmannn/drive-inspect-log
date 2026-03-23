@@ -95,6 +95,11 @@ export function InvoicePrepScreen() {
   // VAT rate
   const [vatRate, setVatRate] = useState(20);
 
+  // Auth & invoice creation
+  const { user } = useAuth();
+  const createInvoice = useCreateInvoice();
+  const [createdInvoiceNumber, setCreatedInvoiceNumber] = useState<string | null>(null);
+
   // Fetch eligible jobs
   const { data: eligibleJobs, isLoading } = useEligibleJobs(selectedClient, {
     dateFrom: dateFrom?.toISOString(),
