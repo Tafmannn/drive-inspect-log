@@ -662,6 +662,101 @@ export function InvoicePrepScreen() {
                   </p>
                 </div>
               )}
+
+              {/* Receipt Export Section */}
+              <Separator />
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-semibold text-foreground">Receipt Export</h4>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Download expense receipts attached to selected jobs
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleDiscoverReceipts}
+                    disabled={isDiscovering || selectedJobs.length === 0}
+                    className="gap-1.5 text-xs"
+                  >
+                    {isDiscovering ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Receipt className="h-3.5 w-3.5" />
+                    )}
+                    Scan Receipts
+                  </Button>
+                </div>
+
+                {receiptDiscovery && (
+                  <div className="space-y-2">
+                    {/* Receipt stats */}
+                    <div className="flex flex-wrap gap-3 text-xs">
+                      <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-muted/50 border border-border">
+                        <Receipt className="h-3.5 w-3.5 text-primary" />
+                        <span className="font-medium">{receiptDiscovery.totalCount}</span>
+                        <span className="text-muted-foreground">receipt{receiptDiscovery.totalCount !== 1 ? "s" : ""} found</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-muted/50 border border-border">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+                        <span className="font-medium">{receiptDiscovery.jobsWithReceipts}</span>
+                        <span className="text-muted-foreground">job{receiptDiscovery.jobsWithReceipts !== 1 ? "s" : ""} with receipts</span>
+                      </div>
+                      {receiptDiscovery.jobsMissing > 0 && (
+                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-warning/5 border border-warning/30">
+                          <FileWarning className="h-3.5 w-3.5 text-warning" />
+                          <span className="font-medium text-warning">{receiptDiscovery.jobsMissing}</span>
+                          <span className="text-warning">job{receiptDiscovery.jobsMissing !== 1 ? "s" : ""} without receipts</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Download buttons */}
+                    {receiptDiscovery.totalCount > 0 && (
+                      <div className="flex items-center gap-2 pt-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleDownloadReceipts}
+                          disabled={isDownloadingZip}
+                          className="gap-1.5 text-xs"
+                        >
+                          {isDownloadingZip ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Download className="h-3.5 w-3.5" />
+                          )}
+                          Download Receipts ZIP
+                        </Button>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={handleDownloadPack}
+                          disabled={isDownloadingPack}
+                          className="gap-1.5 text-xs"
+                        >
+                          {isDownloadingPack ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Package className="h-3.5 w-3.5" />
+                          )}
+                          Download Full Invoice Pack
+                        </Button>
+                      </div>
+                    )}
+
+                    {receiptDiscovery.totalCount === 0 && (
+                      <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/30 border border-border">
+                        <FileWarning className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <p className="text-xs text-muted-foreground">
+                          No receipt files found for the selected jobs.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </ControlSection>
         </>
