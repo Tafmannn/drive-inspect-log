@@ -12,6 +12,10 @@ interface PhotoItem {
 interface PhotoViewerProps {
   photos: PhotoItem[];
   title: string;
+  /** Total photos expected from DB — shows partial-load indicator when > photos.length */
+  totalExpected?: number;
+  /** Called when user taps retry for missing photos */
+  onRetry?: () => void;
 }
 
 export const PhotoViewer = ({ photos, title }: PhotoViewerProps) => {
