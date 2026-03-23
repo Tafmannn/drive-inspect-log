@@ -248,11 +248,11 @@ function drawHeaderBanner(
 
 function drawMetaAndBillTo(doc: jsPDF, data: InvoiceData, y: number): number {
   const contentW = PAGE_W - MARGIN * 2;
-  const gap = 6;
+  const gap = 8;
   const boxW = (contentW - gap) / 2;
   const leftX = MARGIN;
   const rightX = MARGIN + boxW + gap;
-  const radius = 1.5;
+  const radius = 2;
 
   // Determine dynamic height based on content
   const metaLines: Array<[string, string]> = [
@@ -271,57 +271,72 @@ function drawMetaAndBillTo(doc: jsPDF, data: InvoiceData, y: number): number {
   }
   if (data.clientEmail?.trim()) clientLines.push(data.clientEmail.trim());
 
-  const stripH = 7;
-  const clientContentH = stripH + 5 + clientLines.length * 4.8 + 4;
-  const metaContentH = 7 + metaLines.length * 6.5 + 4;
-  const boxH = Math.max(metaContentH, clientContentH, 34);
+  const stripH = 7.5;
+  const clientContentH = stripH + 6 + clientLines.length * 5 + 5;
+  const metaContentH = stripH + 6 + metaLines.length * 6.5 + 5;
+  const boxH = Math.max(metaContentH, clientContentH, 36);
 
-  // --- Left box: Invoice details (rounded) ---
+  // --- Left box: Invoice details with header strip ---
+  doc.setFillColor(...THEME.softBg);
+  doc.roundedRect(leftX, y, boxW, boxH, radius, radius, "F");
   doc.setDrawColor(...THEME.lightBorder);
-  doc.setLineWidth(0.25);
+  doc.setLineWidth(0.3);
   doc.roundedRect(leftX, y, boxW, boxH, radius, radius);
 
-  let ly = y + 8;
-  const labelColX = leftX + 5;
-  const valueColX = leftX + 30;
+  // Header strip
+  doc.setFillColor(...THEME.accent);
+  doc.roundedRect(leftX, y, boxW, stripH, radius, radius, "F");
+  doc.rect(leftX, y + stripH - radius, boxW, radius, "F");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...THEME.white);
+  doc.text("INVOICE DETAILS", leftX + 5, y + 5.2);
+
+  let ly = y + stripH + 6;
+  const labelColX = leftX + 6;
+  const valueColX = leftX + 32;
 
   for (const [label, value] of metaLines) {
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(8.5);
-    doc.setTextColor(...THEME.text);
+    doc.setFontSize(8);
+    doc.setTextColor(...THEME.muted);
     doc.text(label, labelColX, ly);
     doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(...THEME.text);
     doc.text(sanitize(value), valueColX, ly);
     ly += 6.5;
   }
 
-  // --- Right box: Bill To (rounded with navy header) ---
+  // --- Right box: Bill To ---
+  doc.setFillColor(...THEME.softBg);
+  doc.roundedRect(rightX, y, boxW, boxH, radius, radius, "F");
   doc.setDrawColor(...THEME.lightBorder);
-  doc.setLineWidth(0.25);
+  doc.setLineWidth(0.3);
   doc.roundedRect(rightX, y, boxW, boxH, radius, radius);
 
-  // Dark header strip with clipped top corners
+  // Header strip
   doc.setFillColor(...THEME.navy);
   doc.roundedRect(rightX, y, boxW, stripH, radius, radius, "F");
-  // Fill bottom of strip to square off the corners
   doc.rect(rightX, y + stripH - radius, boxW, radius, "F");
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setTextColor(...THEME.white);
-  doc.text("BILL TO", rightX + 5, y + 5);
+  doc.text("BILL TO", rightX + 5, y + 5.2);
 
   // Client details
-  let ry = y + stripH + 5;
+  let ry = y + stripH + 6;
   clientLines.forEach((line, i) => {
     doc.setFont("helvetica", i === 0 ? "bold" : "normal");
     doc.setFontSize(8.5);
     doc.setTextColor(...THEME.text);
-    doc.text(sanitize(line), rightX + 5, ry, { maxWidth: boxW - 10 });
-    ry += 4.8;
+    doc.text(sanitize(line), rightX + 6, ry, { maxWidth: boxW - 12 });
+    ry += 5;
   });
 
-  return y + boxH + 8;
+  return y + boxH + 10;
 }
 
 /* ------------------------------------------------------------------ */
