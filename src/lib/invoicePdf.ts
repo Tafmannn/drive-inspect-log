@@ -187,7 +187,7 @@ function drawHeaderBanner(
   data: InvoiceData,
   logo: CachedImage | null,
 ): number {
-  const bannerH = 38;
+  const bannerH = 44;
 
   // Subtle depth — darker base then navy overlay
   doc.setFillColor(...THEME.navyDeep);
@@ -198,9 +198,9 @@ function drawHeaderBanner(
   // --- Left side: logo image scaled to fill banner height ---
   if (logo) {
     try {
-      const padY = 3;
+      const padY = 2;
       const maxLogoH = bannerH - padY * 2;
-      const maxLogoW = 80;
+      const maxLogoW = 110;
       const scale = Math.min(maxLogoW / logo.w, maxLogoH / logo.h);
       const rw = logo.w * scale;
       const rh = logo.h * scale;
