@@ -233,6 +233,7 @@ const App = () => {
                   <Route path="compliance" element={<ControlCompliance />} />
                   <Route path="finance" element={<ControlFinance />} />
                   <Route path="clients" element={<ControlClients />} />
+                  <Route path="invoice-prep" element={<InvoicePrepScreen />} />
                   <Route path="admin" element={<ControlAdmin />} />
                   <Route
                     path="super-admin"
