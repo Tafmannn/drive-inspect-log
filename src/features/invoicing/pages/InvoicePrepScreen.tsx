@@ -21,7 +21,6 @@ import { KpiStrip, type KpiItem } from "../../control/components/shared/KpiStrip
 import { FilterBar } from "../../control/components/shared/FilterBar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
@@ -45,7 +44,10 @@ import {
   computePreviewTotals,
   type EligibleJob,
 } from "../hooks/useInvoicePrepData";
+import { useCreateInvoice } from "../hooks/useCreateInvoice";
 import { useClients } from "@/hooks/useClients";
+import { useAuth } from "@/context/AuthContext";
+import { toast } from "@/hooks/use-toast";
 import {
   FileText,
   Receipt,
@@ -56,6 +58,8 @@ import {
   Truck,
   CheckCircle2,
   Building2,
+  Loader2,
+  Send,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -90,6 +94,11 @@ export function InvoicePrepScreen() {
 
   // VAT rate
   const [vatRate, setVatRate] = useState(20);
+
+  // Auth & invoice creation
+  const { user } = useAuth();
+  const createInvoice = useCreateInvoice();
+  const [createdInvoiceNumber, setCreatedInvoiceNumber] = useState<string | null>(null);
 
   // Fetch eligible jobs
   const { data: eligibleJobs, isLoading } = useEligibleJobs(selectedClient, {
@@ -133,6 +142,40 @@ export function InvoicePrepScreen() {
   const handleClientChange = (id: string | null) => {
     setSelectedClientId(id);
     setSelectedJobIds(new Set());
+    setCreatedInvoiceNumber(null);
+  };
+
+  // Create invoice handler
+  const handleCreateInvoice = async () => {
+    if (!selectedClient || selectedJobs.length === 0) return;
+    // Get org_id from the user's metadata
+    const { data: { user: authUser } } = await (await import("@/integrations/supabase/client")).supabase.auth.getUser();
+    const orgId = authUser?.app_metadata?.org_id || authUser?.user_metadata?.org_id;
+    if (!orgId) {
+      toast({ title: "Error", description: "Unable to determine organisation.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      const result = await createInvoice.mutateAsync({
+        client: selectedClient,
+        jobs: selectedJobs,
+        vatRate,
+        orgId,
+      });
+      setCreatedInvoiceNumber(result.invoiceNumber);
+      setSelectedJobIds(new Set());
+      toast({
+        title: "Invoice Created",
+        description: `${result.invoiceNumber} — ${result.jobCount} job${result.jobCount !== 1 ? "s" : ""} invoiced.`,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Invoice Creation Failed",
+        description: err.message || "Something went wrong.",
+        variant: "destructive",
+      });
+    }
   };
 
   // KPIs
@@ -473,21 +516,41 @@ export function InvoicePrepScreen() {
                 </div>
               </div>
 
-              {/* Info strip */}
-              <div className="flex items-center gap-4 pt-2 text-xs text-muted-foreground">
-                <div className="flex items-center gap-1">
-                  <FileText className="h-3.5 w-3.5" />
-                  {preview.jobCount} job{preview.jobCount !== 1 ? "s" : ""}
+              {/* Info strip + Create button */}
+              <div className="flex items-center justify-between pt-2">
+                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1">
+                    <FileText className="h-3.5 w-3.5" />
+                    {preview.jobCount} job{preview.jobCount !== 1 ? "s" : ""}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Receipt className="h-3.5 w-3.5" />
+                    {preview.receiptCount} receipt{preview.receiptCount !== 1 ? "s" : ""}
+                  </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <Receipt className="h-3.5 w-3.5" />
-                  {preview.receiptCount} receipt{preview.receiptCount !== 1 ? "s" : ""}
-                </div>
-                <div className="flex items-center gap-1">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-success" />
-                  Read-only preview
-                </div>
+                <Button
+                  onClick={handleCreateInvoice}
+                  disabled={createInvoice.isPending || preview.jobCount === 0}
+                  className="gap-2"
+                >
+                  {createInvoice.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                  Create Invoice
+                </Button>
               </div>
+
+              {/* Success banner */}
+              {createdInvoiceNumber && (
+                <div className="flex items-center gap-2.5 p-3 rounded-lg border border-success/30 bg-success/5">
+                  <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
+                  <p className="text-sm text-success font-medium">
+                    Invoice {createdInvoiceNumber} created successfully.
+                  </p>
+                </div>
+              )}
             </div>
           </ControlSection>
         </>
