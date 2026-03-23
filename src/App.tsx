@@ -52,6 +52,7 @@ import { ControlDrivers } from "@/features/control/pages/ControlDrivers";
 import { ControlCompliance } from "@/features/control/pages/ControlCompliance";
 import { ControlPodReview } from "@/features/control/pages/ControlPodReview";
 import { ControlFinance } from "@/features/control/pages/ControlFinance";
+import { ControlClients } from "@/features/control/pages/ControlClients";
 import { ControlAdmin } from "@/features/control/pages/ControlAdmin";
 import { ControlSuperAdmin } from "@/features/control/pages/ControlSuperAdmin";
 
