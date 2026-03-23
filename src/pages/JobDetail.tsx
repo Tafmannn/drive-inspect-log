@@ -255,6 +255,17 @@ export const JobDetail = () => {
             {job.vehicle_year && <span className="text-muted-foreground"> ({job.vehicle_year})</span>}
           </p>
 
+          {/* Client profile */}
+          {(job.client_company || job.client_name) && (
+            <div className="flex items-center gap-1.5 mt-1.5">
+              <Building className="h-3 w-3 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">
+                {job.client_company || job.client_name}
+                {job.client_email && ` · ${job.client_email}`}
+              </span>
+            </div>
+          )}
+
           {/* Workflow progress */}
           {activeStep && (
             <div className="flex items-center gap-1 mt-3">
