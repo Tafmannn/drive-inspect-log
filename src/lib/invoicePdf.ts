@@ -9,15 +9,18 @@ const MARGIN = 14;
 const PAGE_W = 210; // A4 mm
 
 const THEME = {
-  navy:        [17, 29, 58]   as [number, number, number],
-  navyDeep:    [12, 20, 45]   as [number, number, number],
+  navy:        [17, 29, 58]    as [number, number, number],
+  navyDeep:    [12, 20, 45]    as [number, number, number],
   white:       [255, 255, 255] as [number, number, number],
-  text:        [35, 35, 42]   as [number, number, number],
-  muted:       [100, 105, 115] as [number, number, number],
-  lightBorder: [215, 218, 225] as [number, number, number],
-  tableStripe: [248, 249, 252] as [number, number, number],
-  headerText:  [180, 190, 210] as [number, number, number],
-  accent:      [45, 120, 220]  as [number, number, number],
+  text:        [40, 42, 48]    as [number, number, number],
+  muted:       [120, 125, 135] as [number, number, number],
+  lightBorder: [225, 228, 235] as [number, number, number],
+  softBg:      [245, 247, 252] as [number, number, number],
+  tableStripe: [250, 251, 254] as [number, number, number],
+  headerText:  [200, 210, 230] as [number, number, number],
+  accent:      [0, 82, 204]    as [number, number, number],
+  accentLight: [230, 240, 255] as [number, number, number],
+  sectionTitle:[17, 29, 58]    as [number, number, number],
 };
 
 const AXENTRA_BANK = {
