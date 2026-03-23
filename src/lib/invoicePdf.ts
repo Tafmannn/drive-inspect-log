@@ -376,10 +376,10 @@ function buildChargesTable(doc: jsPDF, items: InvoiceLineItem[], y: number): num
 /* ------------------------------------------------------------------ */
 
 function buildTotalsBlock(doc: jsPDF, data: InvoiceData, y: number): number {
-  y = ensureSpace(doc, y, 32);
+  y = ensureSpace(doc, y, 30);
 
   const rightEdge = PAGE_W - MARGIN;
-  const labelX = rightEdge - 68;
+  const labelX = rightEdge - 64;
 
   const subtotal = data.lineItems.reduce(
     (s, item) => s + Number(item.quantity ?? 1) * Number(item.unitPrice ?? 0), 0,
@@ -388,33 +388,38 @@ function buildTotalsBlock(doc: jsPDF, data: InvoiceData, y: number): number {
   const vatAmount = subtotal * (vatRate / 100);
   const total = subtotal + vatAmount;
 
+  // Thin separator line
+  doc.setDrawColor(...THEME.lightBorder);
+  doc.setLineWidth(0.2);
+  doc.line(labelX, y - 2, rightEdge, y - 2);
+
   // Subtotal
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setTextColor(...THEME.text);
-  doc.text("Subtotal", labelX, y);
-  doc.text(fmt(subtotal), rightEdge, y, { align: "right" });
+  doc.text("Subtotal", labelX, y + 2);
+  doc.text(fmt(subtotal), rightEdge, y + 2, { align: "right" });
   y += 6;
 
   // VAT
-  doc.text(`VAT (${vatRate}%)`, labelX, y);
-  doc.text(fmt(vatAmount), rightEdge, y, { align: "right" });
-  y += 9;
+  doc.text(`VAT (${vatRate}%)`, labelX, y + 2);
+  doc.text(fmt(vatAmount), rightEdge, y + 2, { align: "right" });
+  y += 8;
 
-  // Total row — premium navy block
-  const totalRowH = 11;
-  const totalRowW = 70;
+  // Total row — navy pill
+  const totalRowH = 10;
+  const totalRowW = 66;
   const totalRowX = rightEdge - totalRowW;
   doc.setFillColor(...THEME.navy);
-  doc.roundedRect(totalRowX, y - 6, totalRowW, totalRowH, 1, 1, "F");
+  doc.roundedRect(totalRowX, y - 5, totalRowW, totalRowH, 1.5, 1.5, "F");
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
+  doc.setFontSize(10);
   doc.setTextColor(...THEME.white);
-  doc.text("Total:", totalRowX + 5, y + 1);
-  doc.text(fmt(total), rightEdge - 4, y + 1, { align: "right" });
+  doc.text("Total:", totalRowX + 4, y + 1);
+  doc.text(fmt(total), rightEdge - 3, y + 1, { align: "right" });
 
-  return y + totalRowH + 10;
+  return y + totalRowH + 8;
 }
 
 /* ------------------------------------------------------------------ */
