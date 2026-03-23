@@ -30,7 +30,7 @@ function isSignatureReference(url: string): boolean {
  * Build a tokenized proxy URL that the browser can use directly in <img> tags.
  * No fetch/redirect dance — just a URL the edge function will serve.
  */
-async function getTokenizedProxyUrl(objectPath: string): Promise<string | null> {
+async function getTokenizedProxyUrl(objectPath: string, attempt = 0): Promise<string | null> {
   try {
     const { data } = await supabase.auth.getSession();
     let token = data.session?.access_token;
@@ -39,13 +39,22 @@ async function getTokenizedProxyUrl(objectPath: string): Promise<string | null> 
       token = refreshed.session?.access_token ?? null;
     }
     if (!token) {
-      console.warn('[MediaResolver] No auth token for GCS proxy', { objectPath: objectPath.slice(0, 50) });
+      // Retry once after 500ms — session refresh may still be in-flight
+      if (attempt < 1) {
+        await new Promise((r) => setTimeout(r, 500));
+        return getTokenizedProxyUrl(objectPath, attempt + 1);
+      }
+      console.warn('[MediaResolver] No auth token for GCS proxy after retry', { objectPath: objectPath.slice(0, 50) });
       return null;
     }
 
-    return `${GCS_PROXY_ENDPOINT}?path=${encodeURIComponent(objectPath)}&token=${encodeURIComponent(token)}`;
+    return GCS_PROXY_ENDPOINT + '?path=' + encodeURIComponent(objectPath) + '&token=' + encodeURIComponent(token);
   } catch (err) {
-    console.error('[MediaResolver] getTokenizedProxyUrl failed', {
+    if (attempt < 1) {
+      await new Promise((r) => setTimeout(r, 500));
+      return getTokenizedProxyUrl(objectPath, attempt + 1);
+    }
+    console.error('[MediaResolver] getTokenizedProxyUrl failed after retry', {
       objectPath: objectPath.slice(0, 50),
       error: err instanceof Error ? err.message : String(err),
     });
