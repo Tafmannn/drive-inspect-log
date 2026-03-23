@@ -5,17 +5,19 @@ import autoTable from "jspdf-autotable";
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
 
-const MARGIN = 16;
+const MARGIN = 14;
 const PAGE_W = 210; // A4 mm
 
 const THEME = {
   navy:        [17, 29, 58]   as [number, number, number],
+  navyDeep:    [12, 20, 45]   as [number, number, number],
   white:       [255, 255, 255] as [number, number, number],
-  text:        [40, 40, 48]   as [number, number, number],
-  muted:       [110, 115, 125] as [number, number, number],
-  lightBorder: [210, 212, 218] as [number, number, number],
-  tableStripe: [246, 247, 250] as [number, number, number],
-  headerText:  [220, 225, 235] as [number, number, number],
+  text:        [35, 35, 42]   as [number, number, number],
+  muted:       [100, 105, 115] as [number, number, number],
+  lightBorder: [215, 218, 225] as [number, number, number],
+  tableStripe: [248, 249, 252] as [number, number, number],
+  headerText:  [180, 190, 210] as [number, number, number],
+  accent:      [45, 120, 220]  as [number, number, number],
 };
 
 const AXENTRA_BANK = {
