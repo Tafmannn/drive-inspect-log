@@ -6,14 +6,16 @@ import autoTable from "jspdf-autotable";
 /* ------------------------------------------------------------------ */
 
 const MARGIN = 16;
+const PAGE_W = 210; // A4 mm
 
 const THEME = {
-  navy: [17, 29, 58] as [number, number, number],
-  white: [255, 255, 255] as [number, number, number],
-  text: [50, 50, 50] as [number, number, number],
-  muted: [120, 120, 120] as [number, number, number],
-  lightBorder: [200, 200, 200] as [number, number, number],
-  tableStripe: [248, 248, 250] as [number, number, number],
+  navy:        [17, 29, 58]   as [number, number, number],
+  white:       [255, 255, 255] as [number, number, number],
+  text:        [40, 40, 48]   as [number, number, number],
+  muted:       [110, 115, 125] as [number, number, number],
+  lightBorder: [210, 212, 218] as [number, number, number],
+  tableStripe: [246, 247, 250] as [number, number, number],
+  headerText:  [220, 225, 235] as [number, number, number],
 };
 
 const AXENTRA_BANK = {
@@ -22,6 +24,8 @@ const AXENTRA_BANK = {
   sortCode: "04-00-03",
   accountNumber: "24861835",
 } as const;
+
+const LOGO_URL = "/__l5e/assets-v1/75eb690a-8666-4961-a098-9501ac71eeab/axentra-logo-white.png";
 
 /* ------------------------------------------------------------------ */
 /*  Public types                                                       */
@@ -60,20 +64,33 @@ function fmt(n: number): string {
   return `£${n.toFixed(2)}`;
 }
 
-function safe(val: string | null | undefined, fb = "—"): string {
+/** Sanitize text — remove unicode chars jsPDF can't render */
+function sanitize(val: string | null | undefined, fb = ""): string {
   const t = String(val ?? "").trim();
+  if (!t) return fb;
+  return t
+    .replace(/[\u2192\u2190\u2194\u21D2]/g, "-")  // arrows
+    .replace(/[\u2013\u2014]/g, "-")               // en/em dash
+    .replace(/[\u2018\u2019]/g, "'")               // smart quotes
+    .replace(/[\u201C\u201D]/g, '"')               // smart double quotes
+    .replace(/[\u2026]/g, "...")                    // ellipsis
+    .replace(/[^\x00-\x7F]/g, (ch) => {
+      // Keep £ sign and common latin chars
+      if (ch === "£" || ch === "€") return ch;
+      return "";
+    });
+}
+
+function safe(val: string | null | undefined, fb = "\u2014"): string {
+  const t = sanitize(val);
   return t || fb;
 }
 
 function fmtDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
+  if (!iso) return "-";
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return "-";
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
-}
-
-function pw(doc: jsPDF): number {
-  return doc.internal.pageSize.getWidth();
 }
 
 function lastY(doc: jsPDF, fb = MARGIN): number {
@@ -81,7 +98,7 @@ function lastY(doc: jsPDF, fb = MARGIN): number {
 }
 
 function ensureSpace(doc: jsPDF, y: number, needed: number): number {
-  const bottom = doc.internal.pageSize.getHeight() - 10;
+  const bottom = doc.internal.pageSize.getHeight() - 12;
   if (y + needed > bottom) {
     doc.addPage();
     return MARGIN;
@@ -93,7 +110,7 @@ function ensureSpace(doc: jsPDF, y: number, needed: number): number {
 /*  Logo loader                                                        */
 /* ------------------------------------------------------------------ */
 
-type CachedImage = { dataUrl: string; format: "PNG" | "JPEG" | "WEBP"; w: number; h: number };
+type CachedImage = { dataUrl: string; format: "PNG" | "JPEG"; w: number; h: number };
 
 async function loadImg(url: string): Promise<CachedImage | null> {
   try {
@@ -107,8 +124,7 @@ async function loadImg(url: string): Promise<CachedImage | null> {
       r.readAsDataURL(blob);
     });
     if (!dataUrl) return null;
-    const format = dataUrl.startsWith("data:image/png") ? "PNG" as const
-      : dataUrl.startsWith("data:image/webp") ? "WEBP" as const : "JPEG" as const;
+    const format = dataUrl.startsWith("data:image/png") ? "PNG" as const : "JPEG" as const;
     const img = await new Promise<HTMLImageElement | null>((resolve) => {
       const el = new Image();
       el.crossOrigin = "anonymous";
@@ -116,144 +132,143 @@ async function loadImg(url: string): Promise<CachedImage | null> {
       el.onerror = () => resolve(null);
       el.src = dataUrl;
     });
-    return { dataUrl, format, w: img?.width ?? 200, h: img?.height ?? 60 };
+    return { dataUrl, format, w: img?.width ?? 200, h: img?.height ?? 100 };
   } catch {
     return null;
   }
 }
 
 /* ------------------------------------------------------------------ */
-/*  1. Header Banner                                                   */
+/*  1. Header Banner — Premium Seamless                                */
 /* ------------------------------------------------------------------ */
 
 function drawHeaderBanner(
   doc: jsPDF,
   data: InvoiceData,
-  logo: CachedImage | null
+  logo: CachedImage | null,
 ): number {
-  const pageW = pw(doc);
-  const bannerH = 52;
+  const bannerH = 54;
 
-  // Navy background
+  // Full-width navy fill
   doc.setFillColor(...THEME.navy);
-  doc.rect(0, 0, pageW, bannerH, "F");
+  doc.rect(0, 0, PAGE_W, bannerH, "F");
 
-  // Logo on left — fit within box
+  // --- Logo (left side) — rendered seamlessly onto the navy fill ---
   if (logo) {
     try {
-      const maxW = 44;
-      const maxH = 30;
-      const scale = Math.min(maxW / logo.w, maxH / logo.h);
+      const maxLogoH = 24;
+      const maxLogoW = 50;
+      const scale = Math.min(maxLogoW / logo.w, maxLogoH / logo.h);
       const rw = logo.w * scale;
       const rh = logo.h * scale;
-      const logoY = (bannerH - rh) / 2; // vertically center
+      const logoY = 6; // near top of banner
       doc.addImage(logo.dataUrl, logo.format, MARGIN, logoY, rw, rh);
-    } catch { /* graceful */ }
+    } catch { /* graceful fallback — text-only branding */ }
   }
 
-  // Company name + tagline
+  // Company name — positioned below logo area
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
+  doc.setFontSize(15);
   doc.setTextColor(...THEME.white);
-  doc.text("AXENTRA VEHICLES", MARGIN, 38);
+  doc.text("AXENTRA VEHICLES", MARGIN, 40);
 
+  // Tagline
   doc.setFont("helvetica", "italic");
   doc.setFontSize(8);
-  doc.text("Precision in Every Move", MARGIN, 44);
+  doc.setTextColor(...THEME.headerText);
+  doc.text("Precision in Every Move", MARGIN, 47);
 
-  // "INVOICE" title — right aligned
+  // --- Right side: INVOICE title ---
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(26);
-  doc.text("INVOICE", pageW - MARGIN, 24, { align: "right" });
+  doc.setFontSize(28);
+  doc.setTextColor(...THEME.white);
+  doc.text("INVOICE", PAGE_W - MARGIN, 24, { align: "right" });
 
-  // Invoice number below
+  // Invoice number below title
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
-  doc.text(safe(data.invoiceNumber), pageW - MARGIN, 34, { align: "right" });
+  doc.setTextColor(...THEME.headerText);
+  doc.text(sanitize(data.invoiceNumber, ""), PAGE_W - MARGIN, 34, { align: "right" });
 
-  return bannerH + 8;
+  return bannerH + 10;
 }
 
 /* ------------------------------------------------------------------ */
-/*  2. Meta + Bill To (two side-by-side boxes)                         */
+/*  2. Meta + Bill To (two side-by-side cards)                         */
 /* ------------------------------------------------------------------ */
 
 function drawMetaAndBillTo(doc: jsPDF, data: InvoiceData, y: number): number {
-  const pageW = pw(doc);
-  const contentW = pageW - MARGIN * 2;
-  const boxW = (contentW - 6) / 2; // 6mm gap
+  const contentW = PAGE_W - MARGIN * 2;
+  const gap = 8;
+  const boxW = (contentW - gap) / 2;
   const leftX = MARGIN;
-  const rightX = MARGIN + boxW + 6;
-  const boxH = 36;
+  const rightX = MARGIN + boxW + gap;
+
+  // Determine dynamic height based on content
+  const metaLines: Array<[string, string]> = [
+    ["Invoice No:", sanitize(data.invoiceNumber)],
+    ["Date:", fmtDate(data.issueDate)],
+  ];
+  if (data.dueDate) metaLines.push(["Due Date:", fmtDate(data.dueDate)]);
+  if (data.jobRef) metaLines.push(["Job Ref:", sanitize(data.jobRef)]);
+
+  const clientLines: string[] = [];
+  if (data.clientName?.trim()) clientLines.push(data.clientName.trim());
+  if (data.clientCompany?.trim()) clientLines.push(data.clientCompany.trim());
+  if (data.clientAddress?.trim()) {
+    const parts = data.clientAddress.split(/\n|,/).map(s => s.trim()).filter(Boolean);
+    clientLines.push(...parts);
+  }
+  if (data.clientEmail?.trim()) clientLines.push(data.clientEmail.trim());
+
+  const stripH = 8;
+  const clientContentH = stripH + 6 + clientLines.length * 5 + 4;
+  const metaContentH = 8 + metaLines.length * 7 + 4;
+  const boxH = Math.max(metaContentH, clientContentH, 38);
 
   // --- Left box: Invoice details ---
   doc.setDrawColor(...THEME.lightBorder);
-  doc.setLineWidth(0.4);
+  doc.setLineWidth(0.35);
   doc.rect(leftX, y, boxW, boxH);
 
-  let ly = y + 8;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(...THEME.text);
-  doc.text("Invoice No:", leftX + 4, ly);
-  doc.setFont("helvetica", "normal");
-  doc.text(safe(data.invoiceNumber), leftX + 30, ly);
+  let ly = y + 9;
+  const labelColX = leftX + 6;
+  const valueColX = leftX + 32;
 
-  ly += 7;
-  doc.setFont("helvetica", "bold");
-  doc.text("Date:", leftX + 4, ly);
-  doc.setFont("helvetica", "normal");
-  doc.text(fmtDate(data.issueDate), leftX + 30, ly);
-
-  if (data.dueDate) {
-    ly += 7;
+  for (const [label, value] of metaLines) {
     doc.setFont("helvetica", "bold");
-    doc.text("Due Date:", leftX + 4, ly);
+    doc.setFontSize(9);
+    doc.setTextColor(...THEME.text);
+    doc.text(label, labelColX, ly);
     doc.setFont("helvetica", "normal");
-    doc.text(fmtDate(data.dueDate), leftX + 30, ly);
-  }
-
-  if (data.jobRef) {
+    doc.text(sanitize(value), valueColX, ly);
     ly += 7;
-    doc.setFont("helvetica", "bold");
-    doc.text("Job Ref:", leftX + 4, ly);
-    doc.setFont("helvetica", "normal");
-    doc.text(safe(data.jobRef), leftX + 30, ly);
   }
 
   // --- Right box: Bill To ---
   doc.setDrawColor(...THEME.lightBorder);
+  doc.setLineWidth(0.35);
   doc.rect(rightX, y, boxW, boxH);
 
   // Dark header strip
-  const stripH = 8;
   doc.setFillColor(...THEME.navy);
   doc.rect(rightX, y, boxW, stripH, "F");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
   doc.setTextColor(...THEME.white);
-  doc.text("BILL TO", rightX + 4, y + 5.5);
+  doc.text("BILL TO", rightX + 6, y + 5.5);
 
   // Client details
   let ry = y + stripH + 6;
-  const lines: string[] = [];
-  if (data.clientName?.trim()) lines.push(data.clientName.trim());
-  if (data.clientCompany?.trim()) lines.push(data.clientCompany.trim());
-  if (data.clientAddress?.trim()) {
-    const parts = data.clientAddress.split(/\n|,/).map(s => s.trim()).filter(Boolean);
-    lines.push(...parts);
-  }
-  if (data.clientEmail?.trim()) lines.push(data.clientEmail.trim());
-
-  lines.forEach((line, i) => {
+  clientLines.forEach((line, i) => {
     doc.setFont("helvetica", i === 0 ? "bold" : "normal");
     doc.setFontSize(9);
     doc.setTextColor(...THEME.text);
-    doc.text(line, rightX + 4, ry, { maxWidth: boxW - 8 });
-    ry += 4.5;
+    doc.text(sanitize(line), rightX + 6, ry, { maxWidth: boxW - 12 });
+    ry += 5;
   });
 
-  return y + boxH + 8;
+  return y + boxH + 10;
 }
 
 /* ------------------------------------------------------------------ */
@@ -261,35 +276,40 @@ function drawMetaAndBillTo(doc: jsPDF, data: InvoiceData, y: number): number {
 /* ------------------------------------------------------------------ */
 
 function buildChargesTable(doc: jsPDF, items: InvoiceLineItem[], y: number): number {
-  const contentW = pw(doc) - MARGIN * 2;
-  const descW = contentW - 22 - 28 - 30;
+  const contentW = PAGE_W - MARGIN * 2;
+  const qtyW = 20;
+  const rateW = 28;
+  const totalW = 30;
+  const descW = contentW - qtyW - rateW - totalW;
 
   autoTable(doc, {
     startY: y,
     margin: { left: MARGIN, right: MARGIN },
-    theme: "striped",
+    theme: "plain",
     styles: {
       fontSize: 9,
-      cellPadding: { top: 3, bottom: 3, left: 4, right: 4 },
+      cellPadding: { top: 3.5, bottom: 3.5, left: 5, right: 5 },
       overflow: "linebreak",
       valign: "middle",
       lineColor: THEME.lightBorder,
-      lineWidth: 0.2,
+      lineWidth: 0.3,
+      textColor: THEME.text,
     },
     headStyles: {
       fillColor: THEME.navy,
       textColor: THEME.white,
       fontStyle: "bold",
       fontSize: 9,
+      cellPadding: { top: 4, bottom: 4, left: 5, right: 5 },
     },
     alternateRowStyles: {
       fillColor: THEME.tableStripe,
     },
     columnStyles: {
       0: { cellWidth: descW },
-      1: { cellWidth: 22, halign: "center" },
-      2: { cellWidth: 28, halign: "right" },
-      3: { cellWidth: 30, halign: "right" },
+      1: { cellWidth: qtyW, halign: "center" },
+      2: { cellWidth: rateW, halign: "right" },
+      3: { cellWidth: totalW, halign: "right" },
     },
     showHead: "everyPage",
     head: [["Description", "Qty", "Rate", "Total"]],
@@ -297,15 +317,18 @@ function buildChargesTable(doc: jsPDF, items: InvoiceLineItem[], y: number): num
       const qty = Number(item.quantity ?? 1);
       const price = Number(item.unitPrice ?? 0);
       return [
-        safe(item.description, "Line item"),
+        sanitize(item.description, "Line item"),
         String(qty),
         fmt(price),
         fmt(qty * price),
       ];
     }),
+    didDrawPage: () => {
+      // Optionally re-draw header on new pages if needed
+    },
   });
 
-  return lastY(doc) + 6;
+  return lastY(doc) + 8;
 }
 
 /* ------------------------------------------------------------------ */
@@ -313,47 +336,45 @@ function buildChargesTable(doc: jsPDF, items: InvoiceLineItem[], y: number): num
 /* ------------------------------------------------------------------ */
 
 function buildTotalsBlock(doc: jsPDF, data: InvoiceData, y: number): number {
-  const pageW = pw(doc);
-  const rightX = pageW - MARGIN;
-  const labelX = rightX - 70;
-  const valX = rightX;
+  y = ensureSpace(doc, y, 32);
+
+  const rightEdge = PAGE_W - MARGIN;
+  const labelX = rightEdge - 68;
 
   const subtotal = data.lineItems.reduce(
-    (s, item) => s + Number(item.quantity ?? 1) * Number(item.unitPrice ?? 0), 0
+    (s, item) => s + Number(item.quantity ?? 1) * Number(item.unitPrice ?? 0), 0,
   );
   const vatRate = typeof data.vatRate === "number" ? data.vatRate : 0;
   const vatAmount = subtotal * (vatRate / 100);
   const total = subtotal + vatAmount;
 
-  y = ensureSpace(doc, y, 30);
-
-  // Subtotal row
+  // Subtotal
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(...THEME.text);
   doc.text("Subtotal", labelX, y);
-  doc.text(fmt(subtotal), valX, y, { align: "right" });
+  doc.text(fmt(subtotal), rightEdge, y, { align: "right" });
   y += 6;
 
-  // VAT row
+  // VAT
   doc.text(`VAT (${vatRate}%)`, labelX, y);
-  doc.text(fmt(vatAmount), valX, y, { align: "right" });
-  y += 8;
+  doc.text(fmt(vatAmount), rightEdge, y, { align: "right" });
+  y += 9;
 
-  // Total row — dark filled background
-  const totalRowH = 10;
-  const totalRowW = 72;
-  const totalRowX = rightX - totalRowW;
+  // Total row — premium navy block
+  const totalRowH = 11;
+  const totalRowW = 70;
+  const totalRowX = rightEdge - totalRowW;
   doc.setFillColor(...THEME.navy);
-  doc.rect(totalRowX, y - 5, totalRowW, totalRowH, "F");
+  doc.roundedRect(totalRowX, y - 6, totalRowW, totalRowH, 1, 1, "F");
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(...THEME.white);
-  doc.text("Total:", totalRowX + 4, y + 1.5);
-  doc.text(fmt(total), valX - 3, y + 1.5, { align: "right" });
+  doc.text("Total:", totalRowX + 5, y + 1);
+  doc.text(fmt(total), rightEdge - 4, y + 1, { align: "right" });
 
-  return y + totalRowH + 8;
+  return y + totalRowH + 10;
 }
 
 /* ------------------------------------------------------------------ */
@@ -362,25 +383,27 @@ function buildTotalsBlock(doc: jsPDF, data: InvoiceData, y: number): number {
 
 function drawNotes(doc: jsPDF, notes: string | undefined, y: number): number {
   if (!notes?.trim()) return y;
-  y = ensureSpace(doc, y, 16);
+  y = ensureSpace(doc, y, 18);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.setTextColor(...THEME.navy);
   doc.text("Notes", MARGIN, y);
+
+  // Subtle underline
   const tw = doc.getTextWidth("Notes");
   doc.setDrawColor(...THEME.navy);
   doc.setLineWidth(0.4);
-  doc.line(MARGIN, y + 1, MARGIN + tw, y + 1);
-  y += 6;
+  doc.line(MARGIN, y + 1.2, MARGIN + tw, y + 1.2);
+  y += 7;
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(...THEME.text);
-  const contentW = pw(doc) - MARGIN * 2;
-  const lines = doc.splitTextToSize(notes.trim(), contentW);
+  const contentW = PAGE_W - MARGIN * 2;
+  const lines = doc.splitTextToSize(sanitize(notes), contentW);
   doc.text(lines, MARGIN, y);
-  return y + lines.length * 4.2 + 6;
+  return y + lines.length * 4.2 + 8;
 }
 
 /* ------------------------------------------------------------------ */
@@ -388,9 +411,9 @@ function drawNotes(doc: jsPDF, notes: string | undefined, y: number): number {
 /* ------------------------------------------------------------------ */
 
 function drawPaymentInfo(doc: jsPDF, data: InvoiceData, y: number): number {
-  y = ensureSpace(doc, y, 50);
+  y = ensureSpace(doc, y, 52);
 
-  // Title with underline
+  // Section title with underline
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.setTextColor(...THEME.navy);
@@ -398,45 +421,44 @@ function drawPaymentInfo(doc: jsPDF, data: InvoiceData, y: number): number {
   const tw = doc.getTextWidth("Payment Information");
   doc.setDrawColor(...THEME.navy);
   doc.setLineWidth(0.4);
-  doc.line(MARGIN, y + 1, MARGIN + tw, y + 1);
-  y += 8;
+  doc.line(MARGIN, y + 1.2, MARGIN + tw, y + 1.2);
+  y += 9;
 
-  // Bank details as simple label: value lines
+  // Bank details — label: value pairs
   const details: Array<[string, string]> = [
-    ["Bank", AXENTRA_BANK.bankName],
-    ["Account Name", AXENTRA_BANK.accountName],
-    ["Sort Code", AXENTRA_BANK.sortCode],
-    ["Account Number", AXENTRA_BANK.accountNumber],
+    ["Bank:", AXENTRA_BANK.bankName],
+    ["Account Name:", AXENTRA_BANK.accountName],
+    ["Sort Code:", AXENTRA_BANK.sortCode],
+    ["Account Number:", AXENTRA_BANK.accountNumber],
   ];
 
   doc.setFontSize(9);
-  doc.setTextColor(...THEME.text);
-
   for (const [label, value] of details) {
     doc.setFont("helvetica", "bold");
-    const labelText = `${label}: `;
+    doc.setTextColor(...THEME.text);
+    const labelText = `${label} `;
     doc.text(labelText, MARGIN, y);
     const labelW = doc.getTextWidth(labelText);
     doc.setFont("helvetica", "normal");
     doc.text(value, MARGIN + labelW, y);
-    y += 5;
+    y += 5.5;
   }
 
   y += 3;
 
-  // Reference note
+  // Reference note — italicized
   const refNote = data.paymentTerms?.trim()
-    ? `${data.paymentTerms}. Please use invoice number as payment reference.`
+    ? `${sanitize(data.paymentTerms)}. Please use invoice number as payment reference.`
     : "Please use invoice number as payment reference.";
 
   doc.setFont("helvetica", "italic");
   doc.setFontSize(8);
   doc.setTextColor(...THEME.muted);
-  const contentW = pw(doc) - MARGIN * 2;
+  const contentW = PAGE_W - MARGIN * 2;
   const lines = doc.splitTextToSize(refNote, contentW);
   doc.text(lines, MARGIN, y);
 
-  return y + lines.length * 3.5 + 6;
+  return y + lines.length * 3.5 + 8;
 }
 
 /* ------------------------------------------------------------------ */
@@ -445,7 +467,8 @@ function drawPaymentInfo(doc: jsPDF, data: InvoiceData, y: number): number {
 
 export async function generateInvoicePdf(data: InvoiceData): Promise<Blob> {
   const doc = new jsPDF({ unit: "mm", format: "a4", compress: true });
-  const logo = await loadImg(data.logoUrl || "/axentra-logo-white.png");
+  const logoSrc = data.logoUrl || LOGO_URL;
+  const logo = await loadImg(logoSrc);
 
   let y = drawHeaderBanner(doc, data, logo);
   y = drawMetaAndBillTo(doc, data, y);
@@ -463,7 +486,7 @@ export async function downloadInvoicePdf(data: InvoiceData): Promise<void> {
   try {
     const a = document.createElement("a");
     a.href = url;
-    a.download = `AXENTRA_INV_${safe(data.invoiceNumber, "INVOICE")}.pdf`;
+    a.download = `AXENTRA_INV_${sanitize(data.invoiceNumber, "INVOICE")}.pdf`;
     a.click();
   } finally {
     URL.revokeObjectURL(url);
