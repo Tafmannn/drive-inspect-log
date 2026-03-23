@@ -154,6 +154,7 @@ export const PodReport = () => {
   const [resolvedPhotos, setResolvedPhotos] = useState<Record<string, string>>(
     {}
   );
+  const [photoRetryCount, setPhotoRetryCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -166,7 +167,6 @@ export const PodReport = () => {
       const delivery = job.inspections.find((i) => i.type === "delivery");
 
       const nextSignatures: Record<string, string | null> = {};
-      const nextPhotos: Record<string, string> = {};
 
       const sigSlots: Record<string, string | null> = {
         pickup_driver: pickup?.driver_signature_url ?? null,
@@ -221,17 +221,46 @@ export const PodReport = () => {
         setResolvedSignatures(nextSignatures);
       }
 
-      // Resolve photos independently via Promise.allSettled
+      // Resolve photos with retry for failures
+      const allPhotos = job.photos ?? [];
+      const nextPhotos: Record<string, string> = {};
+      const failedPhotos: typeof allPhotos = [];
+
       const photoResults = await Promise.allSettled(
-        (job.photos ?? []).map(async (photo) => {
+        allPhotos.map(async (photo) => {
           const resolved = await resolveMediaUrlAsync(photo.url);
-          return { id: photo.id, resolved };
+          return { id: photo.id, resolved, photo };
         })
       );
 
       for (const result of photoResults) {
         if (result.status === "fulfilled" && result.value.resolved && !cancelled) {
           nextPhotos[result.value.id] = result.value.resolved;
+        } else if (result.status === "fulfilled" && !result.value.resolved) {
+          failedPhotos.push(result.value.photo);
+        } else if (result.status === "rejected") {
+          const photo = allPhotos.find((_, i) => photoResults[i] === result);
+          if (photo) failedPhotos.push(photo);
+        }
+      }
+
+      // Retry pass for failed photos after 2s
+      if (failedPhotos.length > 0 && !cancelled) {
+        console.info('[PodReport] Retrying ' + failedPhotos.length + ' failed photos');
+        await new Promise(r => setTimeout(r, 2000));
+        const retryResults = await Promise.allSettled(
+          failedPhotos.map(async (photo) => {
+            const resolved = await resolveMediaUrlAsync(photo.url);
+            return { id: photo.id, resolved };
+          })
+        );
+        for (const result of retryResults) {
+          if (result.status === "fulfilled" && result.value.resolved && !cancelled) {
+            nextPhotos[result.value.id] = result.value.resolved;
+          } else {
+            const failedId = result.status === "fulfilled" ? result.value.id : "unknown";
+            console.warn('[PodReport] Photo failed after retry', { id: failedId });
+          }
         }
       }
 
@@ -245,7 +274,9 @@ export const PodReport = () => {
     return () => {
       cancelled = true;
     };
-  }, [job]);
+  }, [job, photoRetryCount]);
+
+  const handleRetryPhotos = () => setPhotoRetryCount(c => c + 1);
 
   const handleDownloadPhotos = async (photos: Photo[], label: string) => {
     if (!photos.length) {
@@ -714,6 +745,8 @@ export const PodReport = () => {
 
                 <PhotoViewer
                   title="Collection Photos"
+                  totalExpected={pickupPhotos.length}
+                  onRetry={handleRetryPhotos}
                   photos={pickupPhotos
                     .map((p) => ({
                       url: resolvedPhotos[p.id] || "",
@@ -726,6 +759,8 @@ export const PodReport = () => {
 
                 <PhotoViewer
                   title="Delivery Photos"
+                  totalExpected={deliveryPhotos.length}
+                  onRetry={handleRetryPhotos}
                   photos={deliveryPhotos
                     .map((p) => ({
                       url: resolvedPhotos[p.id] || "",
@@ -738,6 +773,8 @@ export const PodReport = () => {
 
                 <PhotoViewer
                   title="Damage Close-ups"
+                  totalExpected={damagePhotos.length}
+                  onRetry={handleRetryPhotos}
                   photos={damagePhotos
                     .map((p) => ({
                       url: resolvedPhotos[p.id] || "",

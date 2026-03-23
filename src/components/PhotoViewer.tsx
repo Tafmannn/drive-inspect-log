@@ -12,9 +12,13 @@ interface PhotoItem {
 interface PhotoViewerProps {
   photos: PhotoItem[];
   title: string;
+  /** Total photos expected from DB — shows partial-load indicator when > photos.length */
+  totalExpected?: number;
+  /** Called when user taps retry for missing photos */
+  onRetry?: () => void;
 }
 
-export const PhotoViewer = ({ photos, title }: PhotoViewerProps) => {
+export const PhotoViewer = ({ photos, title, totalExpected, onRetry }: PhotoViewerProps) => {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [zoom, setZoom] = useState(1);
   const [downloading, setDownloading] = useState(false);
@@ -83,13 +87,30 @@ export const PhotoViewer = ({ photos, title }: PhotoViewerProps) => {
     }
   }, [selectedIndex, photos, downloading]);
 
-  if (photos.length === 0) return null;
+  const hasMissing = totalExpected != null && totalExpected > photos.length;
+
+  if (photos.length === 0 && !hasMissing) return null;
 
   return (
     <div className="space-y-2">
-      <h4 className="text-sm font-medium text-foreground">
-        {title} ({photos.length})
-      </h4>
+      <div className="flex items-center gap-2">
+        <h4 className="text-sm font-medium text-foreground">
+          {title} ({photos.length}{hasMissing ? '/' + totalExpected : ''})
+        </h4>
+        {hasMissing && onRetry && (
+          <button
+            onClick={onRetry}
+            className="text-[11px] text-primary font-medium hover:underline"
+          >
+            Retry {(totalExpected ?? 0) - photos.length} missing
+          </button>
+        )}
+      </div>
+      {hasMissing && !onRetry && (
+        <p className="text-[11px] text-muted-foreground">
+          {(totalExpected ?? 0) - photos.length} photo(s) couldn't be loaded
+        </p>
+      )}
       <div className="grid grid-cols-4 gap-2">
         {photos.map((photo, idx) => (
           <button
