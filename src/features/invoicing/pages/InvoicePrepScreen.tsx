@@ -195,6 +195,100 @@ export function InvoicePrepScreen() {
     }
   };
 
+  // Discover receipts when jobs are selected
+  const handleDiscoverReceipts = async () => {
+    if (selectedJobs.length === 0) return;
+    setIsDiscovering(true);
+    try {
+      const result = await discoverReceipts(selectedJobs);
+      setReceiptDiscovery(result);
+    } catch {
+      toast({ title: "Error", description: "Failed to discover receipts.", variant: "destructive" });
+    } finally {
+      setIsDiscovering(false);
+    }
+  };
+
+  // Download receipts ZIP
+  const handleDownloadReceipts = async () => {
+    if (!receiptDiscovery || receiptDiscovery.files.length === 0) return;
+    setIsDownloadingZip(true);
+    try {
+      const { blob, succeeded, failed } = await buildReceiptsZip(receiptDiscovery.files);
+      if (succeeded === 0) {
+        toast({ title: "No Receipts Downloaded", description: "All files failed to download.", variant: "destructive" });
+        return;
+      }
+      const zipName = "receipts_" + (createdInvoiceNumber || "selected_jobs") + ".zip";
+      downloadBlob(blob, zipName);
+      if (failed.length > 0) {
+        toast({
+          title: succeeded + " downloaded, " + failed.length + " failed",
+          description: failed.slice(0, 3).join(", "),
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Receipts Downloaded", description: succeeded + " file(s) in ZIP." });
+      }
+    } catch (err: any) {
+      toast({ title: "Download Failed", description: err.message || "Unknown error", variant: "destructive" });
+    } finally {
+      setIsDownloadingZip(false);
+    }
+  };
+
+  // Download full invoice pack (PDF + receipts)
+  const handleDownloadPack = async () => {
+    if (!selectedClient || selectedJobs.length === 0) return;
+    setIsDownloadingPack(true);
+    try {
+      // Generate the invoice PDF
+      const invoiceData: InvoiceData = {
+        invoiceNumber: createdInvoiceNumber || "PREVIEW",
+        issueDate: new Date().toISOString(),
+        clientName: selectedClient.name,
+        clientCompany: selectedClient.company || undefined,
+        clientEmail: selectedClient.email || undefined,
+        clientAddress: selectedClient.address || undefined,
+        vatRate,
+        lineItems: selectedJobs.map((j) => ({
+          description: "Vehicle transport - " + j.vehicle_reg + " (" + j.vehicle_make + " " + j.vehicle_model + ")",
+          quantity: 1,
+          unitPrice: j.total_price ?? 0,
+        })),
+      };
+      const pdfBlob = await generateInvoicePdf(invoiceData);
+
+      // Discover receipts if not already done
+      const discovery = receiptDiscovery || await discoverReceipts(selectedJobs);
+      if (!receiptDiscovery) setReceiptDiscovery(discovery);
+
+      const { blob, succeeded, failed } = await buildInvoicePack(
+        pdfBlob,
+        createdInvoiceNumber || "PREVIEW",
+        discovery.files
+      );
+
+      const packName = "invoice_pack_" + (createdInvoiceNumber || "preview") + ".zip";
+      downloadBlob(blob, packName);
+
+      const desc = "PDF + " + succeeded + " receipt(s)";
+      if (failed.length > 0) {
+        toast({
+          title: "Pack Downloaded (" + failed.length + " receipts failed)",
+          description: desc + ". Failed: " + failed.slice(0, 2).join(", "),
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Invoice Pack Downloaded", description: desc });
+      }
+    } catch (err: any) {
+      toast({ title: "Pack Download Failed", description: err.message || "Unknown error", variant: "destructive" });
+    } finally {
+      setIsDownloadingPack(false);
+    }
+  };
+
   // KPIs
   const kpis: KpiItem[] = [
     {
