@@ -25,7 +25,7 @@ const AXENTRA_BANK = {
   accountNumber: "24861835",
 } as const;
 
-const LOGO_URL = "/__l5e/assets-v1/75eb690a-8666-4961-a098-9501ac71eeab/axentra-logo-white.png";
+const LOGO_URL = "/__l5e/assets-v1/f41614c9-47c3-4524-9979-18ec682de972/axentra-logo-dark.png";
 
 /* ------------------------------------------------------------------ */
 /*  Public types                                                       */
