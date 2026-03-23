@@ -461,21 +461,33 @@ function buildTotalsBlock(doc: jsPDF, data: InvoiceData, y: number): number {
 
 function drawNotes(doc: jsPDF, notes: string | undefined, y: number): number {
   if (!notes?.trim()) return y;
-  y = ensureSpace(doc, y, 16);
+  y = ensureSpace(doc, y, 20);
+
+  // Light background card for notes
+  const contentW = PAGE_W - MARGIN * 2;
+  const noteText = sanitize(notes);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  const lines = doc.splitTextToSize(noteText, contentW - 12);
+  const cardH = 10 + lines.length * 4 + 4;
+
+  doc.setFillColor(...THEME.softBg);
+  doc.roundedRect(MARGIN, y - 2, contentW, cardH, 2, 2, "F");
+  doc.setDrawColor(...THEME.lightBorder);
+  doc.setLineWidth(0.2);
+  doc.roundedRect(MARGIN, y - 2, contentW, cardH, 2, 2);
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(...THEME.navy);
-  doc.text("Notes", MARGIN, y);
-  y += 5;
+  doc.setFontSize(8);
+  doc.setTextColor(...THEME.sectionTitle);
+  doc.text("NOTES", MARGIN + 6, y + 4);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
   doc.setTextColor(...THEME.text);
-  const contentW = PAGE_W - MARGIN * 2;
-  const lines = doc.splitTextToSize(sanitize(notes), contentW);
-  doc.text(lines, MARGIN, y);
-  return y + lines.length * 4 + 6;
+  doc.text(lines, MARGIN + 6, y + 10);
+
+  return y + cardH + 6;
 }
 
 /* ------------------------------------------------------------------ */
