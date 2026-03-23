@@ -134,6 +134,56 @@ export type Database = {
         }
         Relationships: []
       }
+      clients: {
+        Row: {
+          address: string | null
+          company: string | null
+          created_at: string
+          email: string | null
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          org_id: string
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          company?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          org_id: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          company?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          org_id?: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clients_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       damage_items: {
         Row: {
           area: string | null
@@ -638,11 +688,63 @@ export type Database = {
           },
         ]
       }
+      invoice_items: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string
+          id: string
+          invoice_id: string
+          job_id: string | null
+          quantity: number
+          sort_order: number
+          unit_price: number
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          description?: string
+          id?: string
+          invoice_id: string
+          job_id?: string | null
+          quantity?: number
+          sort_order?: number
+          unit_price?: number
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string
+          id?: string
+          invoice_id?: string
+          job_id?: string | null
+          quantity?: number
+          sort_order?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_items_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           client_address: string | null
           client_company: string | null
           client_email: string | null
+          client_id: string | null
           client_name: string
           created_at: string
           due_date: string | null
@@ -666,6 +768,7 @@ export type Database = {
           client_address?: string | null
           client_company?: string | null
           client_email?: string | null
+          client_id?: string | null
           client_name: string
           created_at?: string
           due_date?: string | null
@@ -689,6 +792,7 @@ export type Database = {
           client_address?: string | null
           client_company?: string | null
           client_email?: string | null
+          client_id?: string | null
           client_name?: string
           created_at?: string
           due_date?: string | null
@@ -709,6 +813,13 @@ export type Database = {
           vat_rate?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "invoices_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "invoices_job_id_fkey"
             columns: ["job_id"]
