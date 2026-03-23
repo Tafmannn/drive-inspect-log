@@ -9,15 +9,18 @@ const MARGIN = 14;
 const PAGE_W = 210; // A4 mm
 
 const THEME = {
-  navy:        [17, 29, 58]   as [number, number, number],
-  navyDeep:    [12, 20, 45]   as [number, number, number],
+  navy:        [17, 29, 58]    as [number, number, number],
+  navyDeep:    [12, 20, 45]    as [number, number, number],
   white:       [255, 255, 255] as [number, number, number],
-  text:        [35, 35, 42]   as [number, number, number],
-  muted:       [100, 105, 115] as [number, number, number],
-  lightBorder: [215, 218, 225] as [number, number, number],
-  tableStripe: [248, 249, 252] as [number, number, number],
-  headerText:  [180, 190, 210] as [number, number, number],
-  accent:      [45, 120, 220]  as [number, number, number],
+  text:        [40, 42, 48]    as [number, number, number],
+  muted:       [120, 125, 135] as [number, number, number],
+  lightBorder: [225, 228, 235] as [number, number, number],
+  softBg:      [245, 247, 252] as [number, number, number],
+  tableStripe: [250, 251, 254] as [number, number, number],
+  headerText:  [200, 210, 230] as [number, number, number],
+  accent:      [0, 82, 204]    as [number, number, number],
+  accentLight: [230, 240, 255] as [number, number, number],
+  sectionTitle:[17, 29, 58]    as [number, number, number],
 };
 
 const AXENTRA_BANK = {
@@ -187,20 +190,19 @@ function drawHeaderBanner(
   data: InvoiceData,
   logo: CachedImage | null,
 ): number {
-  const bannerH = 44;
+  const bannerH = 46;
 
-  // Subtle depth — darker base then navy overlay
-  doc.setFillColor(...THEME.navyDeep);
-  doc.rect(0, 0, PAGE_W, bannerH, "F");
+  // Solid navy banner
   doc.setFillColor(...THEME.navy);
   doc.rect(0, 0, PAGE_W, bannerH, "F");
 
-  // --- Left side: logo image scaled to fill banner height ---
+  // --- Left side: logo at ~45% of content width ---
+  const contentW = PAGE_W - MARGIN * 2;
   if (logo) {
     try {
       const padY = 2;
       const maxLogoH = bannerH - padY * 2;
-      const maxLogoW = 110;
+      const maxLogoW = contentW * 0.48; // ~45-48% of content width
       const scale = Math.min(maxLogoW / logo.w, maxLogoH / logo.h);
       const rw = logo.w * scale;
       const rh = logo.h * scale;
@@ -210,23 +212,31 @@ function drawHeaderBanner(
     } catch { /* graceful fallback */ }
   }
 
-  // --- Right side: INVOICE title ---
+  // --- Right side: INVOICE title + prominent number ---
   const centerY = bannerH / 2;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(24);
+  doc.setFontSize(26);
   doc.setTextColor(...THEME.white);
-  doc.text("INVOICE", PAGE_W - MARGIN, centerY - 2, { align: "right" });
+  doc.text("INVOICE", PAGE_W - MARGIN, centerY - 4, { align: "right" });
 
-  // Invoice number — smaller, muted
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-  doc.setTextColor(...THEME.headerText);
+  // Invoice number — prominent white, not muted
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(255, 255, 255);
   const invNum = sanitize(data.invoiceNumber, "");
   doc.text(invNum, PAGE_W - MARGIN, centerY + 6, { align: "right" });
 
-  // Thin accent line at bottom of banner
+  // Job ref underneath if present — lighter
+  if (data.jobRef) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...THEME.headerText);
+    doc.text(`Ref: ${sanitize(data.jobRef)}`, PAGE_W - MARGIN, centerY + 12, { align: "right" });
+  }
+
+  // Accent line at bottom
   doc.setDrawColor(...THEME.accent);
-  doc.setLineWidth(0.6);
+  doc.setLineWidth(0.8);
   doc.line(0, bannerH, PAGE_W, bannerH);
 
   return bannerH + 8;
@@ -238,11 +248,11 @@ function drawHeaderBanner(
 
 function drawMetaAndBillTo(doc: jsPDF, data: InvoiceData, y: number): number {
   const contentW = PAGE_W - MARGIN * 2;
-  const gap = 6;
+  const gap = 8;
   const boxW = (contentW - gap) / 2;
   const leftX = MARGIN;
   const rightX = MARGIN + boxW + gap;
-  const radius = 1.5;
+  const radius = 2;
 
   // Determine dynamic height based on content
   const metaLines: Array<[string, string]> = [
@@ -261,57 +271,72 @@ function drawMetaAndBillTo(doc: jsPDF, data: InvoiceData, y: number): number {
   }
   if (data.clientEmail?.trim()) clientLines.push(data.clientEmail.trim());
 
-  const stripH = 7;
-  const clientContentH = stripH + 5 + clientLines.length * 4.8 + 4;
-  const metaContentH = 7 + metaLines.length * 6.5 + 4;
-  const boxH = Math.max(metaContentH, clientContentH, 34);
+  const stripH = 7.5;
+  const clientContentH = stripH + 6 + clientLines.length * 5 + 5;
+  const metaContentH = stripH + 6 + metaLines.length * 6.5 + 5;
+  const boxH = Math.max(metaContentH, clientContentH, 36);
 
-  // --- Left box: Invoice details (rounded) ---
+  // --- Left box: Invoice details with header strip ---
+  doc.setFillColor(...THEME.softBg);
+  doc.roundedRect(leftX, y, boxW, boxH, radius, radius, "F");
   doc.setDrawColor(...THEME.lightBorder);
-  doc.setLineWidth(0.25);
+  doc.setLineWidth(0.3);
   doc.roundedRect(leftX, y, boxW, boxH, radius, radius);
 
-  let ly = y + 8;
-  const labelColX = leftX + 5;
-  const valueColX = leftX + 30;
+  // Header strip
+  doc.setFillColor(...THEME.accent);
+  doc.roundedRect(leftX, y, boxW, stripH, radius, radius, "F");
+  doc.rect(leftX, y + stripH - radius, boxW, radius, "F");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...THEME.white);
+  doc.text("INVOICE DETAILS", leftX + 5, y + 5.2);
+
+  let ly = y + stripH + 6;
+  const labelColX = leftX + 6;
+  const valueColX = leftX + 32;
 
   for (const [label, value] of metaLines) {
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(8.5);
-    doc.setTextColor(...THEME.text);
+    doc.setFontSize(8);
+    doc.setTextColor(...THEME.muted);
     doc.text(label, labelColX, ly);
     doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(...THEME.text);
     doc.text(sanitize(value), valueColX, ly);
     ly += 6.5;
   }
 
-  // --- Right box: Bill To (rounded with navy header) ---
+  // --- Right box: Bill To ---
+  doc.setFillColor(...THEME.softBg);
+  doc.roundedRect(rightX, y, boxW, boxH, radius, radius, "F");
   doc.setDrawColor(...THEME.lightBorder);
-  doc.setLineWidth(0.25);
+  doc.setLineWidth(0.3);
   doc.roundedRect(rightX, y, boxW, boxH, radius, radius);
 
-  // Dark header strip with clipped top corners
+  // Header strip
   doc.setFillColor(...THEME.navy);
   doc.roundedRect(rightX, y, boxW, stripH, radius, radius, "F");
-  // Fill bottom of strip to square off the corners
   doc.rect(rightX, y + stripH - radius, boxW, radius, "F");
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setTextColor(...THEME.white);
-  doc.text("BILL TO", rightX + 5, y + 5);
+  doc.text("BILL TO", rightX + 5, y + 5.2);
 
   // Client details
-  let ry = y + stripH + 5;
+  let ry = y + stripH + 6;
   clientLines.forEach((line, i) => {
     doc.setFont("helvetica", i === 0 ? "bold" : "normal");
     doc.setFontSize(8.5);
     doc.setTextColor(...THEME.text);
-    doc.text(sanitize(line), rightX + 5, ry, { maxWidth: boxW - 10 });
-    ry += 4.8;
+    doc.text(sanitize(line), rightX + 6, ry, { maxWidth: boxW - 12 });
+    ry += 5;
   });
 
-  return y + boxH + 8;
+  return y + boxH + 10;
 }
 
 /* ------------------------------------------------------------------ */
@@ -331,22 +356,26 @@ function buildChargesTable(doc: jsPDF, items: InvoiceLineItem[], y: number): num
     theme: "plain",
     styles: {
       fontSize: 8.5,
-      cellPadding: { top: 3, bottom: 3, left: 4, right: 4 },
+      cellPadding: { top: 3.5, bottom: 3.5, left: 5, right: 5 },
       overflow: "linebreak",
       valign: "middle",
       lineColor: THEME.lightBorder,
-      lineWidth: 0.2,
+      lineWidth: 0.15,
       textColor: THEME.text,
     },
     headStyles: {
       fillColor: THEME.navy,
       textColor: THEME.white,
       fontStyle: "bold",
-      fontSize: 8,
-      cellPadding: { top: 3.5, bottom: 3.5, left: 4, right: 4 },
+      fontSize: 7.5,
+      cellPadding: { top: 4, bottom: 4, left: 5, right: 5 },
     },
     alternateRowStyles: {
       fillColor: THEME.tableStripe,
+    },
+    bodyStyles: {
+      lineColor: THEME.lightBorder,
+      lineWidth: 0.15,
     },
     columnStyles: {
       0: { cellWidth: descW },
@@ -355,7 +384,7 @@ function buildChargesTable(doc: jsPDF, items: InvoiceLineItem[], y: number): num
       3: { cellWidth: totalW, halign: "right", fontStyle: "bold" },
     },
     showHead: "everyPage",
-    head: [["Description", "Qty", "Rate", "Total"]],
+    head: [["DESCRIPTION", "QTY", "RATE", "TOTAL"]],
     body: items.map(item => {
       const qty = Number(item.quantity ?? 1);
       const price = Number(item.unitPrice ?? 0);
@@ -368,7 +397,7 @@ function buildChargesTable(doc: jsPDF, items: InvoiceLineItem[], y: number): num
     }),
   });
 
-  return lastY(doc) + 6;
+  return lastY(doc) + 8;
 }
 
 /* ------------------------------------------------------------------ */
@@ -376,10 +405,11 @@ function buildChargesTable(doc: jsPDF, items: InvoiceLineItem[], y: number): num
 /* ------------------------------------------------------------------ */
 
 function buildTotalsBlock(doc: jsPDF, data: InvoiceData, y: number): number {
-  y = ensureSpace(doc, y, 30);
+  y = ensureSpace(doc, y, 34);
 
   const rightEdge = PAGE_W - MARGIN;
-  const labelX = rightEdge - 64;
+  const blockW = 72;
+  const labelX = rightEdge - blockW;
 
   const subtotal = data.lineItems.reduce(
     (s, item) => s + Number(item.quantity ?? 1) * Number(item.unitPrice ?? 0), 0,
@@ -388,38 +418,41 @@ function buildTotalsBlock(doc: jsPDF, data: InvoiceData, y: number): number {
   const vatAmount = subtotal * (vatRate / 100);
   const total = subtotal + vatAmount;
 
-  // Thin separator line
-  doc.setDrawColor(...THEME.lightBorder);
-  doc.setLineWidth(0.2);
-  doc.line(labelX, y - 2, rightEdge, y - 2);
-
   // Subtotal
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
-  doc.setTextColor(...THEME.text);
+  doc.setTextColor(...THEME.muted);
   doc.text("Subtotal", labelX, y + 2);
+  doc.setTextColor(...THEME.text);
   doc.text(fmt(subtotal), rightEdge, y + 2, { align: "right" });
-  y += 6;
+  y += 6.5;
 
   // VAT
+  doc.setTextColor(...THEME.muted);
   doc.text(`VAT (${vatRate}%)`, labelX, y + 2);
+  doc.setTextColor(...THEME.text);
   doc.text(fmt(vatAmount), rightEdge, y + 2, { align: "right" });
-  y += 8;
+  y += 7;
 
-  // Total row — navy pill
-  const totalRowH = 10;
-  const totalRowW = 66;
-  const totalRowX = rightEdge - totalRowW;
+  // Separator
+  doc.setDrawColor(...THEME.lightBorder);
+  doc.setLineWidth(0.3);
+  doc.line(labelX, y - 1, rightEdge, y - 1);
+  y += 3;
+
+  // Total row — navy rounded pill
+  const totalRowH = 11;
+  const totalRowX = labelX;
   doc.setFillColor(...THEME.navy);
-  doc.roundedRect(totalRowX, y - 5, totalRowW, totalRowH, 1.5, 1.5, "F");
+  doc.roundedRect(totalRowX, y - 5, blockW, totalRowH, 2, 2, "F");
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
+  doc.setFontSize(10.5);
   doc.setTextColor(...THEME.white);
-  doc.text("Total:", totalRowX + 4, y + 1);
-  doc.text(fmt(total), rightEdge - 3, y + 1, { align: "right" });
+  doc.text("TOTAL", totalRowX + 5, y + 1.5);
+  doc.text(fmt(total), rightEdge - 4, y + 1.5, { align: "right" });
 
-  return y + totalRowH + 8;
+  return y + totalRowH + 10;
 }
 
 /* ------------------------------------------------------------------ */
@@ -428,21 +461,33 @@ function buildTotalsBlock(doc: jsPDF, data: InvoiceData, y: number): number {
 
 function drawNotes(doc: jsPDF, notes: string | undefined, y: number): number {
   if (!notes?.trim()) return y;
-  y = ensureSpace(doc, y, 16);
+  y = ensureSpace(doc, y, 20);
+
+  // Light background card for notes
+  const contentW = PAGE_W - MARGIN * 2;
+  const noteText = sanitize(notes);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.5);
+  const lines = doc.splitTextToSize(noteText, contentW - 12);
+  const cardH = 10 + lines.length * 4 + 4;
+
+  doc.setFillColor(...THEME.softBg);
+  doc.roundedRect(MARGIN, y - 2, contentW, cardH, 2, 2, "F");
+  doc.setDrawColor(...THEME.lightBorder);
+  doc.setLineWidth(0.2);
+  doc.roundedRect(MARGIN, y - 2, contentW, cardH, 2, 2);
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(...THEME.navy);
-  doc.text("Notes", MARGIN, y);
-  y += 5;
+  doc.setFontSize(8);
+  doc.setTextColor(...THEME.sectionTitle);
+  doc.text("NOTES", MARGIN + 6, y + 4);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
   doc.setTextColor(...THEME.text);
-  const contentW = PAGE_W - MARGIN * 2;
-  const lines = doc.splitTextToSize(sanitize(notes), contentW);
-  doc.text(lines, MARGIN, y);
-  return y + lines.length * 4 + 6;
+  doc.text(lines, MARGIN + 6, y + 10);
+
+  return y + cardH + 6;
 }
 
 /* ------------------------------------------------------------------ */
@@ -450,33 +495,48 @@ function drawNotes(doc: jsPDF, notes: string | undefined, y: number): number {
 /* ------------------------------------------------------------------ */
 
 function drawPaymentInfo(doc: jsPDF, data: InvoiceData, y: number): number {
-  y = ensureSpace(doc, y, 46);
+  y = ensureSpace(doc, y, 50);
 
-  // Section title
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(...THEME.navy);
-  doc.text("Payment Information", MARGIN, y);
-  y += 7;
+  const contentW = PAGE_W - MARGIN * 2;
 
-  // Bank details
+  // Payment card with accent left border
   const details: Array<[string, string]> = [
     ["Bank:", AXENTRA_BANK.bankName],
     ["Account Name:", AXENTRA_BANK.accountName],
     ["Sort Code:", AXENTRA_BANK.sortCode],
     ["Account Number:", AXENTRA_BANK.accountNumber],
   ];
+  const cardH = 10 + details.length * 5.5 + 10;
 
+  // Card background
+  doc.setFillColor(...THEME.softBg);
+  doc.roundedRect(MARGIN, y - 2, contentW, cardH, 2, 2, "F");
+  doc.setDrawColor(...THEME.lightBorder);
+  doc.setLineWidth(0.2);
+  doc.roundedRect(MARGIN, y - 2, contentW, cardH, 2, 2);
+
+  // Accent left border
+  doc.setFillColor(...THEME.accent);
+  doc.rect(MARGIN, y - 2, 1.2, cardH, "F");
+
+  // Section title
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(...THEME.sectionTitle);
+  doc.text("PAYMENT INFORMATION", MARGIN + 7, y + 4);
+  y += 10;
+
+  // Bank details
   doc.setFontSize(8.5);
   for (const [label, value] of details) {
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(...THEME.text);
-    const labelText = `${label} `;
-    doc.text(labelText, MARGIN, y);
-    const labelW = doc.getTextWidth(labelText);
+    doc.setTextColor(...THEME.muted);
+    doc.text(label, MARGIN + 7, y);
+    const labelW = doc.getTextWidth(`${label} `);
     doc.setFont("helvetica", "normal");
-    doc.text(value, MARGIN + labelW, y);
-    y += 5;
+    doc.setTextColor(...THEME.text);
+    doc.text(value, MARGIN + 7 + labelW, y);
+    y += 5.5;
   }
 
   y += 2;
@@ -487,13 +547,12 @@ function drawPaymentInfo(doc: jsPDF, data: InvoiceData, y: number): number {
     : "Please use invoice number as payment reference.";
 
   doc.setFont("helvetica", "italic");
-  doc.setFontSize(7.5);
+  doc.setFontSize(7);
   doc.setTextColor(...THEME.muted);
-  const contentW = PAGE_W - MARGIN * 2;
-  const lines = doc.splitTextToSize(refNote, contentW);
-  doc.text(lines, MARGIN, y);
+  const lines = doc.splitTextToSize(refNote, contentW - 14);
+  doc.text(lines, MARGIN + 7, y);
 
-  return y + lines.length * 3.5 + 6;
+  return y + lines.length * 3.5 + 8;
 }
 
 /* ------------------------------------------------------------------ */
