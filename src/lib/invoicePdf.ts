@@ -320,9 +320,9 @@ function drawMetaAndBillTo(doc: jsPDF, data: InvoiceData, y: number): number {
 
 function buildChargesTable(doc: jsPDF, items: InvoiceLineItem[], y: number): number {
   const contentW = PAGE_W - MARGIN * 2;
-  const qtyW = 20;
-  const rateW = 28;
-  const totalW = 30;
+  const qtyW = 18;
+  const rateW = 26;
+  const totalW = 28;
   const descW = contentW - qtyW - rateW - totalW;
 
   autoTable(doc, {
@@ -330,20 +330,20 @@ function buildChargesTable(doc: jsPDF, items: InvoiceLineItem[], y: number): num
     margin: { left: MARGIN, right: MARGIN },
     theme: "plain",
     styles: {
-      fontSize: 9,
-      cellPadding: { top: 3.5, bottom: 3.5, left: 5, right: 5 },
+      fontSize: 8.5,
+      cellPadding: { top: 3, bottom: 3, left: 4, right: 4 },
       overflow: "linebreak",
       valign: "middle",
       lineColor: THEME.lightBorder,
-      lineWidth: 0.3,
+      lineWidth: 0.2,
       textColor: THEME.text,
     },
     headStyles: {
       fillColor: THEME.navy,
       textColor: THEME.white,
       fontStyle: "bold",
-      fontSize: 9,
-      cellPadding: { top: 4, bottom: 4, left: 5, right: 5 },
+      fontSize: 8,
+      cellPadding: { top: 3.5, bottom: 3.5, left: 4, right: 4 },
     },
     alternateRowStyles: {
       fillColor: THEME.tableStripe,
@@ -352,7 +352,7 @@ function buildChargesTable(doc: jsPDF, items: InvoiceLineItem[], y: number): num
       0: { cellWidth: descW },
       1: { cellWidth: qtyW, halign: "center" },
       2: { cellWidth: rateW, halign: "right" },
-      3: { cellWidth: totalW, halign: "right" },
+      3: { cellWidth: totalW, halign: "right", fontStyle: "bold" },
     },
     showHead: "everyPage",
     head: [["Description", "Qty", "Rate", "Total"]],
@@ -366,12 +366,9 @@ function buildChargesTable(doc: jsPDF, items: InvoiceLineItem[], y: number): num
         fmt(qty * price),
       ];
     }),
-    didDrawPage: () => {
-      // Optionally re-draw header on new pages if needed
-    },
   });
 
-  return lastY(doc) + 8;
+  return lastY(doc) + 6;
 }
 
 /* ------------------------------------------------------------------ */
