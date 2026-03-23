@@ -497,7 +497,8 @@ function drawPaymentInfo(doc: jsPDF, data: InvoiceData, y: number): number {
 export async function generateInvoicePdf(data: InvoiceData): Promise<Blob> {
   const doc = new jsPDF({ unit: "mm", format: "a4", compress: true });
   const logoSrc = data.logoUrl || LOGO_URL;
-  const logo = await loadImg(logoSrc);
+  let logo = await loadImg(logoSrc);
+  if (logo) logo = await recolorToNavy(logo);
 
   let y = drawHeaderBanner(doc, data, logo);
   y = drawMetaAndBillTo(doc, data, y);
