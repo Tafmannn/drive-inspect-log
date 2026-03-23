@@ -489,12 +489,20 @@ export const JobForm = () => {
     try {
       if (isEdit && jobId) {
         await updateMutation.mutateAsync({ jobId, input: payload });
+        if (selectedClientId) {
+          const { linkJobToClient } = await import("@/lib/clientApi");
+          await linkJobToClient(jobId, selectedClientId).catch(() => {});
+        }
         const updRef = payload.external_job_number || jobId.slice(0, 8);
         toast({ title: `Job ${updRef} updated.` });
         navigate(`/jobs/${jobId}`);
       } else {
         if (dk) clearDraft(dk);
         const job = await createMutation.mutateAsync(payload);
+        if (selectedClientId) {
+          const { linkJobToClient } = await import("@/lib/clientApi");
+          await linkJobToClient(job.id, selectedClientId).catch(() => {});
+        }
         const newRef = job.external_job_number || job.id.slice(0, 8);
         toast({ title: `Job ${newRef} created.` });
         navigate(`/jobs/${job.id}`);
