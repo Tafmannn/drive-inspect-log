@@ -226,12 +226,18 @@ function drawHeaderBanner(
   const invNum = sanitize(data.invoiceNumber, "");
   doc.text(invNum, PAGE_W - MARGIN, centerY + 6, { align: "right" });
 
-  // Job ref underneath if present — lighter
+  // Job ref or job count underneath
   if (data.jobRef) {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.5);
     doc.setTextColor(...THEME.headerText);
-    doc.text(`Ref: ${sanitize(data.jobRef)}`, PAGE_W - MARGIN, centerY + 12, { align: "right" });
+    var refLabel = "Ref: " + sanitize(data.jobRef);
+    doc.text(refLabel, PAGE_W - MARGIN, centerY + 12, { align: "right" });
+  } else if (data.lineItems.length > 1) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...THEME.headerText);
+    doc.text(String(data.lineItems.length) + " items", PAGE_W - MARGIN, centerY + 12, { align: "right" });
   }
 
   // Accent line at bottom
@@ -344,11 +350,11 @@ function drawMetaAndBillTo(doc: jsPDF, data: InvoiceData, y: number): number {
 /* ------------------------------------------------------------------ */
 
 function buildChargesTable(doc: jsPDF, items: InvoiceLineItem[], y: number): number {
-  const contentW = PAGE_W - MARGIN * 2;
-  const qtyW = 18;
-  const rateW = 26;
-  const totalW = 28;
-  const descW = contentW - qtyW - rateW - totalW;
+  var contentW = PAGE_W - MARGIN * 2;
+  var qtyW = 18;
+  var rateW = 26;
+  var totalW = 28;
+  var descW = contentW - qtyW - rateW - totalW;
 
   autoTable(doc, {
     startY: y,
@@ -362,6 +368,7 @@ function buildChargesTable(doc: jsPDF, items: InvoiceLineItem[], y: number): num
       lineColor: THEME.lightBorder,
       lineWidth: 0.15,
       textColor: THEME.text,
+      minCellHeight: 8,
     },
     headStyles: {
       fillColor: THEME.navy,
@@ -385,9 +392,9 @@ function buildChargesTable(doc: jsPDF, items: InvoiceLineItem[], y: number): num
     },
     showHead: "everyPage",
     head: [["DESCRIPTION", "QTY", "RATE", "TOTAL"]],
-    body: items.map(item => {
-      const qty = Number(item.quantity ?? 1);
-      const price = Number(item.unitPrice ?? 0);
+    body: items.map(function(item) {
+      var qty = Number(item.quantity ?? 1);
+      var price = Number(item.unitPrice ?? 0);
       return [
         sanitize(item.description, "Line item"),
         String(qty),
