@@ -450,20 +450,16 @@ function drawNotes(doc: jsPDF, notes: string | undefined, y: number): number {
 /* ------------------------------------------------------------------ */
 
 function drawPaymentInfo(doc: jsPDF, data: InvoiceData, y: number): number {
-  y = ensureSpace(doc, y, 52);
+  y = ensureSpace(doc, y, 46);
 
-  // Section title with underline
+  // Section title
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
+  doc.setFontSize(9);
   doc.setTextColor(...THEME.navy);
   doc.text("Payment Information", MARGIN, y);
-  const tw = doc.getTextWidth("Payment Information");
-  doc.setDrawColor(...THEME.navy);
-  doc.setLineWidth(0.4);
-  doc.line(MARGIN, y + 1.2, MARGIN + tw, y + 1.2);
-  y += 9;
+  y += 7;
 
-  // Bank details — label: value pairs
+  // Bank details
   const details: Array<[string, string]> = [
     ["Bank:", AXENTRA_BANK.bankName],
     ["Account Name:", AXENTRA_BANK.accountName],
@@ -471,7 +467,7 @@ function drawPaymentInfo(doc: jsPDF, data: InvoiceData, y: number): number {
     ["Account Number:", AXENTRA_BANK.accountNumber],
   ];
 
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   for (const [label, value] of details) {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...THEME.text);
@@ -480,24 +476,24 @@ function drawPaymentInfo(doc: jsPDF, data: InvoiceData, y: number): number {
     const labelW = doc.getTextWidth(labelText);
     doc.setFont("helvetica", "normal");
     doc.text(value, MARGIN + labelW, y);
-    y += 5.5;
+    y += 5;
   }
 
-  y += 3;
+  y += 2;
 
-  // Reference note — italicized
+  // Reference note
   const refNote = data.paymentTerms?.trim()
     ? `${sanitize(data.paymentTerms)}. Please use invoice number as payment reference.`
     : "Please use invoice number as payment reference.";
 
   doc.setFont("helvetica", "italic");
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setTextColor(...THEME.muted);
   const contentW = PAGE_W - MARGIN * 2;
   const lines = doc.splitTextToSize(refNote, contentW);
   doc.text(lines, MARGIN, y);
 
-  return y + lines.length * 3.5 + 8;
+  return y + lines.length * 3.5 + 6;
 }
 
 /* ------------------------------------------------------------------ */
