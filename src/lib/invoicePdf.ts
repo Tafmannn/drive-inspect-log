@@ -187,7 +187,7 @@ function drawHeaderBanner(
   data: InvoiceData,
   logo: CachedImage | null,
 ): number {
-  const bannerH = 38;
+  const bannerH = 44;
 
   // Subtle depth — darker base then navy overlay
   doc.setFillColor(...THEME.navyDeep);
