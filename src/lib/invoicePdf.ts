@@ -428,27 +428,21 @@ function buildTotalsBlock(doc: jsPDF, data: InvoiceData, y: number): number {
 
 function drawNotes(doc: jsPDF, notes: string | undefined, y: number): number {
   if (!notes?.trim()) return y;
-  y = ensureSpace(doc, y, 18);
+  y = ensureSpace(doc, y, 16);
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
+  doc.setFontSize(9);
   doc.setTextColor(...THEME.navy);
   doc.text("Notes", MARGIN, y);
-
-  // Subtle underline
-  const tw = doc.getTextWidth("Notes");
-  doc.setDrawColor(...THEME.navy);
-  doc.setLineWidth(0.4);
-  doc.line(MARGIN, y + 1.2, MARGIN + tw, y + 1.2);
-  y += 7;
+  y += 5;
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setTextColor(...THEME.text);
   const contentW = PAGE_W - MARGIN * 2;
   const lines = doc.splitTextToSize(sanitize(notes), contentW);
   doc.text(lines, MARGIN, y);
-  return y + lines.length * 4.2 + 8;
+  return y + lines.length * 4 + 6;
 }
 
 /* ------------------------------------------------------------------ */
