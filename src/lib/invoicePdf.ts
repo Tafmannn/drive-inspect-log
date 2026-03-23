@@ -388,7 +388,7 @@ function drawNotes(doc: jsPDF, notes: string | undefined, y: number): number {
 /* ------------------------------------------------------------------ */
 
 function drawPaymentInfo(doc: jsPDF, data: InvoiceData, y: number): number {
-  y = ensureSpace(doc, y, 40);
+  y = ensureSpace(doc, y, 50);
 
   // Title with underline
   doc.setFont("helvetica", "bold");
