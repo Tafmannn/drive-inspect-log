@@ -60,7 +60,18 @@ import {
   Building2,
   Loader2,
   Send,
+  Download,
+  Package,
+  FileWarning,
 } from "lucide-react";
+import {
+  discoverReceipts,
+  buildReceiptsZip,
+  buildInvoicePack,
+  downloadBlob,
+  type ReceiptDiscoveryResult,
+} from "../api/receiptExport";
+import { generateInvoicePdf, type InvoiceData } from "@/lib/invoicePdf";
 import { cn } from "@/lib/utils";
 
 function fmtGbp(n: number): string {
