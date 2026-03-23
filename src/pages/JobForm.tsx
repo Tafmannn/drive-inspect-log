@@ -68,6 +68,9 @@ export const JobForm = () => {
   const [driverPickerOpen, setDriverPickerOpen] = useState(false);
   const [driverSearch, setDriverSearch] = useState("");
 
+  // Client linking state
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+
   // Fetch active drivers for picker
   const { data: activeDrivers } = useQuery({
     queryKey: ["job-form-drivers"],
