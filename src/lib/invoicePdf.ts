@@ -6,11 +6,14 @@ const TEMPLATE_PATH = "/invoice-template.png";
 const PAGE_W = 210;
 const PAGE_H = 297;
 
+// Conversion from 794×1123 px canvas to mm
+const PX_TO_MM_X = PAGE_W / 794;
+const PX_TO_MM_Y = PAGE_H / 1123;
+
 // Locked colors
 const DARK: [number, number, number] = [24, 33, 53];
 const MID: [number, number, number] = [78, 89, 110];
 const BLUE: [number, number, number] = [17, 42, 102];
-const WHITE: [number, number, number] = [255, 255, 255];
 
 // Locked bank details
 const AXENTRA_BANK = {
@@ -21,49 +24,50 @@ const AXENTRA_BANK = {
   paymentTermsText: "Payable within 7 days. Please use invoice number as payment reference.",
 } as const;
 
-// Locked overlay coordinates tuned for your template
+// All coordinates converted from user-provided px on 794×1123 canvas
 const POS = {
-  invoiceNoTopRight: { x: 186.0, y: 55.0, maxW: 34 },
-
   leftCard: {
-    invoiceNo: { x: 48.0, y: 76.5, maxW: 38 },
-    date: { x: 34.0, y: 83.5, maxW: 38 },
+    invoiceNo: { x: 173 * PX_TO_MM_X, y: 171 * PX_TO_MM_Y, maxW: 150 * PX_TO_MM_X },
+    date:      { x: 171 * PX_TO_MM_X, y: 198 * PX_TO_MM_Y, maxW: 150 * PX_TO_MM_X },
   },
 
   rightCard: {
-    line1: { x: 112.8, y: 85.0, maxW: 74 },
-    line2: { x: 112.8, y: 91.0, maxW: 74 },
-    line3: { x: 112.8, y: 97.0, maxW: 74 },
-    line4: { x: 112.8, y: 103.0, maxW: 74 },
+    line1: { x: 465 * PX_TO_MM_X, y: 201 * PX_TO_MM_Y, maxW: 74 },
+    line2: { x: 465 * PX_TO_MM_X, y: 229 * PX_TO_MM_Y, maxW: 74 },
+    line3: { x: 465 * PX_TO_MM_X, y: 257 * PX_TO_MM_Y, maxW: 74 },
+    line4: { x: 465 * PX_TO_MM_X, y: 285 * PX_TO_MM_Y, maxW: 74 },
   },
 
   table: {
-    startY: 121.0,
+    startY: 341 * PX_TO_MM_Y,
     rowGap: 8.0,
-    description: { x: 25.0, maxW: 101 },
-    qty: { x: 139.2 },
-    rate: { x: 165.6 },
-    total: { x: 189.4 },
+    description: { x: 93 * PX_TO_MM_X, maxW: 445 * PX_TO_MM_X },
+    qty:   { x: (567 + 34) * PX_TO_MM_X },   // right edge
+    rate:  { x: (642 + 72) * PX_TO_MM_X },   // right edge
+    total: { x: (727 + 58) * PX_TO_MM_X },   // right edge
     maxRows: 4,
   },
 
   totals: {
-    subtotal: { x: 189.4, y: 160.0 },
-    vat: { x: 189.4, y: 167.0 },
-    total: { x: 189.4, y: 178.0 },
+    rightEdge: (692 + 92) * PX_TO_MM_X,
+    subtotal: { y: 492 * PX_TO_MM_Y },
+    vat:      { y: 526 * PX_TO_MM_Y },
+    total:    { y: 565 * PX_TO_MM_Y },
   },
 
   payment: {
-    bank: { x: 39.2, y: 186.0, maxW: 80 },
-    accountName: { x: 54.5, y: 193.5, maxW: 160 },
-    sortCode: { x: 39.2, y: 200.8, maxW: 80 },
-    accountNumber: { x: 51.9, y: 208.1, maxW: 80 },
-    terms: { x: 17.8, y: 216.0, maxW: 175 },
+    labelX: 70 * PX_TO_MM_X,
+    valueX: 150 * PX_TO_MM_X,
+    bank:        { y: 706 * PX_TO_MM_Y },
+    accountName: { y: 738 * PX_TO_MM_Y },
+    sortCode:    { y: 771 * PX_TO_MM_Y },
+    accountNumber: { y: 804 * PX_TO_MM_Y },
+    terms:       { x: 70 * PX_TO_MM_X, y: 838 * PX_TO_MM_Y, maxW: 175 },
   },
 
   notes: {
     title: { x: 16.0, y: 248.0 },
-    body: { x: 16.0, y: 253.0, maxW: 178, lineH: 4.2, maxLines: 8 },
+    body:  { x: 16.0, y: 253.0, maxW: 178, lineH: 4.2, maxLines: 8 },
   },
 } as const;
 
@@ -136,9 +140,7 @@ function fitSingleLine(
   }
 ): string {
   setText(doc, opts);
-
   if (doc.getTextWidth(text) <= maxWidth) return text;
-
   let out = text;
   while (out.length > 0 && doc.getTextWidth(`${out}…`) > maxWidth) {
     out = out.slice(0, -1);
@@ -159,9 +161,7 @@ function clipLines(
 ): string[] {
   setText(doc, opts);
   const lines = doc.splitTextToSize(text, maxWidth) as string[];
-
   if (lines.length <= maxLines) return lines;
-
   const clipped = lines.slice(0, maxLines);
   clipped[maxLines - 1] = fitSingleLine(doc, clipped[maxLines - 1], maxWidth, opts);
   return clipped;
@@ -191,7 +191,6 @@ function getFallbackDescription(data: InvoiceData): string {
     data.route ? `– ${data.route}` : "",
     data.jobRef ? `– Job ${data.jobRef}` : "",
   ].filter(Boolean);
-
   return parts.join(" ");
 }
 
@@ -199,7 +198,6 @@ function getVisibleItems(data: InvoiceData): InvoiceLineItem[] {
   if (data.lineItems.length > 0) {
     return data.lineItems.slice(0, POS.table.maxRows).map(normalizeLineItem);
   }
-
   return [
     {
       description: getFallbackDescription(data),
@@ -224,13 +222,10 @@ function getVatRate(data: InvoiceData): number {
 
 function buildBillToLines(data: InvoiceData): string[] {
   const lines: string[] = [];
-
   if (data.clientName?.trim()) lines.push(data.clientName.trim());
   if (data.clientCompany?.trim()) lines.push(data.clientCompany.trim());
-
   const addressLines = splitAddressLines(data.clientAddress);
   lines.push(...addressLines);
-
   return lines.slice(0, 4);
 }
 
@@ -238,9 +233,7 @@ async function loadImageAsDataUrl(url: string): Promise<string | null> {
   try {
     const response = await fetch(url, { cache: "no-store" });
     if (!response.ok) return null;
-
     const blob = await response.blob();
-
     return await new Promise<string | null>((resolve) => {
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -270,34 +263,20 @@ function drawInvoiceMeta(doc: jsPDF, data: InvoiceData): void {
     ? data.invoiceNumber
     : `INV-${data.invoiceNumber}`;
 
-  setText(doc, { size: 10.5, style: "bold", color: WHITE });
-  doc.text(
-    fitSingleLine(doc, displayInvoiceNo, POS.invoiceNoTopRight.maxW, {
-      size: 10.5,
-      style: "bold",
-      color: WHITE,
-    }),
-    POS.invoiceNoTopRight.x,
-    POS.invoiceNoTopRight.y,
-    { align: "right" }
-  );
-
+  // Invoice number in left card
   setText(doc, { size: 9.5, style: "normal", color: DARK });
   doc.text(
     fitSingleLine(doc, displayInvoiceNo, POS.leftCard.invoiceNo.maxW, {
-      size: 9.5,
-      style: "normal",
-      color: DARK,
+      size: 9.5, style: "normal", color: DARK,
     }),
     POS.leftCard.invoiceNo.x,
     POS.leftCard.invoiceNo.y
   );
 
+  // Date in left card
   doc.text(
     fitSingleLine(doc, safeDate(data.issueDate), POS.leftCard.date.maxW, {
-      size: 9.5,
-      style: "normal",
-      color: DARK,
+      size: 9.5, style: "normal", color: DARK,
     }),
     POS.leftCard.date.x,
     POS.leftCard.date.y
@@ -316,21 +295,15 @@ function drawBillTo(doc: jsPDF, data: InvoiceData): void {
   lines.forEach((line, idx) => {
     const target = targets[idx];
     if (!target) return;
-
     const isFirst = idx === 0;
-
-    setText(doc, {
+    const opts = {
       size: isFirst ? 9.3 : 9.1,
-      style: isFirst ? "bold" : "normal",
-      color: DARK,
-    });
-
+      style: (isFirst ? "bold" : "normal") as "bold" | "normal",
+      color: DARK as [number, number, number],
+    };
+    setText(doc, opts);
     doc.text(
-      fitSingleLine(doc, line, target.maxW, {
-        size: isFirst ? 9.3 : 9.1,
-        style: isFirst ? "bold" : "normal",
-        color: DARK,
-      }),
+      fitSingleLine(doc, line, target.maxW, opts),
       target.x,
       target.y
     );
@@ -346,6 +319,7 @@ function drawLineItems(doc: jsPDF, data: InvoiceData): void {
     const unitPrice = Number(item.unitPrice ?? 0);
     const lineTotal = qty * unitPrice;
 
+    // Description: single line, clamped with ellipsis
     setText(doc, { size: 8.8, style: "normal", color: DARK });
     doc.text(
       fitSingleLine(
@@ -358,8 +332,9 @@ function drawLineItems(doc: jsPDF, data: InvoiceData): void {
       y
     );
 
+    // Qty, Rate, Total: right-aligned at right edge of each column
     setText(doc, { size: 8.8, style: "bold", color: DARK });
-    doc.text(String(qty), POS.table.qty.x, y, { align: "center" });
+    doc.text(String(qty), POS.table.qty.x, y, { align: "right" });
     doc.text(money(unitPrice), POS.table.rate.x, y, { align: "right" });
     doc.text(money(lineTotal), POS.table.total.x, y, { align: "right" });
   });
@@ -370,88 +345,54 @@ function drawTotals(doc: jsPDF, data: InvoiceData): void {
   const vatRate = getVatRate(data);
   const vatAmount = subtotal * (vatRate / 100);
   const total = subtotal + vatAmount;
+  const rx = POS.totals.rightEdge;
 
   setText(doc, { size: 9.0, style: "bold", color: DARK });
-  doc.text(money(subtotal), POS.totals.subtotal.x, POS.totals.subtotal.y, { align: "right" });
-  doc.text(money(vatAmount), POS.totals.vat.x, POS.totals.vat.y, { align: "right" });
+  doc.text(money(subtotal), rx, POS.totals.subtotal.y, { align: "right" });
+  doc.text(money(vatAmount), rx, POS.totals.vat.y, { align: "right" });
 
   setText(doc, { size: 13.0, style: "bold", color: BLUE });
-  doc.text(money(total), POS.totals.total.x, POS.totals.total.y, { align: "right" });
+  doc.text(money(total), rx, POS.totals.total.y, { align: "right" });
 }
 
 function drawPaymentDetails(doc: jsPDF, data: InvoiceData): void {
-  setText(doc, { size: 9.0, style: "normal", color: DARK });
-  doc.text(
-    fitSingleLine(doc, AXENTRA_BANK.bankName, POS.payment.bank.maxW, {
-      size: 9.0,
-      style: "normal",
-      color: DARK,
-    }),
-    POS.payment.bank.x,
-    POS.payment.bank.y
-  );
+  const lx = POS.payment.labelX;
+  const vx = POS.payment.valueX;
 
+  // Bank
+  setText(doc, { size: 9.0, style: "normal", color: DARK });
+  doc.text("Bank:", lx, POS.payment.bank.y);
+  doc.text(AXENTRA_BANK.bankName, vx, POS.payment.bank.y);
+
+  // Account Name
+  doc.text("Account:", lx, POS.payment.accountName.y);
   setText(doc, { size: 9.0, style: "bold", color: DARK });
-  doc.text(
-    fitSingleLine(doc, AXENTRA_BANK.accountName, POS.payment.accountName.maxW, {
-      size: 9.0,
-      style: "bold",
-      color: DARK,
-    }),
-    POS.payment.accountName.x,
-    POS.payment.accountName.y
-  );
+  doc.text(AXENTRA_BANK.accountName, vx, POS.payment.accountName.y);
 
-  doc.text(
-    fitSingleLine(doc, AXENTRA_BANK.sortCode, POS.payment.sortCode.maxW, {
-      size: 9.0,
-      style: "bold",
-      color: DARK,
-    }),
-    POS.payment.sortCode.x,
-    POS.payment.sortCode.y
-  );
-
+  // Sort Code
   setText(doc, { size: 9.0, style: "normal", color: DARK });
-  doc.text(
-    fitSingleLine(doc, AXENTRA_BANK.accountNumber, POS.payment.accountNumber.maxW, {
-      size: 9.0,
-      style: "normal",
-      color: DARK,
-    }),
-    POS.payment.accountNumber.x,
-    POS.payment.accountNumber.y
-  );
+  doc.text("Sort Code:", lx, POS.payment.sortCode.y);
+  setText(doc, { size: 9.0, style: "bold", color: DARK });
+  doc.text(AXENTRA_BANK.sortCode, vx, POS.payment.sortCode.y);
 
+  // Account Number
+  setText(doc, { size: 9.0, style: "normal", color: DARK });
+  doc.text("Account No:", lx, POS.payment.accountNumber.y);
+  doc.text(AXENTRA_BANK.accountNumber, vx, POS.payment.accountNumber.y);
+
+  // Payment terms
   const termsText = data.paymentTerms?.trim()
     ? `${data.paymentTerms.trim()} Please use invoice number as payment reference.`
     : AXENTRA_BANK.paymentTermsText;
 
   const lines = clipLines(doc, termsText, POS.payment.terms.maxW, 2, {
-    size: 8.6,
-    style: "normal",
-    color: DARK,
+    size: 8.6, style: "normal", color: DARK,
   });
 
   if (lines.length > 0) {
-    const prefix = "Payable within 7 days.";
-
-    if (lines[0].startsWith(prefix)) {
-      setText(doc, { size: 8.6, style: "bold", color: DARK });
-      doc.text(prefix, POS.payment.terms.x, POS.payment.terms.y);
-
-      const rest = lines[0].slice(prefix.length).trim();
-      if (rest) {
-        setText(doc, { size: 8.6, style: "normal", color: DARK });
-        doc.text(rest, POS.payment.terms.x + 40.5, POS.payment.terms.y);
-      }
-    } else {
-      setText(doc, { size: 8.6, style: "normal", color: DARK });
-      doc.text(lines[0], POS.payment.terms.x, POS.payment.terms.y);
-    }
-
+    setText(doc, { size: 8.6, style: "normal", color: DARK });
+    doc.text(lines[0], POS.payment.terms.x, POS.payment.terms.y);
     if (lines[1]) {
-      setText(doc, { size: 8.6, style: "normal", color: DARK });
       doc.text(lines[1], POS.payment.terms.x, POS.payment.terms.y + 4.2);
     }
   }
@@ -464,9 +405,7 @@ function drawNotes(doc: jsPDF, notes?: string): void {
   doc.text("Notes", POS.notes.title.x, POS.notes.title.y);
 
   const lines = clipLines(doc, notes.trim(), POS.notes.body.maxW, POS.notes.body.maxLines, {
-    size: 8.2,
-    style: "normal",
-    color: MID,
+    size: 8.2, style: "normal", color: MID,
   });
 
   setText(doc, { size: 8.2, style: "normal", color: MID });
@@ -492,6 +431,7 @@ export async function generateInvoicePdf(data: InvoiceData): Promise<Blob> {
   drawBillTo(doc, data);
   drawLineItems(doc, data);
   drawTotals(doc, data);
+  drawPaymentDetails(doc, data);
   drawNotes(doc, data.notes);
 
   return doc.output("blob");
