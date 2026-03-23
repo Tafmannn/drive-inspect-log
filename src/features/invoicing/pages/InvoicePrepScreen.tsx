@@ -111,6 +111,12 @@ export function InvoicePrepScreen() {
   const createInvoice = useCreateInvoice();
   const [createdInvoiceNumber, setCreatedInvoiceNumber] = useState<string | null>(null);
 
+  // Receipt export state
+  const [receiptDiscovery, setReceiptDiscovery] = useState<ReceiptDiscoveryResult | null>(null);
+  const [isDiscovering, setIsDiscovering] = useState(false);
+  const [isDownloadingZip, setIsDownloadingZip] = useState(false);
+  const [isDownloadingPack, setIsDownloadingPack] = useState(false);
+
   // Fetch eligible jobs
   const { data: eligibleJobs, isLoading } = useEligibleJobs(selectedClient, {
     dateFrom: dateFrom?.toISOString(),
