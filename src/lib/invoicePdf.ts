@@ -187,17 +187,20 @@ function drawHeaderBanner(
   data: InvoiceData,
   logo: CachedImage | null,
 ): number {
-  const bannerH = 56;
+  const bannerH = 38;
 
-  // Full-width navy fill
+  // Subtle depth — darker base then navy overlay
+  doc.setFillColor(...THEME.navyDeep);
+  doc.rect(0, 0, PAGE_W, bannerH, "F");
   doc.setFillColor(...THEME.navy);
   doc.rect(0, 0, PAGE_W, bannerH, "F");
 
-  // --- Left side: full logo image (contains icon + AXENTRA + tagline) ---
+  // --- Left side: logo image scaled to fill banner height ---
   if (logo) {
     try {
-      const maxLogoH = 46;
-      const maxLogoW = 65;
+      const padY = 3;
+      const maxLogoH = bannerH - padY * 2;
+      const maxLogoW = 80;
       const scale = Math.min(maxLogoW / logo.w, maxLogoH / logo.h);
       const rw = logo.w * scale;
       const rh = logo.h * scale;
@@ -210,18 +213,23 @@ function drawHeaderBanner(
   // --- Right side: INVOICE title ---
   const centerY = bannerH / 2;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(28);
+  doc.setFontSize(24);
   doc.setTextColor(...THEME.white);
-  doc.text("INVOICE", PAGE_W - MARGIN, centerY - 4, { align: "right" });
+  doc.text("INVOICE", PAGE_W - MARGIN, centerY - 2, { align: "right" });
 
-  // Invoice number below title
+  // Invoice number — smaller, muted
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
+  doc.setFontSize(8.5);
   doc.setTextColor(...THEME.headerText);
   const invNum = sanitize(data.invoiceNumber, "");
-  doc.text(invNum, PAGE_W - MARGIN, centerY + 8, { align: "right" });
+  doc.text(invNum, PAGE_W - MARGIN, centerY + 6, { align: "right" });
 
-  return bannerH + 10;
+  // Thin accent line at bottom of banner
+  doc.setDrawColor(...THEME.accent);
+  doc.setLineWidth(0.6);
+  doc.line(0, bannerH, PAGE_W, bannerH);
+
+  return bannerH + 8;
 }
 
 /* ------------------------------------------------------------------ */
