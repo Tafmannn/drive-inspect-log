@@ -185,75 +185,39 @@ function drawHeaderBanner(
   data: InvoiceData,
   logo: CachedImage | null,
 ): number {
-  const bannerH = 50;
+  const bannerH = 56;
 
-  // Full-width navy fill with subtle gradient effect via two rects
-  doc.setFillColor(14, 24, 50);
-  doc.rect(0, 0, PAGE_W, bannerH, "F");
+  // Full-width navy fill
   doc.setFillColor(...THEME.navy);
-  doc.rect(0, 2, PAGE_W, bannerH - 2, "F");
+  doc.rect(0, 0, PAGE_W, bannerH, "F");
 
-  // --- Logo icon + text lockup (HORIZONTAL layout like reference) ---
-  let textStartX = MARGIN;
-
+  // --- Left side: full logo image (contains icon + AXENTRA + tagline) ---
   if (logo) {
     try {
-      const maxLogoH = 28;
-      const maxLogoW = 28;
+      const maxLogoH = 46;
+      const maxLogoW = 65;
       const scale = Math.min(maxLogoW / logo.w, maxLogoH / logo.h);
       const rw = logo.w * scale;
       const rh = logo.h * scale;
       const logoX = MARGIN;
-      const logoY = (bannerH - rh) / 2 - 2; // vertically centered, slightly up
+      const logoY = (bannerH - rh) / 2;
       doc.addImage(logo.dataUrl, logo.format, logoX, logoY, rw, rh);
-      textStartX = logoX + rw + 4; // text starts right of logo
-    } catch { /* graceful fallback — text-only branding */ }
+    } catch { /* graceful fallback */ }
   }
 
-  // "AXENTRA" — large bold
+  // --- Right side: INVOICE title ---
   const centerY = bannerH / 2;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(18);
-  doc.setTextColor(...THEME.white);
-  doc.text("AXENTRA", textStartX, centerY - 5);
-
-  // "VEHICLES" — slightly smaller, with thin decorative lines
-  doc.setFontSize(11);
-  doc.setTextColor(...THEME.white);
-  const vehiclesY = centerY + 3;
-  doc.text("VEHICLES", textStartX, vehiclesY);
-
-  // Thin decorative lines flanking "VEHICLES"
-  const vehW = doc.getTextWidth("VEHICLES");
-  doc.setDrawColor(80, 120, 180);
-  doc.setLineWidth(0.3);
-  doc.line(textStartX, vehiclesY - 5.5, textStartX + vehW, vehiclesY - 5.5);
-  doc.line(textStartX, vehiclesY + 1.5, textStartX + vehW, vehiclesY + 1.5);
-
-  // Tagline below
-  doc.setFont("helvetica", "italic");
-  doc.setFontSize(7.5);
-  doc.setTextColor(...THEME.headerText);
-  doc.text("Precision in Every Move", textStartX, vehiclesY + 8);
-
-  // --- Right side: INVOICE title ---
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(26);
+  doc.setFontSize(28);
   doc.setTextColor(...THEME.white);
   doc.text("INVOICE", PAGE_W - MARGIN, centerY - 4, { align: "right" });
 
-  // Invoice number below title with subtle underline
+  // Invoice number below title
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   doc.setTextColor(...THEME.headerText);
   const invNum = sanitize(data.invoiceNumber, "");
-  const invNumY = centerY + 6;
-  doc.text(invNum, PAGE_W - MARGIN, invNumY, { align: "right" });
-  // Subtle underline for invoice number
-  const invNumW = doc.getTextWidth(invNum);
-  doc.setDrawColor(80, 120, 180);
-  doc.setLineWidth(0.25);
-  doc.line(PAGE_W - MARGIN - invNumW - 2, invNumY + 1.5, PAGE_W - MARGIN + 1, invNumY + 1.5);
+  doc.text(invNum, PAGE_W - MARGIN, centerY + 8, { align: "right" });
 
   return bannerH + 10;
 }
