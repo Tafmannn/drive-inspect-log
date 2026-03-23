@@ -291,6 +291,7 @@ function buildChargesTable(doc: jsPDF, items: InvoiceLineItem[], y: number): num
       2: { cellWidth: 28, halign: "right" },
       3: { cellWidth: 30, halign: "right" },
     },
+    showHead: "everyPage",
     head: [["Description", "Qty", "Rate", "Total"]],
     body: items.map(item => {
       const qty = Number(item.quantity ?? 1);
