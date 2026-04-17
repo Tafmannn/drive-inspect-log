@@ -947,6 +947,7 @@ export type Database = {
           caz_ulez_flag: string | null
           client_company: string | null
           client_email: string | null
+          client_id: string | null
           client_name: string | null
           client_notes: string | null
           client_phone: string | null
@@ -1022,6 +1023,7 @@ export type Database = {
           caz_ulez_flag?: string | null
           client_company?: string | null
           client_email?: string | null
+          client_id?: string | null
           client_name?: string | null
           client_notes?: string | null
           client_phone?: string | null
@@ -1097,6 +1099,7 @@ export type Database = {
           caz_ulez_flag?: string | null
           client_company?: string | null
           client_email?: string | null
+          client_id?: string | null
           client_name?: string | null
           client_notes?: string | null
           client_phone?: string | null
@@ -1166,6 +1169,13 @@ export type Database = {
           vehicle_year?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "jobs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "jobs_driver_id_fkey"
             columns: ["driver_id"]
@@ -1473,111 +1483,6 @@ export type Database = {
             referencedColumns: ["permission_key"]
           },
         ]
-      }
-      sheet_sync_config: {
-        Row: {
-          column_mapping: Json
-          created_at: string
-          id: string
-          is_enabled: boolean
-          last_pull_at: string | null
-          last_push_at: string | null
-          sheet_name: string
-          spreadsheet_id: string
-          updated_at: string
-        }
-        Insert: {
-          column_mapping?: Json
-          created_at?: string
-          id?: string
-          is_enabled?: boolean
-          last_pull_at?: string | null
-          last_push_at?: string | null
-          sheet_name?: string
-          spreadsheet_id: string
-          updated_at?: string
-        }
-        Update: {
-          column_mapping?: Json
-          created_at?: string
-          id?: string
-          is_enabled?: boolean
-          last_pull_at?: string | null
-          last_push_at?: string | null
-          sheet_name?: string
-          spreadsheet_id?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      sheet_sync_logs: {
-        Row: {
-          created_at: string
-          details: Json | null
-          direction: string
-          errors: Json | null
-          id: string
-          rows_created: number
-          rows_processed: number
-          rows_skipped: number
-          rows_updated: number
-          status: string
-        }
-        Insert: {
-          created_at?: string
-          details?: Json | null
-          direction: string
-          errors?: Json | null
-          id?: string
-          rows_created?: number
-          rows_processed?: number
-          rows_skipped?: number
-          rows_updated?: number
-          status: string
-        }
-        Update: {
-          created_at?: string
-          details?: Json | null
-          direction?: string
-          errors?: Json | null
-          id?: string
-          rows_created?: number
-          rows_processed?: number
-          rows_skipped?: number
-          rows_updated?: number
-          status?: string
-        }
-        Relationships: []
-      }
-      sync_errors: {
-        Row: {
-          created_at: string
-          error_message: string | null
-          id: string
-          missing_fields: string[]
-          resolved: boolean
-          sheet_job_id: string | null
-          sheet_row_index: number
-        }
-        Insert: {
-          created_at?: string
-          error_message?: string | null
-          id?: string
-          missing_fields?: string[]
-          resolved?: boolean
-          sheet_job_id?: string | null
-          sheet_row_index: number
-        }
-        Update: {
-          created_at?: string
-          error_message?: string | null
-          id?: string
-          missing_fields?: string[]
-          resolved?: boolean
-          sheet_job_id?: string | null
-          sheet_row_index?: number
-        }
-        Relationships: []
       }
       user_permission_overrides: {
         Row: {
@@ -2046,6 +1951,7 @@ export type Database = {
       is_protected_user: { Args: { p_user_id: string }; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
       next_job_number: { Args: never; Returns: string }
+      normalize_client_name: { Args: { input: string }; Returns: string }
       restore_driver_profile: {
         Args: {
           p_reactivate_account?: boolean
