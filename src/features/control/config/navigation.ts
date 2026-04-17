@@ -38,6 +38,7 @@ export const CONTROL_NAV: NavGroup[] = [
     label: "Administration",
     items: [
       { label: "Admin", path: "/control/admin", icon: "Settings" },
+      { label: "Exports", path: "/control/exports", icon: "FileDown" },
     ],
   },
   {
