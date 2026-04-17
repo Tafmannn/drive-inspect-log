@@ -201,44 +201,12 @@ export function deriveEvidenceExceptions(
   return out;
 }
 
-/* ── Sync exceptions ───────────────────────────────────────────── */
-
-interface SyncErrorRow {
-  id: string;
-  sheet_row_index: number;
-  missing_fields: string[];
-  error_message: string | null;
-  resolved: boolean;
-  created_at: string;
-}
+/* ── Sync exceptions (legacy: from client_logs only) ───────────── */
 
 export function deriveSyncExceptions(
-  syncErrors: SyncErrorRow[],
   logEntries: { event: string; created_at: string; context: any }[],
 ): AttentionException[] {
   const out: AttentionException[] = [];
-
-  for (const se of syncErrors) {
-    if (se.resolved) continue;
-
-    // Issue #4: Graduated severity based on error content
-    let severity: ExceptionSeverity;
-    if (se.error_message) {
-      severity = "high";
-    } else if (se.missing_fields && se.missing_fields.length > 0) {
-      severity = "medium";
-    } else {
-      severity = "low";
-    }
-
-    out.push(exc({
-      severity, category: "sync",
-      title: `Sync error row ${se.sheet_row_index}`,
-      detail: se.error_message ?? `Missing: ${se.missing_fields.join(", ")}`,
-      createdAt: se.created_at,
-      actionLabel: "Open sync errors", actionRoute: "/admin/sync-errors",
-    }));
-  }
 
   // Issue #4: duplicate_job_skipped is always low severity
   const dupes = logEntries.filter(l => l.event === "duplicate_job_skipped");

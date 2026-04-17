@@ -5,7 +5,6 @@ const KNOWN_FLAGS = [
   "MAPS_ENABLED",
   "CLOUD_STORAGE_ENABLED",
   "VISION_AI_ENABLED",
-  "AUTO_SHEET_SYNC_ON_JOB_UPDATE",
 ] as const;
 
 type FeatureFlagKey = (typeof KNOWN_FLAGS)[number];

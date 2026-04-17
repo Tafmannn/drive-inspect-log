@@ -10,20 +10,8 @@ import type {
 } from './types';
 import type { JobStatusValue } from './statusConfig';
 import { JOB_STATUS, ACTIVE_STATUSES, PENDING_STATUSES } from './statusConfig';
-import { isFeatureEnabled } from './featureFlags';
 import { logClientEvent } from './logger';
 import { getOrgId } from './orgHelper';
-
-// ─── Sheet Sync Helper ───────────────────────────────────────────────
-
-async function syncJobToSheetIfEnabled(jobId: string): Promise<void> {
-  try {
-    const { safePushToSheet } = await import("./safePushToSheet");
-    void safePushToSheet([jobId]); // fire-and-forget
-  } catch {
-    // allow silent fail
-  }
-}
 
 // ─── Jobs ────────────────────────────────────────────────────────────
 
@@ -160,10 +148,6 @@ export async function adminChangeStatus(
   const updated = await updateJob(jobId, updates);
   await logJobActivity(jobId, 'admin_status_change', fromStatus, newStatus, notes || `Admin changed status from ${fromStatus} to ${newStatus}`);
 
-  if (await isFeatureEnabled("AUTO_SHEET_SYNC_ON_JOB_UPDATE")) {
-    void syncJobToSheetIfEnabled(jobId);
-  }
-
   return updated;
 }
 
@@ -274,10 +258,6 @@ export async function submitInspection(
     jobId,
     context: { inspectionType: type, newStatus: toStatus },
   });
-
-  if (await isFeatureEnabled("AUTO_SHEET_SYNC_ON_JOB_UPDATE")) {
-    void syncJobToSheetIfEnabled(jobId);
-  }
 
   return { inspectionId: inspection.id, damageItemIds };
 }

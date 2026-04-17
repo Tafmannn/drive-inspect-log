@@ -1,4 +1,4 @@
-import { Home, Briefcase, Upload, User } from "lucide-react";
+import { Home, Briefcase, Upload, User, ShieldCheck } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -10,12 +10,19 @@ const driverTabs = [
   { icon: User, label: "Profile", path: "/profile" },
 ] as const;
 
+const adminTabs = [
+  { icon: Home, label: "Dashboard", path: "/" },
+  { icon: Briefcase, label: "Jobs", path: "/jobs" },
+  { icon: ShieldCheck, label: "Control", path: "/control" },
+  { icon: User, label: "Profile", path: "/profile" },
+] as const;
+
 export const BottomNav = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { isAdmin, isSuperAdmin } = useAuth();
 
-  // Always use the same tabs — routes themselves handle access control
-  const tabs = driverTabs;
+  const tabs = isAdmin || isSuperAdmin ? adminTabs : driverTabs;
 
   const isActive = (path: string) => {
     if (path === "/") return location.pathname === "/";

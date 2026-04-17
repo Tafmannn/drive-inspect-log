@@ -24,7 +24,6 @@ export interface AttentionKpiData {
   highSeverity: number;
   missingSignatures: number;
   uploadFailuresToday: number;
-  syncErrorsToday: number;
 }
 
 export interface AttentionFiltersState {

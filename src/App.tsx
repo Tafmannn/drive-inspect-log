@@ -8,7 +8,6 @@ import { DevRoleBanner } from "@/components/DevRoleBanner";
 import { Dashboard } from "./pages/Dashboard";
 import { JobList } from "./pages/JobList";
 import { JobMasterList } from "./pages/JobMasterList";
-import { SyncErrors } from "./pages/SyncErrors";
 import { JobForm } from "./pages/JobForm";
 import { JobDetail } from "./pages/JobDetail";
 import { CompletedJobs } from "./pages/CompletedJobs";
@@ -56,6 +55,7 @@ import { ControlClients } from "@/features/control/pages/ControlClients";
 import { InvoicePrepScreen } from "@/features/invoicing/pages/InvoicePrepScreen";
 import { ControlAdmin } from "@/features/control/pages/ControlAdmin";
 import { ControlSuperAdmin } from "@/features/control/pages/ControlSuperAdmin";
+import { ExportsPage } from "@/features/exports/pages/ExportsPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -198,7 +198,7 @@ const App = () => {
                 <Route path="/admin" element={<ProtectedRoute><AdminRoute><AdminDashboard /></AdminRoute></ProtectedRoute>} />
                 <Route path="/admin/jobs" element={<ProtectedRoute><AdminRoute><AdminJobsQueue /></AdminRoute></ProtectedRoute>} />
                 <Route path="/admin/timesheets" element={<ProtectedRoute><AdminRoute><Timesheets /></AdminRoute></ProtectedRoute>} />
-                <Route path="/admin/sync-errors" element={<ProtectedRoute><AdminRoute><SyncErrors /></AdminRoute></ProtectedRoute>} />
+                {/* /admin/sync-errors removed — Google Sheets sync retired */}
                 <Route path="/admin/users" element={<ProtectedRoute><AdminRoute><AdminUsers /></AdminRoute></ProtectedRoute>} />
                 <Route path="/admin/drivers" element={<ProtectedRoute><AdminRoute><AdminDrivers /></AdminRoute></ProtectedRoute>} />
                 <Route path="/admin/pod-review" element={<ProtectedRoute><AdminRoute><AdminPodReview /></AdminRoute></ProtectedRoute>} />
@@ -235,6 +235,7 @@ const App = () => {
                   <Route path="clients" element={<ControlClients />} />
                   <Route path="invoice-prep" element={<InvoicePrepScreen />} />
                   <Route path="admin" element={<ControlAdmin />} />
+                  <Route path="exports" element={<ExportsPage />} />
                   <Route
                     path="super-admin"
                     element={

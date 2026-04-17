@@ -44,7 +44,6 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
       const [
         activeJobsRes,
         completedJobsRes,
-        syncErrorsRes,
         logEntriesRes,
         orgsRes,
         acksRes,
@@ -60,11 +59,6 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
           .in("status", ["completed", "delivery_complete", "pod_ready"])
           .gte("updated_at", new Date(Date.now() - 7 * 86400_000).toISOString())
           .limit(500),
-
-        supabase.from("sync_errors").select("*")
-          .eq("resolved", false)
-          .order("created_at", { ascending: false })
-          .limit(200),
 
         supabase.from("client_logs").select("event, job_id, created_at, context, severity")
           .in("event", [
@@ -91,7 +85,6 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
 
       const activeJobs = (activeJobsRes.data ?? []) as JobRow[];
       const completedJobs = (completedJobsRes.data ?? []) as JobRow[];
-      const syncErrors = (syncErrorsRes.data ?? []) as any[];
       const logEntries = (logEntriesRes.data ?? []) as any[];
       const orgs = (orgsRes as any).data ?? [];
       const acknowledgements = (acksRes.data ?? []) as AcknowledgementRow[];
@@ -131,7 +124,7 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
       let allExceptions: AttentionException[] = sortExceptions([
         ...deriveTimingExceptions(activeJobs, orgLookup),
         ...deriveEvidenceExceptions(completedJobs, inspections, logEntries, orgLookup),
-        ...deriveSyncExceptions(syncErrors, logEntries),
+        ...deriveSyncExceptions(logEntries),
         ...deriveStateExceptions(logEntries),
       ]);
 
@@ -181,14 +174,12 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
       const uploadFailuresToday = logEntries.filter(l =>
         (l.event === "photo_upload_failed" || l.event === "upload_failed") && l.created_at >= todayStart
       ).length;
-      const syncErrorsToday = syncErrors.filter(s => s.created_at >= todayStart).length;
 
       const kpis: AttentionKpiData = {
         activeJobs: allActiveCount,
         highSeverity: exceptions.filter(e => e.severity === "critical" || e.severity === "high").length,
         missingSignatures: exceptions.filter(e => e.title.includes("Missing") && e.title.includes("signature")).length,
         uploadFailuresToday,
-        syncErrorsToday,
       };
 
       return {

@@ -11,7 +11,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { DriverGateScreen } from "@/components/DriverGateScreen";
 import { Button } from "@/components/ui/button";
 import {
-  Truck, Clock, AlertTriangle, Download, FileDown,
+  Truck, Clock, AlertTriangle, FileDown,
   Receipt, ShieldCheck, Loader2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -20,10 +20,8 @@ import { useDriverGate } from "@/hooks/useDriverGate";
 import { toast } from "@/hooks/use-toast";
 import { exportJobsCsv, exportInspectionsCsv } from "@/lib/export";
 import { exportExpensesCsv } from "@/lib/expenseApi";
-import { pushToSheet, pullFromSheet } from "@/lib/sheetSyncApi";
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { useQueryClient } from "@tanstack/react-query";
 
 export const Dashboard = () => {
   const navigate = useNavigate();
@@ -31,8 +29,6 @@ export const Dashboard = () => {
   const gate = useDriverGate();
   const { data: counts, isLoading } = useDashboardCounts(gate.isDriverOnly ? gate.driverProfileId : undefined);
   const [exporting, setExporting] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-  const qc = useQueryClient();
 
   // Driver gate: show holding screen for non-active drivers
   if (gate.isDriverOnly && gate.status === "loading") {
@@ -57,21 +53,6 @@ export const Dashboard = () => {
       toast({ title: "Export failed.", variant: "destructive" });
     } finally {
       setExporting(false);
-    }
-  };
-
-  const handleDownloadJobs = async () => {
-    setSyncing(true);
-    try {
-      try { await pushToSheet(); } catch (e) { console.warn("Push phase warning:", e); }
-      await pullFromSheet();
-      qc.invalidateQueries({ queryKey: ["jobs"] });
-      qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
-      toast({ title: "Jobs updated." });
-    } catch {
-      toast({ title: "Sync failed.", variant: "destructive" });
-    } finally {
-      setSyncing(false);
     }
   };
 
@@ -113,28 +94,20 @@ export const Dashboard = () => {
           )}
         </section>
 
-        {/* ── Utilities ───────────────────────────────────── */}
-        <section>
-          <h2 className="text-[14px] font-semibold text-muted-foreground mb-3">Utilities</h2>
-          <div className="space-y-3">
-            {(isAdmin || isSuperAdmin) && (
-              <DashboardCard
-                icon={syncing ? <Loader2 className="w-6 h-6 stroke-[2] animate-spin" /> : <Download className="w-6 h-6 stroke-[2]" />}
-                title="Download Jobs"
-                subtitle={syncing ? "Syncing jobs…" : "Refresh and sync your jobs"}
-                onClick={syncing ? undefined : handleDownloadJobs}
-              />
-            )}
-            {(isAdmin || isSuperAdmin) && (
+        {/* ── Utilities (admin only) ───────────────────────── */}
+        {(isAdmin || isSuperAdmin) && (
+          <section>
+            <h2 className="text-[14px] font-semibold text-muted-foreground mb-3">Utilities</h2>
+            <div className="space-y-3">
               <DashboardCard
                 icon={<Receipt className="w-6 h-6 stroke-[2]" />}
                 title="Expenses"
                 subtitle="Log and view your expenses"
                 onClick={() => navigate("/expenses")}
               />
-            )}
-          </div>
-        </section>
+            </div>
+          </section>
+        )}
 
         {/* ── Management (role-gated) ─────────────────────── */}
         {(isAdmin || isSuperAdmin) && (
@@ -144,9 +117,9 @@ export const Dashboard = () => {
               {isAdmin && (
                 <DashboardCard
                   icon={<ShieldCheck className="w-6 h-6 stroke-[2]" />}
-                  title="Admin Dashboard"
-                  subtitle="Dispatch, queues & interventions"
-                  onClick={() => navigate("/admin")}
+                  title="Control Center"
+                  subtitle="Operations, jobs, drivers & exports"
+                  onClick={() => navigate("/control")}
                   iconClassName="bg-accent/10 text-accent"
                 />
               )}
@@ -163,10 +136,10 @@ export const Dashboard = () => {
           </section>
         )}
 
-        {/* ── Exports (admin only) ─────────────────────────── */}
+        {/* ── Quick Exports (admin only) ───────────────────── */}
         {(isAdmin || isSuperAdmin) && (
           <section>
-            <h2 className="text-[14px] font-semibold text-muted-foreground mb-3">Exports</h2>
+            <h2 className="text-[14px] font-semibold text-muted-foreground mb-3">Quick Exports</h2>
             <div className="grid grid-cols-3 gap-3">
               <Button variant="outline" onClick={() => handleExport("jobs")} disabled={exporting} className="min-h-[44px] rounded-lg">
                 <FileDown className="w-4 h-4 mr-1" /> Jobs

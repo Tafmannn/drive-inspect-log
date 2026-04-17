@@ -10,6 +10,10 @@ import {
   PoundSterling,
   Settings,
   Crown,
+  Building2,
+  FileText,
+  FileDown,
+  ClipboardCheck,
   ChevronsLeft,
   ChevronsRight,
   LogOut,
@@ -26,6 +30,10 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   PoundSterling,
   Settings,
   Crown,
+  Building2,
+  FileText,
+  FileDown,
+  ClipboardCheck,
 };
 
 export function ControlSidebar() {
