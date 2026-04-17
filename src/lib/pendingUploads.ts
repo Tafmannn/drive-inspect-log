@@ -497,8 +497,3 @@ export async function retryJobUploads(
 
   return { succeeded, failed };
 }
-
-  return Array.from(jobMap.entries())
-    .filter(([, allDone]) => allDone)
-    .map(([jobId]) => jobId);
-}
