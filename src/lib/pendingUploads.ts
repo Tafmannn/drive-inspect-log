@@ -410,17 +410,6 @@ export async function retryAllPending(options?: {
     else failed++;
   }
 
-  // After retrying all, trigger sheet sync for any jobs that are now fully uploaded
-  try {
-    const { safePushToSheet } = await import("./safePushToSheet");
-    const completedJobIds = getFullyUploadedJobIds();
-    if (completedJobIds.length > 0) {
-      safePushToSheet(completedJobIds); // fire-and-forget
-    }
-  } catch {
-    // Ignore — sheet sync is best-effort
-  }
-
   return { succeeded, failed };
 }
 
@@ -506,32 +495,8 @@ export async function retryJobUploads(
     else failed++;
   }
 
-  // If all items for this job succeeded, trigger sheet sync
-  if (failed === 0 && succeeded > 0) {
-    try {
-      const { safePushToSheet } = await import("./safePushToSheet");
-      safePushToSheet([jobId]); // fire-and-forget
-    } catch {
-      // Ignore
-    }
-  }
-
   return { succeeded, failed };
 }
-
-/**
- * Get job IDs where ALL items are "done" (fully uploaded).
- * Used internally to trigger sheet sync after retryAllPending.
- */
-function getFullyUploadedJobIds(): string[] {
-  const all = loadAll();
-  const jobMap = new Map<string, boolean>();
-
-  for (const u of all) {
-    const current = jobMap.get(u.jobId);
-    if (current === false) continue; // already has a non-done item
-    jobMap.set(u.jobId, u.status === "done");
-  }
 
   return Array.from(jobMap.entries())
     .filter(([, allDone]) => allDone)

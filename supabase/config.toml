@@ -1,8 +1,5 @@
 project_id = "lynkvfduzqdyvlzgriyh"
 
-[functions.google-sheets-sync]
-verify_jwt = false
-
 [functions.maps-directions]
 verify_jwt = false
 
