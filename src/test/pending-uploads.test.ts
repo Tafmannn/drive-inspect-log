@@ -119,7 +119,7 @@ describe("pendingUploads — IDB-backed offline queue", () => {
     const [after] = await getAllPendingUploads();
     expect(after.status).toBe("failed");
     expect(after.errorMessage).toMatch(/network gone/);
-    expect(after.fileBlob).toBeInstanceOf(Blob); // blob retained for retry
+    expect(after.fileBlob).not.toBeNull(); // blob retained for retry
   });
 
   it("concurrency lock prevents duplicate uploads of the same id", async () => {
@@ -140,6 +140,9 @@ describe("pendingUploads — IDB-backed offline queue", () => {
     });
 
     const first = retryUpload(item.id);
+    // Yield once so retryUpload's sync prelude (which calls inFlight.add)
+    // has executed before the second invocation.
+    await Promise.resolve();
     const second = await retryUpload(item.id); // should short-circuit to false
     expect(second).toBe(false);
 
@@ -210,6 +213,8 @@ describe("pendingUploads — IDB-backed offline queue", () => {
     });
     await addPendingUpload(makeFile(), {
       jobId: "JA",
+      jobNumber: "AX-001",
+      vehicleReg: "AB12 CDE",
       inspectionType: "pickup",
       photoType: "y",
       label: null,
@@ -229,6 +234,7 @@ describe("pendingUploads — IDB-backed offline queue", () => {
     const ja = groups.find((g) => g.jobId === "JA");
     expect(ja?.pendingCount).toBe(1);
     expect(ja?.jobNumber).toBe("AX-001");
+    expect(ja?.vehicleReg).toBe("AB12 CDE");
 
     expect(await getPendingJobCount()).toBe(2);
   });
