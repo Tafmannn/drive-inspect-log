@@ -215,7 +215,7 @@ export async function submitInspection(
   if (existingInspection?.inspected_at) {
     const job = await getJob(jobId);
     const terminalStatuses = [JOB_STATUS.COMPLETED, JOB_STATUS.POD_READY, JOB_STATUS.DELIVERY_COMPLETE];
-    if (terminalStatuses.includes(job.status as any)) {
+    if ((terminalStatuses as string[]).includes(job.status)) {
       throw new Error(`${type} inspection already submitted for this job. Cannot overwrite completed inspection.`);
     }
   }

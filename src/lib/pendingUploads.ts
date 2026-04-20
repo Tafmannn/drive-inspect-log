@@ -1,8 +1,22 @@
 // src/lib/pendingUploads.ts
 // Local-first photo upload queue for Axentra inspections.
-// Stores images in localStorage while offline / low signal,
-// then replays them to Supabase (and Google Drive if configured).
+//
+// Storage: IndexedDB (via idb-keyval). Photos are stored as raw Blobs which
+// is dramatically more space-efficient than base64 in localStorage and gives
+// us tens of MB of headroom on mobile browsers vs ~5 MB previously.
+//
+// Public API (signatures preserved for backward compatibility):
+//   - addPendingUpload(file, args)          -> Promise<PendingUpload>
+//   - getAllPendingUploads()                -> Promise<PendingUpload[]>
+//   - deletePendingUpload(id)               -> Promise<void>
+//   - retryUpload(id, opts?)                -> Promise<boolean>
+//   - retryAllPending(opts?)                -> Promise<{succeeded, failed}>
+//   - retryJobUploads(jobId)                -> Promise<{succeeded, failed}>
+//   - getPendingUploadsByJob()              -> Promise<JobUploadSummary[]>
+//   - getPendingJobCount()                  -> Promise<number>
+//   - pruneDone()                           -> Promise<void>
 
+import { get, set, del, createStore } from "idb-keyval";
 import { storageService } from "./storage";
 import { insertPhoto } from "./api";
 import { logClientEvent } from "./logger";
@@ -12,7 +26,12 @@ import type {
   StorageBackend,
 } from "./types";
 
-const STORAGE_KEY = "axentra.pendingUploads.v1";
+const QUEUE_KEY = "queue";
+const store = createStore("axentra-pending-uploads", "v2");
+
+// One-time migration flag from legacy localStorage queue.
+const LEGACY_LOCALSTORAGE_KEY = "axentra.pendingUploads.v1";
+const MIGRATION_FLAG_KEY = "_migrated_from_v1";
 
 export type PendingUploadStatus = "pending" | "uploading" | "failed" | "done";
 
@@ -23,15 +42,22 @@ export interface PendingUpload {
   photoType: PhotoType | string;
   label: string | null;
   createdAt: string;
-  completedAt: string | null; // set when status transitions to "done"
+  completedAt: string | null;
   status: PendingUploadStatus;
   errorMessage?: string | null;
 
-  // Local-only data for reconstructing the file.
-  // Stripped from the record after a successful upload to reclaim localStorage quota.
-  fileDataUrl: string | null;
+  /**
+   * Raw image blob, kept until the upload succeeds.
+   * Cleared (set to null) after a successful upload to reclaim quota.
+   * Stored as a Blob in IndexedDB — structured-clone supports this natively.
+   */
+  fileBlob: Blob | null;
 
-  // Optional metadata that can be attached later
+  /**
+   * Original filename, used to reconstruct a File on retry.
+   */
+  fileName: string;
+
   inspectionId?: string | null;
   backend?: StorageBackend;
   backendRef?: string | null;
@@ -41,171 +67,198 @@ export interface PendingUpload {
 }
 
 // ─────────────────────────────────────────────────────────────
-// in-memory upload lock — prevents duplicate concurrent uploads
-// for the same pending item (e.g. manual retry + auto-retry race)
+// concurrency lock — prevents duplicate uploads of the same item
 // ─────────────────────────────────────────────────────────────
 
 const inFlight = new Set<string>();
 
 // ─────────────────────────────────────────────────────────────
-// internal storage helpers
+// IndexedDB helpers
 // ─────────────────────────────────────────────────────────────
 
-function safeGetStorage(): Storage | null {
-  if (typeof window === "undefined") return null;
+async function loadAll(): Promise<PendingUpload[]> {
+  await migrateLegacyIfNeeded();
   try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
-}
-
-function loadAll(): PendingUpload[] {
-  const storage = safeGetStorage();
-  if (!storage) return [];
-  try {
-    const raw = storage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    // Validate: if corrupted (not an array), clear and return empty
-    if (!Array.isArray(parsed)) {
-      console.warn("[pendingUploads] Corrupt queue data (not an array) — clearing.");
-      storage.removeItem(STORAGE_KEY);
-      return [];
-    }
-    return parsed as PendingUpload[];
-  } catch {
+    const data = (await get<PendingUpload[]>(QUEUE_KEY, store)) ?? [];
+    return Array.isArray(data) ? data : [];
+  } catch (e) {
+    console.warn("[pendingUploads] Failed to read queue from IDB", e);
     return [];
   }
 }
 
-/**
- * Measure byte size of the current queue in localStorage.
- */
-function getStorageUsageBytes(): number {
-  const storage = safeGetStorage();
-  if (!storage) return 0;
-  const raw = storage.getItem(STORAGE_KEY);
-  return raw ? new Blob([raw]).size : 0;
+async function saveAll(items: PendingUpload[]): Promise<void> {
+  await set(QUEUE_KEY, items, store);
 }
 
-const MAX_QUEUE_BYTES = 3.5 * 1024 * 1024; // 3.5 MB — headroom for other storage
-
-/**
- * Persist the queue. Throws if localStorage is unavailable or over quota —
- * callers that enqueue new items should propagate this so the UI can warn
- * the user rather than silently losing the upload.
- */
-function saveAll(items: PendingUpload[]): void {
-  const storage = safeGetStorage();
-  if (!storage) throw new Error("localStorage unavailable");
-  storage.setItem(STORAGE_KEY, JSON.stringify(items));
-}
-
-function updateOne(
+async function updateOne(
   id: string,
   updater: (item: PendingUpload) => PendingUpload,
-): PendingUpload | null {
-  const all = loadAll();
+): Promise<PendingUpload | null> {
+  const all = await loadAll();
   const idx = all.findIndex((u) => u.id === id);
   if (idx === -1) return null;
   const updated = updater(all[idx]);
   all[idx] = updated;
   try {
-    saveAll(all);
+    await saveAll(all);
   } catch {
-    // Best-effort; the in-memory mutation still happened for this session
+    // best-effort
   }
   return updated;
 }
 
-function removeOne(id: string): void {
-  const all = loadAll();
+async function removeOne(id: string): Promise<void> {
+  const all = await loadAll();
   const next = all.filter((u) => u.id !== id);
   try {
-    saveAll(next);
+    await saveAll(next);
   } catch {
-    // Ignore — worst case a stale entry sits in storage
+    // ignore
   }
 }
 
 // ─────────────────────────────────────────────────────────────
-// file <-> data URL helpers
+// Image compression — produces a Blob, not a data URL
 // ─────────────────────────────────────────────────────────────
 
 const MAX_PHOTO_DIMENSION = 1920;
 const JPEG_QUALITY = 0.75;
 
-/**
- * Compress an image file to max dimension and JPEG quality
- * before converting to data URL. Reduces localStorage pressure.
- */
-function compressAndConvertToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
+async function compressToBlob(file: File): Promise<Blob> {
+  return await new Promise<Blob>((resolve, reject) => {
     const img = new Image();
     const objectUrl = URL.createObjectURL(file);
 
     img.onload = () => {
       URL.revokeObjectURL(objectUrl);
       try {
-        const scale = Math.min(MAX_PHOTO_DIMENSION / img.width, MAX_PHOTO_DIMENSION / img.height, 1);
+        const scale = Math.min(
+          MAX_PHOTO_DIMENSION / img.width,
+          MAX_PHOTO_DIMENSION / img.height,
+          1,
+        );
         const w = Math.round(img.width * scale);
         const h = Math.round(img.height * scale);
 
-        const canvas = document.createElement('canvas');
+        const canvas = document.createElement("canvas");
         canvas.width = w;
         canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) { reject(new Error('Canvas context unavailable')); return; }
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Canvas context unavailable"));
+          return;
+        }
         ctx.drawImage(img, 0, 0, w, h);
 
-        const dataUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
-        resolve(dataUrl);
+        canvas.toBlob(
+          (blob) => {
+            if (blob) resolve(blob);
+            else reject(new Error("Canvas toBlob returned null"));
+          },
+          "image/jpeg",
+          JPEG_QUALITY,
+        );
       } catch (e) {
         reject(e);
       }
     };
     img.onerror = () => {
       URL.revokeObjectURL(objectUrl);
-      // Fall back to raw FileReader if image can't be loaded for compression
-      fileToDataUrl(file).then(resolve, reject);
+      // Fall back to the raw file if it can't be decoded for compression
+      resolve(file);
     };
     img.src = objectUrl;
   });
 }
 
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () =>
-      reject(reader.error ?? new Error("File read error"));
-    reader.onload = () => resolve(reader.result as string);
-    reader.readAsDataURL(file);
-  });
-}
+// ─────────────────────────────────────────────────────────────
+// One-time migration from legacy localStorage queue
+// ─────────────────────────────────────────────────────────────
 
-/**
- * Convert a data URL back into a File without using fetch(data:…),
- * which can be blocked by strict Content Security Policies in some
- * browsers and WebViews.
- */
-function dataUrlToFile(dataUrl: string, name: string): File {
-  const [header, b64] = dataUrl.split(",");
-  const mime = header.match(/:(.*?);/)?.[1] ?? "image/jpeg";
-  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-  return new File([bytes], name, { type: mime });
+let migrationPromise: Promise<void> | null = null;
+
+async function migrateLegacyIfNeeded(): Promise<void> {
+  if (migrationPromise) return migrationPromise;
+  migrationPromise = (async () => {
+    try {
+      const flag = await get<boolean>(MIGRATION_FLAG_KEY, store);
+      if (flag) return;
+
+      if (typeof window === "undefined") {
+        await set(MIGRATION_FLAG_KEY, true, store);
+        return;
+      }
+
+      const raw = window.localStorage?.getItem(LEGACY_LOCALSTORAGE_KEY);
+      if (!raw) {
+        await set(MIGRATION_FLAG_KEY, true, store);
+        return;
+      }
+
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        window.localStorage.removeItem(LEGACY_LOCALSTORAGE_KEY);
+        await set(MIGRATION_FLAG_KEY, true, store);
+        return;
+      }
+
+      const migrated: PendingUpload[] = [];
+      for (const legacy of parsed) {
+        try {
+          const dataUrl: string | null = legacy?.fileDataUrl ?? null;
+          let blob: Blob | null = null;
+          if (typeof dataUrl === "string" && dataUrl.startsWith("data:")) {
+            const [header, b64] = dataUrl.split(",");
+            const mime = header.match(/:(.*?);/)?.[1] ?? "image/jpeg";
+            const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+            blob = new Blob([bytes], { type: mime });
+          }
+          migrated.push({
+            id: legacy.id,
+            jobId: legacy.jobId,
+            inspectionType: legacy.inspectionType,
+            photoType: legacy.photoType,
+            label: legacy.label ?? null,
+            createdAt: legacy.createdAt,
+            completedAt: legacy.completedAt ?? null,
+            status: legacy.status ?? "pending",
+            errorMessage: legacy.errorMessage ?? null,
+            fileBlob: blob,
+            fileName: `${legacy.id}.jpg`,
+            inspectionId: legacy.inspectionId ?? null,
+            backend: legacy.backend,
+            backendRef: legacy.backendRef ?? null,
+            jobNumber: legacy.jobNumber ?? null,
+            vehicleReg: legacy.vehicleReg ?? null,
+            damageItemId: legacy.damageItemId ?? null,
+          });
+        } catch {
+          // Skip un-migratable entries rather than break the whole migration
+        }
+      }
+
+      if (migrated.length > 0) {
+        await set(QUEUE_KEY, migrated, store);
+      }
+      window.localStorage.removeItem(LEGACY_LOCALSTORAGE_KEY);
+      await set(MIGRATION_FLAG_KEY, true, store);
+    } catch (e) {
+      console.warn("[pendingUploads] Legacy migration failed", e);
+      try {
+        await set(MIGRATION_FLAG_KEY, true, store);
+      } catch {
+        /* ignore */
+      }
+    }
+  })();
+  return migrationPromise;
 }
 
 // ─────────────────────────────────────────────────────────────
 // public API
 // ─────────────────────────────────────────────────────────────
 
-/**
- * Enqueue a new photo for upload.
- *
- * @throws if localStorage is full or unavailable — callers should catch and
- * surface a warning to the user so they know the photo wasn't queued.
- */
 export async function addPendingUpload(
   file: File,
   args: {
@@ -219,16 +272,7 @@ export async function addPendingUpload(
     damageItemId?: string | null;
   },
 ): Promise<PendingUpload> {
-  const fileDataUrl = await compressAndConvertToDataUrl(file);
-
-  // Guard: check if adding this item would exceed the localStorage budget
-  const currentBytes = getStorageUsageBytes();
-  const newItemBytes = new Blob([fileDataUrl]).size + 500; // ~500 bytes overhead for metadata
-  if (currentBytes + newItemBytes > MAX_QUEUE_BYTES) {
-    throw new Error(
-      "Local storage limit reached. Please retry pending uploads before adding more photos."
-    );
-  }
+  const blob = await compressToBlob(file);
 
   const id =
     "pu_" +
@@ -246,57 +290,56 @@ export async function addPendingUpload(
     completedAt: null,
     status: "pending",
     errorMessage: null,
-    fileDataUrl,
+    fileBlob: blob,
+    fileName: file.name || `${id}.jpg`,
     inspectionId: args.inspectionId ?? null,
     jobNumber: args.jobNumber ?? null,
     vehicleReg: args.vehicleReg ?? null,
     damageItemId: args.damageItemId ?? null,
   };
 
-  const all = loadAll();
+  const all = await loadAll();
   all.push(item);
-  saveAll(all); // intentionally throws on quota error
+  try {
+    await saveAll(all);
+  } catch (e) {
+    throw new Error(
+      "Could not save photo to local queue. Please retry pending uploads or free device storage.",
+    );
+  }
   return item;
 }
 
-// 🔧 IMPORTANT: keep this async so .then(...) and await both work
 export async function getAllPendingUploads(): Promise<PendingUpload[]> {
   return loadAll();
 }
 
-export function deletePendingUpload(id: string): void {
-  removeOne(id);
+export async function deletePendingUpload(id: string): Promise<void> {
+  await removeOne(id);
 }
 
 /**
- * Remove all items with status "done" from the queue.
- * Call this periodically or after a sync to reclaim localStorage quota.
+ * Remove all "done" items to reclaim space.
  */
-export function pruneDone(): void {
-  const all = loadAll();
+export async function pruneDone(): Promise<void> {
+  const all = await loadAll();
   const next = all.filter((u) => u.status !== "done");
   try {
-    saveAll(next);
+    await saveAll(next);
   } catch {
-    // Ignore
+    /* ignore */
   }
 }
 
-/**
- * Try to upload a single pending item.
- * Returns true on success, false if the item was not found, already in flight,
- * or the upload failed.
- */
 export async function retryUpload(
   id: string,
-  options?: { timeoutMs?: number }, // kept for API compatibility, not used in this version
+  _options?: { timeoutMs?: number },
 ): Promise<boolean> {
-  // Prevent concurrent uploads of the same item
   if (inFlight.has(id)) return false;
   inFlight.add(id);
 
   try {
-    const existing = updateOne(id, (u) => ({
+    const existing = await updateOne(id, (u) => ({
       ...u,
       status: "uploading",
       errorMessage: null,
@@ -304,9 +347,8 @@ export async function retryUpload(
 
     if (!existing) return false;
 
-    // If there is no file data, assume it's already been uploaded and just mark as done.
-    if (!existing.fileDataUrl) {
-      updateOne(id, (u) => ({
+    if (!existing.fileBlob) {
+      await updateOne(id, (u) => ({
         ...u,
         status: "done",
         completedAt: u.completedAt ?? new Date().toISOString(),
@@ -315,18 +357,15 @@ export async function retryUpload(
       return true;
     }
 
-    const file = dataUrlToFile(
-      existing.fileDataUrl,
-      `${existing.id}.jpg`,
-    );
+    const file = new File([existing.fileBlob], existing.fileName, {
+      type: existing.fileBlob.type || "image/jpeg",
+    });
 
-    // Upload to configured storage (Supabase bucket or Google Drive wrapper)
     const stored = await storageService.uploadImage(
       file,
       `jobs/${existing.jobId}/${existing.inspectionType}/${existing.photoType}/${existing.id}`,
     );
 
-    // Insert row into photos table
     await insertPhoto({
       job_id: existing.jobId,
       inspection_id: existing.inspectionId ?? null,
@@ -338,7 +377,6 @@ export async function retryUpload(
       label: existing.label,
     });
 
-    // Write photo URL back to damage_items if this is a damage photo
     if (existing.photoType === "damage_close_up" && existing.damageItemId) {
       try {
         const { supabase } = await import("@/integrations/supabase/client");
@@ -347,35 +385,32 @@ export async function retryUpload(
           .update({ photo_url: stored.url })
           .eq("id", existing.damageItemId);
       } catch {
-        // Best-effort — the photo is already in the photos table
+        // best-effort
       }
     }
 
-    // On success: record completion metadata and strip the raw image data
-    // to reclaim localStorage quota. The DB row is now the source of truth.
-    updateOne(id, (u) => ({
+    await updateOne(id, (u) => ({
       ...u,
       status: "done",
       completedAt: new Date().toISOString(),
       errorMessage: null,
-      fileDataUrl: null, // free the base64 blob
+      fileBlob: null,
       backend: stored.backend,
       backendRef: stored.backendRef ?? null,
     }));
 
     return true;
   } catch (e: unknown) {
-    const msg =
-      e instanceof Error ? e.message : "Upload failed";
+    const msg = e instanceof Error ? e.message : "Upload failed";
 
-    updateOne(id, (u) => ({
+    await updateOne(id, (u) => ({
       ...u,
       status: "failed",
       errorMessage: msg,
     }));
 
-    // Log failure to client_logs (orgId auto-resolved from session by logger)
-    const item = loadAll().find((u) => u.id === id);
+    const all = await loadAll();
+    const item = all.find((u) => u.id === id);
     void logClientEvent("photo_upload_failed", "error", {
       jobId: item?.jobId,
       source: "storage",
@@ -389,14 +424,11 @@ export async function retryUpload(
   }
 }
 
-/**
- * Retry all items currently marked pending or failed, sequentially to avoid
- * hammering the network. Returns a summary for the UI.
- */
 export async function retryAllPending(options?: {
   timeoutMs?: number;
 }): Promise<{ succeeded: number; failed: number }> {
-  const targets = loadAll().filter(
+  const all = await loadAll();
+  const targets = all.filter(
     (u) => u.status === "pending" || u.status === "failed",
   );
 
@@ -414,7 +446,7 @@ export async function retryAllPending(options?: {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Job-level grouping helpers
+// Job-level grouping
 // ─────────────────────────────────────────────────────────────
 
 export interface JobUploadSummary {
@@ -426,12 +458,8 @@ export interface JobUploadSummary {
   lastErrorAt: string | null;
 }
 
-/**
- * Group all actionable (pending/failed) uploads by job.
- * Returns one summary per job for the job-level Pending Uploads screen.
- */
-export function getPendingUploadsByJob(): JobUploadSummary[] {
-  const all = loadAll().filter(
+export async function getPendingUploadsByJob(): Promise<JobUploadSummary[]> {
+  const all = (await loadAll()).filter(
     (u) => u.status === "pending" || u.status === "failed",
   );
 
@@ -455,7 +483,6 @@ export function getPendingUploadsByJob(): JobUploadSummary[] {
     if (u.status === "failed") {
       entry.failedCount++;
       if (u.errorMessage) {
-        // Track most recent error timestamp
         const errTime = u.completedAt || u.createdAt;
         if (!entry.lastErrorAt || errTime > entry.lastErrorAt) {
           entry.lastErrorAt = errTime;
@@ -467,20 +494,15 @@ export function getPendingUploadsByJob(): JobUploadSummary[] {
   return Array.from(map.values());
 }
 
-/**
- * Count distinct jobs with pending/failed uploads.
- */
-export function getPendingJobCount(): number {
-  return getPendingUploadsByJob().length;
+export async function getPendingJobCount(): Promise<number> {
+  return (await getPendingUploadsByJob()).length;
 }
 
-/**
- * Retry uploads for a single job. Returns success/failure counts.
- */
 export async function retryJobUploads(
   jobId: string,
 ): Promise<{ succeeded: number; failed: number }> {
-  const targets = loadAll().filter(
+  const all = await loadAll();
+  const targets = all.filter(
     (u) =>
       u.jobId === jobId &&
       (u.status === "pending" || u.status === "failed"),
@@ -490,6 +512,7 @@ export async function retryJobUploads(
   let failed = 0;
 
   for (const u of targets) {
+    // eslint-disable-next-line no-await-in-loop
     const ok = await retryUpload(u.id);
     if (ok) succeeded++;
     else failed++;
@@ -497,3 +520,11 @@ export async function retryJobUploads(
 
   return { succeeded, failed };
 }
+
+// Internal: exposed only for tests
+export const __testing__ = {
+  loadAll,
+  saveAll,
+  store,
+  QUEUE_KEY,
+};

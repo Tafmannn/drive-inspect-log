@@ -1,7 +1,14 @@
 // Domain types matching Supabase schema exactly
 
+// Canonical job status union — must stay in sync with JOB_STATUS in statusConfig.ts.
+// (Kept as a string-literal union here to avoid a circular import from types → statusConfig.)
 export type JobStatus =
+  | 'draft'
+  | 'pending'
+  | 'incomplete'
+  | 'new'
   | 'ready_for_pickup'
+  | 'assigned'
   | 'pickup_in_progress'
   | 'pickup_complete'
   | 'in_transit'
@@ -9,7 +16,9 @@ export type JobStatus =
   | 'delivery_complete'
   | 'pod_ready'
   | 'completed'
-  | 'cancelled';
+  | 'cancelled'
+  | 'failed'
+  | 'archived';
 
 export type InspectionType = 'pickup' | 'delivery';
 

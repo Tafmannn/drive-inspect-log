@@ -15,8 +15,10 @@ export function AdminPendingUploads() {
   const [retrying, setRetrying] = useState<string | null>(null);
 
   useEffect(() => {
-    pruneDone();
-    setGroups(getPendingUploadsByJob());
+    (async () => {
+      await pruneDone();
+      setGroups(await getPendingUploadsByJob());
+    })();
   }, []);
 
   const handleRetry = async (jobId: string) => {
@@ -29,8 +31,8 @@ export function AdminPendingUploads() {
           : `${result.succeeded} photo(s) uploaded successfully.`,
         variant: result.failed > 0 ? "destructive" : "default",
       });
-      pruneDone();
-      setGroups(getPendingUploadsByJob());
+      await pruneDone();
+      setGroups(await getPendingUploadsByJob());
     } catch {
       toast({ title: "Retry failed.", variant: "destructive" });
     } finally {

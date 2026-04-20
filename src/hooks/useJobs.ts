@@ -43,12 +43,16 @@ export function useDashboardCounts(driverProfileId?: string | null) {
         completedQuery = completedQuery.eq("driver_id", driverProfileId);
       }
 
-      const [activeRes, completedRes] = await Promise.all([activeQuery, completedQuery]);
+      const [activeRes, completedRes, pendingUploads] = await Promise.all([
+        activeQuery,
+        completedQuery,
+        getPendingJobCount(),
+      ]);
 
       return {
         myJobs: activeRes.count ?? 0,
         completedLast14Days: completedRes.count ?? 0,
-        pendingUploads: getPendingJobCount(),
+        pendingUploads,
       } satisfies DashboardCounts;
     },
     staleTime: 60_000,

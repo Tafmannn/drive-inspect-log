@@ -332,7 +332,7 @@ export const InspectionFlow = () => {
       const earlyStatuses: string[] = [JOB_STATUS.READY_FOR_PICKUP, JOB_STATUS.PICKUP_COMPLETE, JOB_STATUS.IN_TRANSIT];
       if (type === "pickup" && earlyStatuses.includes(freshJob.status)) {
         api.updateJob(jobId, { status: targetStatus } as Partial<Job>).catch(() => {});
-      } else if (type === "delivery" && [JOB_STATUS.PICKUP_COMPLETE, JOB_STATUS.IN_TRANSIT].includes(freshJob.status as any)) {
+      } else if (type === "delivery" && ([JOB_STATUS.PICKUP_COMPLETE, JOB_STATUS.IN_TRANSIT] as string[]).includes(freshJob.status)) {
         api.updateJob(jobId, { status: targetStatus } as Partial<Job>).catch(() => {});
       }
     } catch {
