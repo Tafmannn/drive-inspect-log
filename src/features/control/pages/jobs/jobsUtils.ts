@@ -18,24 +18,22 @@ export interface DispatchRow {
 const STALE_HOURS = 24;
 
 export function isJobStale(row: DispatchRow): boolean {
-  if (!ACTIVE_STATUSES.includes(row.status as any)) return false;
+  if (!(ACTIVE_STATUSES as string[]).includes(row.status)) return false;
   const ms = Date.now() - new Date(row.updated_at).getTime();
   return ms > STALE_HOURS * 60 * 60 * 1000;
 }
 
-// ─── Action eligibility ──────────────────────────────────────────────
-
 export function canReviewPod(row: DispatchRow): boolean {
-  return PENDING_STATUSES.includes(row.status as any);
+  return (PENDING_STATUSES as string[]).includes(row.status);
 }
 
 export function canInspect(row: DispatchRow): boolean {
-  if (!ACTIVE_STATUSES.includes(row.status as any)) return false;
+  if (!(ACTIVE_STATUSES as string[]).includes(row.status)) return false;
   return !row.has_pickup_inspection || !row.has_delivery_inspection;
 }
 
 export function canAddExpense(row: DispatchRow): boolean {
-  return !TERMINAL_STATUSES.includes(row.status as any);
+  return !(TERMINAL_STATUSES as string[]).includes(row.status);
 }
 
 export function isUnassigned(row: DispatchRow): boolean {
