@@ -10,6 +10,10 @@ import type {
 } from './types';
 import type { JobStatusValue } from './statusConfig';
 import { JOB_STATUS, ACTIVE_STATUSES, PENDING_STATUSES } from './statusConfig';
+import {
+  nextStatusForInspection,
+  shouldBlockResubmission,
+} from './inspectionTransitions';
 import { logClientEvent } from './logger';
 import { getOrgId } from './orgHelper';
 
@@ -214,8 +218,7 @@ export async function submitInspection(
   const existingInspection = await getInspection(jobId, type);
   if (existingInspection?.inspected_at) {
     const job = await getJob(jobId);
-    const terminalStatuses = [JOB_STATUS.COMPLETED, JOB_STATUS.POD_READY, JOB_STATUS.DELIVERY_COMPLETE];
-    if ((terminalStatuses as string[]).includes(job.status)) {
+    if (shouldBlockResubmission(existingInspection.inspected_at, job.status)) {
       throw new Error(`${type} inspection already submitted for this job. Cannot overwrite completed inspection.`);
     }
   }
@@ -238,13 +241,14 @@ export async function submitInspection(
 
   const job = await getJob(jobId);
   const fromStatus = job.status;
-  let toStatus: JobStatusValue | string = job.status;
+  const toStatus: JobStatusValue = nextStatusForInspection(
+    type,
+    job.has_pickup_inspection,
+  );
 
   if (type === 'pickup') {
-    toStatus = JOB_STATUS.PICKUP_COMPLETE;
     await updateJob(jobId, { has_pickup_inspection: true, status: toStatus } as Partial<Job>);
   } else {
-    toStatus = job.has_pickup_inspection ? JOB_STATUS.POD_READY : JOB_STATUS.DELIVERY_COMPLETE;
     await updateJob(jobId, {
       has_delivery_inspection: true,
       status: toStatus,
