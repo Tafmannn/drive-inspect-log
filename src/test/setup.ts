@@ -7,12 +7,12 @@ import "fake-indexeddb/auto";
 // jsdom (no real renderer) and the helper falls back to the raw File — which
 // is the documented behaviour and is exactly what the tests exercise.
 if (typeof URL.createObjectURL !== "function") {
-  // @ts-expect-error — augmenting jsdom's URL
-  URL.createObjectURL = () => "blob:mock";
+  (URL as unknown as { createObjectURL: (b: Blob) => string }).createObjectURL =
+    () => "blob:mock";
 }
 if (typeof URL.revokeObjectURL !== "function") {
-  // @ts-expect-error — augmenting jsdom's URL
-  URL.revokeObjectURL = () => {};
+  (URL as unknown as { revokeObjectURL: (s: string) => void }).revokeObjectURL =
+    () => {};
 }
 
 Object.defineProperty(window, "matchMedia", {
