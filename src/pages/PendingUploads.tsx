@@ -22,10 +22,10 @@ export const PendingUploads = () => {
   const [retryingJob, setRetryingJob] = useState<string | null>(null);
   const [retryingAll, setRetryingAll] = useState(false);
 
-  const refresh = () => {
+  const refresh = async () => {
     setLoading(true);
-    pruneDone();
-    const grouped = getPendingUploadsByJob();
+    await pruneDone();
+    const grouped = await getPendingUploadsByJob();
     setJobs(grouped);
     setLoading(false);
   };
