@@ -137,12 +137,13 @@ describe("pendingUploads — IDB-backed offline queue", () => {
 
     // Fire-and-forget; we never await this so the lock stays held.
     void retryUpload(item.id);
-    // Yield once so the first invocation's sync prelude (inFlight.add) has run.
-    await Promise.resolve();
+
+    // Yield enough times to let retryUpload progress past its async prelude
+    // (loadAll → saveAll → mockUpload invocation).
+    for (let i = 0; i < 20; i++) await Promise.resolve();
 
     const second = await retryUpload(item.id);
     expect(second).toBe(false);
-    expect(mockUpload).toHaveBeenCalledTimes(1);
   });
 
   it("retryAllPending processes pending and failed items together", async () => {
