@@ -61,26 +61,16 @@ export function isAdminDriverCheck(user: AppUser): boolean {
   return user.roles.includes("ADMIN") && user.roles.includes("DRIVER");
 }
 
+/**
+ * Build a baseline AppUser from the Supabase session.
+ *
+ * SECURITY: This intentionally assigns ONLY the "DRIVER" role.
+ * Privileged roles (ADMIN, SUPERADMIN) are added later in handleSession()
+ * exclusively from the user_profiles table — never from JWT metadata —
+ * so a tampered/stale JWT cannot escalate privileges.
+ */
 function deriveAppUser(supaUser: SupaUser): AppUser {
   const email = (supaUser.email ?? "").toLowerCase();
-  const roles: AppRole[] = ["DRIVER"];
-
-  // Merge any metadata roles
-  const metaRoles = [
-    ...((supaUser.user_metadata?.roles ?? []) as string[]),
-    ...((supaUser.app_metadata?.roles ?? []) as string[]),
-    typeof supaUser.user_metadata?.role === "string" ? supaUser.user_metadata.role : "",
-    typeof supaUser.app_metadata?.role === "string" ? supaUser.app_metadata.role : "",
-  ].filter(Boolean);
-
-  for (const r of metaRoles) {
-    const normalized = String(r).toUpperCase().replace(/-/g, "_");
-    const mapped = (normalized === "SUPER_ADMIN" ? "SUPERADMIN" : normalized) as AppRole;
-    if (["DRIVER", "ADMIN", "SUPERADMIN"].includes(mapped) && !roles.includes(mapped)) {
-      roles.push(mapped);
-    }
-  }
-
   return {
     id: supaUser.id,
     name:
@@ -89,7 +79,7 @@ function deriveAppUser(supaUser: SupaUser): AppUser {
       email.split("@")[0] ??
       "User",
     email,
-    roles,
+    roles: ["DRIVER"],
     status: "active",
   };
 }
@@ -175,7 +165,8 @@ function RealAuthProvider({ children }: { children: ReactNode }) {
   const handleSession = useCallback(async (session: Session | null) => {
     if (session?.user) {
       const user = deriveAppUser(session.user);
-      // Fetch account_status + role from user_profiles (DB is authoritative)
+      // SECURITY: user_profiles is the SOLE authoritative source for ADMIN/SUPERADMIN.
+      // Never trust JWT metadata for privileged roles — it can be stale or tampered.
       try {
         const { data } = await (supabase as any)
           .from("user_profiles")
@@ -186,22 +177,17 @@ function RealAuthProvider({ children }: { children: ReactNode }) {
           user.accountStatus = data.account_status as AppUser["accountStatus"];
         }
         if (data?.role) {
-          const dbRole = data.role === "super_admin" ? "SUPERADMIN" : data.role.toUpperCase();
+          const dbRole =
+            data.role === "super_admin" ? "SUPERADMIN" : String(data.role).toUpperCase();
           if (
             ["DRIVER", "ADMIN", "SUPERADMIN"].includes(dbRole) &&
             !user.roles.includes(dbRole as AppRole)
           ) {
             user.roles.push(dbRole as AppRole);
-
-            // JWT is stale — trigger background sync to fix it
-            supabase.functions
-              .invoke("user-lifecycle", { body: { _action: "sync_role_from_db" } })
-              .then(() => console.log("[auth] JWT role synced from DB"))
-              .catch(() => {/* non-blocking */});
           }
         }
       } catch {
-        // If fetch fails, allow through (fail-open for now)
+        // Fail-closed: if DB lookup fails, the user keeps only the baseline DRIVER role.
       }
       setAppUser(user);
     } else {
