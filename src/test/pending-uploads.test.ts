@@ -123,13 +123,9 @@ describe("pendingUploads — IDB-backed offline queue", () => {
   });
 
   it("concurrency lock prevents duplicate uploads of the same id", async () => {
-    let resolveUpload: (v: unknown) => void = () => {};
-    mockUpload.mockImplementation(
-      () =>
-        new Promise((res) => {
-          resolveUpload = res;
-        }),
-    );
+    // First call holds the lock via a never-resolving upload promise.
+    // Second call must short-circuit and return false without invoking upload.
+    mockUpload.mockImplementation(() => new Promise(() => {}));
     mockInsertPhoto.mockResolvedValue({ id: "p" });
 
     const item = await addPendingUpload(makeFile(), {
@@ -139,20 +135,13 @@ describe("pendingUploads — IDB-backed offline queue", () => {
       label: null,
     });
 
-    const first = retryUpload(item.id);
-    // Yield once so retryUpload's sync prelude (which calls inFlight.add)
-    // has executed before the second invocation.
+    // Fire-and-forget; we never await this so the lock stays held.
+    void retryUpload(item.id);
+    // Yield once so the first invocation's sync prelude (inFlight.add) has run.
     await Promise.resolve();
-    const second = await retryUpload(item.id); // should short-circuit to false
-    expect(second).toBe(false);
 
-    resolveUpload({
-      url: "u",
-      thumbnailUrl: null,
-      backend: "gcs",
-      backendRef: null,
-    });
-    await first;
+    const second = await retryUpload(item.id);
+    expect(second).toBe(false);
     expect(mockUpload).toHaveBeenCalledTimes(1);
   });
 
