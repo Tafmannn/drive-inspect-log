@@ -10,7 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ACTIVE_STATUSES, PENDING_STATUSES, TERMINAL_STATUSES } from "@/lib/statusConfig";
 import { qk } from "@/lib/queryKeys";
-import { resolveDriverName, staleThresholdIso, STALE_HOURS } from "@/features/jobs/selectors";
+import { resolveDriverName, staleThresholdIso } from "@/features/jobs/selectors";
 import type { Job } from "@/lib/types";
 
 export type JobControlRow = Pick<
@@ -26,16 +26,6 @@ export type JobControlRow = Pick<
   /** Resolved driver display name from FK join or legacy driver_name */
   resolvedDriverName: string | null;
 };
-
-const ALL_OPERATIONAL = [
-  ...ACTIVE_STATUSES,
-  ...PENDING_STATUSES,
-  "assigned",
-  "draft",
-  "new",
-  "pending",
-  "incomplete",
-] as string[];
 
 export interface JobsFilter {
   search: string;
