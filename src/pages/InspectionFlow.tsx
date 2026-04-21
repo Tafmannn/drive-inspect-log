@@ -393,7 +393,7 @@ export const InspectionFlow = () => {
         jobId,
         type,
         inspectionPayload: inspPayload as any,
-        damageItems: damageItemsPayload,
+        damageItems: damageItemsPayload as any,
       });
 
       // ── 3b) Queue damage photos AFTER submission (so we have damage_item IDs) ──
@@ -496,7 +496,7 @@ export const InspectionFlow = () => {
   }
 
   // Determine which step is the signature step
-  const signatureStepNumber = type === "pickup" ? 5 : 4;
+  const signatureStepNumber = getSignatureStepNumber(type);
 
   const nextStep = async () => {
     if (currentStep >= totalSteps || capturing) return;
