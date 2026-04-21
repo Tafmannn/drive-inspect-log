@@ -1,27 +1,21 @@
 /**
- * Jobs dispatch utilities — shared by Jobs page and Admin overview.
- * Accepts minimal row shapes so both JobControlRow and DispatchBoardRow work.
+ * Jobs dispatch utilities — thin re-exports of the shared selectors.
+ *
+ * Kept as a separate module for backwards compatibility with existing call
+ * sites (AdminDashboard, AdminJobsQueue, etc). New code should import directly
+ * from `@/features/jobs/selectors`.
  */
-import { ACTIVE_STATUSES, PENDING_STATUSES, TERMINAL_STATUSES } from "@/lib/statusConfig";
+import { PENDING_STATUSES, TERMINAL_STATUSES, ACTIVE_STATUSES } from "@/lib/statusConfig";
+import {
+  isJobStale as _isJobStale,
+  isUnassigned as _isUnassigned,
+  type DispatchJob,
+} from "@/features/jobs/selectors";
 
-/** Minimal shape needed by dispatch utilities */
-export interface DispatchRow {
-  status: string;
-  updated_at: string;
-  has_pickup_inspection?: boolean;
-  has_delivery_inspection?: boolean;
-  resolvedDriverName?: string | null;
-}
+export type DispatchRow = DispatchJob;
 
-// ─── Stale threshold ─────────────────────────────────────────────────
-/** An active job with no update for >24 h is considered stale. */
-const STALE_HOURS = 24;
-
-export function isJobStale(row: DispatchRow): boolean {
-  if (!(ACTIVE_STATUSES as string[]).includes(row.status)) return false;
-  const ms = Date.now() - new Date(row.updated_at).getTime();
-  return ms > STALE_HOURS * 60 * 60 * 1000;
-}
+export const isJobStale = _isJobStale;
+export const isUnassigned = _isUnassigned;
 
 export function canReviewPod(row: DispatchRow): boolean {
   return (PENDING_STATUSES as string[]).includes(row.status);
@@ -34,10 +28,6 @@ export function canInspect(row: DispatchRow): boolean {
 
 export function canAddExpense(row: DispatchRow): boolean {
   return !(TERMINAL_STATUSES as string[]).includes(row.status);
-}
-
-export function isUnassigned(row: DispatchRow): boolean {
-  return !row.resolvedDriverName;
 }
 
 // ─── Human-readable age ──────────────────────────────────────────────
