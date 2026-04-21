@@ -25,7 +25,6 @@ import { useJob, useSubmitInspection } from "@/hooks/useJobs";
 import { storageService } from "@/lib/storage";
 import { addPendingUpload } from "@/lib/pendingUploads";
 import { toast } from "@/hooks/use-toast";
-import { FUEL_LEVEL_MAP } from "@/lib/types";
 import type {
   Job,
   InspectionType,
@@ -37,6 +36,19 @@ import { PhotoViewer } from "@/components/PhotoViewer";
 import { useAuth } from "@/context/AuthContext";
 import { saveDraft, loadDraft, clearDraft, draftKey } from "@/lib/autosave";
 import { JOB_STATUS } from "@/lib/statusConfig";
+import {
+  type InspectionFormState,
+  INITIAL_INSPECTION_FORM,
+  PHOTO_TYPES_BY_INSPECTION,
+  REVIEW_CHECKLIST,
+  SAVED_PICKUP_FIELDS,
+  getTotalSteps,
+  getSignatureStepNumber,
+  validateInspectionStep,
+  validateBeforeSubmit as validateBeforeSubmitPure,
+  buildInspectionPayload,
+  buildDamageItemsPayload,
+} from "@/features/inspection/inspectionFormConfig";
 
 interface InspectionFormState {
   odometer: string;
