@@ -25,7 +25,6 @@ import { useJob, useSubmitInspection } from "@/hooks/useJobs";
 import { storageService } from "@/lib/storage";
 import { addPendingUpload } from "@/lib/pendingUploads";
 import { toast } from "@/hooks/use-toast";
-import { FUEL_LEVEL_MAP } from "@/lib/types";
 import type {
   Job,
   InspectionType,
@@ -37,88 +36,21 @@ import { PhotoViewer } from "@/components/PhotoViewer";
 import { useAuth } from "@/context/AuthContext";
 import { saveDraft, loadDraft, clearDraft, draftKey } from "@/lib/autosave";
 import { JOB_STATUS } from "@/lib/statusConfig";
+import {
+  type InspectionFormState,
+  INITIAL_INSPECTION_FORM,
+  PHOTO_TYPES_BY_INSPECTION,
+  REVIEW_CHECKLIST,
+  SAVED_PICKUP_FIELDS,
+  getTotalSteps,
+  getSignatureStepNumber,
+  validateInspectionStep,
+  validateBeforeSubmit as validateBeforeSubmitPure,
+  buildInspectionPayload,
+  buildDamageItemsPayload,
+} from "@/features/inspection/inspectionFormConfig";
 
-interface InspectionFormState {
-  odometer: string;
-  fuelLevel: string;
-  vehicleCondition: string;
-  lightCondition: string;
-  oilLevel: string;
-  waterLevel: string;
-  notes: string;
-  handbook: string;
-  serviceBook: string;
-  mot: string;
-  v5: string;
-  parcelShelf: string;
-  spareWheel: string;
-  toolKit: string;
-  tyreInflationKit: string;
-  lockingWheelNut: string;
-  satNavWorking: string;
-  alloysOrTrims: string;
-  alloysDamaged: string;
-  wheelTrimsDamaged: string;
-  numberOfKeys: string;
-  evChargingCables: string;
-  aerial: string;
-  customerPaperwork: string;
-  damages: DamageItemDraft[];
-  standardPhotos: Record<string, File | null>;
-  standardPhotoUrls: Record<string, string>;
-  additionalPhotos: AdditionalPhotoDraft[];
-  driverName: string;
-  customerName: string;
-}
 
-// Moved outside component to avoid re-allocation on every render
-const REVIEW_CHECKLIST = [
-  { field: "vehicleCondition" as const, label: "Vehicle Condition" },
-  { field: "lightCondition" as const, label: "Light Condition" },
-  { field: "oilLevel" as const, label: "Oil Level" },
-  { field: "waterLevel" as const, label: "Water Level" },
-  { field: "handbook" as const, label: "Handbook" },
-  { field: "serviceBook" as const, label: "Service Book" },
-  { field: "mot" as const, label: "MOT" },
-  { field: "v5" as const, label: "V5" },
-  { field: "parcelShelf" as const, label: "Parcel Shelf" },
-  { field: "spareWheel" as const, label: "Spare Wheel" },
-  { field: "toolKit" as const, label: "Tool Kit" },
-  { field: "tyreInflationKit" as const, label: "Tyre Inflation Kit" },
-  { field: "lockingWheelNut" as const, label: "Locking Wheel Nut" },
-  { field: "satNavWorking" as const, label: "Sat Nav Working" },
-  { field: "alloysOrTrims" as const, label: "Alloys / Trims" },
-  { field: "alloysDamaged" as const, label: "Alloys Damaged" },
-  { field: "wheelTrimsDamaged" as const, label: "Wheel Trims Damaged" },
-  { field: "numberOfKeys" as const, label: "Number of Keys" },
-  { field: "evChargingCables" as const, label: "EV Charging Cables" },
-  { field: "aerial" as const, label: "Aerial" },
-  { field: "customerPaperwork" as const, label: "Customer Paperwork" },
-] as const;
-
-const PHOTO_TYPES_BY_INSPECTION: Record<
-  InspectionType,
-  { key: string; label: string }[]
-> = {
-  pickup: [
-    { key: "pickup_exterior_front", label: "Front" },
-    { key: "pickup_exterior_rear", label: "Rear" },
-    { key: "pickup_exterior_driver_side", label: "Driver Side" },
-    { key: "pickup_exterior_passenger_side", label: "Passenger Side" },
-    { key: "pickup_interior", label: "Interior" },
-    { key: "pickup_dashboard", label: "Dashboard" },
-    { key: "pickup_fuel_gauge", label: "Fuel Gauge" },
-  ],
-  delivery: [
-    { key: "delivery_exterior_front", label: "Front" },
-    { key: "delivery_exterior_rear", label: "Rear" },
-    { key: "delivery_exterior_driver_side", label: "Driver Side" },
-    { key: "delivery_exterior_passenger_side", label: "Passenger Side" },
-    { key: "delivery_interior", label: "Interior" },
-    { key: "delivery_dashboard", label: "Dashboard" },
-    { key: "delivery_fuel_gauge", label: "Fuel Gauge" },
-  ],
-};
 
 export const InspectionFlow = () => {
   const navigate = useNavigate();
@@ -179,42 +111,9 @@ export const InspectionFlow = () => {
   const [newPhotoLabel, setNewPhotoLabel] = useState("");
   const [stepError, setStepError] = useState<string | null>(null);
 
-  const [formState, setFormState] = useState<InspectionFormState>({
-    odometer: "",
-    fuelLevel: "",
-    vehicleCondition: "",
-    lightCondition: "",
-    oilLevel: "",
-    waterLevel: "",
-    notes: "",
-    handbook: "",
-    serviceBook: "",
-    mot: "",
-    v5: "",
-    parcelShelf: "",
-    spareWheel: "",
-    toolKit: "",
-    tyreInflationKit: "",
-    lockingWheelNut: "",
-    satNavWorking: "",
-    alloysOrTrims: "",
-    alloysDamaged: "",
-    wheelTrimsDamaged: "",
-    numberOfKeys: "",
-    evChargingCables: "",
-    aerial: "",
-    customerPaperwork: "",
-    damages: [],
-    standardPhotos: {},
-    standardPhotoUrls: {},
-    additionalPhotos: [],
-    driverName: "",
-    customerName: "",
-  });
+  const [formState, setFormState] = useState<InspectionFormState>(INITIAL_INSPECTION_FORM);
 
-  const pickupStepCount = 6;
-  const deliveryStepCount = 5;
-  const totalSteps = type === "pickup" ? pickupStepCount : deliveryStepCount;
+  const totalSteps = getTotalSteps(type);
 
   // ─── Memoized derived data (avoid recomputing on every render) ─────
   const standardPhotoCount = useMemo(
@@ -437,68 +336,11 @@ export const InspectionFlow = () => {
 
   // ───────────────── PER-STEP VALIDATION ─────────────────
 
-  const validateStep = (step: number): string[] => {
-    const missing: string[] = [];
+  const validateStep = (step: number): string[] =>
+    validateInspectionStep(type, step, { formState, driverSigned, customerSigned });
 
-    if (type === "pickup") {
-      switch (step) {
-        case 1:
-          if (!formState.odometer) missing.push("Odometer reading");
-          if (!formState.fuelLevel) missing.push("Fuel level");
-          break;
-        case 2:
-          if (!formState.vehicleCondition) missing.push("Vehicle condition");
-          if (!formState.lightCondition) missing.push("Light condition");
-          if (!formState.numberOfKeys) missing.push("Number of keys");
-          break;
-        case 3: // Damage – optional
-          break;
-        case 4: {
-          const hasPhotos = Object.values(formState.standardPhotos).filter(Boolean).length > 0;
-          if (!hasPhotos) missing.push("At least one pickup photo");
-          break;
-        }
-        case 5:
-          if (!formState.driverName) missing.push("Driver name");
-          if (!driverSigned) missing.push("Driver signature");
-          if (!formState.customerName) missing.push("Customer name");
-          if (!customerSigned) missing.push("Customer signature");
-          break;
-      }
-    } else {
-      switch (step) {
-        case 1:
-          if (!formState.odometer) missing.push("Odometer reading");
-          if (!formState.fuelLevel) missing.push("Fuel level");
-          break;
-        case 2: // Damage – optional
-          break;
-        case 3: {
-          const hasPhotos =
-            Object.values(formState.standardPhotos).filter(Boolean).length > 0 ||
-            formState.additionalPhotos.length > 0;
-          if (!hasPhotos) missing.push("At least one delivery photo");
-          break;
-        }
-        case 4:
-          if (!formState.driverName) missing.push("Driver name");
-          if (!driverSigned) missing.push("Driver signature");
-          if (!formState.customerName) missing.push("Customer name");
-          if (!customerSigned) missing.push("Customer signature");
-          break;
-      }
-    }
-    return missing;
-  };
-
-  const validateBeforeSubmit = (): string[] => {
-    // Aggregate all steps
-    const allMissing: string[] = [];
-    for (let s = 1; s < totalSteps; s++) {
-      allMissing.push(...validateStep(s));
-    }
-    return allMissing;
-  };
+  const validateBeforeSubmit = (): string[] =>
+    validateBeforeSubmitPure(type, { formState, driverSigned, customerSigned });
 
   const handleFinalSubmit = async () => {
     if (!jobId) return;
@@ -539,64 +381,19 @@ export const InspectionFlow = () => {
       }
 
       // ── 2) Build damage items payload ──
-      const damageItemsPayload: any[] = [];
-      for (const d of formState.damages) {
-        damageItemsPayload.push({
-          x: d.x,
-          y: d.y,
-          area: d.area,
-          location: d.location,
-          item: d.item,
-          damage_types: d.damageTypes,
-          notes: d.notes,
-          photo_url: null, // Will be populated when upload completes
-        });
-      }
+      const damageItemsPayload = buildDamageItemsPayload(formState.damages);
 
       // ── 3) Submit inspection metadata IMMEDIATELY (non-blocking) ──
-      const inspPayload: Record<string, unknown> = {
-        odometer: formState.odometer
-          ? parseInt(formState.odometer, 10)
-          : null,
-        fuel_level_percent: FUEL_LEVEL_MAP[formState.fuelLevel] ?? null,
-        inspected_by_name: formState.driverName || null,
-        customer_name: formState.customerName || null,
-        driver_signature_url: driverSigUrl,
-        customer_signature_url: customerSigUrl,
-        notes: formState.notes || null,
-      };
-
-      if (type === "pickup") {
-        Object.assign(inspPayload, {
-          vehicle_condition: formState.vehicleCondition || null,
-          light_condition: formState.lightCondition || null,
-          oil_level_status: formState.oilLevel || null,
-          water_level_status: formState.waterLevel || null,
-          handbook: formState.handbook || null,
-          service_book: formState.serviceBook || null,
-          mot: formState.mot || null,
-          v5: formState.v5 || null,
-          parcel_shelf: formState.parcelShelf || null,
-          spare_wheel_status: formState.spareWheel || null,
-          tool_kit: formState.toolKit || null,
-          tyre_inflation_kit: formState.tyreInflationKit || null,
-          locking_wheel_nut: formState.lockingWheelNut || null,
-          sat_nav_working: formState.satNavWorking || null,
-          alloys_or_trims: formState.alloysOrTrims || null,
-          alloys_damaged: formState.alloysDamaged || null,
-          wheel_trims_damaged: formState.wheelTrimsDamaged || null,
-          number_of_keys: formState.numberOfKeys || null,
-          ev_charging_cables: formState.evChargingCables || null,
-          aerial: formState.aerial || null,
-          customer_paperwork: formState.customerPaperwork || null,
-        });
-      }
+      const inspPayload = buildInspectionPayload(type, formState, {
+        driverSignatureUrl: driverSigUrl,
+        customerSignatureUrl: customerSigUrl,
+      });
 
       const submitResult = await submitMutation.mutateAsync({
         jobId,
         type,
         inspectionPayload: inspPayload as any,
-        damageItems: damageItemsPayload,
+        damageItems: damageItemsPayload as any,
       });
 
       // ── 3b) Queue damage photos AFTER submission (so we have damage_item IDs) ──
@@ -699,7 +496,7 @@ export const InspectionFlow = () => {
   }
 
   // Determine which step is the signature step
-  const signatureStepNumber = type === "pickup" ? 5 : 4;
+  const signatureStepNumber = getSignatureStepNumber(type);
 
   const nextStep = async () => {
     if (currentStep >= totalSteps || capturing) return;
