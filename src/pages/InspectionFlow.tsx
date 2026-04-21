@@ -111,38 +111,7 @@ export const InspectionFlow = () => {
   const [newPhotoLabel, setNewPhotoLabel] = useState("");
   const [stepError, setStepError] = useState<string | null>(null);
 
-  const [formState, setFormState] = useState<InspectionFormState>({
-    odometer: "",
-    fuelLevel: "",
-    vehicleCondition: "",
-    lightCondition: "",
-    oilLevel: "",
-    waterLevel: "",
-    notes: "",
-    handbook: "",
-    serviceBook: "",
-    mot: "",
-    v5: "",
-    parcelShelf: "",
-    spareWheel: "",
-    toolKit: "",
-    tyreInflationKit: "",
-    lockingWheelNut: "",
-    satNavWorking: "",
-    alloysOrTrims: "",
-    alloysDamaged: "",
-    wheelTrimsDamaged: "",
-    numberOfKeys: "",
-    evChargingCables: "",
-    aerial: "",
-    customerPaperwork: "",
-    damages: [],
-    standardPhotos: {},
-    standardPhotoUrls: {},
-    additionalPhotos: [],
-    driverName: "",
-    customerName: "",
-  });
+  const [formState, setFormState] = useState<InspectionFormState>(INITIAL_INSPECTION_FORM);
 
   const pickupStepCount = 6;
   const deliveryStepCount = 5;
