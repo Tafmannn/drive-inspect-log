@@ -1,10 +1,16 @@
 /**
  * Data hooks for the Jobs Control Page.
  * Reuses existing Supabase queries, extends for filtering.
+ *
+ * Driver-name resolution and stale/unassigned predicates are delegated to
+ * `@/features/jobs/selectors` so the desktop Control surface and the mobile
+ * Admin Jobs Queue cannot drift in their definitions of these concepts.
  */
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ACTIVE_STATUSES, PENDING_STATUSES, TERMINAL_STATUSES } from "@/lib/statusConfig";
+import { qk } from "@/lib/queryKeys";
+import { resolveDriverName, staleThresholdIso, STALE_HOURS } from "@/features/jobs/selectors";
 import type { Job } from "@/lib/types";
 
 export type JobControlRow = Pick<
@@ -31,9 +37,6 @@ const ALL_OPERATIONAL = [
   "incomplete",
 ] as string[];
 
-/** Stale threshold in hours — active jobs not updated within this window */
-const STALE_HOURS = 24;
-
 export interface JobsFilter {
   search: string;
   status: "all" | "active" | "pod_review" | "completed" | "unassigned" | "stale";
@@ -42,7 +45,7 @@ export interface JobsFilter {
 
 export function useControlJobs(filter: JobsFilter) {
   return useQuery({
-    queryKey: ["control-jobs", filter],
+    queryKey: qk.jobs.controlList(filter),
     queryFn: async () => {
       // Select with FK join to driver_profiles for resolved name + inspection flags
       let query = supabase
@@ -63,8 +66,7 @@ export function useControlJobs(filter: JobsFilter) {
         query = query.in("status", ACTIVE_STATUSES as string[]).is("driver_id", null).is("driver_name", null);
       } else if (filter.status === "stale") {
         // Stale = active + not updated within threshold. Filter server-side as much as possible.
-        const staleThreshold = new Date(Date.now() - STALE_HOURS * 60 * 60 * 1000).toISOString();
-        query = query.in("status", ACTIVE_STATUSES as string[]).lt("updated_at", staleThreshold);
+        query = query.in("status", ACTIVE_STATUSES as string[]).lt("updated_at", staleThresholdIso());
       }
 
       // Sort order
@@ -74,18 +76,12 @@ export function useControlJobs(filter: JobsFilter) {
       const { data, error } = await query;
       if (error) throw error;
 
-      // Resolve driver display name: prefer FK-joined profile, fallback to legacy driver_name
-      let rows: JobControlRow[] = (data ?? []).map((r: any) => {
-        const profile = r.driver_profiles;
-        const resolvedDriverName = profile
-          ? (profile.display_name || profile.full_name || r.driver_name)
-          : (r.driver_name || null);
-        return {
-          ...r,
-          driver_profiles: undefined, // strip join artifact
-          resolvedDriverName,
-        };
-      });
+      // Resolve driver display name via shared selector (single source of truth).
+      let rows: JobControlRow[] = (data ?? []).map((r: any) => ({
+        ...r,
+        driver_profiles: undefined, // strip join artifact
+        resolvedDriverName: resolveDriverName(r),
+      }));
 
       // Client-side search — search resolved name too
       if (filter.search.trim()) {
@@ -113,9 +109,9 @@ export function useControlJobs(filter: JobsFilter) {
 
 export function useJobsKpis() {
   return useQuery({
-    queryKey: ["control-jobs-kpis"],
+    queryKey: qk.jobs.controlKpis(),
     queryFn: async () => {
-      const staleThreshold = new Date(Date.now() - STALE_HOURS * 60 * 60 * 1000).toISOString();
+      const staleThreshold = staleThresholdIso();
       const [activeRes, podRes, unassignedRes, staleRes, totalRes] = await Promise.all([
         supabase.from("jobs").select("id", { count: "exact", head: true })
           .eq("is_hidden", false).in("status", ACTIVE_STATUSES as string[]),
