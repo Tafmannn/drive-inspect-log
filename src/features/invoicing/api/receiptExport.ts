@@ -83,12 +83,13 @@ export async function discoverReceipts(
     }
   }
 
-  // 2. Direct photo receipts on jobs
-  const { data: photos } = await supabase
+  // 2. Direct photo receipts on jobs — active only (exclude archived runs)
+  const { data: photos } = await (supabase
     .from("photos")
     .select("id, job_id, url, label")
     .in("job_id", jobIds)
-    .eq("type", "receipt");
+    .eq("type", "receipt") as any)
+    .is("archived_at", null);
 
   if (photos) {
     photos.forEach((p, idx) => {

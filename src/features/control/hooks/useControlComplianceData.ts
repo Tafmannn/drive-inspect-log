@@ -15,21 +15,26 @@ export function useComplianceKpis() {
     queryFn: async () => {
       const since = THIRTY_DAYS_AGO();
 
-      // Inspections in last 30 days
-      const { count: inspectionCount } = await supabase
+      // Active inspections in last 30 days (exclude archived runs)
+      const { count: inspectionCount } = await (supabase
         .from("inspections")
         .select("id", { count: "exact", head: true })
-        .gte("created_at", since);
+        .gte("created_at", since) as any)
+        .is("archived_at", null);
 
-      // Total damage items (no resolution column — all are "open")
-      const { count: damageCount } = await supabase
+      // Active damage items only — soft-archived items belong to a prior run
+      const { count: damageCount } = await (supabase
         .from("damage_items")
-        .select("id", { count: "exact", head: true });
+        .select("id", { count: "exact", head: true }) as any)
+        .is("archived_at", null);
 
-      // Compliance rate: completed jobs with BOTH inspections / total completed (30d)
+      // Compliance rate: only true completed jobs (status = 'completed') with
+      // BOTH inspections / total completed (30d). pod_ready / delivery_complete
+      // are review states and must not pollute completion metrics.
       const { data: completedJobs } = await supabase
         .from("jobs")
         .select("id, has_pickup_inspection, has_delivery_inspection")
+        .eq("status", "completed")
         .gte("completed_at", since)
         .not("completed_at", "is", null);
 
@@ -65,11 +70,12 @@ export function useRecentInspections() {
   return useQuery({
     queryKey: ["control", "compliance", "recentInspections"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase
         .from("inspections")
         .select("id, type, has_damage, created_at, job_id, jobs!inner(vehicle_reg, vehicle_make, vehicle_model)")
         .order("created_at", { ascending: false })
-        .limit(20);
+        .limit(20) as any)
+        .is("archived_at", null);
 
       if (error) throw error;
 
@@ -102,11 +108,12 @@ export function useOutstandingDamage() {
   return useQuery({
     queryKey: ["control", "compliance", "outstandingDamage"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase
         .from("damage_items")
         .select("id, area, damage_types, notes, created_at, inspection_id")
         .order("created_at", { ascending: false })
-        .limit(20);
+        .limit(20) as any)
+        .is("archived_at", null);
 
       if (error) throw error;
       return (data ?? []) as OutstandingDamageRow[];

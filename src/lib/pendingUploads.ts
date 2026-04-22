@@ -542,7 +542,11 @@ export async function retryUpload(
 
 export async function retryAllPending(options?: {
   timeoutMs?: number;
-}): Promise<{ succeeded: number; failed: number }> {
+}): Promise<{ succeeded: number; failed: number; purged: number }> {
+  // Run-isolation safety net: drop items whose run no longer matches
+  // the job's current run before attempting any uploads.
+  const purged = await purgeStaleRunUploads().catch(() => 0);
+
   const all = await loadAll();
   const targets = all.filter(
     (u) => u.status === "pending" || u.status === "failed",
@@ -558,7 +562,7 @@ export async function retryAllPending(options?: {
     else failed++;
   }
 
-  return { succeeded, failed };
+  return { succeeded, failed, purged };
 }
 
 // ─────────────────────────────────────────────────────────────

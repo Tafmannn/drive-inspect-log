@@ -406,6 +406,13 @@ export const InspectionFlow = () => {
       };
 
       try {
+        // Snapshot the job's current_run_id so every queued photo is
+        // tagged. The retry worker will refuse to upload items whose
+        // runId no longer matches the job's current run (i.e. the job
+        // was reopened in the meantime), preventing stale evidence
+        // from polluting a fresh run.
+        const queueRunId: string | null = (job as any)?.current_run_id ?? null;
+
         // Damage photos (inspectionId + damageItemId attached after submit)
         for (let i = 0; i < formState.damages.length; i++) {
           const d = formState.damages[i];
@@ -417,6 +424,7 @@ export const InspectionFlow = () => {
             label: null,
             damageItemId: null,
             inspectionId: null,
+            runId: queueRunId,
           });
           queued.push({ id: item.id, kind: "damage", index: i });
         }
@@ -430,6 +438,7 @@ export const InspectionFlow = () => {
             photoType: pt.key,
             label: null,
             inspectionId: null,
+            runId: queueRunId,
           });
           queued.push({ id: item.id, kind: "standard", index: 0 });
         }
@@ -443,6 +452,7 @@ export const InspectionFlow = () => {
             photoType: photoKey,
             label: ap.label,
             inspectionId: null,
+            runId: queueRunId,
           });
           queued.push({ id: item.id, kind: "additional", index: i });
         }

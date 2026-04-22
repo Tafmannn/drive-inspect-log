@@ -63,7 +63,9 @@ const INSPECTION_HEADERS = [
 ];
 
 export async function exportInspectionsCsvSql(filters: ExportFilters): Promise<number> {
-  let q = supabase.from("inspections").select("*");
+  // Active operational export — exclude archived inspections from prior runs.
+  // (A separate audit export can be added if/when historical evidence is needed.)
+  let q = (supabase.from("inspections").select("*") as any).is("archived_at", null);
   const { from, to } = isoRange(filters.dateFrom, filters.dateTo);
   if (from) q = q.gte("created_at", from);
   if (to) q = q.lte("created_at", to);

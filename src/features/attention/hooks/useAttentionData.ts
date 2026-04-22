@@ -107,9 +107,10 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
         }
         const results = await Promise.all(
           chunks.map(chunk =>
-            supabase.from("inspections")
+            (supabase.from("inspections")
               .select("id, job_id, org_id, driver_signature_url, customer_signature_url")
-              .in("job_id", chunk)
+              .in("job_id", chunk) as any)
+              .is("archived_at", null)
           )
         );
         for (const r of results) {

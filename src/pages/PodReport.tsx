@@ -136,10 +136,9 @@ export const PodReport = () => {
     if (!job || confirmingReview) return;
     setConfirmingReview(true);
     try {
-      await updateJob.mutateAsync({
-        jobId: job.id,
-        input: { status: "completed" as any, completed_at: new Date().toISOString() },
-      });
+      // Centralized validated completion path — writes activity log
+      // and enforces transition. Direct status updates are forbidden.
+      await api.completeJobRpc(job.id, "Confirmed via POD report");
       invalidateForEvent(qc, "job_status_changed", [["job", job.id]]);
       toast({ title: "Review confirmed — job completed" });
     } catch (e: any) {
