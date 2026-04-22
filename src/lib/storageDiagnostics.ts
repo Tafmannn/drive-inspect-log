@@ -193,9 +193,9 @@ export async function probeLocalStorageHealth(): Promise<StorageHealth> {
   if (typeof indexedDB === "undefined") {
     const failure = classifyStorageError(new Error("IndexedDB is not supported"));
     void logClientEvent("storage_probe_failed", "error", {
-      kind: failure.kind,
-      raw: failure.raw,
-      source: "storage_probe",
+      source: "storage",
+      type: "upload",
+      context: { kind: failure.kind, raw: failure.raw, phase: "probe" },
     });
     return { status: "blocked", failure };
   }
@@ -212,9 +212,9 @@ export async function probeLocalStorageHealth(): Promise<StorageHealth> {
   } catch (err) {
     const failure = classifyStorageError(err);
     void logClientEvent("storage_probe_failed", "error", {
-      kind: failure.kind,
-      raw: failure.raw,
-      source: "storage_probe",
+      source: "storage",
+      type: "upload",
+      context: { kind: failure.kind, raw: failure.raw, phase: "probe" },
     });
     return { status: "blocked", failure };
   }
@@ -230,10 +230,9 @@ export function logStorageSubmitFailure(
 ): StorageFailure {
   const failure = classifyStorageError(err);
   void logClientEvent("inspection_submit_storage_failure", "error", {
-    kind: failure.kind,
-    raw: failure.raw,
-    source: "inspection_submit",
-    context: ctx,
+    source: "storage",
+    type: "upload",
+    context: { kind: failure.kind, raw: failure.raw, phase: "submit", ...ctx },
   });
   return failure;
 }
