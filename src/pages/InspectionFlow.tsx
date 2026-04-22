@@ -499,7 +499,7 @@ export const InspectionFlow = () => {
           const { deletePendingUpload } = await import("@/lib/pendingUploads");
           await Promise.all(queued.map((q) => deletePendingUpload(q.id).catch(() => {})));
         } catch { /* best-effort cleanup */ }
-        failPreflight(err);
+        failPreflight(err, queued.length);
         setSubmitting(false);
         return;
       }
