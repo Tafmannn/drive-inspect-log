@@ -14,11 +14,18 @@ class GcsStorageService implements StorageService {
       throw new Error('Upload failed: File too large (max 10 MB)');
     }
 
+    if (file.size === 0) {
+      throw new Error('Upload failed: File is empty');
+    }
+
     const ext = file.name.split('.').pop() || 'jpg';
     const fileName = `${pathHint}.${ext}`;
 
     // Convert file to base64
     const base64 = await this.fileToBase64(file);
+    if (!base64) {
+      throw new Error('Upload failed: Could not read file contents');
+    }
 
     const { data, error } = await supabase.functions.invoke('gcs-upload', {
       body: {
