@@ -134,12 +134,16 @@ export const InspectionFlow = () => {
 
   const totalSteps = getTotalSteps(type);
 
-  // Probe local storage health when the driver lands on the review step.
-  // This surfaces blocked/quota issues BEFORE submit so they can recover
-  // without losing context. Re-runs if the user navigates away & back.
+  // Probe local storage health EARLY — on mount and at the photo step,
+  // not just at review. This surfaces blocked Safari / private-mode /
+  // quota issues BEFORE the driver invests time capturing photos.
+  // Re-runs on entering the review step as the final guard.
   useEffect(() => {
-    if (currentStep !== totalSteps) return;
     let cancelled = false;
+    const photoStep = type === "pickup" ? 4 : 3;
+    const probePoints = new Set([1, photoStep, totalSteps]);
+    if (!probePoints.has(currentStep)) return;
+
     setProbing(true);
     probeLocalStorageHealth().then((h) => {
       if (!cancelled) {
@@ -148,7 +152,7 @@ export const InspectionFlow = () => {
       }
     });
     return () => { cancelled = true; };
-  }, [currentStep, totalSteps]);
+  }, [currentStep, totalSteps, type]);
 
   // ─── Memoized derived data (avoid recomputing on every render) ─────
   const standardPhotoCount = useMemo(
@@ -401,6 +405,33 @@ export const InspectionFlow = () => {
     setSubmitStorageFailure(null);
 
     try {
+      // ── 0) Server-safe idempotency pre-check ──
+      // If the inspection of this type is already committed for the
+      // CURRENT run (not a prior reopened run), short-circuit. This
+      // protects against duplicate submits across refreshes / multiple
+      // tabs / device-resume races that the in-memory mutex can't see.
+      try {
+        const fresh = await api.getJob(jobId);
+        const alreadySubmitted =
+          (type === "pickup" && fresh.has_pickup_inspection === true) ||
+          (type === "delivery" && fresh.has_delivery_inspection === true);
+        if (alreadySubmitted) {
+          toast({
+            title: `${type === "pickup" ? "Pickup" : "Delivery"} already submitted.`,
+            description: "Returning you to the job.",
+          });
+          if (dk) clearDraft(dk);
+          try { sessionStorage.removeItem(sessionKey); } catch { /* ignore */ }
+          setSubmitting(false);
+          submitInFlight.current = false;
+          navigate(`/jobs/${jobId}`);
+          return;
+        }
+      } catch {
+        // Pre-check is a defence-in-depth optimisation. If it fails
+        // (offline / RLS edge), fall through — the server RPC will
+        // still raise INSPECTION_ALREADY_SUBMITTED for blocking statuses.
+      }
       // ── 1) Upload signatures (critical for POD — do these synchronously) ──
       // Use eagerly-captured File objects stored when the user left the signature step.
       // Falls back to ref.toFile() only if files weren't captured (e.g. direct submit).
@@ -655,7 +686,9 @@ export const InspectionFlow = () => {
       }
 
       // ── 5) Immediately trigger background retry (best-effort) ──
-      import("@/lib/pendingUploads").then(m => m.retryAllPending()).catch(() => {});
+      import("@/lib/retryOrchestrator")
+        .then((m) => m.triggerRetry("manual"))
+        .catch(() => {});
 
       const jobRef = job?.external_job_number || jobId.slice(0, 8);
       const label = type === "pickup" ? "Pickup" : "Delivery";
@@ -1601,6 +1634,39 @@ export const InspectionFlow = () => {
       </div>
 
       <div className="p-4">
+        {/* Early-warning banner: shown on every non-review step when storage is blocked */}
+        {storageHealth?.status === "blocked" && currentStep !== totalSteps && (
+          <div
+            role="alert"
+            className="mb-4 bg-destructive/10 border border-destructive/30 rounded-lg p-3 space-y-2"
+          >
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+              <div className="space-y-1 flex-1 min-w-0">
+                <p className="text-[13px] font-semibold text-destructive">
+                  {storageHealth.failure.title}
+                </p>
+                <p className="text-[12px] text-foreground">
+                  Fix this before continuing — submission will be blocked otherwise.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-1 h-8 text-[12px]"
+                  disabled={probing}
+                  onClick={() => {
+                    setProbing(true);
+                    probeLocalStorageHealth()
+                      .then((h) => { setStorageHealth(h); setProbing(false); })
+                      .catch(() => setProbing(false));
+                  }}
+                >
+                  {probing ? "Re-checking…" : "Re-check storage"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
         {stepError ? (
           <Card className="p-6 text-center space-y-3">
             <p className="text-sm text-destructive font-medium">Something went wrong on this step</p>

@@ -548,68 +548,17 @@ export async function discardSubmissionSession(
 }
 
 // ─────────────────────────────────────────────────────────────
-// Legacy compatibility shim
+// Legacy shim removed.
+//
+// Earlier versions exported `addPendingUpload(file, args)` which created
+// items directly in state="ready", bypassing the staging contract. That
+// path is incompatible with the per-submission rollback model and is no
+// longer reachable from any caller in the codebase. The canonical entry
+// points are:
+//   - stagePendingUpload(...)
+//   - promoteSubmissionSession(...)
+//   - discardSubmissionSession(...)
 // ─────────────────────────────────────────────────────────────
-
-/**
- * @deprecated Use stagePendingUpload + promoteSubmissionSession instead.
- * Kept for code paths that don't yet use the submission-session model
- * (e.g. damage photo retroactive backfill). Items added via this path
- * are created in state "ready" and are immediately uploadable.
- */
-export async function addPendingUpload(
-  file: File,
-  args: {
-    jobId: string;
-    inspectionType: InspectionType;
-    photoType: PhotoType | string;
-    label: string | null;
-    inspectionId?: string | null;
-    jobNumber?: string | null;
-    vehicleReg?: string | null;
-    damageItemId?: string | null;
-    runId?: string | null;
-  },
-): Promise<PendingUpload> {
-  const blob = await compressToBlob(file);
-
-  const id =
-    "pu_" +
-    (crypto.randomUUID
-      ? crypto.randomUUID()
-      : Math.random().toString(36).slice(2));
-
-  const item: PendingUpload = {
-    id,
-    jobId: args.jobId,
-    inspectionType: args.inspectionType,
-    photoType: args.photoType,
-    label: args.label ?? null,
-    createdAt: new Date().toISOString(),
-    completedAt: null,
-    status: "pending",
-    state: "ready",
-    errorMessage: null,
-    fileBlob: blob,
-    fileName: file.name || `${id}.jpg`,
-    inspectionId: args.inspectionId ?? null,
-    jobNumber: args.jobNumber ?? null,
-    vehicleReg: args.vehicleReg ?? null,
-    damageItemId: args.damageItemId ?? null,
-    runId: args.runId ?? null,
-  };
-
-  const all = await loadAll();
-  all.push(item);
-  try {
-    await saveAll(all);
-  } catch {
-    throw new Error(
-      "Could not save photo to local queue. Please retry pending uploads or free device storage.",
-    );
-  }
-  return item;
-}
 
 export async function getAllPendingUploads(): Promise<PendingUpload[]> {
   return loadAll();
