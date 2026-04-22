@@ -10,12 +10,23 @@ import type {
 } from './types';
 import type { JobStatusValue } from './statusConfig';
 import { JOB_STATUS, ACTIVE_STATUSES, PENDING_STATUSES } from './statusConfig';
-import {
-  nextStatusForInspection,
-  shouldBlockResubmission,
-} from './inspectionTransitions';
+import { ADMIN_ALLOWED_TRANSITIONS } from './statusConfig';
 import { logClientEvent } from './logger';
 import { getOrgId } from './orgHelper';
+
+// Statuses that re-open a completed/cancelled job. These go through the
+// reopen_job RPC which soft-archives prior evidence and starts a new run.
+const REOPEN_TARGET_STATUSES = new Set<string>([
+  JOB_STATUS.READY_FOR_PICKUP,
+  JOB_STATUS.ASSIGNED,
+]);
+const REOPENABLE_FROM_STATUSES = new Set<string>([
+  JOB_STATUS.COMPLETED,
+  JOB_STATUS.CANCELLED,
+  JOB_STATUS.FAILED,
+  JOB_STATUS.POD_READY,
+  JOB_STATUS.DELIVERY_COMPLETE,
+]);
 
 // ─── Jobs ────────────────────────────────────────────────────────────
 
