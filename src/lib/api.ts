@@ -8,14 +8,23 @@ import type {
   JobActivityLog,
   InspectionType,
 } from './types';
-import type { JobStatusValue } from './statusConfig';
-import { JOB_STATUS, ACTIVE_STATUSES, PENDING_STATUSES } from './statusConfig';
-import {
-  nextStatusForInspection,
-  shouldBlockResubmission,
-} from './inspectionTransitions';
+import { JOB_STATUS, ACTIVE_STATUSES, PENDING_STATUSES, ADMIN_ALLOWED_TRANSITIONS } from './statusConfig';
 import { logClientEvent } from './logger';
 import { getOrgId } from './orgHelper';
+
+// Statuses that re-open a completed/cancelled job. These go through the
+// reopen_job RPC which soft-archives prior evidence and starts a new run.
+const REOPEN_TARGET_STATUSES = new Set<string>([
+  JOB_STATUS.READY_FOR_PICKUP,
+  JOB_STATUS.ASSIGNED,
+]);
+const REOPENABLE_FROM_STATUSES = new Set<string>([
+  JOB_STATUS.COMPLETED,
+  JOB_STATUS.CANCELLED,
+  JOB_STATUS.FAILED,
+  JOB_STATUS.POD_READY,
+  JOB_STATUS.DELIVERY_COMPLETE,
+]);
 
 // ─── Jobs ────────────────────────────────────────────────────────────
 
@@ -40,6 +49,7 @@ export async function listCompletedJobs(): Promise<Job[]> {
     .from('jobs')
     .select('*')
     .eq('is_hidden', false)
+    .eq('status', JOB_STATUS.COMPLETED)
     .not('completed_at', 'is', null)
     .gte('completed_at', fourteenDaysAgo.toISOString())
     .order('completed_at', { ascending: false });
@@ -58,10 +68,12 @@ export async function getJob(jobId: string): Promise<Job> {
 }
 
 export async function getJobWithRelations(jobId: string): Promise<JobWithRelations> {
+  // Active-run filter: archived_at IS NULL excludes evidence from prior runs
+  // (a job that was reopened by an admin soft-archives the previous run).
   const [jobRes, inspRes, photoRes, actRes] = await Promise.all([
     supabase.from('jobs').select('*, driver_profiles(display_name, full_name)').eq('id', jobId).single(),
-    supabase.from('inspections').select('*').eq('job_id', jobId),
-    supabase.from('photos').select('*').eq('job_id', jobId),
+    (supabase.from('inspections').select('*').eq('job_id', jobId) as any).is('archived_at', null),
+    (supabase.from('photos').select('*').eq('job_id', jobId) as any).is('archived_at', null),
     supabase.from('job_activity_log').select('*').eq('job_id', jobId).order('created_at', { ascending: true }),
   ]);
   if (jobRes.error) throw jobRes.error;
@@ -71,7 +83,7 @@ export async function getJobWithRelations(jobId: string): Promise<JobWithRelatio
 
   let damageItems: DamageItem[] = [];
   if (inspectionIds.length > 0) {
-    const { data } = await supabase.from('damage_items').select('*').in('inspection_id', inspectionIds);
+    const { data } = await (supabase.from('damage_items').select('*').in('inspection_id', inspectionIds) as any).is('archived_at', null);
     damageItems = (data ?? []) as DamageItem[];
   }
 
@@ -139,20 +151,55 @@ export async function adminChangeStatus(
   const job = await getJob(jobId);
   const fromStatus = job.status;
 
-  const updates: Partial<Job> = { status: newStatus as any };
-  // Set completed_at for terminal statuses
-  if (['completed', 'pod_ready', 'delivery_complete'].includes(newStatus) && !job.completed_at) {
-    updates.completed_at = new Date().toISOString();
+  // ─── Validate the transition is allowed (defence in depth: UI also gates this) ───
+  const allowed = ADMIN_ALLOWED_TRANSITIONS[fromStatus] ?? [];
+  if (!allowed.includes(newStatus as any)) {
+    throw new Error(
+      `Status transition not allowed: ${fromStatus} → ${newStatus}. ` +
+      `Allowed targets from "${fromStatus}": ${allowed.join(', ') || '(none)'}.`,
+    );
   }
-  // Clear completed_at if re-opening
-  if (['ready_for_pickup', 'assigned'].includes(newStatus) && job.completed_at) {
-    updates.completed_at = null;
+
+  // ─── Re-open path: route through reopen_job RPC which soft-archives prior
+  //     inspection evidence and starts a fresh run. This prevents stale photos /
+  //     damage items from bleeding into the new pickup/delivery cycle. ───
+  if (
+    REOPEN_TARGET_STATUSES.has(newStatus) &&
+    REOPENABLE_FROM_STATUSES.has(fromStatus)
+  ) {
+    const { error: rpcErr } = await (supabase as any).rpc('reopen_job', {
+      p_job_id: jobId,
+      p_notes: notes ?? null,
+    });
+    if (rpcErr) throw rpcErr;
+    // If admin requested 'assigned' specifically, flip from ready_for_pickup → assigned
+    if (newStatus === JOB_STATUS.ASSIGNED) {
+      await updateJob(jobId, { status: JOB_STATUS.ASSIGNED } as Partial<Job>);
+    }
+    return await getJob(jobId);
+  }
+
+  const updates: Partial<Job> = { status: newStatus as any };
+  // Only true terminal completion sets completed_at. pod_ready / delivery_complete
+  // are review states, not completion — counting them as "completed" pollutes
+  // dashboards and finance reports.
+  if (newStatus === JOB_STATUS.COMPLETED && !job.completed_at) {
+    updates.completed_at = new Date().toISOString();
   }
 
   const updated = await updateJob(jobId, updates);
   await logJobActivity(jobId, 'admin_status_change', fromStatus, newStatus, notes || `Admin changed status from ${fromStatus} to ${newStatus}`);
 
   return updated;
+}
+
+export async function reopenJob(jobId: string, notes?: string): Promise<Job> {
+  const { error } = await (supabase as any).rpc('reopen_job', {
+    p_job_id: jobId,
+    p_notes: notes ?? null,
+  });
+  if (error) throw error;
+  return await getJob(jobId);
 }
 
 // ─── Archive (legacy) ────────────────────────────────────────────────
@@ -170,11 +217,12 @@ export async function restoreJob(jobId: string): Promise<void> {
 // ─── Inspections ─────────────────────────────────────────────────────
 
 export async function getInspection(jobId: string, type: InspectionType): Promise<Inspection | null> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase
     .from('inspections')
     .select('*')
     .eq('job_id', jobId)
-    .eq('type', type)
+    .eq('type', type) as any)
+    .is('archived_at', null)
     .maybeSingle();
   if (error) throw error;
   return data as Inspection | null;
@@ -214,59 +262,47 @@ export async function submitInspection(
   inspectionPayload: Partial<Inspection>,
   damageItems: Array<Omit<DamageItem, 'id' | 'inspection_id' | 'created_at'>>,
 ): Promise<{ inspectionId: string; damageItemIds: string[] }> {
-  // J: Guard against accidental resubmission overwriting existing inspection
-  const existingInspection = await getInspection(jobId, type);
-  if (existingInspection?.inspected_at) {
-    const job = await getJob(jobId);
-    if (shouldBlockResubmission(existingInspection.inspected_at, job.status)) {
-      throw new Error(`${type} inspection already submitted for this job. Cannot overwrite completed inspection.`);
-    }
-  }
-
-  const inspection = await upsertInspection(jobId, type, {
-    ...inspectionPayload,
-    inspected_at: new Date().toISOString(),
-    has_damage: damageItems.length > 0,
+  // Atomic submission via Postgres function. The RPC wraps these writes in a
+  // single transaction, so dashboards / detail pages can never observe a
+  // half-committed state where the inspection exists but job.status / flags
+  // disagree:
+  //   1. upsert inspection row (active run only)
+  //   2. soft-archive prior damage_items, insert new ones
+  //   3. update job.has_pickup/delivery_inspection + status
+  //   4. write job_activity_log
+  // Resubmission protection (already-submitted + blocking status) is enforced
+  // server-side and surfaces as `INSPECTION_ALREADY_SUBMITTED`.
+  const { data, error } = await (supabase as any).rpc('submit_inspection', {
+    p_job_id: jobId,
+    p_type: type,
+    p_inspection: inspectionPayload as any,
+    p_damage_items: (damageItems as any) ?? [],
   });
-
-  // Only delete existing damage items if this is a resubmission (items already exist)
-  // or if new items are being inserted — avoids a redundant DELETE on fresh inspections.
-  if (existingInspection || damageItems.length > 0) {
-    await supabase.from('damage_items').delete().eq('inspection_id', inspection.id);
-  }
-  let damageItemIds: string[] = [];
-  if (damageItems.length > 0) {
-    const orgId = await getOrgId();
-    const items = damageItems.map((d) => ({ ...d, inspection_id: inspection.id, org_id: orgId }));
-    const { data: insertedDamage, error } = await supabase.from('damage_items').insert(items as any).select('id');
-    if (error) throw error;
-    damageItemIds = (insertedDamage ?? []).map((d: any) => d.id);
+  if (error) {
+    if (error.message?.includes('INSPECTION_ALREADY_SUBMITTED')) {
+      throw new Error(
+        `${type} inspection already submitted for this job. Cannot overwrite completed inspection.`,
+      );
+    }
+    throw error;
   }
 
-  const job = await getJob(jobId);
-  const fromStatus = job.status;
-  const toStatus: JobStatusValue = nextStatusForInspection(
-    type,
-    job.has_pickup_inspection,
-  );
-
-  if (type === 'pickup') {
-    await updateJob(jobId, { has_pickup_inspection: true, status: toStatus } as Partial<Job>);
-  } else {
-    await updateJob(jobId, {
-      has_delivery_inspection: true,
-      status: toStatus,
-    } as Partial<Job>);
-  }
-
-  await logJobActivity(jobId, `${type}_inspection_submitted`, fromStatus, toStatus);
+  const result = (data ?? {}) as {
+    inspectionId: string;
+    damageItemIds: string[];
+    fromStatus?: string;
+    toStatus?: string;
+  };
 
   void logClientEvent("inspection_submitted", "info", {
     jobId,
-    context: { inspectionType: type, newStatus: toStatus },
+    context: { inspectionType: type, newStatus: result.toStatus },
   });
 
-  return { inspectionId: inspection.id, damageItemIds };
+  return {
+    inspectionId: result.inspectionId,
+    damageItemIds: result.damageItemIds ?? [],
+  };
 }
 
 // ─── Photos ──────────────────────────────────────────────────────────
@@ -319,6 +355,7 @@ export async function getDashboardCounts(): Promise<{
       .from('jobs')
       .select('id', { count: 'exact', head: true })
       .eq('is_hidden', false)
+      .eq('status', JOB_STATUS.COMPLETED)
       .not('completed_at', 'is', null)
       .gte('completed_at', fourteenDaysAgo.toISOString()),
     supabase
