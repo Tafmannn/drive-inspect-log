@@ -264,59 +264,47 @@ export async function submitInspection(
   inspectionPayload: Partial<Inspection>,
   damageItems: Array<Omit<DamageItem, 'id' | 'inspection_id' | 'created_at'>>,
 ): Promise<{ inspectionId: string; damageItemIds: string[] }> {
-  // J: Guard against accidental resubmission overwriting existing inspection
-  const existingInspection = await getInspection(jobId, type);
-  if (existingInspection?.inspected_at) {
-    const job = await getJob(jobId);
-    if (shouldBlockResubmission(existingInspection.inspected_at, job.status)) {
-      throw new Error(`${type} inspection already submitted for this job. Cannot overwrite completed inspection.`);
-    }
-  }
-
-  const inspection = await upsertInspection(jobId, type, {
-    ...inspectionPayload,
-    inspected_at: new Date().toISOString(),
-    has_damage: damageItems.length > 0,
+  // Atomic submission via Postgres function. The RPC wraps these writes in a
+  // single transaction, so dashboards / detail pages can never observe a
+  // half-committed state where the inspection exists but job.status / flags
+  // disagree:
+  //   1. upsert inspection row (active run only)
+  //   2. soft-archive prior damage_items, insert new ones
+  //   3. update job.has_pickup/delivery_inspection + status
+  //   4. write job_activity_log
+  // Resubmission protection (already-submitted + blocking status) is enforced
+  // server-side and surfaces as `INSPECTION_ALREADY_SUBMITTED`.
+  const { data, error } = await (supabase as any).rpc('submit_inspection', {
+    p_job_id: jobId,
+    p_type: type,
+    p_inspection: inspectionPayload as any,
+    p_damage_items: (damageItems as any) ?? [],
   });
-
-  // Only delete existing damage items if this is a resubmission (items already exist)
-  // or if new items are being inserted — avoids a redundant DELETE on fresh inspections.
-  if (existingInspection || damageItems.length > 0) {
-    await supabase.from('damage_items').delete().eq('inspection_id', inspection.id);
-  }
-  let damageItemIds: string[] = [];
-  if (damageItems.length > 0) {
-    const orgId = await getOrgId();
-    const items = damageItems.map((d) => ({ ...d, inspection_id: inspection.id, org_id: orgId }));
-    const { data: insertedDamage, error } = await supabase.from('damage_items').insert(items as any).select('id');
-    if (error) throw error;
-    damageItemIds = (insertedDamage ?? []).map((d: any) => d.id);
+  if (error) {
+    if (error.message?.includes('INSPECTION_ALREADY_SUBMITTED')) {
+      throw new Error(
+        `${type} inspection already submitted for this job. Cannot overwrite completed inspection.`,
+      );
+    }
+    throw error;
   }
 
-  const job = await getJob(jobId);
-  const fromStatus = job.status;
-  const toStatus: JobStatusValue = nextStatusForInspection(
-    type,
-    job.has_pickup_inspection,
-  );
-
-  if (type === 'pickup') {
-    await updateJob(jobId, { has_pickup_inspection: true, status: toStatus } as Partial<Job>);
-  } else {
-    await updateJob(jobId, {
-      has_delivery_inspection: true,
-      status: toStatus,
-    } as Partial<Job>);
-  }
-
-  await logJobActivity(jobId, `${type}_inspection_submitted`, fromStatus, toStatus);
+  const result = (data ?? {}) as {
+    inspectionId: string;
+    damageItemIds: string[];
+    fromStatus?: string;
+    toStatus?: string;
+  };
 
   void logClientEvent("inspection_submitted", "info", {
     jobId,
-    context: { inspectionType: type, newStatus: toStatus },
+    context: { inspectionType: type, newStatus: result.toStatus },
   });
 
-  return { inspectionId: inspection.id, damageItemIds };
+  return {
+    inspectionId: result.inspectionId,
+    damageItemIds: result.damageItemIds ?? [],
+  };
 }
 
 // ─── Photos ──────────────────────────────────────────────────────────
