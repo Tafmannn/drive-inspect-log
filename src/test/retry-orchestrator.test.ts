@@ -27,7 +27,7 @@ beforeEach(() => {
 describe("retryOrchestrator.triggerRetry", () => {
   it("de-duplicates overlapping triggers via single-flight latch", async () => {
     // Make the inner work resolve slowly so concurrent calls collide.
-    let resolveInner!: (v: unknown) => void;
+    let resolveInner: ((v: unknown) => void) | null = null;
     mockRetry.mockImplementationOnce(
       () => new Promise((res) => { resolveInner = res; }),
     );
@@ -36,7 +36,11 @@ describe("retryOrchestrator.triggerRetry", () => {
     const b = triggerRetry("online");
     const c = triggerRetry("visibility");
 
-    resolveInner({ succeeded: 1, failed: 0, purged: 0 });
+    // Wait for the orchestrator's jitter window + microtask flush so the
+    // first inner call has actually started before we resolve it.
+    await new Promise((r) => setTimeout(r, 900));
+    expect(resolveInner).toBeTypeOf("function");
+    resolveInner!({ succeeded: 1, failed: 0, purged: 0 });
     await Promise.all([a, b, c]);
 
     expect(mockRetry).toHaveBeenCalledTimes(1);
