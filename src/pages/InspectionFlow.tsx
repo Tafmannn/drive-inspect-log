@@ -424,14 +424,20 @@ export const InspectionFlow = () => {
       type QueuedHandle = { id: string; kind: "damage" | "standard" | "additional"; index: number };
       const queued: QueuedHandle[] = [];
 
-      const failPreflight = (err: unknown) => {
-        const msg = String(err).toLowerCase();
-        const isStorageError = msg.includes("storage") || msg.includes("quota") || msg.includes("localstorage");
+      const failPreflight = (err: unknown, queuedSoFar: number) => {
+        const failure = logStorageSubmitFailure(err, {
+          jobId: jobId!,
+          inspectionType: type,
+          queuedSoFar,
+        });
+        // Persist the failure on the review screen so the driver sees a
+        // permanent, classified explanation — not just a transient toast.
+        setSubmitStorageFailure(failure);
+        // Also re-run the probe so the disabled state matches reality.
+        probeLocalStorageHealth().then(setStorageHealth).catch(() => {});
         toast({
-          title: isStorageError ? "Photo not saved – storage issue" : "Could not save photos locally",
-          description: isStorageError
-            ? "Your device storage is full or blocked. Clear space and try again — your inspection has NOT been submitted."
-            : "Please try again. Your inspection has NOT been submitted.",
+          title: failure.title,
+          description: failure.description,
           variant: "destructive",
         });
       };
