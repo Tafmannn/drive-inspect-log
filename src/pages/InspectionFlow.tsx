@@ -38,6 +38,7 @@ import type {
 import * as api from "@/lib/api";
 import { PhotoViewer } from "@/components/PhotoViewer";
 import { EvidenceStatusBadges } from "@/components/EvidenceStatusBadges";
+import { StorageFailureCard } from "@/components/StorageFailureCard";
 import { useAuth } from "@/context/AuthContext";
 import { saveDraft, loadDraft, clearDraft, draftKey } from "@/lib/autosave";
 import {
@@ -46,7 +47,7 @@ import {
   type StorageHealth,
   type StorageFailure,
 } from "@/lib/storageDiagnostics";
-import { AlertTriangle } from "lucide-react";
+
 import { JOB_STATUS } from "@/lib/statusConfig";
 import {
   type InspectionFormState,
@@ -130,6 +131,10 @@ export const InspectionFlow = () => {
   const [storageHealth, setStorageHealth] = useState<StorageHealth | null>(null);
   const [submitStorageFailure, setSubmitStorageFailure] = useState<StorageFailure | null>(null);
   const [probing, setProbing] = useState(false);
+  // Retry-in-progress flag for the canonical StorageFailureCard.
+  // Distinct from `submitting` so the rest of the submit button UX stays
+  // unchanged on first attempt.
+  const [retryingStaging, setRetryingStaging] = useState(false);
 
   const [formState, setFormState] = useState<InspectionFormState>(INITIAL_INSPECTION_FORM);
 
@@ -487,14 +492,16 @@ export const InspectionFlow = () => {
           queuedSoFar,
           submissionSessionId,
           phase: "stage",
+          attempt: retryingStaging ? "retry" : "initial",
         });
+        // Single canonical surface: render the StorageFailureCard.
+        // Intentionally NO destructive toast here — the card already
+        // states the failure, and a duplicate toast was the source of
+        // the "two reds" issue on mobile.
         setSubmitStorageFailure(failure);
+        // Refresh the persistent health probe so the submit button
+        // stays disabled until storage is genuinely healthy again.
         probeLocalStorageHealth().then(setStorageHealth).catch(() => {});
-        toast({
-          title: failure.title,
-          description: failure.description,
-          variant: "destructive",
-        });
       };
 
       const newClientId = () =>
@@ -701,9 +708,32 @@ export const InspectionFlow = () => {
       toast({ title: "Submission failed. Please try again.", variant: "destructive" });
     } finally {
       setSubmitting(false);
+      setRetryingStaging(false);
       submitInFlight.current = false;
     }
   };
+
+  /**
+   * Re-attempt the staged local save after a "Photos could not be saved
+   * on this device" failure. We re-invoke the same submit pipeline,
+   * which begins with the staging loop. Form state, signatures, damage
+   * entries, and captured photos are all kept in React state and are
+   * not affected — only the IndexedDB stage step is re-run.
+   *
+   * If staging now succeeds, the pipeline continues to the RPC and
+   * promote, and `submitStorageFailure` is cleared on the success path
+   * (see clear-on-entry inside handleFinalSubmit). If it fails again,
+   * a fresh classified failure replaces the previous one and the
+   * StorageFailureCard updates in place.
+   */
+  const handleRetryStaging = useCallback(() => {
+    if (retryingStaging || submitting) return;
+    setRetryingStaging(true);
+    // handleFinalSubmit already clears submitStorageFailure at entry,
+    // re-runs staging, and on a fresh failure re-populates it via
+    // failPreflight. The finally block above resets retryingStaging.
+    void handleFinalSubmit();
+  }, [retryingStaging, submitting]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Only show full-screen spinner on initial load (no cached data).
   // On rotation remounts, staleTime keeps the cached data so we skip the spinner.
@@ -1223,84 +1253,56 @@ export const InspectionFlow = () => {
           </p>
         </div>
 
-        {/* Persistent storage-health surface — pre-submit risk warning. */}
-        {storageHealth?.status === "blocked" && !submitStorageFailure && (
-          <div
-            role="alert"
-            className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-2"
-          >
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-              <div className="space-y-1 flex-1">
-                <p className="text-sm font-semibold text-destructive">
-                  {storageHealth.failure.title}
-                </p>
-                <p className="text-xs text-foreground">
-                  {storageHealth.failure.description} You cannot submit until this is resolved.
-                </p>
-                <ul className="text-xs text-foreground list-disc pl-4 space-y-0.5">
-                  {storageHealth.failure.recovery.map((step, i) => (
-                    <li key={i}>{step}</li>
-                  ))}
-                </ul>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-2"
-                  disabled={probing}
-                  onClick={() => {
-                    setProbing(true);
-                    probeLocalStorageHealth()
-                      .then((h) => { setStorageHealth(h); setProbing(false); })
-                      .catch(() => setProbing(false));
-                  }}
-                >
-                  {probing ? "Re-checking…" : "Re-check storage"}
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/*
+          Single canonical storage failure surface.
+          Priority: a real submit failure (submitStorageFailure) wins
+          over a passive probe block, so the driver only ever sees one
+          red card with one set of recovery actions. Suppressing the
+          destructive toast on the failure path is what stops the
+          previous duplicate (toast + card) from rendering at once.
+        */}
+        {submitStorageFailure ? (
+          <StorageFailureCard
+            failure={submitStorageFailure}
+            retrying={retryingStaging}
+            onRetry={handleRetryStaging}
+          />
+        ) : storageHealth?.status === "blocked" ? (
+          <StorageFailureCard
+            failure={storageHealth.failure}
+            retrying={probing}
+            onRetry={() => {
+              setProbing(true);
+              probeLocalStorageHealth()
+                .then((h) => { setStorageHealth(h); setProbing(false); })
+                .catch(() => setProbing(false));
+            }}
+          />
+        ) : null}
 
-        {/* Persistent post-failure surface — survives until next submit attempt. */}
-        {submitStorageFailure && (
-          <div
-            role="alert"
-            className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-2"
-          >
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <p className="text-sm font-semibold text-destructive">
-                  {submitStorageFailure.title}
-                </p>
-                <p className="text-xs text-foreground">
-                  {submitStorageFailure.description}
-                </p>
-                <p className="text-xs font-medium text-foreground pt-1">How to fix:</p>
-                <ul className="text-xs text-foreground list-disc pl-4 space-y-0.5">
-                  {submitStorageFailure.recovery.map((step, i) => (
-                    <li key={i}>{step}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-        )}
 
         <Button
           className="w-full"
           size="lg"
           onClick={() => setShowConfirmationModal(true)}
-          disabled={submitting || probing || storageHealth?.status === "blocked"}
+          disabled={
+            submitting ||
+            retryingStaging ||
+            probing ||
+            !!submitStorageFailure ||
+            storageHealth?.status === "blocked"
+          }
+          data-testid="inspection-submit-button"
         >
-          {submitting ? (
+          {submitting || retryingStaging ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Submitting…
+              {retryingStaging ? "Trying again…" : "Submitting…"}
             </>
           ) : probing ? (
             "Checking storage…"
+          ) : submitStorageFailure ? (
+            "Submit blocked — resolve photo error above"
           ) : storageHealth?.status === "blocked" ? (
             "Submit blocked — fix storage above"
           ) : (
@@ -1643,37 +1645,27 @@ export const InspectionFlow = () => {
       </div>
 
       <div className="p-4">
-        {/* Early-warning banner: shown on every non-review step when storage is blocked */}
+        {/*
+          Early-warning surface (non-review steps only). Uses the same
+          canonical card so the driver sees one consistent UX from the
+          first probe through to the final submit attempt. Hidden on
+          the review step because the review step renders its own copy
+          (with retry tied to handleRetryStaging). This guarantees the
+          card never appears twice on the same screen.
+        */}
         {storageHealth?.status === "blocked" && currentStep !== totalSteps && (
-          <div
-            role="alert"
-            className="mb-4 bg-destructive/10 border border-destructive/30 rounded-lg p-3 space-y-2"
-          >
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-              <div className="space-y-1 flex-1 min-w-0">
-                <p className="text-[13px] font-semibold text-destructive">
-                  {storageHealth.failure.title}
-                </p>
-                <p className="text-[12px] text-foreground">
-                  Fix this before continuing — submission will be blocked otherwise.
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-1 h-8 text-[12px]"
-                  disabled={probing}
-                  onClick={() => {
-                    setProbing(true);
-                    probeLocalStorageHealth()
-                      .then((h) => { setStorageHealth(h); setProbing(false); })
-                      .catch(() => setProbing(false));
-                  }}
-                >
-                  {probing ? "Re-checking…" : "Re-check storage"}
-                </Button>
-              </div>
-            </div>
+          <div className="mb-4">
+            <StorageFailureCard
+              dense
+              failure={storageHealth.failure}
+              retrying={probing}
+              onRetry={() => {
+                setProbing(true);
+                probeLocalStorageHealth()
+                  .then((h) => { setStorageHealth(h); setProbing(false); })
+                  .catch(() => setProbing(false));
+              }}
+            />
           </div>
         )}
         {stepError ? (
