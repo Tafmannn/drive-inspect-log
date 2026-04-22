@@ -60,7 +60,11 @@ export function evaluateExecutableState(
     const thisIsInProgress = inProgressStatuses.includes(job.status);
     if (!thisIsInProgress) {
       const blockingJob = siblingJobs.find(
-        (s) => s.id !== job.id && inProgressStatuses.includes(s.status)
+        (s) =>
+          s.id !== job.id &&
+          inProgressStatuses.includes(s.status) &&
+          s.driver_id !== null &&
+          s.driver_id === job.driver_id
       );
       if (blockingJob) {
         const blockRef = blockingJob.external_job_number || blockingJob.id.slice(0, 8);
