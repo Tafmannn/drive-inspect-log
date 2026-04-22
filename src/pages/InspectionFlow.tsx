@@ -419,26 +419,35 @@ export const InspectionFlow = () => {
       // ── 2) Build damage items payload ──
       const damageItemsPayload = buildDamageItemsPayload(formState.damages);
 
-      // ── 3) PRE-FLIGHT: persist ALL photos to IndexedDB BEFORE submitting the
-      //     inspection. If local persistence fails (quota, blocked storage,
-      //     private mode, etc.), we abort the entire submission so the driver
-      //     never ends up with a "submitted" inspection that has no photo
-      //     evidence. inspectionId / damageItemId get patched in afterwards
-      //     by the background uploader using the queued items' job + index.
+      // ── 3) PRE-FLIGHT: stage ALL photos to IndexedDB BEFORE submitting the
+      //     inspection. Items are written in state="staged" so the upload
+      //     worker cannot pick them up until we promote them after the RPC
+      //     and linkage patch both succeed. If any stage write fails, we
+      //     discard the entire session and abort — no orphan evidence and
+      //     no committed inspection without photos.
       const photoTypes = PHOTO_TYPES_BY_INSPECTION[type];
-      type QueuedHandle = { id: string; kind: "damage" | "standard" | "additional"; index: number };
+      type QueuedHandle = {
+        id: string;
+        kind: "damage" | "standard" | "additional";
+        index: number;
+        clientPhotoId: string;
+        clientDamageId?: string;
+      };
       const queued: QueuedHandle[] = [];
+      const submissionSessionId =
+        (typeof crypto !== "undefined" && "randomUUID" in crypto)
+          ? crypto.randomUUID()
+          : `sess-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
       const failPreflight = (err: unknown, queuedSoFar: number) => {
         const failure = logStorageSubmitFailure(err, {
           jobId: jobId!,
           inspectionType: type,
           queuedSoFar,
+          submissionSessionId,
+          phase: "stage",
         });
-        // Persist the failure on the review screen so the driver sees a
-        // permanent, classified explanation — not just a transient toast.
         setSubmitStorageFailure(failure);
-        // Also re-run the probe so the disabled state matches reality.
         probeLocalStorageHealth().then(setStorageHealth).catch(() => {});
         toast({
           title: failure.title,
@@ -447,63 +456,67 @@ export const InspectionFlow = () => {
         });
       };
 
+      const newClientId = () =>
+        (typeof crypto !== "undefined" && "randomUUID" in crypto)
+          ? crypto.randomUUID()
+          : `cid-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
       try {
-        // Snapshot the job's current_run_id so every queued photo is
-        // tagged. The retry worker will refuse to upload items whose
-        // runId no longer matches the job's current run (i.e. the job
-        // was reopened in the meantime), preventing stale evidence
-        // from polluting a fresh run.
         const queueRunId: string | null = (job as any)?.current_run_id ?? null;
 
-        // Damage photos (inspectionId + damageItemId attached after submit)
+        // Damage photos
         for (let i = 0; i < formState.damages.length; i++) {
           const d = formState.damages[i];
           if (!d.photo) continue;
-          const item = await addPendingUpload(d.photo, {
+          const clientPhotoId = newClientId();
+          const clientDamageId = (d as any).clientId ?? `dmg-${i}-${clientPhotoId}`;
+          const item = await stagePendingUpload(d.photo, {
+            submissionSessionId,
+            clientPhotoId,
+            clientDamageId,
             jobId,
             inspectionType: type,
             photoType: "damage_close_up",
             label: null,
-            damageItemId: null,
-            inspectionId: null,
             runId: queueRunId,
           });
-          queued.push({ id: item.id, kind: "damage", index: i });
+          queued.push({ id: item.id, kind: "damage", index: i, clientPhotoId, clientDamageId });
         }
         // Standard photos
         for (const pt of photoTypes) {
           const file = formState.standardPhotos[pt.key];
           if (!file) continue;
-          const item = await addPendingUpload(file, {
+          const clientPhotoId = newClientId();
+          const item = await stagePendingUpload(file, {
+            submissionSessionId,
+            clientPhotoId,
             jobId,
             inspectionType: type,
             photoType: pt.key,
             label: null,
-            inspectionId: null,
             runId: queueRunId,
           });
-          queued.push({ id: item.id, kind: "standard", index: 0 });
+          queued.push({ id: item.id, kind: "standard", index: 0, clientPhotoId });
         }
         // Additional photos
         for (let i = 0; i < formState.additionalPhotos.length; i++) {
           const ap = formState.additionalPhotos[i];
           const photoKey = type === "pickup" ? "pickup_other" : "delivery_other";
-          const item = await addPendingUpload(ap.file, {
+          const clientPhotoId = newClientId();
+          const item = await stagePendingUpload(ap.file, {
+            submissionSessionId,
+            clientPhotoId,
             jobId,
             inspectionType: type,
             photoType: photoKey,
             label: ap.label,
-            inspectionId: null,
             runId: queueRunId,
           });
-          queued.push({ id: item.id, kind: "additional", index: i });
+          queued.push({ id: item.id, kind: "additional", index: i, clientPhotoId });
         }
       } catch (err) {
-        // Roll back any queued items so a retry doesn't double-upload.
-        try {
-          const { deletePendingUpload } = await import("@/lib/pendingUploads");
-          await Promise.all(queued.map((q) => deletePendingUpload(q.id).catch(() => {})));
-        } catch { /* best-effort cleanup */ }
+        // Hard rollback of the entire session — no survivors.
+        try { await discardSubmissionSession(submissionSessionId); } catch { /* best-effort */ }
         failPreflight(err, queued.length);
         setSubmitting(false);
         return;
@@ -515,34 +528,96 @@ export const InspectionFlow = () => {
         customerSignatureUrl: customerSigUrl,
       });
 
-      const submitResult = await submitMutation.mutateAsync({
-        jobId,
-        type,
-        inspectionPayload: inspPayload as any,
-        damageItems: damageItemsPayload as any,
-      });
+      let submitResultTyped: { inspectionId: string; damageItemIds: string[]; submissionSessionId?: string | null };
+      try {
+        const submitResult = await submitMutation.mutateAsync({
+          jobId,
+          type,
+          inspectionPayload: inspPayload as any,
+          damageItems: damageItemsPayload as any,
+          submissionSessionId,
+        });
+        submitResultTyped = submitResult as typeof submitResultTyped;
+      } catch (rpcErr) {
+        // RPC failed AFTER staging — discard staged items so they can never
+        // upload as orphans. No committed inspection exists, nothing to roll
+        // back server-side.
+        try { await discardSubmissionSession(submissionSessionId); } catch { /* ignore */ }
+        logStorageSubmitFailure(rpcErr, {
+          jobId: jobId!,
+          inspectionType: type,
+          queuedSoFar: queued.length,
+          submissionSessionId,
+          phase: "submit_rpc",
+        });
+        toast({
+          title: "Submission failed.",
+          description: "The inspection was not submitted and queued evidence has been discarded. Please try again.",
+          variant: "destructive",
+        });
+        setSubmitting(false);
+        return;
+      }
 
-      const submitResultTyped = submitResult as { inspectionId: string; damageItemIds: string[] };
       const inspectionId: string | null = submitResultTyped?.inspectionId ?? null;
       const damageItemIds: string[] = submitResultTyped?.damageItemIds ?? [];
 
-      // ── 4b) Patch inspectionId + damageItemId onto already-queued items.
-      //     Best-effort: even if patching fails the photos still upload — they
-      //     just won't be linked to a damage_item row.
+      // ── 4b) HARD-REQUIRED linkage patch + promote staged → ready.
+      //     If either step fails we invoke the server-side rollback RPC so
+      //     no committed-but-unlinked inspection survives.
       try {
-        const { getAllPendingUploads } = await import("@/lib/pendingUploads");
-        const { set, createStore } = await import("idb-keyval");
-        const store = createStore("axentra-pending-uploads", "v2");
-        const all = await getAllPendingUploads();
-        const byId = new Map(all.map((u) => [u.id, u]));
+        if (!inspectionId) throw new Error("Submit RPC returned no inspectionId");
+        const damageIdMap: Record<string, string> = {};
         for (const q of queued) {
-          const u = byId.get(q.id);
-          if (!u) continue;
-          u.inspectionId = inspectionId;
-          if (q.kind === "damage") u.damageItemId = damageItemIds[q.index] ?? null;
+          if (q.kind === "damage" && q.clientDamageId) {
+            const serverId = damageItemIds[q.index];
+            if (serverId) damageIdMap[q.clientDamageId] = serverId;
+          }
         }
-        await set("queue", Array.from(byId.values()), store);
-      } catch { /* non-fatal */ }
+        const promoted = await promoteSubmissionSession(submissionSessionId, {
+          inspectionId,
+          damageIdMap,
+        });
+        if (promoted.promoted !== queued.length) {
+          throw new Error(
+            `Linkage promotion incomplete: promoted ${promoted.promoted} of ${queued.length}`,
+          );
+        }
+      } catch (patchErr) {
+        // Compensating rollback: archive the just-committed inspection +
+        // damage rows so the system never shows a submitted inspection
+        // with missing evidence.
+        try { await discardSubmissionSession(submissionSessionId); } catch { /* ignore */ }
+        try {
+          await api.rollbackInspectionSubmission(
+            jobId,
+            submissionSessionId,
+            "client_linkage_patch_failed",
+          );
+        } catch (rbErr) {
+          logStorageSubmitFailure(rbErr, {
+            jobId: jobId!,
+            inspectionType: type,
+            queuedSoFar: queued.length,
+            submissionSessionId,
+            phase: "rollback_rpc",
+          });
+        }
+        logStorageSubmitFailure(patchErr, {
+          jobId: jobId!,
+          inspectionType: type,
+          queuedSoFar: queued.length,
+          submissionSessionId,
+          phase: "linkage_patch",
+        });
+        toast({
+          title: "Submission reverted.",
+          description: "The inspection could not be safely finalized and has been rolled back to protect evidence integrity. Please try again.",
+          variant: "destructive",
+        });
+        setSubmitting(false);
+        return;
+      }
 
       const pendingCount = queued.length;
       if (pendingCount > 0) {
