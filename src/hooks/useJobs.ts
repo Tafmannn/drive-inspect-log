@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as api from "@/lib/api";
 import { getPendingJobCount } from "@/lib/pendingUploads";
 import { supabase } from "@/integrations/supabase/client";
-import { ACTIVE_STATUSES } from "@/lib/statusConfig";
+import { ACTIVE_STATUSES, JOB_STATUS } from "@/lib/statusConfig";
 import { invalidateForEvent } from "@/lib/mutationEvents";
 import type { Job, JobWithRelations, InspectionType, Inspection, DamageItem } from "@/lib/types";
 
@@ -31,11 +31,14 @@ export function useDashboardCounts(driverProfileId?: string | null) {
         .eq("is_hidden", false)
         .in("status", ACTIVE_STATUSES as string[]);
 
+      // Lifecycle contract: only `status = COMPLETED` counts as completed.
+      // pod_ready / delivery_complete are review states, NOT terminal completion.
+      // completed_at is metadata; status is the source of truth for business counts.
       let completedQuery = supabase
         .from("jobs")
         .select("id", { count: "exact", head: true })
         .eq("is_hidden", false)
-        .not("completed_at", "is", null)
+        .eq("status", JOB_STATUS.COMPLETED)
         .gte("completed_at", fourteenDaysAgo.toISOString());
 
       if (driverProfileId) {

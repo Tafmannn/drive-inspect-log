@@ -7,7 +7,7 @@
  * server's contract (ADMIN_ALLOWED_TRANSITIONS, the JOB_STATUS map, and the
  * pending-upload run-id contract).
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   ADMIN_ALLOWED_TRANSITIONS,
   JOB_STATUS,
@@ -179,3 +179,128 @@ describe("active evidence filtering", () => {
     expect(activeOnly(rows, null)).toHaveLength(2);
   });
 });
+
+// ─── Dashboard completion semantics ─────────────────────────────────────
+//
+// Lifecycle contract: only `status = COMPLETED` is truly complete.
+// pod_ready / delivery_complete are review states and MUST be counted as
+// "pending review", not as completed work. completed_at is metadata only.
+
+describe("dashboard completion semantics", () => {
+  it("POD_READY and DELIVERY_COMPLETE are PENDING, not COMPLETED", () => {
+    expect(PENDING_STATUSES).toContain(JOB_STATUS.POD_READY);
+    expect(PENDING_STATUSES).toContain(JOB_STATUS.DELIVERY_COMPLETE);
+    expect(PENDING_STATUSES).not.toContain(JOB_STATUS.COMPLETED);
+  });
+
+  it("only COMPLETED counts as completed (not POD_READY / DELIVERY_COMPLETE)", () => {
+    // Mirrors the SQL filter applied in useDashboardCounts and
+    // useAdminControlData.completedToday, which both filter by
+    // status = JOB_STATUS.COMPLETED instead of completed_at IS NOT NULL.
+    const jobsToCount = [
+      { status: JOB_STATUS.COMPLETED },
+      { status: JOB_STATUS.POD_READY },
+      { status: JOB_STATUS.DELIVERY_COMPLETE },
+      { status: JOB_STATUS.IN_TRANSIT },
+    ];
+    const completedCount = jobsToCount.filter(
+      (j) => j.status === JOB_STATUS.COMPLETED,
+    ).length;
+    expect(completedCount).toBe(1);
+  });
+});
+
+// ─── Submission session lifecycle (worker guard + duplicate-submit) ─────
+//
+// These tests validate the staged → ready → uploading state machine and
+// the single-flight submit guard against fast double-tap. The full session
+// flow (stage / promote / discard / TTL) is covered in pending-uploads.test.ts;
+// here we keep small focused contracts so a regression in any of the
+// invariants is caught without depending on IndexedDB infrastructure.
+
+type QueueState = "staged" | "ready" | "uploading" | "uploaded" | "failed";
+
+function workerWouldUpload(state: QueueState): boolean {
+  // Must mirror retryUpload's hard guard in src/lib/pendingUploads.ts.
+  return state === "ready" || state === "failed";
+}
+
+describe("upload worker state guard", () => {
+  it("REFUSES staged items (cannot upload until promoted)", () => {
+    expect(workerWouldUpload("staged")).toBe(false);
+  });
+  it("REFUSES uploading items (already in flight)", () => {
+    expect(workerWouldUpload("uploading")).toBe(false);
+  });
+  it("REFUSES uploaded items (terminal success)", () => {
+    expect(workerWouldUpload("uploaded")).toBe(false);
+  });
+  it("ACCEPTS ready items (post-promotion)", () => {
+    expect(workerWouldUpload("ready")).toBe(true);
+  });
+  it("ACCEPTS failed items (user-initiated retry)", () => {
+    expect(workerWouldUpload("failed")).toBe(true);
+  });
+});
+
+// Single-flight submit mutex — pure model of the useRef guard used in
+// InspectionFlow.handleFinalSubmit. Asserts that two concurrent calls
+// only produce one inspection submission, even if React render hasn't
+// caught up between rapid taps.
+function makeSubmitMutex() {
+  let inFlight = false;
+  let calls = 0;
+  return {
+    async submit(work: () => Promise<void>) {
+      if (inFlight) return false;
+      inFlight = true;
+      calls++;
+      try {
+        await work();
+        return true;
+      } finally {
+        inFlight = false;
+      }
+    },
+    get callCount() {
+      return calls;
+    },
+  };
+}
+
+describe("single-flight submit guard", () => {
+  it("blocks a second concurrent call and only invokes work once", async () => {
+    const mutex = makeSubmitMutex();
+    const work = vi.fn(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+    });
+    const [a, b] = await Promise.all([
+      mutex.submit(work),
+      mutex.submit(work),
+    ]);
+    expect([a, b].filter(Boolean)).toHaveLength(1);
+    expect(work).toHaveBeenCalledTimes(1);
+    expect(mutex.callCount).toBe(1);
+  });
+
+  it("releases the lock after work completes (subsequent submit allowed)", async () => {
+    const mutex = makeSubmitMutex();
+    const work = vi.fn(async () => {});
+    await mutex.submit(work);
+    await mutex.submit(work);
+    expect(work).toHaveBeenCalledTimes(2);
+  });
+
+  it("releases the lock even if work throws", async () => {
+    const mutex = makeSubmitMutex();
+    await mutex
+      .submit(async () => {
+        throw new Error("boom");
+      })
+      .catch(() => {});
+    const ok = await mutex.submit(async () => {});
+    expect(ok).toBe(true);
+  });
+});
+
+

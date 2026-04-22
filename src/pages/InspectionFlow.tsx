@@ -377,14 +377,23 @@ export const InspectionFlow = () => {
   const validateBeforeSubmit = (): string[] =>
     validateBeforeSubmitPure(type, { formState, driverSigned, customerSigned });
 
+  // Hard single-flight mutex. React state updates are async and can be
+  // outraced by a second tap before re-render. This ref blocks reentry the
+  // moment the first invocation begins, no matter the render cycle.
+  const submitInFlight = useRef(false);
+
   const handleFinalSubmit = async () => {
     if (!jobId) return;
+    if (submitInFlight.current) return;
+    submitInFlight.current = true;
+
     const missing = validateBeforeSubmit();
     if (missing.length > 0) {
       toast({
         title: `Please complete ${missing.length} required field(s).`,
         variant: "destructive",
       });
+      submitInFlight.current = false;
       return;
     }
 
@@ -564,7 +573,9 @@ export const InspectionFlow = () => {
 
       // ── 4b) HARD-REQUIRED linkage patch + promote staged → ready.
       //     If either step fails we invoke the server-side rollback RPC so
-      //     no committed-but-unlinked inspection survives.
+      //     no committed-but-unlinked inspection survives. We distinguish
+      //     between rollback-success and rollback-failure: the user must
+      //     never be told "safely reverted" if the rollback itself failed.
       try {
         if (!inspectionId) throw new Error("Submit RPC returned no inspectionId");
         const damageIdMap: Record<string, string> = {};
@@ -584,16 +595,28 @@ export const InspectionFlow = () => {
           );
         }
       } catch (patchErr) {
-        // Compensating rollback: archive the just-committed inspection +
-        // damage rows so the system never shows a submitted inspection
-        // with missing evidence.
+        // Always discard local staged items first — they must never upload.
         try { await discardSubmissionSession(submissionSessionId); } catch { /* ignore */ }
+
+        logStorageSubmitFailure(patchErr, {
+          jobId: jobId!,
+          inspectionType: type,
+          queuedSoFar: queued.length,
+          submissionSessionId,
+          phase: "linkage_patch",
+        });
+
+        // Compensating rollback: archive the just-committed inspection +
+        // damage rows. We MUST distinguish success from failure so the
+        // user message stays honest.
+        let rollbackOk = false;
         try {
           await api.rollbackInspectionSubmission(
             jobId,
             submissionSessionId,
             "client_linkage_patch_failed",
           );
+          rollbackOk = true;
         } catch (rbErr) {
           logStorageSubmitFailure(rbErr, {
             jobId: jobId!,
@@ -603,18 +626,22 @@ export const InspectionFlow = () => {
             phase: "rollback_rpc",
           });
         }
-        logStorageSubmitFailure(patchErr, {
-          jobId: jobId!,
-          inspectionType: type,
-          queuedSoFar: queued.length,
-          submissionSessionId,
-          phase: "linkage_patch",
-        });
-        toast({
-          title: "Submission reverted.",
-          description: "The inspection could not be safely finalized and has been rolled back to protect evidence integrity. Please try again.",
-          variant: "destructive",
-        });
+
+        if (rollbackOk) {
+          toast({
+            title: "Submission was safely reverted.",
+            description:
+              "Evidence linkage failed after submit. The inspection has been rolled back so nothing was committed without proof. Please try again.",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Automatic recovery failed.",
+            description:
+              "The inspection submitted but its evidence could not be linked, and automatic rollback also failed. Please contact admin support before retrying.",
+            variant: "destructive",
+          });
+        }
         setSubmitting(false);
         return;
       }
@@ -640,6 +667,7 @@ export const InspectionFlow = () => {
       toast({ title: "Submission failed. Please try again.", variant: "destructive" });
     } finally {
       setSubmitting(false);
+      submitInFlight.current = false;
     }
   };
 
@@ -1161,7 +1189,7 @@ export const InspectionFlow = () => {
           >
             <div className="flex items-start gap-2">
               <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-              <div className="space-y-1">
+              <div className="space-y-1 flex-1">
                 <p className="text-sm font-semibold text-destructive">
                   {storageHealth.failure.title}
                 </p>
@@ -1173,6 +1201,20 @@ export const InspectionFlow = () => {
                     <li key={i}>{step}</li>
                   ))}
                 </ul>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  disabled={probing}
+                  onClick={() => {
+                    setProbing(true);
+                    probeLocalStorageHealth()
+                      .then((h) => { setStorageHealth(h); setProbing(false); })
+                      .catch(() => setProbing(false));
+                  }}
+                >
+                  {probing ? "Re-checking…" : "Re-check storage"}
+                </Button>
               </div>
             </div>
           </div>

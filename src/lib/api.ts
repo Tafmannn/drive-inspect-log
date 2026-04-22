@@ -70,39 +70,46 @@ export async function getJob(jobId: string): Promise<Job> {
 export async function getJobWithRelations(jobId: string): Promise<JobWithRelations> {
   // Active-run filter: archived_at IS NULL excludes evidence from prior runs
   // (a job that was reopened by an admin soft-archives the previous run).
+  // We additionally constrain by run_id == current_run_id where available so
+  // a brand-new run never inherits inspections/damage/photos from a prior
+  // cycle even if a row was missed by the archive sweep.
   const [jobRes, inspRes, photoRes, actRes] = await Promise.all([
     supabase.from('jobs').select('*, driver_profiles(display_name, full_name)').eq('id', jobId).single(),
     (supabase.from('inspections').select('*').eq('job_id', jobId) as any).is('archived_at', null),
-    // Active-run filter for photos: archived_at IS NULL excludes evidence
-    // soft-archived by reopen_job. We additionally constrain by run_id ==
-    // current_run_id when available so a brand-new run never inherits photos
-    // from a prior cycle even if a row was missed by the archive sweep.
     (supabase.from('photos').select('*').eq('job_id', jobId) as any).is('archived_at', null),
     supabase.from('job_activity_log').select('*').eq('job_id', jobId).order('created_at', { ascending: true }),
   ]);
   if (jobRes.error) throw jobRes.error;
 
-  const inspections = (inspRes.data ?? []) as Inspection[];
+  const raw = jobRes.data as any;
+  const currentRun: string | null = (raw as any).current_run_id ?? null;
+
+  // Defensive client-side run filter for inspections (mirrors the photo path).
+  const allInspections = (inspRes.data ?? []) as Inspection[];
+  const inspections = allInspections.filter((i) => {
+    const rid = (i as any).run_id ?? null;
+    if (!currentRun || !rid) return true;
+    return rid === currentRun;
+  });
   const inspectionIds = inspections.map((i) => i.id);
 
   let damageItems: DamageItem[] = [];
   if (inspectionIds.length > 0) {
     const { data } = await (supabase.from('damage_items').select('*').in('inspection_id', inspectionIds) as any).is('archived_at', null);
-    damageItems = (data ?? []) as DamageItem[];
+    const allDamage = (data ?? []) as DamageItem[];
+    damageItems = allDamage.filter((d) => {
+      const rid = (d as any).run_id ?? null;
+      if (!currentRun || !rid) return true;
+      return rid === currentRun;
+    });
   }
 
   // Resolve assigned driver name via FK join, with fallback chain
-  const raw = jobRes.data as any;
   const dp = raw.driver_profiles;
   const resolvedDriverName = dp
     ? (dp.display_name || dp.full_name || raw.driver_name)
     : (raw.driver_name || null);
 
-  // Belt-and-braces: also exclude any photo whose run_id is stale relative
-  // to the job's current run. The DB-side archive_at sweep is authoritative;
-  // this is a defensive filter for reads issued during the brief window
-  // between reopen_job's status flip and its archive update.
-  const currentRun = (raw as any).current_run_id ?? null;
   const activePhotos = ((photoRes.data ?? []) as Photo[]).filter((p) => {
     const rid = (p as any).run_id ?? null;
     if (!currentRun || !rid) return true;

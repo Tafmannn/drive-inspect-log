@@ -37,9 +37,11 @@ export function useAdminKpis() {
         supabase.from("jobs").select("id", { count: "exact", head: true })
           .eq("is_hidden", false)
           .in("status", ["pod_ready", "delivery_complete"]),
+        // Only `status = completed` counts as completed. pod_ready /
+        // delivery_complete are review states surfaced separately above.
         supabase.from("jobs").select("id", { count: "exact", head: true })
           .eq("is_hidden", false)
-          .not("completed_at", "is", null)
+          .eq("status", "completed")
           .gte("completed_at", `${todayStr}T00:00:00`),
         supabase.from("jobs").select("id", { count: "exact", head: true })
           .eq("is_hidden", false)
