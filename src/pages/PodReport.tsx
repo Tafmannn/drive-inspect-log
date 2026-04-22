@@ -24,6 +24,7 @@ import {
   Receipt,
   CheckCircle,
 } from "lucide-react";
+import { completeJobRpc } from "@/lib/api";
 import { openPodEmail, generatePodEmailBody } from "@/lib/podEmail";
 import { sharePodPdf, emailPodPdf } from "@/lib/podPdf";
 import { FUEL_PERCENT_TO_LABEL } from "@/lib/types";
@@ -138,7 +139,7 @@ export const PodReport = () => {
     try {
       // Centralized validated completion path — writes activity log
       // and enforces transition. Direct status updates are forbidden.
-      await api.completeJobRpc(job.id, "Confirmed via POD report");
+      await completeJobRpc(job.id, "Confirmed via POD report");
       invalidateForEvent(qc, "job_status_changed", [["job", job.id]]);
       toast({ title: "Review confirmed — job completed" });
     } catch (e: any) {
