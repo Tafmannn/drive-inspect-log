@@ -8,10 +8,10 @@ import { useNavigate } from "react-router-dom";
 import {
   getPendingUploadsByJob,
   retryJobUploads,
-  retryAllPending,
   pruneDone,
   type JobUploadSummary,
 } from "@/lib/pendingUploads";
+import { triggerRetry } from "@/lib/retryOrchestrator";
 import { Loader2, RefreshCw, AlertTriangle, Upload } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -46,13 +46,10 @@ export const PendingUploads = () => {
 
   const handleRetryAll = async () => {
     setRetryingAll(true);
-    const { succeeded, failed } = await retryAllPending();
-    toast({
-      title: failed > 0
-        ? `Some uploads failed. ${succeeded} succeeded, ${failed} failed.`
-        : "All uploads complete.",
-      variant: failed > 0 ? "destructive" : "default",
-    });
+    // Route through the orchestrator so the trigger source is logged
+    // and the same single-flight/jitter guards apply as background runs.
+    await triggerRetry("manual");
+    toast({ title: "Retry started." });
     refresh();
     setRetryingAll(false);
   };
