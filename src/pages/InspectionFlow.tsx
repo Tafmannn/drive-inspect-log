@@ -1189,7 +1189,7 @@ export const InspectionFlow = () => {
           >
             <div className="flex items-start gap-2">
               <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-              <div className="space-y-1">
+              <div className="space-y-1 flex-1">
                 <p className="text-sm font-semibold text-destructive">
                   {storageHealth.failure.title}
                 </p>
@@ -1201,6 +1201,20 @@ export const InspectionFlow = () => {
                     <li key={i}>{step}</li>
                   ))}
                 </ul>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  disabled={probing}
+                  onClick={() => {
+                    setProbing(true);
+                    probeLocalStorageHealth()
+                      .then((h) => { setStorageHealth(h); setProbing(false); })
+                      .catch(() => setProbing(false));
+                  }}
+                >
+                  {probing ? "Re-checking…" : "Re-check storage"}
+                </Button>
               </div>
             </div>
           </div>
