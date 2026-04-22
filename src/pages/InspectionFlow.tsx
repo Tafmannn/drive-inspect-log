@@ -35,6 +35,13 @@ import * as api from "@/lib/api";
 import { PhotoViewer } from "@/components/PhotoViewer";
 import { useAuth } from "@/context/AuthContext";
 import { saveDraft, loadDraft, clearDraft, draftKey } from "@/lib/autosave";
+import {
+  probeLocalStorageHealth,
+  logStorageSubmitFailure,
+  type StorageHealth,
+  type StorageFailure,
+} from "@/lib/storageDiagnostics";
+import { AlertTriangle } from "lucide-react";
 import { JOB_STATUS } from "@/lib/statusConfig";
 import {
   type InspectionFormState,
@@ -110,6 +117,14 @@ export const InspectionFlow = () => {
   // Additional photos label (lifted out of PhotosStep to avoid remount)
   const [newPhotoLabel, setNewPhotoLabel] = useState("");
   const [stepError, setStepError] = useState<string | null>(null);
+
+  // Local-storage health: probed when entering the review step and after a
+  // failed submit. If `blocked`, the Submit button is disabled and a
+  // persistent recovery banner is shown. Memory-only fallback is intentionally
+  // NOT supported — submitting without durable photo evidence is forbidden.
+  const [storageHealth, setStorageHealth] = useState<StorageHealth | null>(null);
+  const [submitStorageFailure, setSubmitStorageFailure] = useState<StorageFailure | null>(null);
+  const [probing, setProbing] = useState(false);
 
   const [formState, setFormState] = useState<InspectionFormState>(INITIAL_INSPECTION_FORM);
 
