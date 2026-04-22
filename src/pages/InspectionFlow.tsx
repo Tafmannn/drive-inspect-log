@@ -1253,70 +1253,33 @@ export const InspectionFlow = () => {
           </p>
         </div>
 
-        {/* Persistent storage-health surface — pre-submit risk warning. */}
-        {storageHealth?.status === "blocked" && !submitStorageFailure && (
-          <div
-            role="alert"
-            className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-2"
-          >
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-              <div className="space-y-1 flex-1">
-                <p className="text-sm font-semibold text-destructive">
-                  {storageHealth.failure.title}
-                </p>
-                <p className="text-xs text-foreground">
-                  {storageHealth.failure.description} You cannot submit until this is resolved.
-                </p>
-                <ul className="text-xs text-foreground list-disc pl-4 space-y-0.5">
-                  {storageHealth.failure.recovery.map((step, i) => (
-                    <li key={i}>{step}</li>
-                  ))}
-                </ul>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-2"
-                  disabled={probing}
-                  onClick={() => {
-                    setProbing(true);
-                    probeLocalStorageHealth()
-                      .then((h) => { setStorageHealth(h); setProbing(false); })
-                      .catch(() => setProbing(false));
-                  }}
-                >
-                  {probing ? "Re-checking…" : "Re-check storage"}
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/*
+          Single canonical storage failure surface.
+          Priority: a real submit failure (submitStorageFailure) wins
+          over a passive probe block, so the driver only ever sees one
+          red card with one set of recovery actions. Suppressing the
+          destructive toast on the failure path is what stops the
+          previous duplicate (toast + card) from rendering at once.
+        */}
+        {submitStorageFailure ? (
+          <StorageFailureCard
+            failure={submitStorageFailure}
+            retrying={retryingStaging}
+            onRetry={handleRetryStaging}
+          />
+        ) : storageHealth?.status === "blocked" ? (
+          <StorageFailureCard
+            failure={storageHealth.failure}
+            retrying={probing}
+            onRetry={() => {
+              setProbing(true);
+              probeLocalStorageHealth()
+                .then((h) => { setStorageHealth(h); setProbing(false); })
+                .catch(() => setProbing(false));
+            }}
+          />
+        ) : null}
 
-        {/* Persistent post-failure surface — survives until next submit attempt. */}
-        {submitStorageFailure && (
-          <div
-            role="alert"
-            className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-2"
-          >
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <p className="text-sm font-semibold text-destructive">
-                  {submitStorageFailure.title}
-                </p>
-                <p className="text-xs text-foreground">
-                  {submitStorageFailure.description}
-                </p>
-                <p className="text-xs font-medium text-foreground pt-1">How to fix:</p>
-                <ul className="text-xs text-foreground list-disc pl-4 space-y-0.5">
-                  {submitStorageFailure.recovery.map((step, i) => (
-                    <li key={i}>{step}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-        )}
 
         <Button
           className="w-full"
