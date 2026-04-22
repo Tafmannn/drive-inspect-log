@@ -27,11 +27,24 @@ class GcsStorageService implements StorageService {
       throw new Error('Upload failed: Could not read file contents');
     }
 
+    // Explicitly forward the user's access token. supabase.functions.invoke
+    // does not always attach it when the function is deployed with
+    // verify_jwt = false, but the function itself calls auth.getUser() and
+    // requires it.
+    const { data: { session } } = await supabase.auth.getSession();
+    const accessToken = session?.access_token;
+    if (!accessToken) {
+      throw new Error('Upload failed: Authentication expired');
+    }
+
     const { data, error } = await supabase.functions.invoke('gcs-upload', {
       body: {
         fileName,
         contentType: file.type || 'image/jpeg',
         fileBase64: base64,
+      },
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
       },
     });
 
