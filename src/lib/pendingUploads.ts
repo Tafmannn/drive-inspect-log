@@ -279,6 +279,13 @@ export async function addPendingUpload(
     jobNumber?: string | null;
     vehicleReg?: string | null;
     damageItemId?: string | null;
+    /**
+     * Job's current run id when the photo was captured. Required for
+     * run isolation — if omitted the retry worker will treat the item
+     * as run-less and still attempt upload, but reopened jobs may then
+     * receive stale evidence. Always pass `job.current_run_id` here.
+     */
+    runId?: string | null;
   },
 ): Promise<PendingUpload> {
   const blob = await compressToBlob(file);
@@ -305,6 +312,7 @@ export async function addPendingUpload(
     jobNumber: args.jobNumber ?? null,
     vehicleReg: args.vehicleReg ?? null,
     damageItemId: args.damageItemId ?? null,
+    runId: args.runId ?? null,
   };
 
   const all = await loadAll();
