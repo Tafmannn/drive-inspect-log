@@ -357,6 +357,7 @@ export async function getDashboardCounts(): Promise<{
       .from('jobs')
       .select('id', { count: 'exact', head: true })
       .eq('is_hidden', false)
+      .eq('status', JOB_STATUS.COMPLETED)
       .not('completed_at', 'is', null)
       .gte('completed_at', fourteenDaysAgo.toISOString()),
     supabase
