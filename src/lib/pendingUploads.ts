@@ -64,6 +64,15 @@ export interface PendingUpload {
   jobNumber?: string | null;
   vehicleReg?: string | null;
   damageItemId?: string | null;
+
+  /**
+   * The job's `current_run_id` at the time this photo was queued.
+   * The retry worker compares this to the job's *current* run before
+   * uploading. If they don't match the photo belongs to a previous
+   * run (e.g. job was reopened) and is purged instead of uploaded so
+   * stale evidence cannot leak into the new active run.
+   */
+  runId?: string | null;
 }
 
 // ─────────────────────────────────────────────────────────────
