@@ -1605,6 +1605,39 @@ export const InspectionFlow = () => {
       </div>
 
       <div className="p-4">
+        {/* Early-warning banner: shown on every non-review step when storage is blocked */}
+        {storageHealth?.status === "blocked" && currentStep !== totalSteps && (
+          <div
+            role="alert"
+            className="mb-4 bg-destructive/10 border border-destructive/30 rounded-lg p-3 space-y-2"
+          >
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+              <div className="space-y-1 flex-1 min-w-0">
+                <p className="text-[13px] font-semibold text-destructive">
+                  {storageHealth.failure.title}
+                </p>
+                <p className="text-[12px] text-foreground">
+                  Fix this before continuing — submission will be blocked otherwise.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-1 h-8 text-[12px]"
+                  disabled={probing}
+                  onClick={() => {
+                    setProbing(true);
+                    probeLocalStorageHealth()
+                      .then((h) => { setStorageHealth(h); setProbing(false); })
+                      .catch(() => setProbing(false));
+                  }}
+                >
+                  {probing ? "Re-checking…" : "Re-check storage"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
         {stepError ? (
           <Card className="p-6 text-center space-y-3">
             <p className="text-sm text-destructive font-medium">Something went wrong on this step</p>
