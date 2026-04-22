@@ -70,11 +70,20 @@ export const PendingUploads = () => {
 
   const refresh = async () => {
     setLoading(true);
-    await pruneDone();
-    const grouped = await getPendingUploadsByJob();
-    setJobs(grouped);
-    setLoading(false);
-    notifyEvidenceQueueChanged();
+    try {
+      await pruneDone();
+      const grouped = await getPendingUploadsByJob();
+      setJobs(grouped);
+    } catch {
+      // Don't strand the screen on a stuck spinner if IDB is blocked
+      // (Safari private mode, quota, etc). Show a non-blocking message.
+      toast({
+        title: "Couldn't read pending uploads on this device.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { refresh(); }, []);
