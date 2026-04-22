@@ -198,6 +198,7 @@ export type Database = {
           org_id: string
           photo_url: string | null
           run_id: string | null
+          submission_session_id: string | null
           x: number | null
           y: number | null
         }
@@ -214,6 +215,7 @@ export type Database = {
           org_id: string
           photo_url?: string | null
           run_id?: string | null
+          submission_session_id?: string | null
           x?: number | null
           y?: number | null
         }
@@ -230,6 +232,7 @@ export type Database = {
           org_id?: string
           photo_url?: string | null
           run_id?: string | null
+          submission_session_id?: string | null
           x?: number | null
           y?: number | null
         }
@@ -594,6 +597,7 @@ export type Database = {
           sat_nav_working: string | null
           service_book: string | null
           spare_wheel_status: string | null
+          submission_session_id: string | null
           tool_kit: string | null
           type: string
           tyre_inflation_kit: string | null
@@ -634,6 +638,7 @@ export type Database = {
           sat_nav_working?: string | null
           service_book?: string | null
           spare_wheel_status?: string | null
+          submission_session_id?: string | null
           tool_kit?: string | null
           type: string
           tyre_inflation_kit?: string | null
@@ -674,6 +679,7 @@ export type Database = {
           sat_nav_working?: string | null
           service_book?: string | null
           spare_wheel_status?: string | null
+          submission_session_id?: string | null
           tool_kit?: string | null
           type?: string
           tyre_inflation_kit?: string | null
@@ -2109,16 +2115,35 @@ export type Database = {
         }
       }
       role_rank: { Args: { p_role: string }; Returns: number }
-      same_org_as_target: { Args: { target_org_id: string }; Returns: boolean }
-      submit_inspection: {
+      rollback_inspection_submission: {
         Args: {
-          p_damage_items: Json
-          p_inspection: Json
           p_job_id: string
-          p_type: string
+          p_reason?: string
+          p_submission_session_id: string
         }
         Returns: Json
       }
+      same_org_as_target: { Args: { target_org_id: string }; Returns: boolean }
+      submit_inspection:
+        | {
+            Args: {
+              p_damage_items: Json
+              p_inspection: Json
+              p_job_id: string
+              p_type: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_damage_items: Json
+              p_inspection: Json
+              p_job_id: string
+              p_submission_session_id?: string
+              p_type: string
+            }
+            Returns: Json
+          }
       suspend_user_account: {
         Args: { p_reason?: string; p_target_user_id: string }
         Returns: {
