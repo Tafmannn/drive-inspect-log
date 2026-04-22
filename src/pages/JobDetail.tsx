@@ -284,7 +284,10 @@ export const JobDetail = () => {
             </span>
             <UKPlate reg={job.vehicle_reg} />
           </div>
-          <p className="text-sm font-semibold text-foreground">Job {jobRef}</p>
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <p className="text-sm font-semibold text-foreground">Job {jobRef}</p>
+            <EvidenceStatusBadges jobId={job.id} />
+          </div>
           <p className="text-sm text-foreground mt-0.5">
             {job.vehicle_make} {job.vehicle_model}
             <span className="text-muted-foreground"> — </span>

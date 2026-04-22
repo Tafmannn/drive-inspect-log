@@ -37,6 +37,7 @@ import type {
 } from "@/lib/types";
 import * as api from "@/lib/api";
 import { PhotoViewer } from "@/components/PhotoViewer";
+import { EvidenceStatusBadges } from "@/components/EvidenceStatusBadges";
 import { useAuth } from "@/context/AuthContext";
 import { saveDraft, loadDraft, clearDraft, draftKey } from "@/lib/autosave";
 import {
