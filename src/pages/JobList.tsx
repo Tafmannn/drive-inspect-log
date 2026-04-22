@@ -28,12 +28,15 @@ export const JobList = () => {
     recommended: DriverJobSummary;
   } | null>(null);
 
-  // Rank then derive summaries
-  const allRanked = jobs ? rankJobs(jobs).filter(j => j.execution_class !== "terminal") : [];
-  const scoped = (gate.isDriverOnly && gate.driverProfileId)
-    ? allRanked.filter(j => j.driver_id === gate.driverProfileId)
-    : allRanked;
-
+  // Scope BEFORE ranking so cross-driver route-adjacency comparisons don't
+  // corrupt the sort, and so deriveJobSummaries sees the same job set that
+  // rankJobs used when computing is_next_recommended.
+  const driverScoped = jobs
+    ? (gate.isDriverOnly && gate.driverProfileId)
+      ? jobs.filter(j => j.driver_id === gate.driverProfileId)
+      : jobs
+    : [];
+  const scoped = rankJobs(driverScoped).filter(j => j.execution_class !== "terminal");
   const summaries = deriveJobSummaries(scoped);
 
   const isDriverOnly = gate.isDriverOnly;
