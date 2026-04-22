@@ -130,6 +130,22 @@ export const InspectionFlow = () => {
 
   const totalSteps = getTotalSteps(type);
 
+  // Probe local storage health when the driver lands on the review step.
+  // This surfaces blocked/quota issues BEFORE submit so they can recover
+  // without losing context. Re-runs if the user navigates away & back.
+  useEffect(() => {
+    if (currentStep !== totalSteps) return;
+    let cancelled = false;
+    setProbing(true);
+    probeLocalStorageHealth().then((h) => {
+      if (!cancelled) {
+        setStorageHealth(h);
+        setProbing(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [currentStep, totalSteps]);
+
   // ─── Memoized derived data (avoid recomputing on every render) ─────
   const standardPhotoCount = useMemo(
     () => Object.values(formState.standardPhotos).filter(Boolean).length,
