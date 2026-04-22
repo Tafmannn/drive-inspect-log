@@ -134,12 +134,16 @@ export const InspectionFlow = () => {
 
   const totalSteps = getTotalSteps(type);
 
-  // Probe local storage health when the driver lands on the review step.
-  // This surfaces blocked/quota issues BEFORE submit so they can recover
-  // without losing context. Re-runs if the user navigates away & back.
+  // Probe local storage health EARLY — on mount and at the photo step,
+  // not just at review. This surfaces blocked Safari / private-mode /
+  // quota issues BEFORE the driver invests time capturing photos.
+  // Re-runs on entering the review step as the final guard.
   useEffect(() => {
-    if (currentStep !== totalSteps) return;
     let cancelled = false;
+    const photoStep = type === "pickup" ? 4 : 3;
+    const probePoints = new Set([1, photoStep, totalSteps]);
+    if (!probePoints.has(currentStep)) return;
+
     setProbing(true);
     probeLocalStorageHealth().then((h) => {
       if (!cancelled) {
@@ -148,7 +152,7 @@ export const InspectionFlow = () => {
       }
     });
     return () => { cancelled = true; };
-  }, [currentStep, totalSteps]);
+  }, [currentStep, totalSteps, type]);
 
   // ─── Memoized derived data (avoid recomputing on every render) ─────
   const standardPhotoCount = useMemo(
