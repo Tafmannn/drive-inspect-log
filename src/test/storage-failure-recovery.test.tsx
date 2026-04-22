@@ -82,9 +82,15 @@ describe("StorageFailureCard — single canonical surface", () => {
     fireEvent.click(getByTestId("storage-failure-details"));
     expect(getByText("Free up space")).toBeInTheDocument();
     expect(getByText("Retry")).toBeInTheDocument();
-    // Raw reason is shown for support escalation.
+    // Raw reason is shown for support escalation. Match the leaf <p>
+    // that ends with the raw error string to avoid matching ancestor
+    // containers that happen to inherit the same text.
     expect(
-      getByText((_, n) => !!n && n.textContent?.includes("QuotaExceededError") === true),
+      getByText((_, n) =>
+        n?.tagName === "P" &&
+        n.textContent?.startsWith("Reason:") === true &&
+        n.textContent?.includes("QuotaExceededError") === true
+      ),
     ).toBeInTheDocument();
   });
 });
