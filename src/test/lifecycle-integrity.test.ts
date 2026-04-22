@@ -7,7 +7,7 @@
  * server's contract (ADMIN_ALLOWED_TRANSITIONS, the JOB_STATUS map, and the
  * pending-upload run-id contract).
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   ADMIN_ALLOWED_TRANSITIONS,
   JOB_STATUS,
@@ -303,6 +303,4 @@ describe("single-flight submit guard", () => {
   });
 });
 
-// Add the vi import we lazily reference above.
-import { vi } from "vitest";
 
