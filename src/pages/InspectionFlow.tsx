@@ -459,8 +459,8 @@ export const InspectionFlow = () => {
             inspectionType: type,
             photoType: photoKey,
             label: ap.label,
+            inspectionId,
           });
-          toast({ title: "Photo saved offline", description: "We'll upload it when you're online." });
         } catch (err) {
           const msg = String(err).toLowerCase();
           const isStorageError = msg.includes("storage") || msg.includes("quota") || msg.includes("localstorage");
@@ -470,6 +470,13 @@ export const InspectionFlow = () => {
             variant: "destructive",
           });
         }
+      }
+
+      if (pendingCount > 0) {
+        toast({
+          title: `${pendingCount} photo${pendingCount > 1 ? "s" : ""} queued for upload`,
+          description: "They'll upload automatically in the background.",
+        });
       }
 
       // ── 5) Immediately trigger background retry (best-effort) ──
