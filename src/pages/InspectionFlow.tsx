@@ -1083,6 +1083,14 @@ export const InspectionFlow = () => {
           <span className="font-medium text-foreground">{job?.vehicle_reg}</span>
         </div>
 
+        {/* Evidence lifecycle status — surfaces in-flight/failed uploads
+            for this job so the driver knows the queue truth at submit time. */}
+        {jobId && (
+          <div className="flex justify-center">
+            <EvidenceStatusBadges jobId={jobId} />
+          </div>
+        )}
+
         <Card className="p-6 space-y-3">
           <h3 className="font-medium">Inspection Summary</h3>
           <div className="space-y-2 text-sm">
