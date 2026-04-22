@@ -405,6 +405,33 @@ export const InspectionFlow = () => {
     setSubmitStorageFailure(null);
 
     try {
+      // ── 0) Server-safe idempotency pre-check ──
+      // If the inspection of this type is already committed for the
+      // CURRENT run (not a prior reopened run), short-circuit. This
+      // protects against duplicate submits across refreshes / multiple
+      // tabs / device-resume races that the in-memory mutex can't see.
+      try {
+        const fresh = await api.getJob(jobId);
+        const alreadySubmitted =
+          (type === "pickup" && fresh.has_pickup_inspection === true) ||
+          (type === "delivery" && fresh.has_delivery_inspection === true);
+        if (alreadySubmitted) {
+          toast({
+            title: `${type === "pickup" ? "Pickup" : "Delivery"} already submitted.`,
+            description: "Returning you to the job.",
+          });
+          if (dk) clearDraft(dk);
+          try { sessionStorage.removeItem(sessionKey); } catch { /* ignore */ }
+          setSubmitting(false);
+          submitInFlight.current = false;
+          navigate(`/jobs/${jobId}`);
+          return;
+        }
+      } catch {
+        // Pre-check is a defence-in-depth optimisation. If it fails
+        // (offline / RLS edge), fall through — the server RPC will
+        // still raise INSPECTION_ALREADY_SUBMITTED for blocking statuses.
+      }
       // ── 1) Upload signatures (critical for POD — do these synchronously) ──
       // Use eagerly-captured File objects stored when the user left the signature step.
       // Falls back to ref.toFile() only if files weren't captured (e.g. direct submit).
