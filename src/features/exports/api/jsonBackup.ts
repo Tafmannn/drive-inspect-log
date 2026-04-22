@@ -1,6 +1,12 @@
 /**
  * Full JSON backup of org-scoped operational data.
  * RLS ensures admins see their org only; super admins see all.
+ *
+ * NOTE: This export INTENTIONALLY includes archived (soft-deleted by reopen)
+ * inspections / damage_items / photos. A backup must preserve full audit
+ * history — operational/active screens use `archived_at IS NULL` filters,
+ * but a backup that drops archived rows would silently lose evidence from
+ * reopened job runs and break audit reconstruction.
  */
 
 import { supabase } from "@/integrations/supabase/client";
