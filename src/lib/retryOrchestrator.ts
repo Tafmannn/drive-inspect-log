@@ -17,6 +17,11 @@
 //   - Triggers are de-duped by an in-memory single-flight latch and a
 //     small jitter window so a "wake storm" (online+visibility firing
 //     together) cannot spam the queue.
+//
+// Return contract:
+//   triggerRetry returns a structured outcome so manual callers (e.g.
+//   the Pending Uploads screen) can give honest user feedback instead of
+//   pretending a no-op was a successful retry.
 
 import { retryAllPending } from "./pendingUploads";
 import { logClientEvent } from "./logger";
@@ -28,6 +33,23 @@ export type RetryTrigger =
   | "manual"
   | "interval";
 
+export type RetryOutcome =
+  | "completed"
+  | "skipped_inflight"
+  | "skipped_backoff"
+  | "failed";
+
+export interface RetryResult {
+  outcome: RetryOutcome;
+  succeeded: number;
+  failed: number;
+  purged: number;
+  /** Milliseconds until the backoff window clears (only set on skipped_backoff). */
+  retryAfterMs?: number;
+  /** Error message when outcome === "failed". */
+  error?: string;
+}
+
 let inFlight = false;
 let lastFiredAt = 0;
 const MIN_INTERVAL_MS = 4_000; // jitter floor — avoid back-to-back storms
@@ -35,11 +57,24 @@ const MIN_INTERVAL_MS = 4_000; // jitter floor — avoid back-to-back storms
 /**
  * Run a queue retry pass, de-duped against concurrent triggers and a
  * small minimum interval. Safe to call from any event source.
+ *
+ * Returns a structured RetryResult so callers can surface honest UX.
  */
-export async function triggerRetry(source: RetryTrigger): Promise<void> {
+export async function triggerRetry(source: RetryTrigger): Promise<RetryResult> {
   const now = Date.now();
-  if (inFlight) return;
-  if (now - lastFiredAt < MIN_INTERVAL_MS) return;
+  if (inFlight) {
+    return { outcome: "skipped_inflight", succeeded: 0, failed: 0, purged: 0 };
+  }
+  const sinceLast = now - lastFiredAt;
+  if (sinceLast < MIN_INTERVAL_MS) {
+    return {
+      outcome: "skipped_backoff",
+      succeeded: 0,
+      failed: 0,
+      purged: 0,
+      retryAfterMs: MIN_INTERVAL_MS - sinceLast,
+    };
+  }
 
   inFlight = true;
   lastFiredAt = now;
@@ -62,12 +97,26 @@ export async function triggerRetry(source: RetryTrigger): Promise<void> {
         context: { trigger: source, ...result },
       });
     }
+    return {
+      outcome: "completed",
+      succeeded: result.succeeded,
+      failed: result.failed,
+      purged: result.purged,
+    };
   } catch (err) {
+    const message = (err as Error)?.message ?? "unknown_error";
     void logClientEvent("pending_upload_retry_failed", "warn", {
       source: "storage",
       type: "upload",
-      context: { trigger: source, error: (err as Error)?.message },
+      context: { trigger: source, error: message },
     });
+    return {
+      outcome: "failed",
+      succeeded: 0,
+      failed: 0,
+      purged: 0,
+      error: message,
+    };
   } finally {
     inFlight = false;
   }
@@ -101,4 +150,10 @@ export function installRetryTriggers(): () => void {
     document.removeEventListener("visibilitychange", onVisibility);
     window.removeEventListener("focus", onFocus);
   };
+}
+
+/** Test-only helper to reset internal latches between tests. */
+export function __resetRetryOrchestratorForTests(): void {
+  inFlight = false;
+  lastFiredAt = 0;
 }
