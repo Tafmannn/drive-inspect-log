@@ -397,7 +397,9 @@ export const InspectionFlow = () => {
       });
 
       // ── 3b) Queue damage photos AFTER submission (so we have damage_item IDs) ──
-      const damageItemIds: string[] = (submitResult as any)?.damageItemIds ?? [];
+      const submitResultTyped = submitResult as { inspectionId: string; damageItemIds: string[] };
+      const inspectionId: string | null = submitResultTyped?.inspectionId ?? null;
+      const damageItemIds: string[] = submitResultTyped?.damageItemIds ?? [];
       for (let i = 0; i < formState.damages.length; i++) {
         const d = formState.damages[i];
         if (!d.photo) continue;
@@ -408,6 +410,7 @@ export const InspectionFlow = () => {
             photoType: "damage_close_up",
             label: null,
             damageItemId: damageItemIds[i] ?? null,
+            inspectionId,
           });
         } catch (err) {
           const msg = String(err).toLowerCase();
@@ -433,8 +436,8 @@ export const InspectionFlow = () => {
               inspectionType: type,
               photoType: pt.key,
               label: null,
+              inspectionId,
             });
-            toast({ title: "Photo saved offline", description: "We'll upload it when you're online." });
           } catch (err) {
             const msg = String(err).toLowerCase();
             const isStorageError = msg.includes("storage") || msg.includes("quota") || msg.includes("localstorage");
@@ -456,8 +459,8 @@ export const InspectionFlow = () => {
             inspectionType: type,
             photoType: photoKey,
             label: ap.label,
+            inspectionId,
           });
-          toast({ title: "Photo saved offline", description: "We'll upload it when you're online." });
         } catch (err) {
           const msg = String(err).toLowerCase();
           const isStorageError = msg.includes("storage") || msg.includes("quota") || msg.includes("localstorage");
@@ -467,6 +470,13 @@ export const InspectionFlow = () => {
             variant: "destructive",
           });
         }
+      }
+
+      if (pendingCount > 0) {
+        toast({
+          title: `${pendingCount} photo${pendingCount > 1 ? "s" : ""} queued for upload`,
+          description: "They'll upload automatically in the background.",
+        });
       }
 
       // ── 5) Immediately trigger background retry (best-effort) ──

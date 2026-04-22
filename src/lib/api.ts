@@ -252,7 +252,6 @@ export async function submitInspection(
     await updateJob(jobId, {
       has_delivery_inspection: true,
       status: toStatus,
-      completed_at: new Date().toISOString(),
     } as Partial<Job>);
   }
 
