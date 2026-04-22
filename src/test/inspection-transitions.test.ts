@@ -16,8 +16,6 @@ describe("inspectionTransitions — nextStatusForInspection", () => {
   });
 
   it("delivery inspection WITHOUT prior pickup → DELIVERY_COMPLETE (incomplete trail)", () => {
-    // Critical edge case: orphan delivery inspection must NOT mark as POD_READY
-    // because there is no pickup signature/photos to bundle into the POD.
     expect(nextStatusForInspection("delivery", false)).toBe(
       JOB_STATUS.DELIVERY_COMPLETE,
     );
@@ -30,13 +28,24 @@ describe("inspectionTransitions — shouldBlockResubmission", () => {
     expect(shouldBlockResubmission(undefined, JOB_STATUS.NEW)).toBe(false);
   });
 
-  it("does not block resubmission while job is still in progress", () => {
+  it("does not block resubmission while pickup is actively in progress", () => {
     expect(
       shouldBlockResubmission("2025-01-01T00:00:00Z", JOB_STATUS.PICKUP_IN_PROGRESS),
     ).toBe(false);
+  });
+
+  it("blocks resubmission once pickup inspection is submitted (job moves to PICKUP_COMPLETE or beyond)", () => {
+    // Once a driver has submitted and the customer has signed,
+    // the inspection record is immutable. Admin must correct via status override.
+    expect(
+      shouldBlockResubmission("2025-01-01T00:00:00Z", JOB_STATUS.PICKUP_COMPLETE),
+    ).toBe(true);
     expect(
       shouldBlockResubmission("2025-01-01T00:00:00Z", JOB_STATUS.IN_TRANSIT),
-    ).toBe(false);
+    ).toBe(true);
+    expect(
+      shouldBlockResubmission("2025-01-01T00:00:00Z", JOB_STATUS.DELIVERY_IN_PROGRESS),
+    ).toBe(true);
   });
 
   it("blocks resubmission once job has reached POD_READY", () => {

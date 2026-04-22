@@ -16,9 +16,12 @@ import { JOB_STATUS, type JobStatusValue } from "./statusConfig";
 import type { InspectionType } from "./types";
 
 export const INSPECTION_RESUBMIT_BLOCKING_STATUSES: JobStatusValue[] = [
-  JOB_STATUS.COMPLETED,
-  JOB_STATUS.POD_READY,
+  JOB_STATUS.PICKUP_COMPLETE,
+  JOB_STATUS.IN_TRANSIT,
+  JOB_STATUS.DELIVERY_IN_PROGRESS,
   JOB_STATUS.DELIVERY_COMPLETE,
+  JOB_STATUS.POD_READY,
+  JOB_STATUS.COMPLETED,
 ];
 
 export function nextStatusForInspection(
