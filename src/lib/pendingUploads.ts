@@ -443,8 +443,8 @@ export async function retryUpload(
           void logClientEvent("photo_upload_failed", "warn", {
             jobId: candidate.jobId,
             source: "storage",
-            type: "stale_run_purged",
-            context: { pendingId: id, queuedRun: candidate.runId, currentRun },
+            type: "upload",
+            context: { reason: "stale_run_purged", pendingId: id, queuedRun: candidate.runId, currentRun },
           });
           await removeOne(id);
           return false;
