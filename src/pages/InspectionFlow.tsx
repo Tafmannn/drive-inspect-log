@@ -23,7 +23,11 @@ import {
 } from "lucide-react";
 import { useJob, useSubmitInspection } from "@/hooks/useJobs";
 import { storageService } from "@/lib/storage";
-import { addPendingUpload } from "@/lib/pendingUploads";
+import {
+  stagePendingUpload,
+  promoteSubmissionSession,
+  discardSubmissionSession,
+} from "@/lib/pendingUploads";
 import { toast } from "@/hooks/use-toast";
 import type {
   Job,

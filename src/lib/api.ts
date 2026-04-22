@@ -276,7 +276,8 @@ export async function submitInspection(
   type: InspectionType,
   inspectionPayload: Partial<Inspection>,
   damageItems: Array<Omit<DamageItem, 'id' | 'inspection_id' | 'created_at'>>,
-): Promise<{ inspectionId: string; damageItemIds: string[] }> {
+  submissionSessionId?: string | null,
+): Promise<{ inspectionId: string; damageItemIds: string[]; submissionSessionId: string | null }> {
   // Atomic submission via Postgres function. The RPC wraps these writes in a
   // single transaction, so dashboards / detail pages can never observe a
   // half-committed state where the inspection exists but job.status / flags
@@ -292,6 +293,7 @@ export async function submitInspection(
     p_type: type,
     p_inspection: inspectionPayload as any,
     p_damage_items: (damageItems as any) ?? [],
+    p_submission_session_id: submissionSessionId ?? null,
   });
   if (error) {
     if (error.message?.includes('INSPECTION_ALREADY_SUBMITTED')) {
@@ -317,7 +319,26 @@ export async function submitInspection(
   return {
     inspectionId: result.inspectionId,
     damageItemIds: result.damageItemIds ?? [],
+    submissionSessionId: (result as any).submissionSessionId ?? submissionSessionId ?? null,
   };
+}
+
+// ─── Rollback Compensation ───────────────────────────────────────────
+// Compensates a just-committed submission whose client-side linkage
+// patch failed. Targets only rows stamped with the given session id;
+// historical runs and prior submissions are never touched.
+export async function rollbackInspectionSubmission(
+  jobId: string,
+  submissionSessionId: string,
+  reason?: string,
+): Promise<{ archivedInspections: number; archivedDamageItems: number; restoredStatus: string }> {
+  const { data, error } = await (supabase as any).rpc('rollback_inspection_submission', {
+    p_job_id: jobId,
+    p_submission_session_id: submissionSessionId,
+    p_reason: reason ?? null,
+  });
+  if (error) throw error;
+  return data as { archivedInspections: number; archivedDamageItems: number; restoredStatus: string };
 }
 
 // ─── Photos ──────────────────────────────────────────────────────────
