@@ -13,44 +13,65 @@ import { triggerRetry } from "@/lib/retryOrchestrator";
 export function AdminPendingUploads() {
   const [groups, setGroups] = useState<JobUploadSummary[]>([]);
   const [retrying, setRetrying] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    (async () => {
+  const refresh = async () => {
+    setLoading(true);
+    try {
       await pruneDone();
       setGroups(await getPendingUploadsByJob());
-    })();
-  }, []);
+    } catch {
+      toast({
+        title: "Couldn't read pending uploads on this device.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { void refresh(); }, []);
 
   const handleRetry = async (jobId: string) => {
     setRetrying(jobId);
-    const result = await triggerRetry("manual_job", jobId);
-    switch (result.outcome) {
-      case "completed":
-        toast({
-          title: result.failed > 0
-            ? `${result.succeeded} uploaded, ${result.failed} still failing.`
-            : result.succeeded > 0
-              ? `${result.succeeded} photo(s) uploaded successfully.`
-              : "Nothing to retry for this job.",
-          variant: result.failed > 0 ? "destructive" : "default",
-        });
-        break;
-      case "skipped_inflight":
-        toast({ title: "Retry already running — please wait." });
-        break;
-      case "skipped_backoff": {
-        const seconds = Math.max(1, Math.ceil((result.retryAfterMs ?? 0) / 1000));
-        toast({ title: `Please wait ${seconds}s before retrying again.` });
-        break;
+    try {
+      const result = await triggerRetry("manual_job", jobId);
+      switch (result.outcome) {
+        case "completed":
+          toast({
+            title: result.failed > 0
+              ? `${result.succeeded} uploaded, ${result.failed} still failing.`
+              : result.succeeded > 0
+                ? `${result.succeeded} photo(s) uploaded successfully.`
+                : "Nothing to retry for this job.",
+            variant: result.failed > 0 ? "destructive" : "default",
+          });
+          break;
+        case "skipped_inflight":
+          toast({ title: "Retry already running — please wait." });
+          break;
+        case "skipped_backoff": {
+          const seconds = Math.max(1, Math.ceil((result.retryAfterMs ?? 0) / 1000));
+          toast({ title: `Please wait ${seconds}s before retrying again.` });
+          break;
+        }
+        case "failed":
+          toast({ title: "Retry failed.", variant: "destructive" });
+          break;
       }
-      case "failed":
-        toast({ title: "Retry failed.", variant: "destructive" });
-        break;
+    } finally {
+      await refresh();
+      setRetrying(null);
     }
-    await pruneDone();
-    setGroups(await getPendingUploadsByJob());
-    setRetrying(null);
   };
+
+  if (loading) {
+    return (
+      <div className="text-center py-8">
+        <Loader2 className="w-6 h-6 mx-auto animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   if (!groups.length) {
     return (

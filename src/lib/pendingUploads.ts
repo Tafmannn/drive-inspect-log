@@ -41,6 +41,7 @@ import { get, set, del, createStore } from "idb-keyval";
 import { storageService } from "./storage";
 import { insertPhoto } from "./api";
 import { logClientEvent } from "./logger";
+import { notifyEvidenceQueueChanged } from "./evidenceQueueBus";
 import type {
   InspectionType,
   PhotoType,
@@ -521,6 +522,7 @@ export async function promoteSubmissionSession(
   });
 
   await saveAll(next);
+  notifyEvidenceQueueChanged();
   return { promoted: targets.length };
 }
 
@@ -543,6 +545,7 @@ export async function discardSubmissionSession(
     } catch {
       /* ignore */
     }
+    notifyEvidenceQueueChanged();
   }
   return { discarded };
 }
@@ -566,6 +569,7 @@ export async function getAllPendingUploads(): Promise<PendingUpload[]> {
 
 export async function deletePendingUpload(id: string): Promise<void> {
   await removeOne(id);
+  notifyEvidenceQueueChanged();
 }
 
 /**
@@ -576,11 +580,13 @@ export async function pruneDone(): Promise<void> {
   const next = all.filter(
     (u) => u.state !== "uploaded" && u.status !== "done",
   );
+  if (next.length === all.length) return;
   try {
     await saveAll(next);
   } catch {
     /* ignore */
   }
+  notifyEvidenceQueueChanged();
 }
 
 /**
@@ -638,6 +644,7 @@ export async function purgeStaleRunUploads(): Promise<number> {
     } catch {
       /* ignore */
     }
+    notifyEvidenceQueueChanged();
   }
   return purged;
 }
@@ -762,6 +769,7 @@ export async function retryUpload(
       backend: stored.backend,
       backendRef: stored.backendRef ?? null,
     }));
+    notifyEvidenceQueueChanged();
 
     return true;
   } catch (e: unknown) {
@@ -773,6 +781,7 @@ export async function retryUpload(
       status: "failed",
       errorMessage: msg,
     }));
+    notifyEvidenceQueueChanged();
 
     const all = await loadAll();
     const item = all.find((u) => u.id === id);
