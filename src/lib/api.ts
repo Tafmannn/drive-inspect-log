@@ -8,9 +8,7 @@ import type {
   JobActivityLog,
   InspectionType,
 } from './types';
-import type { JobStatusValue } from './statusConfig';
-import { JOB_STATUS, ACTIVE_STATUSES, PENDING_STATUSES } from './statusConfig';
-import { ADMIN_ALLOWED_TRANSITIONS } from './statusConfig';
+import { JOB_STATUS, ACTIVE_STATUSES, PENDING_STATUSES, ADMIN_ALLOWED_TRANSITIONS } from './statusConfig';
 import { logClientEvent } from './logger';
 import { getOrgId } from './orgHelper';
 
