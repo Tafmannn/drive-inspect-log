@@ -3,18 +3,63 @@ import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { EvidenceStatusBadges } from "@/components/EvidenceStatusBadges";
 import { useNavigate } from "react-router-dom";
 import {
   getPendingUploadsByJob,
-  retryJobUploads,
   pruneDone,
   type JobUploadSummary,
 } from "@/lib/pendingUploads";
-import { triggerRetry } from "@/lib/retryOrchestrator";
-import { Loader2, RefreshCw, AlertTriangle, Upload } from "lucide-react";
+import { triggerRetry, type RetryResult } from "@/lib/retryOrchestrator";
+import { notifyEvidenceQueueChanged } from "@/lib/evidenceQueueBus";
+import { Loader2, RefreshCw, Upload } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+
+/**
+ * Translate a structured RetryResult into honest, human-readable
+ * toast feedback. Both Retry All and per-job Retry route through
+ * the same orchestrator and share this messaging.
+ */
+function toastForRetryResult(result: RetryResult, scope: "all" | "job") {
+  switch (result.outcome) {
+    case "completed": {
+      const { succeeded, failed, purged } = result;
+      if (failed > 0) {
+        toast({
+          title: `Retry finished — ${succeeded} uploaded, ${failed} still failing.`,
+          variant: "destructive",
+        });
+      } else if (succeeded > 0 || purged > 0) {
+        const parts: string[] = [];
+        if (succeeded > 0) parts.push(`${succeeded} uploaded`);
+        if (purged > 0) parts.push(`${purged} purged`);
+        toast({ title: `Retry complete — ${parts.join(", ")}.` });
+      } else {
+        toast({
+          title:
+            scope === "job"
+              ? "Nothing to retry for this job."
+              : "No items needed retry.",
+        });
+      }
+      break;
+    }
+    case "skipped_inflight":
+      toast({ title: "Retry already running — please wait." });
+      break;
+    case "skipped_backoff": {
+      const seconds = Math.max(1, Math.ceil((result.retryAfterMs ?? 0) / 1000));
+      toast({ title: `Please wait ${seconds}s before retrying again.` });
+      break;
+    }
+    case "failed":
+      toast({
+        title: "Retry could not start. Check connection and try again.",
+        variant: "destructive",
+      });
+      break;
+  }
+}
 
 export const PendingUploads = () => {
   const navigate = useNavigate();
@@ -22,8 +67,6 @@ export const PendingUploads = () => {
   const [loading, setLoading] = useState(true);
   const [retryingJob, setRetryingJob] = useState<string | null>(null);
   const [retryingAll, setRetryingAll] = useState(false);
-  // Bumped after every retry so child badges re-read the queue snapshot.
-  const [refreshTick, setRefreshTick] = useState(0);
 
   const refresh = async () => {
     setLoading(true);
@@ -31,63 +74,25 @@ export const PendingUploads = () => {
     const grouped = await getPendingUploadsByJob();
     setJobs(grouped);
     setLoading(false);
-    setRefreshTick((t) => t + 1);
+    notifyEvidenceQueueChanged();
   };
 
   useEffect(() => { refresh(); }, []);
 
   const handleRetryJob = async (jobId: string) => {
     setRetryingJob(jobId);
-    const { succeeded, failed } = await retryJobUploads(jobId);
-    if (failed > 0) {
-      toast({ title: `${failed} upload(s) still failing. Tap to retry.`, variant: "destructive" });
-    } else if (succeeded > 0) {
-      toast({ title: `${succeeded} upload(s) complete.` });
-    } else {
-      toast({ title: "Nothing to retry for this job." });
-    }
+    // Per-job retry now flows through the same orchestrator as Retry All
+    // so single-flight, backoff and outcome semantics are identical.
+    const result = await triggerRetry("manual_job", jobId);
+    toastForRetryResult(result, "job");
     await refresh();
     setRetryingJob(null);
   };
 
   const handleRetryAll = async () => {
     setRetryingAll(true);
-    // Route through the orchestrator so the trigger source is logged
-    // and the same single-flight/jitter guards apply as background runs.
     const result = await triggerRetry("manual");
-    switch (result.outcome) {
-      case "completed": {
-        const { succeeded, failed, purged } = result;
-        if (failed > 0) {
-          toast({
-            title: `Retry finished — ${succeeded} uploaded, ${failed} still failing.`,
-            variant: "destructive",
-          });
-        } else if (succeeded > 0 || purged > 0) {
-          const parts = [];
-          if (succeeded > 0) parts.push(`${succeeded} uploaded`);
-          if (purged > 0) parts.push(`${purged} purged`);
-          toast({ title: `Retry complete — ${parts.join(", ")}.` });
-        } else {
-          toast({ title: "No items needed retry." });
-        }
-        break;
-      }
-      case "skipped_inflight":
-        toast({ title: "Retry already running — please wait." });
-        break;
-      case "skipped_backoff": {
-        const seconds = Math.max(1, Math.ceil((result.retryAfterMs ?? 0) / 1000));
-        toast({ title: `Please wait ${seconds}s before retrying again.` });
-        break;
-      }
-      case "failed":
-        toast({
-          title: "Retry could not start. Check connection and try again.",
-          variant: "destructive",
-        });
-        break;
-    }
+    toastForRetryResult(result, "all");
     await refresh();
     setRetryingAll(false);
   };
@@ -98,11 +103,16 @@ export const PendingUploads = () => {
       <div className="p-4 space-y-4 max-w-lg mx-auto">
         {jobs.length > 0 && (
           <div className="space-y-2">
-            <Button onClick={handleRetryAll} disabled={retryingAll} className="w-full min-h-[44px] rounded-lg">
+            <Button
+              onClick={handleRetryAll}
+              disabled={retryingAll}
+              className="w-full min-h-[44px] rounded-lg"
+              data-testid="retry-all-btn"
+            >
               {retryingAll ? <Loader2 className="mr-2 w-5 h-5 animate-spin" /> : <RefreshCw className="mr-2 w-5 h-5 stroke-[2]" />}
               Retry All ({jobs.length} job{jobs.length !== 1 ? "s" : ""})
             </Button>
-            <EvidenceStatusBadges refreshKey={refreshTick} className="justify-center" />
+            <EvidenceStatusBadges className="justify-center" />
           </div>
         )}
 
@@ -132,7 +142,7 @@ export const PendingUploads = () => {
                     <p className="text-[14px] text-muted-foreground">{job.vehicleReg}</p>
                   )}
                 </div>
-                <EvidenceStatusBadges jobId={job.jobId} refreshKey={refreshTick} />
+                <EvidenceStatusBadges jobId={job.jobId} />
               </div>
 
               <div className="flex items-center justify-between">
@@ -148,6 +158,7 @@ export const PendingUploads = () => {
                   onClick={() => handleRetryJob(job.jobId)}
                   disabled={isRetrying}
                   className="min-h-[44px] rounded-lg"
+                  data-testid={`retry-job-${job.jobId}`}
                 >
                   {isRetrying ? (
                     <Loader2 className="mr-1 w-4 h-4 animate-spin" />

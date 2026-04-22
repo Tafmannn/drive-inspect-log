@@ -6,9 +6,9 @@ import { toast } from "@/hooks/use-toast";
 import {
   pruneDone,
   getPendingUploadsByJob,
-  retryJobUploads,
   type JobUploadSummary,
 } from "@/lib/pendingUploads";
+import { triggerRetry } from "@/lib/retryOrchestrator";
 
 export function AdminPendingUploads() {
   const [groups, setGroups] = useState<JobUploadSummary[]>([]);
@@ -23,21 +23,33 @@ export function AdminPendingUploads() {
 
   const handleRetry = async (jobId: string) => {
     setRetrying(jobId);
-    try {
-      const result = await retryJobUploads(jobId);
-      toast({
-        title: result.failed > 0
-          ? `${result.succeeded} uploaded, ${result.failed} still failing.`
-          : `${result.succeeded} photo(s) uploaded successfully.`,
-        variant: result.failed > 0 ? "destructive" : "default",
-      });
-      await pruneDone();
-      setGroups(await getPendingUploadsByJob());
-    } catch {
-      toast({ title: "Retry failed.", variant: "destructive" });
-    } finally {
-      setRetrying(null);
+    const result = await triggerRetry("manual_job", jobId);
+    switch (result.outcome) {
+      case "completed":
+        toast({
+          title: result.failed > 0
+            ? `${result.succeeded} uploaded, ${result.failed} still failing.`
+            : result.succeeded > 0
+              ? `${result.succeeded} photo(s) uploaded successfully.`
+              : "Nothing to retry for this job.",
+          variant: result.failed > 0 ? "destructive" : "default",
+        });
+        break;
+      case "skipped_inflight":
+        toast({ title: "Retry already running — please wait." });
+        break;
+      case "skipped_backoff": {
+        const seconds = Math.max(1, Math.ceil((result.retryAfterMs ?? 0) / 1000));
+        toast({ title: `Please wait ${seconds}s before retrying again.` });
+        break;
+      }
+      case "failed":
+        toast({ title: "Retry failed.", variant: "destructive" });
+        break;
     }
+    await pruneDone();
+    setGroups(await getPendingUploadsByJob());
+    setRetrying(null);
   };
 
   if (!groups.length) {

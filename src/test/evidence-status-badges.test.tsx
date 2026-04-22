@@ -1,18 +1,14 @@
 // Tests for EvidenceStatusBadges integration.
 //
-// The component is a thin reader on top of `getPendingUploadsByJob` —
-// the production-meaningful contract is:
+// The component is a thin reader on top of `getPendingUploadsByJob`,
+// re-driven by the shared evidenceQueueBus. The production-meaningful
+// contract is:
 //   - it queries the queue
 //   - it sums per-job and global counts correctly
-//   - it re-reads when refreshKey changes
-//
-// We test that contract directly via the underlying queue helper
-// (mocked) and through a React render without leaning on
-// @testing-library/dom (which is not installed in this environment).
+//   - it re-reads when a queue mutation is broadcast on the shared bus
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render } from "@testing-library/react";
-import { act } from "react";
+import { render, act } from "@testing-library/react";
 
 const mockGetByJob = vi.fn();
 vi.mock("@/lib/pendingUploads", () => ({
@@ -20,9 +16,14 @@ vi.mock("@/lib/pendingUploads", () => ({
 }));
 
 import { EvidenceStatusBadges } from "@/components/EvidenceStatusBadges";
+import {
+  notifyEvidenceQueueChanged,
+  __resetEvidenceQueueBusForTests,
+} from "@/lib/evidenceQueueBus";
 
 beforeEach(() => {
   mockGetByJob.mockReset();
+  __resetEvidenceQueueBusForTests();
 });
 
 async function flushAsync() {
@@ -78,14 +79,17 @@ describe("EvidenceStatusBadges", () => {
     expect(root!.textContent).toContain("3 failed");
   });
 
-  it("re-reads the queue when refreshKey changes", async () => {
+  it("re-reads the queue when the shared evidence-queue bus broadcasts a change", async () => {
     mockGetByJob.mockResolvedValue([]);
-    const { rerender } = render(<EvidenceStatusBadges refreshKey={0} />);
+    render(<EvidenceStatusBadges />);
     await flushAsync();
     const initialCalls = mockGetByJob.mock.calls.length;
     expect(initialCalls).toBeGreaterThanOrEqual(1);
 
-    rerender(<EvidenceStatusBadges refreshKey={1} />);
+    await act(async () => {
+      notifyEvidenceQueueChanged();
+      await Promise.resolve();
+    });
     await flushAsync();
     expect(mockGetByJob.mock.calls.length).toBeGreaterThan(initialCalls);
   });
