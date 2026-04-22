@@ -24,6 +24,7 @@ import { useSafeBack } from "@/hooks/useSafeBack";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
+import { EvidenceStatusBadges } from "@/components/EvidenceStatusBadges";
 import { useJob, useDeleteJob, useAdminChangeStatus } from "@/hooks/useJobs";
 import { useJobExpenses } from "@/hooks/useExpenses";
 import { evaluateExecutableState, type ExecutableState } from "@/lib/executionRanking";
