@@ -229,7 +229,11 @@ export async function submitInspection(
     has_damage: damageItems.length > 0,
   });
 
-  await supabase.from('damage_items').delete().eq('inspection_id', inspection.id);
+  // Only delete existing damage items if this is a resubmission (items already exist)
+  // or if new items are being inserted — avoids a redundant DELETE on fresh inspections.
+  if (existingInspection || damageItems.length > 0) {
+    await supabase.from('damage_items').delete().eq('inspection_id', inspection.id);
+  }
   let damageItemIds: string[] = [];
   if (damageItems.length > 0) {
     const orgId = await getOrgId();

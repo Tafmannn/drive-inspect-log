@@ -1381,7 +1381,7 @@ export const InspectionFlow = () => {
           <Button
             variant="outline"
             onClick={prevStep}
-            disabled={currentStep === 1}
+            disabled={currentStep === 1 || capturing}
             className="gap-2"
           >
             <ChevronLeft className="h-4 w-4" />

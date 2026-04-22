@@ -270,6 +270,8 @@ export function validateBeforeSubmit(
 ): string[] {
   const total = getTotalSteps(type);
   const all: string[] = [];
+  // Loop runs steps 1..(total-1), intentionally skipping the last step
+  // (review/submit) which has no validation rules of its own.
   for (let s = 1; s < total; s++) {
     all.push(...validateInspectionStep(type, s, ctx));
   }
