@@ -219,11 +219,12 @@ export async function restoreJob(jobId: string): Promise<void> {
 // ─── Inspections ─────────────────────────────────────────────────────
 
 export async function getInspection(jobId: string, type: InspectionType): Promise<Inspection | null> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase
     .from('inspections')
     .select('*')
     .eq('job_id', jobId)
-    .eq('type', type)
+    .eq('type', type) as any)
+    .is('archived_at', null)
     .maybeSingle();
   if (error) throw error;
   return data as Inspection | null;
