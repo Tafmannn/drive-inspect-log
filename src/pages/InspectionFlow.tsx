@@ -686,7 +686,9 @@ export const InspectionFlow = () => {
       }
 
       // ── 5) Immediately trigger background retry (best-effort) ──
-      import("@/lib/pendingUploads").then(m => m.retryAllPending()).catch(() => {});
+      import("@/lib/retryOrchestrator")
+        .then((m) => m.triggerRetry("manual"))
+        .catch(() => {});
 
       const jobRef = job?.external_job_number || jobId.slice(0, 8);
       const label = type === "pickup" ? "Pickup" : "Delivery";
