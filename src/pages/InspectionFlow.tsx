@@ -38,6 +38,7 @@ import type {
 import * as api from "@/lib/api";
 import { PhotoViewer } from "@/components/PhotoViewer";
 import { EvidenceStatusBadges } from "@/components/EvidenceStatusBadges";
+import { StorageFailureCard } from "@/components/StorageFailureCard";
 import { useAuth } from "@/context/AuthContext";
 import { saveDraft, loadDraft, clearDraft, draftKey } from "@/lib/autosave";
 import {
@@ -707,9 +708,32 @@ export const InspectionFlow = () => {
       toast({ title: "Submission failed. Please try again.", variant: "destructive" });
     } finally {
       setSubmitting(false);
+      setRetryingStaging(false);
       submitInFlight.current = false;
     }
   };
+
+  /**
+   * Re-attempt the staged local save after a "Photos could not be saved
+   * on this device" failure. We re-invoke the same submit pipeline,
+   * which begins with the staging loop. Form state, signatures, damage
+   * entries, and captured photos are all kept in React state and are
+   * not affected — only the IndexedDB stage step is re-run.
+   *
+   * If staging now succeeds, the pipeline continues to the RPC and
+   * promote, and `submitStorageFailure` is cleared on the success path
+   * (see clear-on-entry inside handleFinalSubmit). If it fails again,
+   * a fresh classified failure replaces the previous one and the
+   * StorageFailureCard updates in place.
+   */
+  const handleRetryStaging = useCallback(() => {
+    if (retryingStaging || submitting) return;
+    setRetryingStaging(true);
+    // handleFinalSubmit already clears submitStorageFailure at entry,
+    // re-runs staging, and on a fresh failure re-populates it via
+    // failPreflight. The finally block above resets retryingStaging.
+    void handleFinalSubmit();
+  }, [retryingStaging, submitting]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Only show full-screen spinner on initial load (no cached data).
   // On rotation remounts, staleTime keeps the cached data so we skip the spinner.
