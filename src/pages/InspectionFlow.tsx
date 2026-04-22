@@ -383,7 +383,81 @@ export const InspectionFlow = () => {
       // ── 2) Build damage items payload ──
       const damageItemsPayload = buildDamageItemsPayload(formState.damages);
 
-      // ── 3) Submit inspection metadata IMMEDIATELY (non-blocking) ──
+      // ── 3) PRE-FLIGHT: persist ALL photos to IndexedDB BEFORE submitting the
+      //     inspection. If local persistence fails (quota, blocked storage,
+      //     private mode, etc.), we abort the entire submission so the driver
+      //     never ends up with a "submitted" inspection that has no photo
+      //     evidence. inspectionId / damageItemId get patched in afterwards
+      //     by the background uploader using the queued items' job + index.
+      const photoTypes = PHOTO_TYPES_BY_INSPECTION[type];
+      type QueuedHandle = { id: string; kind: "damage" | "standard" | "additional"; index: number };
+      const queued: QueuedHandle[] = [];
+
+      const failPreflight = (err: unknown) => {
+        const msg = String(err).toLowerCase();
+        const isStorageError = msg.includes("storage") || msg.includes("quota") || msg.includes("localstorage");
+        toast({
+          title: isStorageError ? "Photo not saved – storage issue" : "Could not save photos locally",
+          description: isStorageError
+            ? "Your device storage is full or blocked. Clear space and try again — your inspection has NOT been submitted."
+            : "Please try again. Your inspection has NOT been submitted.",
+          variant: "destructive",
+        });
+      };
+
+      try {
+        // Damage photos (inspectionId + damageItemId attached after submit)
+        for (let i = 0; i < formState.damages.length; i++) {
+          const d = formState.damages[i];
+          if (!d.photo) continue;
+          const item = await addPendingUpload(d.photo, {
+            jobId,
+            inspectionType: type,
+            photoType: "damage_close_up",
+            label: null,
+            damageItemId: null,
+            inspectionId: null,
+          });
+          queued.push({ id: item.id, kind: "damage", index: i });
+        }
+        // Standard photos
+        for (const pt of photoTypes) {
+          const file = formState.standardPhotos[pt.key];
+          if (!file) continue;
+          const item = await addPendingUpload(file, {
+            jobId,
+            inspectionType: type,
+            photoType: pt.key,
+            label: null,
+            inspectionId: null,
+          });
+          queued.push({ id: item.id, kind: "standard", index: 0 });
+        }
+        // Additional photos
+        for (let i = 0; i < formState.additionalPhotos.length; i++) {
+          const ap = formState.additionalPhotos[i];
+          const photoKey = type === "pickup" ? "pickup_other" : "delivery_other";
+          const item = await addPendingUpload(ap.file, {
+            jobId,
+            inspectionType: type,
+            photoType: photoKey,
+            label: ap.label,
+            inspectionId: null,
+          });
+          queued.push({ id: item.id, kind: "additional", index: i });
+        }
+      } catch (err) {
+        // Roll back any queued items so a retry doesn't double-upload.
+        try {
+          const { deletePendingUpload } = await import("@/lib/pendingUploads");
+          await Promise.all(queued.map((q) => deletePendingUpload(q.id).catch(() => {})));
+        } catch { /* best-effort cleanup */ }
+        failPreflight(err);
+        setSubmitting(false);
+        return;
+      }
+
+      // ── 4) Submit inspection metadata atomically (RPC writes 1 transaction) ──
       const inspPayload = buildInspectionPayload(type, formState, {
         driverSignatureUrl: driverSigUrl,
         customerSignatureUrl: customerSigUrl,
@@ -396,82 +470,29 @@ export const InspectionFlow = () => {
         damageItems: damageItemsPayload as any,
       });
 
-      // ── 3b) Queue damage photos AFTER submission (so we have damage_item IDs) ──
       const submitResultTyped = submitResult as { inspectionId: string; damageItemIds: string[] };
       const inspectionId: string | null = submitResultTyped?.inspectionId ?? null;
       const damageItemIds: string[] = submitResultTyped?.damageItemIds ?? [];
-      for (let i = 0; i < formState.damages.length; i++) {
-        const d = formState.damages[i];
-        if (!d.photo) continue;
-        try {
-          await addPendingUpload(d.photo, {
-            jobId,
-            inspectionType: type,
-            photoType: "damage_close_up",
-            label: null,
-            damageItemId: damageItemIds[i] ?? null,
-            inspectionId,
-          });
-        } catch (err) {
-          const msg = String(err).toLowerCase();
-          const isStorageError = msg.includes("storage") || msg.includes("quota") || msg.includes("localstorage");
-          toast({
-            title: isStorageError ? "Photo not saved – storage issue" : "Photo could not be saved",
-            description: isStorageError ? "Your device storage is full or blocked. Clear space and try again." : "Please try again.",
-            variant: "destructive",
-          });
-        }
-      }
 
-      // ── 4) Queue ALL photos to background upload (fire-and-forget) ──
-      let pendingCount = 0;
-      const photoTypes = PHOTO_TYPES_BY_INSPECTION[type];
-      for (const pt of photoTypes) {
-        const file = formState.standardPhotos[pt.key];
-        if (file) {
-          pendingCount++;
-          try {
-            await addPendingUpload(file, {
-              jobId,
-              inspectionType: type,
-              photoType: pt.key,
-              label: null,
-              inspectionId,
-            });
-          } catch (err) {
-            const msg = String(err).toLowerCase();
-            const isStorageError = msg.includes("storage") || msg.includes("quota") || msg.includes("localstorage");
-            toast({
-              title: isStorageError ? "Photo not saved – storage issue" : "Photo could not be saved",
-              description: isStorageError ? "Your device storage is full or blocked. Clear space and try again." : "Please try again.",
-              variant: "destructive",
-            });
-          }
+      // ── 4b) Patch inspectionId + damageItemId onto already-queued items.
+      //     Best-effort: even if patching fails the photos still upload — they
+      //     just won't be linked to a damage_item row.
+      try {
+        const { getAllPendingUploads } = await import("@/lib/pendingUploads");
+        const { set, createStore } = await import("idb-keyval");
+        const store = createStore("axentra-pending-uploads", "v2");
+        const all = await getAllPendingUploads();
+        const byId = new Map(all.map((u) => [u.id, u]));
+        for (const q of queued) {
+          const u = byId.get(q.id);
+          if (!u) continue;
+          u.inspectionId = inspectionId;
+          if (q.kind === "damage") u.damageItemId = damageItemIds[q.index] ?? null;
         }
-      }
+        await set("queue", Array.from(byId.values()), store);
+      } catch { /* non-fatal */ }
 
-      for (const ap of formState.additionalPhotos) {
-        const photoKey = type === "pickup" ? "pickup_other" : "delivery_other";
-        pendingCount++;
-        try {
-          await addPendingUpload(ap.file, {
-            jobId,
-            inspectionType: type,
-            photoType: photoKey,
-            label: ap.label,
-            inspectionId,
-          });
-        } catch (err) {
-          const msg = String(err).toLowerCase();
-          const isStorageError = msg.includes("storage") || msg.includes("quota") || msg.includes("localstorage");
-          toast({
-            title: isStorageError ? "Photo not saved – storage issue" : "Photo could not be saved",
-            description: isStorageError ? "Your device storage is full or blocked. Clear space and try again." : "Please try again.",
-            variant: "destructive",
-          });
-        }
-      }
-
+      const pendingCount = queued.length;
       if (pendingCount > 0) {
         toast({
           title: `${pendingCount} photo${pendingCount > 1 ? "s" : ""} queued for upload`,
