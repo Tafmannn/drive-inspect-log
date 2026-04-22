@@ -1,13 +1,11 @@
-// Tests for the centralised retry orchestrator.
+// Tests for retryOrchestrator structured outcomes.
 //
-// These verify:
-//   - single-flight de-duplication of overlapping triggers
-//   - jitter floor between successive triggers
-//   - graceful no-op when retryAllPending throws
-//
-// We mock pendingUploads.retryAllPending so the test stays focused on
-// the orchestrator's coordination semantics — the queue's own state
-// machine is covered by pending-uploads.test.ts.
+// These verify the manual-retry contract relied on by the Pending
+// Uploads screen for honest user feedback:
+//   - completed       → real run with succeeded/failed counts
+//   - skipped_inflight → second call while first is still running
+//   - skipped_backoff  → second call within the jitter floor
+//   - failed          → underlying retryAllPending threw
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -17,37 +15,56 @@ vi.mock("@/lib/pendingUploads", () => ({
 }));
 vi.mock("@/lib/logger", () => ({ logClientEvent: vi.fn() }));
 
-import { triggerRetry } from "@/lib/retryOrchestrator";
+import {
+  triggerRetry,
+  __resetRetryOrchestratorForTests,
+} from "@/lib/retryOrchestrator";
 
 beforeEach(() => {
   mockRetry.mockReset();
   mockRetry.mockResolvedValue({ succeeded: 0, failed: 0, purged: 0 });
+  __resetRetryOrchestratorForTests();
 });
 
-describe("retryOrchestrator.triggerRetry", () => {
-  it("de-duplicates overlapping triggers via single-flight latch", async () => {
-    // Make the inner work resolve slowly so concurrent calls collide.
+describe("retryOrchestrator outcomes", () => {
+  it("returns completed with counts on a successful run", async () => {
+    mockRetry.mockResolvedValueOnce({ succeeded: 3, failed: 1, purged: 0 });
+    const r = await triggerRetry("manual");
+    expect(r.outcome).toBe("completed");
+    expect(r.succeeded).toBe(3);
+    expect(r.failed).toBe(1);
+  });
+
+  it("returns skipped_inflight when a run is already in flight", async () => {
     let resolveInner: ((v: unknown) => void) | null = null;
     mockRetry.mockImplementationOnce(
       () => new Promise((res) => { resolveInner = res; }),
     );
 
-    const a = triggerRetry("manual");
-    const b = triggerRetry("online");
-    const c = triggerRetry("visibility");
-
-    // Wait for the orchestrator's jitter window + microtask flush so the
-    // first inner call has actually started before we resolve it.
+    const first = triggerRetry("manual");
+    // Wait past jitter so the first call has actually entered retryAllPending.
     await new Promise((r) => setTimeout(r, 900));
-    expect(resolveInner).toBeTypeOf("function");
-    resolveInner!({ succeeded: 1, failed: 0, purged: 0 });
-    await Promise.all([a, b, c]);
 
-    expect(mockRetry).toHaveBeenCalledTimes(1);
+    const second = await triggerRetry("manual");
+    expect(second.outcome).toBe("skipped_inflight");
+
+    resolveInner!({ succeeded: 0, failed: 0, purged: 0 });
+    await first;
   });
 
-  it("does not throw if retryAllPending rejects", async () => {
+  it("returns skipped_backoff inside the jitter floor", async () => {
+    const first = await triggerRetry("manual");
+    expect(first.outcome).toBe("completed");
+
+    const second = await triggerRetry("manual");
+    expect(second.outcome).toBe("skipped_backoff");
+    expect(second.retryAfterMs).toBeGreaterThan(0);
+  });
+
+  it("returns failed when retryAllPending throws", async () => {
     mockRetry.mockRejectedValueOnce(new Error("boom"));
-    await expect(triggerRetry("manual")).resolves.toBeUndefined();
+    const r = await triggerRetry("manual");
+    expect(r.outcome).toBe("failed");
+    expect(r.error).toBe("boom");
   });
 });

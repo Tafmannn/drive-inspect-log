@@ -4,6 +4,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { EvidenceStatusBadges } from "@/components/EvidenceStatusBadges";
 import { useNavigate } from "react-router-dom";
 import {
   getPendingUploadsByJob,
@@ -21,6 +22,8 @@ export const PendingUploads = () => {
   const [loading, setLoading] = useState(true);
   const [retryingJob, setRetryingJob] = useState<string | null>(null);
   const [retryingAll, setRetryingAll] = useState(false);
+  // Bumped after every retry so child badges re-read the queue snapshot.
+  const [refreshTick, setRefreshTick] = useState(0);
 
   const refresh = async () => {
     setLoading(true);
@@ -28,6 +31,7 @@ export const PendingUploads = () => {
     const grouped = await getPendingUploadsByJob();
     setJobs(grouped);
     setLoading(false);
+    setRefreshTick((t) => t + 1);
   };
 
   useEffect(() => { refresh(); }, []);
@@ -37,10 +41,12 @@ export const PendingUploads = () => {
     const { succeeded, failed } = await retryJobUploads(jobId);
     if (failed > 0) {
       toast({ title: `${failed} upload(s) still failing. Tap to retry.`, variant: "destructive" });
-    } else {
+    } else if (succeeded > 0) {
       toast({ title: `${succeeded} upload(s) complete.` });
+    } else {
+      toast({ title: "Nothing to retry for this job." });
     }
-    refresh();
+    await refresh();
     setRetryingJob(null);
   };
 
@@ -48,9 +54,41 @@ export const PendingUploads = () => {
     setRetryingAll(true);
     // Route through the orchestrator so the trigger source is logged
     // and the same single-flight/jitter guards apply as background runs.
-    await triggerRetry("manual");
-    toast({ title: "Retry started." });
-    refresh();
+    const result = await triggerRetry("manual");
+    switch (result.outcome) {
+      case "completed": {
+        const { succeeded, failed, purged } = result;
+        if (failed > 0) {
+          toast({
+            title: `Retry finished — ${succeeded} uploaded, ${failed} still failing.`,
+            variant: "destructive",
+          });
+        } else if (succeeded > 0 || purged > 0) {
+          const parts = [];
+          if (succeeded > 0) parts.push(`${succeeded} uploaded`);
+          if (purged > 0) parts.push(`${purged} purged`);
+          toast({ title: `Retry complete — ${parts.join(", ")}.` });
+        } else {
+          toast({ title: "No items needed retry." });
+        }
+        break;
+      }
+      case "skipped_inflight":
+        toast({ title: "Retry already running — please wait." });
+        break;
+      case "skipped_backoff": {
+        const seconds = Math.max(1, Math.ceil((result.retryAfterMs ?? 0) / 1000));
+        toast({ title: `Please wait ${seconds}s before retrying again.` });
+        break;
+      }
+      case "failed":
+        toast({
+          title: "Retry could not start. Check connection and try again.",
+          variant: "destructive",
+        });
+        break;
+    }
+    await refresh();
     setRetryingAll(false);
   };
 
@@ -59,10 +97,13 @@ export const PendingUploads = () => {
       <AppHeader title="Pending Uploads" showBack onBack={() => navigate('/')} />
       <div className="p-4 space-y-4 max-w-lg mx-auto">
         {jobs.length > 0 && (
-          <Button onClick={handleRetryAll} disabled={retryingAll} className="w-full min-h-[44px] rounded-lg">
-            {retryingAll ? <Loader2 className="mr-2 w-5 h-5 animate-spin" /> : <RefreshCw className="mr-2 w-5 h-5 stroke-[2]" />}
-            Retry All ({jobs.length} job{jobs.length !== 1 ? "s" : ""})
-          </Button>
+          <div className="space-y-2">
+            <Button onClick={handleRetryAll} disabled={retryingAll} className="w-full min-h-[44px] rounded-lg">
+              {retryingAll ? <Loader2 className="mr-2 w-5 h-5 animate-spin" /> : <RefreshCw className="mr-2 w-5 h-5 stroke-[2]" />}
+              Retry All ({jobs.length} job{jobs.length !== 1 ? "s" : ""})
+            </Button>
+            <EvidenceStatusBadges refreshKey={refreshTick} className="justify-center" />
+          </div>
         )}
 
         {loading && <DashboardSkeleton />}
@@ -91,17 +132,7 @@ export const PendingUploads = () => {
                     <p className="text-[14px] text-muted-foreground">{job.vehicleReg}</p>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
-                  {job.failedCount > 0 && (
-                    <Badge variant="destructive" className="flex items-center gap-1">
-                      <AlertTriangle className="w-3 h-3" />
-                      {job.failedCount} failed
-                    </Badge>
-                  )}
-                  {job.pendingCount > 0 && (
-                    <Badge variant="secondary">{job.pendingCount} pending</Badge>
-                  )}
-                </div>
+                <EvidenceStatusBadges jobId={job.jobId} refreshKey={refreshTick} />
               </div>
 
               <div className="flex items-center justify-between">

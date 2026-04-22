@@ -37,6 +37,7 @@ import type {
 } from "@/lib/types";
 import * as api from "@/lib/api";
 import { PhotoViewer } from "@/components/PhotoViewer";
+import { EvidenceStatusBadges } from "@/components/EvidenceStatusBadges";
 import { useAuth } from "@/context/AuthContext";
 import { saveDraft, loadDraft, clearDraft, draftKey } from "@/lib/autosave";
 import {
@@ -1081,6 +1082,14 @@ export const InspectionFlow = () => {
           <span>–</span>
           <span className="font-medium text-foreground">{job?.vehicle_reg}</span>
         </div>
+
+        {/* Evidence lifecycle status — surfaces in-flight/failed uploads
+            for this job so the driver knows the queue truth at submit time. */}
+        {jobId && (
+          <div className="flex justify-center">
+            <EvidenceStatusBadges jobId={jobId} />
+          </div>
+        )}
 
         <Card className="p-6 space-y-3">
           <h3 className="font-medium">Inspection Summary</h3>

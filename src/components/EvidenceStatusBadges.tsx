@@ -7,6 +7,15 @@
 // This does NOT imply success state on its own — it surfaces the
 // underlying queue truth so drivers and admins can see when local
 // evidence is still mid-flight.
+//
+// Refresh strategy:
+//   - One initial load on mount.
+//   - A `refreshKey` prop lets parents trigger a re-read after they
+//     cause a queue mutation (e.g. retry tap, queue mutation event).
+//   - A low-frequency 30s interval acts as a fallback safety net so the
+//     UI converges even if the parent forgets to bump refreshKey. This
+//     is intentionally infrequent — the queue is local IDB, not a
+//     network round-trip — so it does not cause noisy renders.
 
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -20,9 +29,11 @@ interface Props {
   jobId?: string;
   /** Optional className passthrough for the wrapper. */
   className?: string;
+  /** Bump to force a re-read after a known queue mutation. */
+  refreshKey?: number | string;
 }
 
-export function EvidenceStatusBadges({ jobId, className }: Props) {
+export function EvidenceStatusBadges({ jobId, className, refreshKey }: Props) {
   const [summary, setSummary] = useState<JobUploadSummary | null>(null);
   const [globalPending, setGlobalPending] = useState(0);
   const [globalFailed, setGlobalFailed] = useState(0);
@@ -50,9 +61,11 @@ export function EvidenceStatusBadges({ jobId, className }: Props) {
       }
     };
     load();
-    const interval = setInterval(load, 8_000);
+    // Low-frequency safety-net refresh; parents should also bump refreshKey
+    // after known mutations for snappier feedback.
+    const interval = setInterval(load, 30_000);
     return () => { cancelled = true; clearInterval(interval); };
-  }, [jobId]);
+  }, [jobId, refreshKey]);
 
   const pending = jobId ? summary?.pendingCount ?? 0 : globalPending;
   const failed = jobId ? summary?.failedCount ?? 0 : globalFailed;
@@ -60,7 +73,10 @@ export function EvidenceStatusBadges({ jobId, className }: Props) {
   if (pending === 0 && failed === 0) return null;
 
   return (
-    <div className={`flex items-center gap-1.5 ${className ?? ""}`}>
+    <div
+      className={`flex items-center gap-1.5 ${className ?? ""}`}
+      data-testid="evidence-status-badges"
+    >
       {pending > 0 && (
         <Badge
           variant="secondary"
