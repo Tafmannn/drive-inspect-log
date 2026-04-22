@@ -186,6 +186,7 @@ export type Database = {
       }
       damage_items: {
         Row: {
+          archived_at: string | null
           area: string | null
           created_at: string
           damage_types: string[] | null
@@ -196,10 +197,12 @@ export type Database = {
           notes: string | null
           org_id: string
           photo_url: string | null
+          run_id: string | null
           x: number | null
           y: number | null
         }
         Insert: {
+          archived_at?: string | null
           area?: string | null
           created_at?: string
           damage_types?: string[] | null
@@ -210,10 +213,12 @@ export type Database = {
           notes?: string | null
           org_id: string
           photo_url?: string | null
+          run_id?: string | null
           x?: number | null
           y?: number | null
         }
         Update: {
+          archived_at?: string | null
           area?: string | null
           created_at?: string
           damage_types?: string[] | null
@@ -224,6 +229,7 @@ export type Database = {
           notes?: string | null
           org_id?: string
           photo_url?: string | null
+          run_id?: string | null
           x?: number | null
           y?: number | null
         }
@@ -561,6 +567,7 @@ export type Database = {
           aerial: string | null
           alloys_damaged: string | null
           alloys_or_trims: string | null
+          archived_at: string | null
           created_at: string
           customer_name: string | null
           customer_paperwork: string | null
@@ -583,6 +590,7 @@ export type Database = {
           oil_level_status: string | null
           org_id: string
           parcel_shelf: string | null
+          run_id: string | null
           sat_nav_working: string | null
           service_book: string | null
           spare_wheel_status: string | null
@@ -599,6 +607,7 @@ export type Database = {
           aerial?: string | null
           alloys_damaged?: string | null
           alloys_or_trims?: string | null
+          archived_at?: string | null
           created_at?: string
           customer_name?: string | null
           customer_paperwork?: string | null
@@ -621,6 +630,7 @@ export type Database = {
           oil_level_status?: string | null
           org_id: string
           parcel_shelf?: string | null
+          run_id?: string | null
           sat_nav_working?: string | null
           service_book?: string | null
           spare_wheel_status?: string | null
@@ -637,6 +647,7 @@ export type Database = {
           aerial?: string | null
           alloys_damaged?: string | null
           alloys_or_trims?: string | null
+          archived_at?: string | null
           created_at?: string
           customer_name?: string | null
           customer_paperwork?: string | null
@@ -659,6 +670,7 @@ export type Database = {
           oil_level_status?: string | null
           org_id?: string
           parcel_shelf?: string | null
+          run_id?: string | null
           sat_nav_working?: string | null
           service_book?: string | null
           spare_wheel_status?: string | null
@@ -953,6 +965,7 @@ export type Database = {
           client_phone: string | null
           completed_at: string | null
           created_at: string
+          current_run_id: string
           delivery_access_notes: string | null
           delivery_address_line1: string
           delivery_address_line2: string | null
@@ -1029,6 +1042,7 @@ export type Database = {
           client_phone?: string | null
           completed_at?: string | null
           created_at?: string
+          current_run_id?: string
           delivery_access_notes?: string | null
           delivery_address_line1: string
           delivery_address_line2?: string | null
@@ -1105,6 +1119,7 @@ export type Database = {
           client_phone?: string | null
           completed_at?: string | null
           created_at?: string
+          current_run_id?: string
           delivery_access_notes?: string | null
           delivery_address_line1?: string
           delivery_address_line2?: string | null
@@ -1342,6 +1357,7 @@ export type Database = {
       }
       photos: {
         Row: {
+          archived_at: string | null
           backend: string
           backend_ref: string | null
           created_at: string
@@ -1350,11 +1366,13 @@ export type Database = {
           job_id: string
           label: string | null
           org_id: string
+          run_id: string | null
           thumbnail_url: string | null
           type: string
           url: string
         }
         Insert: {
+          archived_at?: string | null
           backend?: string
           backend_ref?: string | null
           created_at?: string
@@ -1363,11 +1381,13 @@ export type Database = {
           job_id: string
           label?: string | null
           org_id: string
+          run_id?: string | null
           thumbnail_url?: string | null
           type: string
           url: string
         }
         Update: {
+          archived_at?: string | null
           backend?: string
           backend_ref?: string | null
           created_at?: string
@@ -1376,6 +1396,7 @@ export type Database = {
           job_id?: string
           label?: string | null
           org_id?: string
+          run_id?: string | null
           thumbnail_url?: string | null
           type?: string
           url?: string
@@ -1952,6 +1973,10 @@ export type Database = {
       is_super_admin: { Args: never; Returns: boolean }
       next_job_number: { Args: never; Returns: string }
       normalize_client_name: { Args: { input: string }; Returns: string }
+      reopen_job: {
+        Args: { p_job_id: string; p_notes?: string }
+        Returns: Json
+      }
       restore_driver_profile: {
         Args: {
           p_reactivate_account?: boolean
@@ -1998,6 +2023,15 @@ export type Database = {
       }
       role_rank: { Args: { p_role: string }; Returns: number }
       same_org_as_target: { Args: { target_org_id: string }; Returns: boolean }
+      submit_inspection: {
+        Args: {
+          p_damage_items: Json
+          p_inspection: Json
+          p_job_id: string
+          p_type: string
+        }
+        Returns: Json
+      }
       suspend_user_account: {
         Args: { p_reason?: string; p_target_user_id: string }
         Returns: {
