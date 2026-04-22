@@ -39,7 +39,7 @@ import { ResetPassword } from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { useEffect } from "react";
-import { retryAllPending } from "@/lib/pendingUploads";
+import { installRetryTriggers, triggerRetry } from "@/lib/retryOrchestrator";
 import { Loader2 } from "lucide-react";
 
 /* ── Command Center imports ── */
@@ -68,12 +68,20 @@ const queryClient = new QueryClient({
 
 function BackgroundUploader() {
   const { authLoading, user } = useAuth();
+
+  // Retry on auth-ready (initial app boot + later sign-ins).
   useEffect(() => {
-    // Only retry uploads after auth is resolved and user is available
-    // (getOrgId requires an active session)
     if (authLoading || !user) return;
-    retryAllPending().catch(() => {});
+    void triggerRetry("auth_ready");
   }, [authLoading, user]);
+
+  // Install global online/visibility/focus triggers exactly once per
+  // app lifetime so a returning driver auto-flushes their queue.
+  useEffect(() => {
+    const cleanup = installRetryTriggers();
+    return cleanup;
+  }, []);
+
   return null;
 }
 
