@@ -70,10 +70,12 @@ export async function getJob(jobId: string): Promise<Job> {
 }
 
 export async function getJobWithRelations(jobId: string): Promise<JobWithRelations> {
+  // Active-run filter: archived_at IS NULL excludes evidence from prior runs
+  // (a job that was reopened by an admin soft-archives the previous run).
   const [jobRes, inspRes, photoRes, actRes] = await Promise.all([
     supabase.from('jobs').select('*, driver_profiles(display_name, full_name)').eq('id', jobId).single(),
-    supabase.from('inspections').select('*').eq('job_id', jobId),
-    supabase.from('photos').select('*').eq('job_id', jobId),
+    (supabase.from('inspections').select('*').eq('job_id', jobId) as any).is('archived_at', null),
+    (supabase.from('photos').select('*').eq('job_id', jobId) as any).is('archived_at', null),
     supabase.from('job_activity_log').select('*').eq('job_id', jobId).order('created_at', { ascending: true }),
   ]);
   if (jobRes.error) throw jobRes.error;
@@ -83,7 +85,7 @@ export async function getJobWithRelations(jobId: string): Promise<JobWithRelatio
 
   let damageItems: DamageItem[] = [];
   if (inspectionIds.length > 0) {
-    const { data } = await supabase.from('damage_items').select('*').in('inspection_id', inspectionIds);
+    const { data } = await (supabase.from('damage_items').select('*').in('inspection_id', inspectionIds) as any).is('archived_at', null);
     damageItems = (data ?? []) as DamageItem[];
   }
 
