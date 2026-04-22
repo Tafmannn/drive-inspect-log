@@ -130,6 +130,10 @@ export const InspectionFlow = () => {
   const [storageHealth, setStorageHealth] = useState<StorageHealth | null>(null);
   const [submitStorageFailure, setSubmitStorageFailure] = useState<StorageFailure | null>(null);
   const [probing, setProbing] = useState(false);
+  // Retry-in-progress flag for the canonical StorageFailureCard.
+  // Distinct from `submitting` so the rest of the submit button UX stays
+  // unchanged on first attempt.
+  const [retryingStaging, setRetryingStaging] = useState(false);
 
   const [formState, setFormState] = useState<InspectionFormState>(INITIAL_INSPECTION_FORM);
 
@@ -487,14 +491,16 @@ export const InspectionFlow = () => {
           queuedSoFar,
           submissionSessionId,
           phase: "stage",
+          attempt: retryingStaging ? "retry" : "initial",
         });
+        // Single canonical surface: render the StorageFailureCard.
+        // Intentionally NO destructive toast here — the card already
+        // states the failure, and a duplicate toast was the source of
+        // the "two reds" issue on mobile.
         setSubmitStorageFailure(failure);
+        // Refresh the persistent health probe so the submit button
+        // stays disabled until storage is genuinely healthy again.
         probeLocalStorageHealth().then(setStorageHealth).catch(() => {});
-        toast({
-          title: failure.title,
-          description: failure.description,
-          variant: "destructive",
-        });
       };
 
       const newClientId = () =>
