@@ -197,6 +197,7 @@ export async function adminChangeStatus(
     // If admin requested 'assigned' specifically, flip from ready_for_pickup → assigned
     if (newStatus === JOB_STATUS.ASSIGNED) {
       await updateJob(jobId, { status: JOB_STATUS.ASSIGNED } as Partial<Job>);
+      await logJobActivity(jobId, 'admin_status_change', JOB_STATUS.READY_FOR_PICKUP, JOB_STATUS.ASSIGNED, notes || 'Reopened and assigned');
     }
     return await getJob(jobId);
   }
