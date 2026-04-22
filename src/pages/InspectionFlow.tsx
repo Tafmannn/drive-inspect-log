@@ -1285,15 +1285,24 @@ export const InspectionFlow = () => {
           className="w-full"
           size="lg"
           onClick={() => setShowConfirmationModal(true)}
-          disabled={submitting || probing || storageHealth?.status === "blocked"}
+          disabled={
+            submitting ||
+            retryingStaging ||
+            probing ||
+            !!submitStorageFailure ||
+            storageHealth?.status === "blocked"
+          }
+          data-testid="inspection-submit-button"
         >
-          {submitting ? (
+          {submitting || retryingStaging ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Submitting…
+              {retryingStaging ? "Trying again…" : "Submitting…"}
             </>
           ) : probing ? (
             "Checking storage…"
+          ) : submitStorageFailure ? (
+            "Submit blocked — resolve photo error above"
           ) : storageHealth?.status === "blocked" ? (
             "Submit blocked — fix storage above"
           ) : (
