@@ -1645,37 +1645,27 @@ export const InspectionFlow = () => {
       </div>
 
       <div className="p-4">
-        {/* Early-warning banner: shown on every non-review step when storage is blocked */}
+        {/*
+          Early-warning surface (non-review steps only). Uses the same
+          canonical card so the driver sees one consistent UX from the
+          first probe through to the final submit attempt. Hidden on
+          the review step because the review step renders its own copy
+          (with retry tied to handleRetryStaging). This guarantees the
+          card never appears twice on the same screen.
+        */}
         {storageHealth?.status === "blocked" && currentStep !== totalSteps && (
-          <div
-            role="alert"
-            className="mb-4 bg-destructive/10 border border-destructive/30 rounded-lg p-3 space-y-2"
-          >
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-              <div className="space-y-1 flex-1 min-w-0">
-                <p className="text-[13px] font-semibold text-destructive">
-                  {storageHealth.failure.title}
-                </p>
-                <p className="text-[12px] text-foreground">
-                  Fix this before continuing — submission will be blocked otherwise.
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-1 h-8 text-[12px]"
-                  disabled={probing}
-                  onClick={() => {
-                    setProbing(true);
-                    probeLocalStorageHealth()
-                      .then((h) => { setStorageHealth(h); setProbing(false); })
-                      .catch(() => setProbing(false));
-                  }}
-                >
-                  {probing ? "Re-checking…" : "Re-check storage"}
-                </Button>
-              </div>
-            </div>
+          <div className="mb-4">
+            <StorageFailureCard
+              dense
+              failure={storageHealth.failure}
+              retrying={probing}
+              onRetry={() => {
+                setProbing(true);
+                probeLocalStorageHealth()
+                  .then((h) => { setStorageHealth(h); setProbing(false); })
+                  .catch(() => setProbing(false));
+              }}
+            />
           </div>
         )}
         {stepError ? (
