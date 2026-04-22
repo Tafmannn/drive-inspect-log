@@ -35,6 +35,13 @@ import * as api from "@/lib/api";
 import { PhotoViewer } from "@/components/PhotoViewer";
 import { useAuth } from "@/context/AuthContext";
 import { saveDraft, loadDraft, clearDraft, draftKey } from "@/lib/autosave";
+import {
+  probeLocalStorageHealth,
+  logStorageSubmitFailure,
+  type StorageHealth,
+  type StorageFailure,
+} from "@/lib/storageDiagnostics";
+import { AlertTriangle } from "lucide-react";
 import { JOB_STATUS } from "@/lib/statusConfig";
 import {
   type InspectionFormState,
@@ -111,9 +118,33 @@ export const InspectionFlow = () => {
   const [newPhotoLabel, setNewPhotoLabel] = useState("");
   const [stepError, setStepError] = useState<string | null>(null);
 
+  // Local-storage health: probed when entering the review step and after a
+  // failed submit. If `blocked`, the Submit button is disabled and a
+  // persistent recovery banner is shown. Memory-only fallback is intentionally
+  // NOT supported — submitting without durable photo evidence is forbidden.
+  const [storageHealth, setStorageHealth] = useState<StorageHealth | null>(null);
+  const [submitStorageFailure, setSubmitStorageFailure] = useState<StorageFailure | null>(null);
+  const [probing, setProbing] = useState(false);
+
   const [formState, setFormState] = useState<InspectionFormState>(INITIAL_INSPECTION_FORM);
 
   const totalSteps = getTotalSteps(type);
+
+  // Probe local storage health when the driver lands on the review step.
+  // This surfaces blocked/quota issues BEFORE submit so they can recover
+  // without losing context. Re-runs if the user navigates away & back.
+  useEffect(() => {
+    if (currentStep !== totalSteps) return;
+    let cancelled = false;
+    setProbing(true);
+    probeLocalStorageHealth().then((h) => {
+      if (!cancelled) {
+        setStorageHealth(h);
+        setProbing(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [currentStep, totalSteps]);
 
   // ─── Memoized derived data (avoid recomputing on every render) ─────
   const standardPhotoCount = useMemo(
@@ -354,6 +385,7 @@ export const InspectionFlow = () => {
     }
 
     setSubmitting(true);
+    setSubmitStorageFailure(null);
 
     try {
       // ── 1) Upload signatures (critical for POD — do these synchronously) ──
@@ -393,14 +425,20 @@ export const InspectionFlow = () => {
       type QueuedHandle = { id: string; kind: "damage" | "standard" | "additional"; index: number };
       const queued: QueuedHandle[] = [];
 
-      const failPreflight = (err: unknown) => {
-        const msg = String(err).toLowerCase();
-        const isStorageError = msg.includes("storage") || msg.includes("quota") || msg.includes("localstorage");
+      const failPreflight = (err: unknown, queuedSoFar: number) => {
+        const failure = logStorageSubmitFailure(err, {
+          jobId: jobId!,
+          inspectionType: type,
+          queuedSoFar,
+        });
+        // Persist the failure on the review screen so the driver sees a
+        // permanent, classified explanation — not just a transient toast.
+        setSubmitStorageFailure(failure);
+        // Also re-run the probe so the disabled state matches reality.
+        probeLocalStorageHealth().then(setStorageHealth).catch(() => {});
         toast({
-          title: isStorageError ? "Photo not saved – storage issue" : "Could not save photos locally",
-          description: isStorageError
-            ? "Your device storage is full or blocked. Clear space and try again — your inspection has NOT been submitted."
-            : "Please try again. Your inspection has NOT been submitted.",
+          title: failure.title,
+          description: failure.description,
           variant: "destructive",
         });
       };
@@ -462,7 +500,7 @@ export const InspectionFlow = () => {
           const { deletePendingUpload } = await import("@/lib/pendingUploads");
           await Promise.all(queued.map((q) => deletePendingUpload(q.id).catch(() => {})));
         } catch { /* best-effort cleanup */ }
-        failPreflight(err);
+        failPreflight(err, queued.length);
         setSubmitting(false);
         return;
       }
@@ -1035,17 +1073,73 @@ export const InspectionFlow = () => {
             able to make changes after submission.
           </p>
         </div>
+
+        {/* Persistent storage-health surface — pre-submit risk warning. */}
+        {storageHealth?.status === "blocked" && !submitStorageFailure && (
+          <div
+            role="alert"
+            className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-2"
+          >
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-destructive">
+                  {storageHealth.failure.title}
+                </p>
+                <p className="text-xs text-foreground">
+                  {storageHealth.failure.description} You cannot submit until this is resolved.
+                </p>
+                <ul className="text-xs text-foreground list-disc pl-4 space-y-0.5">
+                  {storageHealth.failure.recovery.map((step, i) => (
+                    <li key={i}>{step}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Persistent post-failure surface — survives until next submit attempt. */}
+        {submitStorageFailure && (
+          <div
+            role="alert"
+            className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-2"
+          >
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-destructive">
+                  {submitStorageFailure.title}
+                </p>
+                <p className="text-xs text-foreground">
+                  {submitStorageFailure.description}
+                </p>
+                <p className="text-xs font-medium text-foreground pt-1">How to fix:</p>
+                <ul className="text-xs text-foreground list-disc pl-4 space-y-0.5">
+                  {submitStorageFailure.recovery.map((step, i) => (
+                    <li key={i}>{step}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
         <Button
           className="w-full"
           size="lg"
           onClick={() => setShowConfirmationModal(true)}
-          disabled={submitting}
+          disabled={submitting || probing || storageHealth?.status === "blocked"}
         >
           {submitting ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Submitting…
             </>
+          ) : probing ? (
+            "Checking storage…"
+          ) : storageHealth?.status === "blocked" ? (
+            "Submit blocked — fix storage above"
           ) : (
             "Submit Report"
           )}
