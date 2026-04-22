@@ -68,6 +68,7 @@ export function useActiveJobs() {
   return useQuery({
     queryKey: ["jobs", "active"],
     queryFn: () => api.listActiveJobs(),
+    staleTime: 30_000,
   });
 }
 
