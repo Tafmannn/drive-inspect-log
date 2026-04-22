@@ -148,12 +148,12 @@ export function classifyStorageError(err: unknown): StorageFailure {
 
   return {
     kind: "unknown",
-    title: "Photos could not be saved locally",
+    title: "Photos could not be saved on this device",
     description:
-      "Something stopped the photos from being saved on your device. The inspection has NOT been submitted.",
+      "The inspection has not been submitted because the photos could not be saved safely.",
     recovery: [
-      "Reload the page and try again.",
-      "Free up some device storage.",
+      "Tap Try again to retry saving the photos.",
+      "Free up some device storage if it's running low.",
       "If the problem continues, contact your admin.",
     ],
     raw,
@@ -232,13 +232,24 @@ export function logStorageSubmitFailure(
     queuedSoFar: number;
     submissionSessionId?: string;
     phase?: string;
+    /** Distinguish first attempt from a user-initiated "Try again". */
+    attempt?: "initial" | "retry";
   },
 ): StorageFailure {
   const failure = classifyStorageError(err);
   void logClientEvent("inspection_submit_storage_failure", "error", {
     source: "storage",
     type: "upload",
-    context: { kind: failure.kind, raw: failure.raw, phase: ctx.phase ?? "submit", ...ctx },
+    message: failure.title,
+    context: {
+      // Machine-readable reason code for downstream filtering.
+      reason_code: failure.kind,
+      kind: failure.kind,
+      raw: failure.raw,
+      phase: ctx.phase ?? "submit",
+      attempt: ctx.attempt ?? "initial",
+      ...ctx,
+    },
   });
   return failure;
 }
