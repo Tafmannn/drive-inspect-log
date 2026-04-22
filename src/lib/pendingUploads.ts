@@ -348,6 +348,74 @@ export async function pruneDone(): Promise<void> {
   }
 }
 
+/**
+ * Remove queued uploads whose `runId` no longer matches the job's
+ * `current_run_id`. This is the run-isolation safety net: when an
+ * admin reopens a job a fresh `current_run_id` is generated, and
+ * any photo still queued from the previous run must NOT upload —
+ * it would attach evidence to the new active run and pollute the
+ * POD record. Called opportunistically before retries and exposed
+ * for the Pending Uploads screen.
+ *
+ * Items with no `runId` (legacy queue entries from before this
+ * field existed) are left alone — purging them would silently
+ * destroy in-flight evidence on a normal upgrade.
+ *
+ * Returns the count of items purged.
+ */
+export async function purgeStaleRunUploads(): Promise<number> {
+  const all = await loadAll();
+  const itemsWithRun = all.filter((u) => u.runId);
+  if (itemsWithRun.length === 0) return 0;
+
+  const jobIds = Array.from(new Set(itemsWithRun.map((u) => u.jobId)));
+  const { supabase } = await import("@/integrations/supabase/client");
+
+  // Fetch current run for each affected job in a single round-trip.
+  const { data, error } = await supabase
+    .from("jobs")
+    .select("id, current_run_id")
+    .in("id", jobIds);
+  if (error) {
+    // Don't drop items on transient errors — better to retry next time
+    // than to silently destroy a valid queued photo.
+    return 0;
+  }
+  const currentRunByJob = new Map<string, string | null>();
+  for (const row of data ?? []) currentRunByJob.set(row.id, (row as any).current_run_id ?? null);
+
+  const survivors: PendingUpload[] = [];
+  let purged = 0;
+  for (const u of all) {
+    if (!u.runId) {
+      survivors.push(u);
+      continue;
+    }
+    const current = currentRunByJob.get(u.jobId);
+    // If the job no longer exists treat as stale.
+    if (!current || current !== u.runId) {
+      void logClientEvent("photo_upload_failed", "warn", {
+        jobId: u.jobId,
+        source: "storage",
+        type: "stale_run_purged",
+        context: { pendingId: u.id, queuedRun: u.runId, currentRun: current ?? null },
+      });
+      purged++;
+      continue;
+    }
+    survivors.push(u);
+  }
+
+  if (purged > 0) {
+    try {
+      await saveAll(survivors);
+    } catch {
+      /* ignore */
+    }
+  }
+  return purged;
+}
+
 export async function retryUpload(
   id: string,
   _options?: { timeoutMs?: number },
@@ -356,6 +424,37 @@ export async function retryUpload(
   inFlight.add(id);
 
   try {
+    // Run-isolation gate: never upload a photo whose runId no longer
+    // matches the job's current_run_id. Treat as a soft-failed item
+    // that was permanently invalidated by a reopen — it gets removed
+    // entirely so it cannot be retried.
+    const before = await loadAll();
+    const candidate = before.find((u) => u.id === id);
+    if (candidate?.runId) {
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        const { data } = await supabase
+          .from("jobs")
+          .select("current_run_id")
+          .eq("id", candidate.jobId)
+          .maybeSingle();
+        const currentRun = (data as any)?.current_run_id ?? null;
+        if (!currentRun || currentRun !== candidate.runId) {
+          void logClientEvent("photo_upload_failed", "warn", {
+            jobId: candidate.jobId,
+            source: "storage",
+            type: "stale_run_purged",
+            context: { pendingId: id, queuedRun: candidate.runId, currentRun },
+          });
+          await removeOne(id);
+          return false;
+        }
+      } catch {
+        // If we can't verify, fall through to normal retry — better
+        // to attempt the upload than silently lose evidence.
+      }
+    }
+
     const existing = await updateOne(id, (u) => ({
       ...u,
       status: "uploading",
