@@ -1073,17 +1073,73 @@ export const InspectionFlow = () => {
             able to make changes after submission.
           </p>
         </div>
+
+        {/* Persistent storage-health surface — pre-submit risk warning. */}
+        {storageHealth?.status === "blocked" && !submitStorageFailure && (
+          <div
+            role="alert"
+            className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-2"
+          >
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-destructive">
+                  {storageHealth.failure.title}
+                </p>
+                <p className="text-xs text-foreground">
+                  {storageHealth.failure.description} You cannot submit until this is resolved.
+                </p>
+                <ul className="text-xs text-foreground list-disc pl-4 space-y-0.5">
+                  {storageHealth.failure.recovery.map((step, i) => (
+                    <li key={i}>{step}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Persistent post-failure surface — survives until next submit attempt. */}
+        {submitStorageFailure && (
+          <div
+            role="alert"
+            className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-2"
+          >
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-destructive">
+                  {submitStorageFailure.title}
+                </p>
+                <p className="text-xs text-foreground">
+                  {submitStorageFailure.description}
+                </p>
+                <p className="text-xs font-medium text-foreground pt-1">How to fix:</p>
+                <ul className="text-xs text-foreground list-disc pl-4 space-y-0.5">
+                  {submitStorageFailure.recovery.map((step, i) => (
+                    <li key={i}>{step}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
         <Button
           className="w-full"
           size="lg"
           onClick={() => setShowConfirmationModal(true)}
-          disabled={submitting}
+          disabled={submitting || probing || storageHealth?.status === "blocked"}
         >
           {submitting ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Submitting…
             </>
+          ) : probing ? (
+            "Checking storage…"
+          ) : storageHealth?.status === "blocked" ? (
+            "Submit blocked — fix storage above"
           ) : (
             "Submit Report"
           )}
