@@ -397,8 +397,8 @@ export async function purgeStaleRunUploads(): Promise<number> {
       void logClientEvent("photo_upload_failed", "warn", {
         jobId: u.jobId,
         source: "storage",
-        type: "stale_run_purged",
-        context: { pendingId: u.id, queuedRun: u.runId, currentRun: current ?? null },
+        type: "upload",
+        context: { reason: "stale_run_purged", pendingId: u.id, queuedRun: u.runId, currentRun: current ?? null },
       });
       purged++;
       continue;
