@@ -1950,6 +1950,92 @@ export type Database = {
         Args: { p_actor_user_id: string; p_target_user_id: string }
         Returns: boolean
       }
+      complete_job: {
+        Args: { p_job_id: string; p_notes?: string }
+        Returns: {
+          admin_rate: number | null
+          cancellation_reason: string | null
+          caz_ulez_cost: number | null
+          caz_ulez_flag: string | null
+          client_company: string | null
+          client_email: string | null
+          client_id: string | null
+          client_name: string | null
+          client_notes: string | null
+          client_phone: string | null
+          completed_at: string | null
+          created_at: string
+          current_run_id: string
+          delivery_access_notes: string | null
+          delivery_address_line1: string
+          delivery_address_line2: string | null
+          delivery_city: string
+          delivery_company: string | null
+          delivery_contact_name: string
+          delivery_contact_phone: string
+          delivery_notes: string | null
+          delivery_postcode: string
+          delivery_time_from: string | null
+          delivery_time_to: string | null
+          distance_miles: number | null
+          driver_external_id: string | null
+          driver_id: string | null
+          driver_name: string | null
+          earliest_delivery_date: string | null
+          external_job_number: string | null
+          has_delivery_inspection: boolean
+          has_pickup_inspection: boolean
+          id: string
+          is_hidden: boolean
+          job_date: string | null
+          job_notes: string | null
+          job_source: string | null
+          job_type: string | null
+          maps_validated: boolean
+          notify_customer_on_arrival: boolean
+          notify_customer_on_complete: boolean
+          notify_customer_on_start: boolean
+          org_id: string
+          other_expenses: number | null
+          pickup_access_notes: string | null
+          pickup_address_line1: string
+          pickup_address_line2: string | null
+          pickup_city: string
+          pickup_company: string | null
+          pickup_contact_name: string
+          pickup_contact_phone: string
+          pickup_notes: string | null
+          pickup_postcode: string
+          pickup_time_from: string | null
+          pickup_time_to: string | null
+          pod_pdf_url: string | null
+          priority: string | null
+          promise_by_time: string | null
+          rate_per_mile: number | null
+          route_distance_miles: number | null
+          route_eta_minutes: number | null
+          sheet_job_id: string | null
+          sheet_row_index: number | null
+          sort_order: number | null
+          status: string
+          sync_to_map: boolean | null
+          total_price: number | null
+          updated_at: string
+          vehicle_colour: string
+          vehicle_fuel_type: string | null
+          vehicle_make: string
+          vehicle_model: string
+          vehicle_reg: string
+          vehicle_type: string | null
+          vehicle_year: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "jobs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       current_actor_email: { Args: never; Returns: string }
       current_user_has_permission: {
         Args: { p_permission_key: string }
@@ -1971,6 +2057,7 @@ export type Database = {
       is_admin_or_super_admin: { Args: never; Returns: boolean }
       is_protected_user: { Args: { p_user_id: string }; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
+      job_current_run_id: { Args: { p_job_id: string }; Returns: string }
       next_job_number: { Args: never; Returns: string }
       normalize_client_name: { Args: { input: string }; Returns: string }
       reopen_job: {
