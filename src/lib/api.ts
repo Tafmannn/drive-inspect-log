@@ -51,6 +51,7 @@ export async function listCompletedJobs(): Promise<Job[]> {
     .from('jobs')
     .select('*')
     .eq('is_hidden', false)
+    .eq('status', JOB_STATUS.COMPLETED)
     .not('completed_at', 'is', null)
     .gte('completed_at', fourteenDaysAgo.toISOString())
     .order('completed_at', { ascending: false });
