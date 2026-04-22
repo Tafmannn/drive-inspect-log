@@ -385,6 +385,7 @@ export const InspectionFlow = () => {
     }
 
     setSubmitting(true);
+    setSubmitStorageFailure(null);
 
     try {
       // ── 1) Upload signatures (critical for POD — do these synchronously) ──
