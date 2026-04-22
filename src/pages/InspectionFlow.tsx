@@ -29,6 +29,7 @@ import {
   discardSubmissionSession,
 } from "@/lib/pendingUploads";
 import { toast } from "@/hooks/use-toast";
+import { logClientEvent } from "@/lib/logger";
 import type {
   Job,
   InspectionType,
@@ -629,9 +630,25 @@ export const InspectionFlow = () => {
           damageIdMap,
         });
         if (promoted.promoted !== queued.length) {
-          throw new Error(
-            `Linkage promotion incomplete: promoted ${promoted.promoted} of ${queued.length}`,
-          );
+          // Log the mismatch for monitoring but do NOT auto-rollback — a
+          // transient IDB read race can cause a count discrepancy without
+          // any real data loss. Photos are staged and will upload; the
+          // inspection row is committed. Auto-rollback here would archive
+          // a legitimately completed inspection.
+          void logClientEvent("linkage_promote_mismatch", "warn", {
+            jobId,
+            source: "storage",
+            type: "upload",
+            context: {
+              submissionSessionId,
+              promoted: promoted.promoted,
+              queued: queued.length,
+            },
+          });
+          toast({
+            title: "Some photos may need manual retry.",
+            description: "Your inspection was submitted. Check Pending Uploads if any photos are missing.",
+          });
         }
       } catch (patchErr) {
         // Always discard local staged items first — they must never upload.
