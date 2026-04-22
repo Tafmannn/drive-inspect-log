@@ -226,13 +226,19 @@ export async function probeLocalStorageHealth(): Promise<StorageHealth> {
  */
 export function logStorageSubmitFailure(
   err: unknown,
-  ctx: { jobId: string; inspectionType: string; queuedSoFar: number },
+  ctx: {
+    jobId: string;
+    inspectionType: string;
+    queuedSoFar: number;
+    submissionSessionId?: string;
+    phase?: string;
+  },
 ): StorageFailure {
   const failure = classifyStorageError(err);
   void logClientEvent("inspection_submit_storage_failure", "error", {
     source: "storage",
     type: "upload",
-    context: { kind: failure.kind, raw: failure.raw, phase: "submit", ...ctx },
+    context: { kind: failure.kind, raw: failure.raw, phase: ctx.phase ?? "submit", ...ctx },
   });
   return failure;
 }
