@@ -1,6 +1,11 @@
 /**
  * Domain event → query invalidation groups.
  * Each event class refreshes all dependent read models.
+ *
+ * IMPORTANT: keys must match the queryKey used in the corresponding hook.
+ * useAdminJobQueues registers under ["jobs","admin","queues"] (qk.jobs.adminQueues).
+ * useControlJobs registers under ["jobs","control","list",...] (qk.jobs.controlList).
+ * TanStack Query uses prefix matching, so ["jobs","admin"] covers both queue + kpis.
  */
 import type { QueryClient } from "@tanstack/react-query";
 
@@ -15,14 +20,14 @@ type EventClass =
 const EVENT_INVALIDATIONS: Record<EventClass, string[][]> = {
   driver_assignment_changed: [
     // Control surfaces
-    ["control-jobs"], ["control-jobs-kpis"],
+    ["jobs", "control", "list"], ["jobs", "control", "kpis"],
     ["control-drivers"], ["control-drivers-kpis"],
     ["control-admin-kpis"], ["control-dispatch-board"],
     ["control-unassigned-queue"], ["control-overview-pod-queue"],
     ["control-recent-completed"],
     ["closure-review-queue"], ["closure-review-kpis"],
     // Admin mobile
-    ["admin-job-queues"], ["admin-job-queue-kpis"],
+    ["jobs", "admin", "queues"], ["jobs", "admin", "queue-kpis"],
     ["admin-missing-evidence-count"], ["admin-drivers"],
     // Driver
     ["jobs"], ["job"], ["dashboard-counts"],
@@ -31,15 +36,15 @@ const EVENT_INVALIDATIONS: Record<EventClass, string[][]> = {
   inspection_submitted: [
     ["job"], ["jobs"],
     ["dashboard-counts"],
-    ["admin-job-queues"], ["admin-job-queue-kpis"],
+    ["jobs", "admin", "queues"], ["jobs", "admin", "queue-kpis"],
     ["admin-missing-evidence-count"],
-    ["control-jobs"], ["closure-review-queue"], ["closure-review-kpis"],
+    ["jobs", "control", "list"], ["closure-review-queue"], ["closure-review-kpis"],
   ],
 
   expense_changed: [
     ["expenses"], ["expense-totals"],
     ["dashboard-counts"],
-    ["admin-job-queues"],
+    ["jobs", "admin", "queues"],
     ["control-finance"],
   ],
 
@@ -55,9 +60,9 @@ const EVENT_INVALIDATIONS: Record<EventClass, string[][]> = {
   job_status_changed: [
     ["job"], ["jobs"],
     ["dashboard-counts"],
-    ["admin-job-queues"], ["admin-job-queue-kpis"],
+    ["jobs", "admin", "queues"], ["jobs", "admin", "queue-kpis"],
     ["admin-missing-evidence-count"],
-    ["control-jobs"], ["control-jobs-kpis"],
+    ["jobs", "control", "list"], ["jobs", "control", "kpis"],
     ["closure-review-queue"], ["closure-review-kpis"],
     ["admin-pod-review"],
     ["attention-center"],
