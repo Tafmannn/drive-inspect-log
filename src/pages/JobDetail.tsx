@@ -25,7 +25,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { EvidenceStatusBadges } from "@/components/EvidenceStatusBadges";
-import { useJob, useDeleteJob, useAdminChangeStatus } from "@/hooks/useJobs";
+import { useJob, useDeleteJob, useAdminChangeStatus, useActiveJobs } from "@/hooks/useJobs";
 import { useJobExpenses } from "@/hooks/useExpenses";
 import { evaluateExecutableState, type ExecutableState } from "@/lib/executionRanking";
 import {
@@ -123,6 +123,7 @@ export const JobDetail = () => {
   const { jobId } = useParams<{ jobId: string }>();
   const [searchParams] = useSearchParams();
   const { data: job, isLoading } = useJob(jobId ?? "");
+  const { data: allActiveJobs } = useActiveJobs();
   const { data: jobExpenses } = useJobExpenses(jobId ?? "");
   const { isAdmin, isSuperAdmin } = useAuth();
   const deleteJob = useDeleteJob();
@@ -256,7 +257,12 @@ export const JobDetail = () => {
   const deliveryInspection = job.inspections.find((i) => i.type === "delivery");
   const primaryCta = derivePrimaryCta(job.status, job.has_pickup_inspection, job.has_delivery_inspection);
   const activeStep = deriveActiveStep(job.status);
-  const execEval = evaluateExecutableState(job);
+  // Pass the driver's own active jobs as siblings so the one-job-at-a-time
+  // lock works from direct navigation (QR scan, link, history) not just JobList.
+  const driverSiblings = (allActiveJobs ?? []).filter(
+    (j) => j.driver_id !== null && j.driver_id === job.driver_id
+  );
+  const execEval = evaluateExecutableState(job, driverSiblings);
   const isBlocked = execEval.state === "blocked";
   const isReviewOnly = execEval.state === "review_only";
 
@@ -688,6 +694,12 @@ function InspectionRow({
   warning?: string;
 }) {
   const [dismissed, setDismissed] = useState(false);
+
+  // Reset dismissed whenever the warning message changes so a new warning
+  // always requires a fresh double-tap confirmation.
+  useEffect(() => {
+    setDismissed(false);
+  }, [warning]);
 
   const handleAction = () => {
     if (warning && !dismissed) {
