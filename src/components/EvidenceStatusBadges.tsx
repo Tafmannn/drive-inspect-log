@@ -1,21 +1,18 @@
 // Lightweight evidence-lifecycle status surface.
 //
 // Renders human-readable counts of pending / failed evidence uploads
-// for a given job (or globally if no jobId provided). Uses semantic
-// design tokens only.
-//
-// This does NOT imply success state on its own — it surfaces the
-// underlying queue truth so drivers and admins can see when local
-// evidence is still mid-flight.
+// for a given job (or globally if no jobId provided). All mounted
+// instances share a single change signal via evidenceQueueBus, so a
+// retry on one screen instantly refreshes badges on every other
+// mounted surface — no per-screen polling logic.
 //
 // Refresh strategy:
 //   - One initial load on mount.
-//   - A `refreshKey` prop lets parents trigger a re-read after they
-//     cause a queue mutation (e.g. retry tap, queue mutation event).
-//   - A low-frequency 30s interval acts as a fallback safety net so the
-//     UI converges even if the parent forgets to bump refreshKey. This
-//     is intentionally infrequent — the queue is local IDB, not a
-//     network round-trip — so it does not cause noisy renders.
+//   - Re-read whenever the shared evidence-queue version changes
+//     (driven by notifyEvidenceQueueChanged() after any retry / prune /
+//     discard).
+//   - Optional `refreshKey` prop is still honoured for callers that
+//     want explicit local-only refreshes.
 
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -24,12 +21,13 @@ import {
   getPendingUploadsByJob,
   type JobUploadSummary,
 } from "@/lib/pendingUploads";
+import { useEvidenceQueueVersion } from "@/lib/evidenceQueueBus";
 
 interface Props {
   jobId?: string;
   /** Optional className passthrough for the wrapper. */
   className?: string;
-  /** Bump to force a re-read after a known queue mutation. */
+  /** Optional explicit refresh trigger from a parent. */
   refreshKey?: number | string;
 }
 
@@ -37,6 +35,7 @@ export function EvidenceStatusBadges({ jobId, className, refreshKey }: Props) {
   const [summary, setSummary] = useState<JobUploadSummary | null>(null);
   const [globalPending, setGlobalPending] = useState(0);
   const [globalFailed, setGlobalFailed] = useState(0);
+  const queueVersion = useEvidenceQueueVersion();
 
   useEffect(() => {
     let cancelled = false;
@@ -61,11 +60,8 @@ export function EvidenceStatusBadges({ jobId, className, refreshKey }: Props) {
       }
     };
     load();
-    // Low-frequency safety-net refresh; parents should also bump refreshKey
-    // after known mutations for snappier feedback.
-    const interval = setInterval(load, 30_000);
-    return () => { cancelled = true; clearInterval(interval); };
-  }, [jobId, refreshKey]);
+    return () => { cancelled = true; };
+  }, [jobId, refreshKey, queueVersion]);
 
   const pending = jobId ? summary?.pendingCount ?? 0 : globalPending;
   const failed = jobId ? summary?.failedCount ?? 0 : globalFailed;
