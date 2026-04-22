@@ -11,7 +11,7 @@ import {
   type JobUploadSummary,
 } from "@/lib/pendingUploads";
 import { triggerRetry, type RetryResult } from "@/lib/retryOrchestrator";
-import { notifyEvidenceQueueChanged } from "@/lib/evidenceQueueBus";
+
 import { Loader2, RefreshCw, Upload } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 

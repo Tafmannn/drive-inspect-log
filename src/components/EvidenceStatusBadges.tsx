@@ -2,17 +2,15 @@
 //
 // Renders human-readable counts of pending / failed evidence uploads
 // for a given job (or globally if no jobId provided). All mounted
-// instances share a single change signal via evidenceQueueBus, so a
-// retry on one screen instantly refreshes badges on every other
-// mounted surface — no per-screen polling logic.
+// instances share a single change signal via evidenceQueueBus, which
+// is broadcast from the canonical lifecycle layer (pendingUploads.ts)
+// after any retry / prune / discard / promote / purge / delete. So a
+// retry on one screen — or in another tab — instantly refreshes
+// badges on every other mounted surface, with no per-screen polling.
 //
 // Refresh strategy:
 //   - One initial load on mount.
-//   - Re-read whenever the shared evidence-queue version changes
-//     (driven by notifyEvidenceQueueChanged() after any retry / prune /
-//     discard).
-//   - Optional `refreshKey` prop is still honoured for callers that
-//     want explicit local-only refreshes.
+//   - Re-read whenever the shared evidence-queue version changes.
 
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -27,11 +25,9 @@ interface Props {
   jobId?: string;
   /** Optional className passthrough for the wrapper. */
   className?: string;
-  /** Optional explicit refresh trigger from a parent. */
-  refreshKey?: number | string;
 }
 
-export function EvidenceStatusBadges({ jobId, className, refreshKey }: Props) {
+export function EvidenceStatusBadges({ jobId, className }: Props) {
   const [summary, setSummary] = useState<JobUploadSummary | null>(null);
   const [globalPending, setGlobalPending] = useState(0);
   const [globalFailed, setGlobalFailed] = useState(0);
@@ -56,12 +52,12 @@ export function EvidenceStatusBadges({ jobId, className, refreshKey }: Props) {
           setGlobalFailed(f);
         }
       } catch {
-        /* best-effort */
+        /* best-effort — leave previous counts visible rather than flicker */
       }
     };
     load();
     return () => { cancelled = true; };
-  }, [jobId, refreshKey, queueVersion]);
+  }, [jobId, queueVersion]);
 
   const pending = jobId ? summary?.pendingCount ?? 0 : globalPending;
   const failed = jobId ? summary?.failedCount ?? 0 : globalFailed;
