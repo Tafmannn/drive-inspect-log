@@ -65,11 +65,9 @@ export function ControlPodReview() {
   const handleConfirmReview = async (jobId: string) => {
     setConfirming(jobId);
     try {
-      const { error } = await supabase
-        .from("jobs")
-        .update({ status: "completed", completed_at: new Date().toISOString() } as any)
-        .eq("id", jobId);
-      if (error) throw error;
+      // Validated server-side completion — never write status directly.
+      const { completeJobRpc } = await import("@/lib/api");
+      await completeJobRpc(jobId, "Confirmed via Control POD review");
       toast({ title: "Review confirmed — job completed" });
       invalidateForEvent(qc, "job_status_changed", [["job", jobId]]);
     } catch (e: any) {

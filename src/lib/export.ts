@@ -50,7 +50,8 @@ export async function exportJobsCsv(): Promise<void> {
 export async function exportInspectionsCsv(): Promise<void> {
   const { data: jobs, error: jErr } = await supabase.from('jobs').select('*').order('created_at', { ascending: false });
   if (jErr) throw jErr;
-  const { data: inspections, error: iErr } = await supabase.from('inspections').select('*');
+  // Active inspections only — archived rows belong to prior runs of reopened jobs.
+  const { data: inspections, error: iErr } = await (supabase.from('inspections').select('*') as any).is('archived_at', null);
   if (iErr) throw iErr;
 
   const headers = [

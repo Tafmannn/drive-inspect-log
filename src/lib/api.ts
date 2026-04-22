@@ -73,6 +73,10 @@ export async function getJobWithRelations(jobId: string): Promise<JobWithRelatio
   const [jobRes, inspRes, photoRes, actRes] = await Promise.all([
     supabase.from('jobs').select('*, driver_profiles(display_name, full_name)').eq('id', jobId).single(),
     (supabase.from('inspections').select('*').eq('job_id', jobId) as any).is('archived_at', null),
+    // Active-run filter for photos: archived_at IS NULL excludes evidence
+    // soft-archived by reopen_job. We additionally constrain by run_id ==
+    // current_run_id when available so a brand-new run never inherits photos
+    // from a prior cycle even if a row was missed by the archive sweep.
     (supabase.from('photos').select('*').eq('job_id', jobId) as any).is('archived_at', null),
     supabase.from('job_activity_log').select('*').eq('job_id', jobId).order('created_at', { ascending: true }),
   ]);
@@ -94,11 +98,22 @@ export async function getJobWithRelations(jobId: string): Promise<JobWithRelatio
     ? (dp.display_name || dp.full_name || raw.driver_name)
     : (raw.driver_name || null);
 
+  // Belt-and-braces: also exclude any photo whose run_id is stale relative
+  // to the job's current run. The DB-side archive_at sweep is authoritative;
+  // this is a defensive filter for reads issued during the brief window
+  // between reopen_job's status flip and its archive update.
+  const currentRun = (raw as any).current_run_id ?? null;
+  const activePhotos = ((photoRes.data ?? []) as Photo[]).filter((p) => {
+    const rid = (p as any).run_id ?? null;
+    if (!currentRun || !rid) return true;
+    return rid === currentRun;
+  });
+
   return {
     ...(raw as Job),
     resolvedDriverName,
     inspections,
-    photos: (photoRes.data ?? []) as Photo[],
+    photos: activePhotos,
     damage_items: damageItems,
     activity_log: (actRes.data ?? []) as JobActivityLog[],
   };
@@ -309,9 +324,39 @@ export async function submitInspection(
 
 export async function insertPhoto(payload: Omit<Photo, 'id' | 'created_at'>): Promise<Photo> {
   const orgId = await getOrgId();
-  const { data, error } = await supabase.from('photos').insert({ ...payload, org_id: orgId } as any).select().single();
+  // Tag the photo with the job's current run so reopened jobs can isolate
+  // evidence by active run. Best-effort: if the lookup fails (offline /
+  // RLS edge case) we still insert without run_id rather than blocking POD.
+  let runId: string | null = (payload as any).run_id ?? null;
+  if (!runId) {
+    try {
+      const { data } = await supabase.from('jobs').select('current_run_id').eq('id', payload.job_id).maybeSingle();
+      runId = (data as any)?.current_run_id ?? null;
+    } catch {
+      /* best-effort */
+    }
+  }
+  const { data, error } = await supabase.from('photos').insert({ ...payload, org_id: orgId, run_id: runId } as any).select().single();
   if (error) throw error;
   return data as Photo;
+}
+
+// ─── Job Completion (validated server-side) ──────────────────────────
+// Centralized terminal completion path. POD review surfaces MUST call
+// this instead of writing status='completed' directly so we get the
+// validated transition + activity log entry every time.
+export async function completeJobRpc(jobId: string, notes?: string): Promise<Job> {
+  const { data, error } = await (supabase as any).rpc('complete_job', {
+    p_job_id: jobId,
+    p_notes: notes ?? null,
+  });
+  if (error) {
+    if (error.message?.includes('INVALID_COMPLETION_TRANSITION')) {
+      throw new Error('This job cannot be completed from its current status.');
+    }
+    throw error;
+  }
+  return data as Job;
 }
 
 // ─── Activity Log ────────────────────────────────────────────────────

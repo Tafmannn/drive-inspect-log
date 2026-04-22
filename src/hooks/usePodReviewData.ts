@@ -103,17 +103,19 @@ export function usePodReviewData() {
       // 2) Fetch delivery inspections for signature status (persisted DB fields only)
       const sigMap: Record<string, { customer: boolean; driver: boolean; ts: number }> = {};
       if (allJobIds.length > 0) {
-        const { data: inspections } = await supabase
+        // Active-only: archived inspections from prior runs (after reopen) must
+        // never count toward the "missing signature" calculation.
+        const { data: inspections } = await (supabase
           .from("inspections")
-          .select("job_id, customer_signature_url, driver_signature_url, inspected_at, created_at")
+          .select("job_id, customer_signature_url, driver_signature_url, inspected_at, created_at, archived_at")
           .eq("type", "delivery")
-          .in("job_id", allJobIds);
+          .in("job_id", allJobIds) as any)
+          .is("archived_at", null);
 
         for (const insp of inspections ?? []) {
           const ts = Date.parse(insp.inspected_at ?? insp.created_at ?? "") || 0;
           const existing = sigMap[insp.job_id];
 
-          // Use latest persisted delivery inspection only.
           if (!existing || ts >= existing.ts) {
             sigMap[insp.job_id] = {
               customer: hasPersistedSignature(insp.customer_signature_url),
