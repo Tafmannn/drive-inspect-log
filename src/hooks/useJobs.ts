@@ -143,12 +143,14 @@ export function useSubmitInspection() {
       type,
       inspectionPayload,
       damageItems,
+      submissionSessionId,
     }: {
       jobId: string;
       type: InspectionType;
       inspectionPayload: Partial<Inspection>;
       damageItems: Array<Omit<DamageItem, "id" | "inspection_id" | "created_at">>;
-    }) => api.submitInspection(jobId, type, inspectionPayload, damageItems),
+      submissionSessionId?: string | null;
+    }) => api.submitInspection(jobId, type, inspectionPayload, damageItems, submissionSessionId ?? null),
     onSuccess: (_data, vars) => {
       invalidateForEvent(qc, "inspection_submitted", [["job", vars.jobId]]);
     },
