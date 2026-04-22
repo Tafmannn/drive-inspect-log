@@ -77,12 +77,20 @@ serve(async (req) => {
     const sa = JSON.parse(serviceAccountJson);
     const accessToken = await getAccessToken(sa);
 
-    const body: UploadRequest = await req.json();
-    const { fileName, contentType, fileBase64 } = body;
+    let body: UploadRequest;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ error: "Invalid JSON body" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    const { fileName, contentType, fileBase64 } = body ?? {};
 
     if (!fileName || !fileBase64) {
       return new Response(
-        JSON.stringify({ error: "fileName and fileBase64 are required" }),
+        JSON.stringify({ error: "fileName and fileBase64 are required", received: { hasFileName: !!fileName, hasBase64: !!fileBase64, base64Length: fileBase64?.length ?? 0 } }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
