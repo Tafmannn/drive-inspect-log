@@ -153,20 +153,55 @@ export async function adminChangeStatus(
   const job = await getJob(jobId);
   const fromStatus = job.status;
 
-  const updates: Partial<Job> = { status: newStatus as any };
-  // Set completed_at for terminal statuses
-  if (['completed', 'pod_ready', 'delivery_complete'].includes(newStatus) && !job.completed_at) {
-    updates.completed_at = new Date().toISOString();
+  // ─── Validate the transition is allowed (defence in depth: UI also gates this) ───
+  const allowed = ADMIN_ALLOWED_TRANSITIONS[fromStatus] ?? [];
+  if (!allowed.includes(newStatus as any)) {
+    throw new Error(
+      `Status transition not allowed: ${fromStatus} → ${newStatus}. ` +
+      `Allowed targets from "${fromStatus}": ${allowed.join(', ') || '(none)'}.`,
+    );
   }
-  // Clear completed_at if re-opening
-  if (['ready_for_pickup', 'assigned'].includes(newStatus) && job.completed_at) {
-    updates.completed_at = null;
+
+  // ─── Re-open path: route through reopen_job RPC which soft-archives prior
+  //     inspection evidence and starts a fresh run. This prevents stale photos /
+  //     damage items from bleeding into the new pickup/delivery cycle. ───
+  if (
+    REOPEN_TARGET_STATUSES.has(newStatus) &&
+    REOPENABLE_FROM_STATUSES.has(fromStatus)
+  ) {
+    const { error: rpcErr } = await (supabase as any).rpc('reopen_job', {
+      p_job_id: jobId,
+      p_notes: notes ?? null,
+    });
+    if (rpcErr) throw rpcErr;
+    // If admin requested 'assigned' specifically, flip from ready_for_pickup → assigned
+    if (newStatus === JOB_STATUS.ASSIGNED) {
+      await updateJob(jobId, { status: JOB_STATUS.ASSIGNED } as Partial<Job>);
+    }
+    return await getJob(jobId);
+  }
+
+  const updates: Partial<Job> = { status: newStatus as any };
+  // Only true terminal completion sets completed_at. pod_ready / delivery_complete
+  // are review states, not completion — counting them as "completed" pollutes
+  // dashboards and finance reports.
+  if (newStatus === JOB_STATUS.COMPLETED && !job.completed_at) {
+    updates.completed_at = new Date().toISOString();
   }
 
   const updated = await updateJob(jobId, updates);
   await logJobActivity(jobId, 'admin_status_change', fromStatus, newStatus, notes || `Admin changed status from ${fromStatus} to ${newStatus}`);
 
   return updated;
+}
+
+export async function reopenJob(jobId: string, notes?: string): Promise<Job> {
+  const { error } = await (supabase as any).rpc('reopen_job', {
+    p_job_id: jobId,
+    p_notes: notes ?? null,
+  });
+  if (error) throw error;
+  return await getJob(jobId);
 }
 
 // ─── Archive (legacy) ────────────────────────────────────────────────
