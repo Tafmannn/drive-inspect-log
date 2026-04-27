@@ -1015,6 +1015,9 @@ export type Database = {
           pickup_time_from: string | null
           pickup_time_to: string | null
           pod_pdf_url: string | null
+          pricing_metadata: Json | null
+          pricing_suggestion_used_at: string | null
+          pricing_suggestion_used_by: string | null
           priority: string | null
           promise_by_time: string | null
           rate_per_mile: number | null
@@ -1092,6 +1095,9 @@ export type Database = {
           pickup_time_from?: string | null
           pickup_time_to?: string | null
           pod_pdf_url?: string | null
+          pricing_metadata?: Json | null
+          pricing_suggestion_used_at?: string | null
+          pricing_suggestion_used_by?: string | null
           priority?: string | null
           promise_by_time?: string | null
           rate_per_mile?: number | null
@@ -1169,6 +1175,9 @@ export type Database = {
           pickup_time_from?: string | null
           pickup_time_to?: string | null
           pod_pdf_url?: string | null
+          pricing_metadata?: Json | null
+          pricing_suggestion_used_at?: string | null
+          pricing_suggestion_used_by?: string | null
           priority?: string | null
           promise_by_time?: string | null
           rate_per_mile?: number | null
@@ -1430,6 +1439,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pricing_snapshots: {
+        Row: {
+          applied_price: number | null
+          breakdown: Json
+          confidence: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          inputs: Json
+          is_final_invoice_price: boolean
+          job_id: string
+          missing_inputs: Json
+          org_id: string
+          reasons: Json
+          source: string
+          suggested_price: number | null
+          warnings: Json
+        }
+        Insert: {
+          applied_price?: number | null
+          breakdown?: Json
+          confidence?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          inputs?: Json
+          is_final_invoice_price?: boolean
+          job_id: string
+          missing_inputs?: Json
+          org_id: string
+          reasons?: Json
+          source?: string
+          suggested_price?: number | null
+          warnings?: Json
+        }
+        Update: {
+          applied_price?: number | null
+          breakdown?: Json
+          confidence?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          inputs?: Json
+          is_final_invoice_price?: boolean
+          job_id?: string
+          missing_inputs?: Json
+          org_id?: string
+          reasons?: Json
+          source?: string
+          suggested_price?: number | null
+          warnings?: Json
+        }
+        Relationships: []
       }
       qr_confirmations: {
         Row: {
@@ -2015,6 +2078,9 @@ export type Database = {
           pickup_time_from: string | null
           pickup_time_to: string | null
           pod_pdf_url: string | null
+          pricing_metadata: Json | null
+          pricing_suggestion_used_at: string | null
+          pricing_suggestion_used_by: string | null
           priority: string | null
           promise_by_time: string | null
           rate_per_mile: number | null
