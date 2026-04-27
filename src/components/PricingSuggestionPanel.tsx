@@ -88,10 +88,21 @@ export function PricingSuggestionPanel(props: PricingSuggestionPanelProps) {
 
   if (!isAdmin && !isSuperAdmin) return null;
 
+  const hasRouteMiles =
+    typeof props.inputs.routeMiles === "number" &&
+    Number.isFinite(props.inputs.routeMiles) &&
+    props.inputs.routeMiles > 0;
+
+  const delta = computePriceDelta(
+    props.currentTotalPrice ?? null,
+    suggestion?.suggestedPrice ?? null,
+  );
+
   const canSave =
     !!props.jobId &&
     !!props.orgId &&
     typeof suggestion?.suggestedPrice === "number" &&
+    hasRouteMiles &&
     !saving;
 
   const handleAccept = async () => {
