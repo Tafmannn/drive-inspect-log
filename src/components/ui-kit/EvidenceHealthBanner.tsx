@@ -7,14 +7,16 @@
  * inside <RoleScope admin> at the call site if it's admin-only.
  */
 import type { ReactNode } from "react";
-import { ShieldAlert, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { ShieldAlert, AlertTriangle, CheckCircle2, ShieldCheck, Undo2 } from "lucide-react";
 import {
   SectionCard,
   SectionHeader,
   StatusPill,
   WarningCallout,
+  RoleScope,
   type StatusPillTone,
 } from "@/components/ui-kit";
+import { Button } from "@/components/ui/button";
 
 export type EvidenceLevel = "green" | "amber" | "red" | "critical";
 
@@ -36,6 +38,18 @@ interface EvidenceHealthBannerProps {
   /** When true, hide entirely on `green` (use for advisory mode). */
   hideWhenGreen?: boolean;
   className?: string;
+  /**
+   * Admin override (UI-only). When `onAcknowledge` is provided, each active
+   * blocker renders an "Acknowledge" action visible to admins. Acknowledged
+   * codes are moved into a muted strip and visually downgrade red→amber.
+   * The banner does NOT alter readiness logic itself — call sites decide
+   * how to combine `acknowledgedCodes` with their own readiness flags.
+   */
+  acknowledgedCodes?: string[];
+  onAcknowledge?: (code: string) => void;
+  onUnacknowledge?: (code: string) => void;
+  /** Optional extra label for the override action (default: "Acknowledge"). */
+  overrideLabel?: string;
 }
 
 const LEVEL_TONE: Record<EvidenceLevel, StatusPillTone> = {
