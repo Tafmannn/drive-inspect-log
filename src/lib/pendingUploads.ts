@@ -42,6 +42,7 @@ import { storageService } from "./storage";
 import { insertPhoto } from "./api";
 import { logClientEvent } from "./logger";
 import { notifyEvidenceQueueChanged } from "./evidenceQueueBus";
+import { safeRandomId } from "./safeRandomId";
 import type {
   InspectionType,
   PhotoType,
