@@ -51,6 +51,7 @@ import { getStatusStyle, ADMIN_ALLOWED_TRANSITIONS } from "@/lib/statusConfig";
 import { UKPlate } from "@/components/UKPlate";
 import { PhotoViewer } from "@/components/PhotoViewer";
 import { resolveMediaUrlAsync } from "@/lib/mediaResolver";
+import { PricingSuggestionPanel } from "@/components/PricingSuggestionPanel";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
