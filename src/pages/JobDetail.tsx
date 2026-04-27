@@ -503,6 +503,23 @@ export const JobDetail = () => {
             )}
           </div>
 
+          {/* Admin-only: Pricing suggestion (advisory) */}
+          {canAdmin && (
+            <PricingSuggestionPanel
+              jobId={job.id}
+              orgId={(job as { org_id?: string }).org_id ?? null}
+              currentTotalPrice={(job as { total_price?: number | null }).total_price ?? null}
+              inputs={{
+                routeMiles: (job as { route_distance_miles?: number | null }).route_distance_miles
+                  ?? (job as { distance_miles?: number | null }).distance_miles
+                  ?? null,
+                urgency: ((job as { priority?: string }).priority || "").toLowerCase() === "urgent"
+                  ? "urgent"
+                  : "standard",
+              }}
+            />
+          )}
+
           {/* Admin-only: Edit + Delete + Status Change */}
           {canAdmin && (
             <div className="space-y-2">
