@@ -35,6 +35,7 @@ import { getChecklistItems } from "@/lib/inspectionFields";
 import { useAuth } from "@/context/AuthContext";
 import type { Photo } from "@/lib/types";
 import { canonicalisePhotos } from "@/lib/photoDedupe";
+import { evaluateEvidenceHealth } from "@/lib/evidenceHealth";
 
 const fuelLabel = (pct: number | null | undefined): string => {
   if (pct == null) return "N/A";
@@ -438,6 +439,17 @@ export const PodReport = () => {
   const deliveryPhotos = canonicalPhotos.filter((p) => p.type.startsWith("delivery_"));
   const damagePhotos = canonicalPhotos.filter((p) => p.type === "damage_close_up");
 
+  // Stage 2: evidence health is advisory only on this surface — it does
+  // not gate PDF generation today (would be a behavioural change). It
+  // surfaces blockers/warnings to admins so duplicate/stale-run issues
+  // are visible at a glance. RED/CRITICAL are still rendered as a banner.
+  const evidenceHealth = evaluateEvidenceHealth({
+    currentRunId: (job as any).current_run_id ?? null,
+    photos: job.photos,
+    inspections: job.inspections,
+    pendingUploads: null,
+  });
+
   const pickupChecklistItems = getChecklistItems(pickup);
   const deliveryChecklistItems = getChecklistItems(delivery);
 
@@ -500,6 +512,27 @@ export const PodReport = () => {
 
       <main className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto py-6 px-3 sm:px-6 space-y-4 print:py-0 print:px-0">
+          {(isAdmin || isSuperAdmin) && evidenceHealth.level !== "green" && (
+            <div
+              className={`print:hidden rounded-md border px-3 py-2 text-xs space-y-1 ${
+                evidenceHealth.level === "amber"
+                  ? "border-amber-300 bg-amber-50 text-amber-900"
+                  : "border-destructive bg-destructive/10 text-destructive"
+              }`}
+              role="status"
+              aria-live="polite"
+            >
+              <div className="font-semibold uppercase tracking-wide">
+                Evidence: {evidenceHealth.level}
+              </div>
+              {evidenceHealth.blockers.map((b) => (
+                <div key={`b-${b.code}`}>• {b.message}</div>
+              ))}
+              {evidenceHealth.warnings.map((w) => (
+                <div key={`w-${w.code}`}>• {w.message}</div>
+              ))}
+            </div>
+          )}
           <Card className="border border-border shadow-sm print:shadow-none print:border-none">
             <div className="flex items-center justify-between px-6 py-4 bg-foreground text-background rounded-t-lg print:rounded-none">
               <div className="flex flex-col">
