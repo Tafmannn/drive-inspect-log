@@ -96,6 +96,8 @@ type Sleep = (ms: number) => Promise<void>;
 type JitterMs = () => number;
 
 let sleepImpl: Sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// NOTE: Math.random is acceptable here — used only for retry backoff jitter
+// (timing decorrelation under load). Not an ID, token, or security value.
 let jitterImpl: JitterMs = () => Math.floor(Math.random() * 750);
 
 /**
@@ -243,5 +245,6 @@ export function __resetRetryOrchestratorForTests(): void {
   lastGlobalAt = 0;
   perJobInFlight.clear();
   sleepImpl = (ms) => new Promise((r) => setTimeout(r, ms));
+  // Restore default backoff jitter — non-security, timing decorrelation only.
   jitterImpl = () => Math.floor(Math.random() * 750);
 }

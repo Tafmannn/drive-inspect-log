@@ -1,3 +1,4 @@
+// NOTE: Math.random() in this test file generates fixture IDs only — non-security, never reaches production code.
 import { describe, it, expect } from "vitest";
 import { evaluatePodReadiness } from "@/lib/podReadiness";
 import type { Photo, Inspection } from "@/lib/types";

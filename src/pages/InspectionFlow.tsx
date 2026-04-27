@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useJob, useSubmitInspection } from "@/hooks/useJobs";
 import { storageService } from "@/lib/storage";
+import { safeRandomId } from "@/lib/safeRandomId";
 import {
   stagePendingUpload,
   promoteSubmissionSession,
@@ -481,10 +482,9 @@ export const InspectionFlow = () => {
         clientDamageId?: string;
       };
       const queued: QueuedHandle[] = [];
-      const submissionSessionId =
-        (typeof crypto !== "undefined" && "randomUUID" in crypto)
-          ? crypto.randomUUID()
-          : `sess-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      // Submission session ID is security-sensitive: it correlates client
+      // photo uploads with a server-side inspection ledger. Use crypto only.
+      const submissionSessionId = safeRandomId();
 
       const failPreflight = (err: unknown, queuedSoFar: number) => {
         const failure = logStorageSubmitFailure(err, {
@@ -505,10 +505,9 @@ export const InspectionFlow = () => {
         probeLocalStorageHealth().then(setStorageHealth).catch(() => {});
       };
 
-      const newClientId = () =>
-        (typeof crypto !== "undefined" && "randomUUID" in crypto)
-          ? crypto.randomUUID()
-          : `cid-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      // Client photo IDs key the upload ledger and storage paths — must be
+      // cryptographically strong to prevent collisions across concurrent submissions.
+      const newClientId = () => safeRandomId();
 
       try {
         const queueRunId: string | null = (job as any)?.current_run_id ?? null;

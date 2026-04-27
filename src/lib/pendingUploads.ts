@@ -42,6 +42,7 @@ import { storageService } from "./storage";
 import { insertPhoto } from "./api";
 import { logClientEvent } from "./logger";
 import { notifyEvidenceQueueChanged } from "./evidenceQueueBus";
+import { safeRandomId } from "./safeRandomId";
 import type {
   InspectionType,
   PhotoType,
@@ -360,8 +361,17 @@ async function migrateLegacyIfNeeded(): Promise<void> {
           const dataUrl: string | null = legacy?.fileDataUrl ?? null;
           let blob: Blob | null = null;
           if (typeof dataUrl === "string" && dataUrl.startsWith("data:")) {
-            const [header, b64] = dataUrl.split(",");
-            const mime = header.match(/:(.*?);/)?.[1] ?? "image/jpeg";
+            const commaIdx = dataUrl.indexOf(",");
+            const header = commaIdx >= 0 ? dataUrl.slice(0, commaIdx) : dataUrl;
+            const b64 = commaIdx >= 0 ? dataUrl.slice(commaIdx + 1) : "";
+            // Bounded MIME parse — avoids regex backtracking on attacker-controlled headers.
+            // Format is `data:<mime>;base64`, so MIME sits between the first ':' and first ';'.
+            const colonIdx = header.indexOf(":");
+            const semiIdx = header.indexOf(";", colonIdx + 1);
+            const mime =
+              colonIdx >= 0 && semiIdx > colonIdx
+                ? header.slice(colonIdx + 1, semiIdx)
+                : "image/jpeg";
             const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
             blob = new Blob([bytes], { type: mime });
           }
@@ -434,11 +444,9 @@ export async function stagePendingUpload(
 ): Promise<PendingUpload> {
   const blob = await compressToBlob(file);
 
-  const id =
-    "pu_" +
-    (crypto.randomUUID
-      ? crypto.randomUUID()
-      : Math.random().toString(36).slice(2));
+  // Upload reference IDs are security-sensitive (used in storage paths and
+  // server-side ledger lookups). Always use a cryptographically-strong source.
+  const id = "pu_" + safeRandomId();
 
   const item: PendingUpload = {
     id,
