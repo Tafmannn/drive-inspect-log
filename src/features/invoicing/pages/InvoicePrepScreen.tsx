@@ -490,30 +490,64 @@ export function InvoicePrepScreen() {
                         <TableCell>
                           <Checkbox
                             checked={selectedJobIds.has(job.id)}
-                            disabled={!job.readiness?.ready}
+                            disabled={!isJobSelectable(job)}
                             onCheckedChange={() => toggleJob(job.id)}
                             aria-label={`Select job ${job.external_job_number || job.id.slice(0, 8)}`}
                           />
                         </TableCell>
                         <TableCell>
-                          <div className="min-w-0">
+                          <div className="min-w-0 flex items-center flex-wrap gap-1.5">
                             <span className="text-sm font-medium text-foreground">
                               {job.external_job_number || job.id.slice(0, 8)}
                             </span>
                             <Badge
                               variant="outline"
                               className={cn(
-                                "ml-2 text-[9px]",
+                                "text-[9px]",
                                 job.readiness?.alreadyInvoiced
                                   ? "text-muted-foreground border-muted-foreground/30 bg-muted/40"
                                   : job.readiness?.ready
                                   ? "text-success border-success/30 bg-success/5"
+                                  : isOverridden(job.id)
+                                  ? "text-primary border-primary/30 bg-primary/5"
                                   : "text-destructive border-destructive/30 bg-destructive/5",
                               )}
                               title={job.readiness?.primaryReason}
                             >
-                              {job.readiness?.primaryReason ?? job.status.replace(/_/g, " ")}
+                              {isOverridden(job.id) && !job.readiness?.ready
+                                ? `Override · ${job.readiness?.primaryReason ?? "blocked"}`
+                                : job.readiness?.primaryReason ?? job.status.replace(/_/g, " ")}
                             </Badge>
+                            {!job.readiness?.ready && !job.readiness?.alreadyInvoiced && (
+                              <RoleScope admin>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant={isOverridden(job.id) ? "ghost" : "outline"}
+                                  className="h-6 px-2 text-[10px]"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (isOverridden(job.id)) {
+                                      invoiceOverrides.unacknowledge(job.id);
+                                      setSelectedJobIds((prev) => {
+                                        const next = new Set(prev);
+                                        next.delete(job.id);
+                                        return next;
+                                      });
+                                    } else {
+                                      invoiceOverrides.acknowledge(job.id);
+                                    }
+                                  }}
+                                  aria-label={
+                                    isOverridden(job.id)
+                                      ? `Remove override for job ${job.external_job_number || job.id.slice(0, 8)}`
+                                      : `Override readiness for job ${job.external_job_number || job.id.slice(0, 8)}`
+                                  }
+                                >
+                                  {isOverridden(job.id) ? "Undo override" : "Override"}
+                                </Button>
+                              </RoleScope>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>
