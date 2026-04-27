@@ -16,7 +16,7 @@ import {
   type StatusPillTone,
 } from "@/components/ui-kit";
 
-export type EvidenceLevel = "green" | "amber" | "red";
+export type EvidenceLevel = "green" | "amber" | "red" | "critical";
 
 interface BannerItem {
   /** Stable key (e.g. blocker code). */
@@ -42,18 +42,21 @@ const LEVEL_TONE: Record<EvidenceLevel, StatusPillTone> = {
   green: "success",
   amber: "warning",
   red: "danger",
+  critical: "danger",
 };
 
 const LEVEL_ICON: Record<EvidenceLevel, ReactNode> = {
   green: <CheckCircle2 className="h-4 w-4" />,
   amber: <AlertTriangle className="h-4 w-4" />,
   red: <ShieldAlert className="h-4 w-4" />,
+  critical: <ShieldAlert className="h-4 w-4" />,
 };
 
 const LEVEL_LABEL: Record<EvidenceLevel, string> = {
   green: "Healthy",
   amber: "Needs attention",
   red: "Blocked",
+  critical: "Critical",
 };
 
 export function EvidenceHealthBanner({
