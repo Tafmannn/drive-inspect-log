@@ -445,6 +445,14 @@ export const PodReport = () => {
   const pickupChecklistItems = getChecklistItems(pickup);
   const deliveryChecklistItems = getChecklistItems(delivery);
 
+  // Stage 4 — POD operational readiness. Pure, no IO. Used for the
+  // advisory banner AND to gate the "Confirm Review" completion button.
+  const podReadiness = evaluatePodReadiness({
+    currentRunId: (job as any).current_run_id ?? null,
+    photos: job.photos,
+    inspections: job.inspections,
+  });
+
   const DetailRow = ({ label, value }: { label: string; value: string }) => (
     <div className="flex justify-between py-1">
       <span className="text-xs text-muted-foreground">{label}</span>
