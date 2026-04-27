@@ -18,3 +18,4 @@ export { DeltaBadge } from "./DeltaBadge";
 export { RoleScope } from "./RoleScope";
 export { EvidenceHealthBanner } from "./EvidenceHealthBanner";
 export type { EvidenceLevel } from "./EvidenceHealthBanner";
+export { JobHeaderCard } from "./JobHeaderCard";
