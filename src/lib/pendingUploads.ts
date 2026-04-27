@@ -678,6 +678,9 @@ export async function retryUpload(
 
     // STAGED items are NEVER uploadable. This is the central guarantee
     // that a failed submit cannot leak orphan evidence.
+    // Allowed entry states for a worker pass: "ready" (normal queue),
+    // "failed" (user-initiated retry), "blocked" (run unverified — user
+    // or background retry attempting to re-verify).
     if (
       candidate.state === "staged" ||
       candidate.state === "uploading" ||
