@@ -22,6 +22,7 @@ import { exportJobsCsv, exportInspectionsCsv } from "@/lib/export";
 import { exportExpensesCsv } from "@/lib/expenseApi";
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { RoleScope } from "@/components/ui-kit";
 
 export const Dashboard = () => {
   const navigate = useNavigate();
@@ -95,7 +96,7 @@ export const Dashboard = () => {
         </section>
 
         {/* ── Utilities (admin only) ───────────────────────── */}
-        {(isAdmin || isSuperAdmin) && (
+        <RoleScope admin>
           <section>
             <h2 className="text-[14px] font-semibold text-muted-foreground mb-3">Utilities</h2>
             <div className="space-y-3">
@@ -107,10 +108,10 @@ export const Dashboard = () => {
               />
             </div>
           </section>
-        )}
+        </RoleScope>
 
         {/* ── Management (role-gated) ─────────────────────── */}
-        {(isAdmin || isSuperAdmin) && (
+        <RoleScope admin>
           <section>
             <h2 className="text-[14px] font-semibold text-muted-foreground mb-3">Management</h2>
             <div className="space-y-3">
@@ -123,7 +124,7 @@ export const Dashboard = () => {
                   iconClassName="bg-accent/10 text-accent"
                 />
               )}
-              {isSuperAdmin && (
+              <RoleScope superAdminOnly>
                 <DashboardCard
                   icon={<ShieldCheck className="w-6 h-6 stroke-[2]" />}
                   title="Super Admin"
@@ -131,13 +132,13 @@ export const Dashboard = () => {
                   onClick={() => navigate("/super-admin")}
                   iconClassName="bg-destructive/10 text-destructive"
                 />
-              )}
+              </RoleScope>
             </div>
           </section>
-        )}
+        </RoleScope>
 
         {/* ── Quick Exports (admin only) ───────────────────── */}
-        {(isAdmin || isSuperAdmin) && (
+        <RoleScope admin>
           <section>
             <h2 className="text-[14px] font-semibold text-muted-foreground mb-3">Quick Exports</h2>
             <div className="grid grid-cols-3 gap-3">
@@ -152,7 +153,7 @@ export const Dashboard = () => {
               </Button>
             </div>
           </section>
-        )}
+        </RoleScope>
       </div>
 
       <BottomNav />
