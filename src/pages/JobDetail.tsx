@@ -48,6 +48,7 @@ import { PricingAuditTimeline } from "@/components/PricingAuditTimeline";
 import { RoleScope, EvidenceHealthBanner, JobHeaderCard } from "@/components/ui-kit";
 import { JobAdminControls } from "@/features/jobs/components/JobAdminControls";
 import { evaluateEvidenceHealth } from "@/lib/evidenceHealth";
+import { useEvidenceOverrides } from "@/hooks/useEvidenceOverrides";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -275,6 +276,9 @@ export const JobDetail = () => {
         inspections: (job.inspections as any[]) ?? [],
       })
     : null;
+
+  // Session-scoped admin override for Operational Health blockers.
+  const evidenceOverrides = useEvidenceOverrides(job.id);
 
   return (
     <div className="min-h-screen bg-background pb-20">
