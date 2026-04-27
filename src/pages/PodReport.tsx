@@ -439,6 +439,17 @@ export const PodReport = () => {
   const deliveryPhotos = canonicalPhotos.filter((p) => p.type.startsWith("delivery_"));
   const damagePhotos = canonicalPhotos.filter((p) => p.type === "damage_close_up");
 
+  // Stage 2: evidence health is advisory only on this surface — it does
+  // not gate PDF generation today (would be a behavioural change). It
+  // surfaces blockers/warnings to admins so duplicate/stale-run issues
+  // are visible at a glance. RED/CRITICAL are still rendered as a banner.
+  const evidenceHealth = evaluateEvidenceHealth({
+    currentRunId: (job as any).current_run_id ?? null,
+    photos: job.photos,
+    inspections: job.inspections,
+    pendingUploads: null,
+  });
+
   const pickupChecklistItems = getChecklistItems(pickup);
   const deliveryChecklistItems = getChecklistItems(delivery);
 
