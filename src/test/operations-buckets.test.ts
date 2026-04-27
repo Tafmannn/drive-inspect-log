@@ -149,18 +149,18 @@ describe("operationsBuckets — Stage 6 classifier", () => {
     expect(r.byKey.ready_to_invoice.count).toBe(0);
   });
 
-  it("missing customer signature → missing_signatures + blocked_evidence", () => {
+  it("missing delivery customer signature → missing_signatures + blocked_evidence", () => {
     const job = cleanCompletedJob({
       id: "job-sig",
       status: "pod_ready",
       inspections: [
-        insp({ type: "pickup", customer_signature_url: null }),
-        insp({ type: "delivery" }),
+        insp({ type: "pickup" }),
+        insp({ type: "delivery", customer_signature_url: null }),
       ],
     });
     const r = classifyJobsIntoBuckets([{ job }]);
     expect(r.byKey.missing_signatures.count).toBe(1);
-    // Missing signature also escalates evidence — must not be ready_to_close.
+    expect(r.byKey.blocked_evidence.count).toBe(1);
     expect(r.byKey.ready_to_close.count).toBe(0);
     expect(r.byKey.ready_to_invoice.count).toBe(0);
   });
