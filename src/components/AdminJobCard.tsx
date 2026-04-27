@@ -13,6 +13,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { UKPlate } from "@/components/UKPlate";
 import { getStatusStyle } from "@/lib/statusConfig";
+import { getWorkflowBrain } from "@/lib/workflowBrain";
 import { isJobStale, isUnassigned, canReviewPod, humanAge } from "@/features/control/pages/jobs/jobsUtils";
 import {
   MapPin, UserPlus, Eye, ClipboardCheck, AlertTriangle, Clock, User,
