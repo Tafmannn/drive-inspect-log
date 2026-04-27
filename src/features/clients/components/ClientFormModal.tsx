@@ -12,7 +12,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
 import { useCreateClient, useUpdateClient } from "@/hooks/useClients";
-import type { Client } from "@/lib/clientApi";
+import {
+  type Client,
+  getClientRateCardRow,
+  upsertClientRateCard,
+} from "@/lib/clientApi";
 import { useAuth } from "@/context/AuthContext";
 import { Loader2, Tag } from "lucide-react";
 
@@ -45,22 +49,37 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
   });
 
   useEffect(() => {
+    let cancelled = false;
     if (client) {
-      setForm({
+      setForm((f) => ({
+        ...f,
         name: client.name,
         company: client.company ?? "",
         email: client.email ?? "",
         phone: client.phone ?? "",
         address: client.address ?? "",
         notes: client.notes ?? "",
-        rate_card_active: !!client.rate_card_active,
-        rate_per_mile: client.rate_per_mile != null ? String(client.rate_per_mile) : "",
-        minimum_charge: client.minimum_charge != null ? String(client.minimum_charge) : "",
-        agreed_price: client.agreed_price != null ? String(client.agreed_price) : "",
-        waiting_rate_per_hour:
-          client.waiting_rate_per_hour != null ? String(client.waiting_rate_per_hour) : "",
-        rate_card_notes: client.rate_card_notes ?? "",
-      });
+      }));
+      // Load rate card from admin-only table. Drivers will get null via RLS.
+      if (canEditRateCard) {
+        getClientRateCardRow(client.id)
+          .then((rc) => {
+            if (cancelled) return;
+            setForm((f) => ({
+              ...f,
+              rate_card_active: !!rc?.rate_card_active,
+              rate_per_mile: rc?.rate_per_mile != null ? String(rc.rate_per_mile) : "",
+              minimum_charge: rc?.minimum_charge != null ? String(rc.minimum_charge) : "",
+              agreed_price: rc?.agreed_price != null ? String(rc.agreed_price) : "",
+              waiting_rate_per_hour:
+                rc?.waiting_rate_per_hour != null ? String(rc.waiting_rate_per_hour) : "",
+              rate_card_notes: rc?.rate_card_notes ?? "",
+            }));
+          })
+          .catch(() => {
+            // Ignore — RLS denial or no row.
+          });
+      }
     } else {
       setForm({
         name: "", company: "", email: "", phone: "", address: "", notes: "",
@@ -68,7 +87,10 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
         agreed_price: "", waiting_rate_per_hour: "", rate_card_notes: "",
       });
     }
-  }, [client, open]);
+    return () => {
+      cancelled = true;
+    };
+  }, [client, open, canEditRateCard]);
 
   const parseNum = (v: string): number | null => {
     const t = v.trim();
@@ -84,7 +106,7 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
       return;
     }
 
-    const basePayload = {
+    const payload = {
       name: form.name.trim(),
       company: form.company.trim() || null,
       email: form.email.trim() || null,
@@ -94,29 +116,30 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
       is_active: true,
     };
 
-    // Only admins can write rate card fields. For drivers (or non-admins), the
-    // existing rate card values on the row are left untouched.
-    const rateCardPayload = canEditRateCard
-      ? {
+    try {
+      let savedClientId: string;
+      if (isEdit && client) {
+        await updateMutation.mutateAsync({ id: client.id, input: payload });
+        savedClientId = client.id;
+      } else {
+        const created = await createMutation.mutateAsync(payload);
+        savedClientId = (created as any)?.id;
+      }
+
+      // Rate card lives in a separate admin-only table. Only attempt write
+      // when the actor is admin/super_admin — RLS will reject anyone else.
+      if (canEditRateCard && savedClientId) {
+        await upsertClientRateCard(savedClientId, {
           rate_card_active: form.rate_card_active,
           rate_per_mile: parseNum(form.rate_per_mile),
           minimum_charge: parseNum(form.minimum_charge),
           agreed_price: parseNum(form.agreed_price),
           waiting_rate_per_hour: parseNum(form.waiting_rate_per_hour),
           rate_card_notes: form.rate_card_notes.trim() || null,
-        }
-      : {};
-
-    const payload = { ...basePayload, ...rateCardPayload };
-
-    try {
-      if (isEdit && client) {
-        await updateMutation.mutateAsync({ id: client.id, input: payload });
-        toast({ title: "Client updated" });
-      } else {
-        await createMutation.mutateAsync(payload);
-        toast({ title: "Client created" });
+        });
       }
+
+      toast({ title: isEdit ? "Client updated" : "Client created" });
       onOpenChange(false);
     } catch (err: any) {
       toast({

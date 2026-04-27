@@ -134,63 +134,90 @@ export type Database = {
         }
         Relationships: []
       }
+      client_rate_cards: {
+        Row: {
+          agreed_price: number | null
+          client_id: string
+          created_at: string
+          created_by: string | null
+          minimum_charge: number | null
+          org_id: string
+          rate_card_active: boolean
+          rate_card_notes: string | null
+          rate_per_mile: number | null
+          updated_at: string
+          updated_by: string | null
+          waiting_rate_per_hour: number | null
+        }
+        Insert: {
+          agreed_price?: number | null
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          minimum_charge?: number | null
+          org_id: string
+          rate_card_active?: boolean
+          rate_card_notes?: string | null
+          rate_per_mile?: number | null
+          updated_at?: string
+          updated_by?: string | null
+          waiting_rate_per_hour?: number | null
+        }
+        Update: {
+          agreed_price?: number | null
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          minimum_charge?: number | null
+          org_id?: string
+          rate_card_active?: boolean
+          rate_card_notes?: string | null
+          rate_per_mile?: number | null
+          updated_at?: string
+          updated_by?: string | null
+          waiting_rate_per_hour?: number | null
+        }
+        Relationships: []
+      }
       clients: {
         Row: {
           address: string | null
-          agreed_price: number | null
           company: string | null
           created_at: string
           email: string | null
           id: string
           is_active: boolean
-          minimum_charge: number | null
           name: string
           notes: string | null
           org_id: string
           phone: string | null
-          rate_card_active: boolean
-          rate_card_notes: string | null
-          rate_per_mile: number | null
           updated_at: string
-          waiting_rate_per_hour: number | null
         }
         Insert: {
           address?: string | null
-          agreed_price?: number | null
           company?: string | null
           created_at?: string
           email?: string | null
           id?: string
           is_active?: boolean
-          minimum_charge?: number | null
           name: string
           notes?: string | null
           org_id: string
           phone?: string | null
-          rate_card_active?: boolean
-          rate_card_notes?: string | null
-          rate_per_mile?: number | null
           updated_at?: string
-          waiting_rate_per_hour?: number | null
         }
         Update: {
           address?: string | null
-          agreed_price?: number | null
           company?: string | null
           created_at?: string
           email?: string | null
           id?: string
           is_active?: boolean
-          minimum_charge?: number | null
           name?: string
           notes?: string | null
           org_id?: string
           phone?: string | null
-          rate_card_active?: boolean
-          rate_card_notes?: string | null
-          rate_per_mile?: number | null
           updated_at?: string
-          waiting_rate_per_hour?: number | null
         }
         Relationships: [
           {
