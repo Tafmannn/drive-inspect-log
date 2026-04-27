@@ -477,6 +477,7 @@ export function InvoicePrepScreen() {
                         <TableCell>
                           <Checkbox
                             checked={selectedJobIds.has(job.id)}
+                            disabled={!job.readiness?.ready}
                             onCheckedChange={() => toggleJob(job.id)}
                             aria-label={`Select job ${job.external_job_number || job.id.slice(0, 8)}`}
                           />
