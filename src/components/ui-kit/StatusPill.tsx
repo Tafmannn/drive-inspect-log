@@ -33,7 +33,7 @@ export function StatusPill({
   icon?: ReactNode;
   children: ReactNode;
   className?: string;
-} & Omit<React.HTMLAttributes<HTMLSpanElement>, "children">) {
+} & Omit<HTMLAttributes<HTMLSpanElement>, "children">) {
   return (
     <span
       {...rest}
