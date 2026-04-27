@@ -9,6 +9,7 @@
 
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useRefetchOnFocus } from "@/hooks/useRefetchOnFocus";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
@@ -679,6 +680,19 @@ export const AdminDashboard = () => {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
   const { data: queues, isLoading } = useAdminJobQueues();
+
+  // Refresh every admin queue on tab focus / bfcache restore so returning
+  // from a Job Detail / POD Report screen shows the post-mutation state
+  // even when no React lifecycle event fires (iOS Safari swipe-back).
+  useRefetchOnFocus([
+    ["jobs", "admin", "queues"],
+    ["jobs", "admin", "queue-kpis"],
+    ["admin-operations-buckets"],
+    ["admin-missing-evidence-count"],
+    ["admin-compliance-counts"],
+    ["admin-pod-review"],
+    ["attention-center"],
+  ]);
 
   if (!isAdmin) {
     return (

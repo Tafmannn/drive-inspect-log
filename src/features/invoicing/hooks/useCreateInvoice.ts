@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createMultiJobInvoice, type CreateInvoiceInput } from "../api/createInvoice";
+import { createMultiJobInvoice } from "../api/createInvoice";
+import { invalidateForEvent } from "@/lib/mutationEvents";
 
 export function useCreateInvoice() {
   const queryClient = useQueryClient();
@@ -7,8 +8,10 @@ export function useCreateInvoice() {
   return useMutation({
     mutationFn: createMultiJobInvoice,
     onSuccess: () => {
-      // Invalidate eligible jobs so they disappear from the prep list
-      queryClient.invalidateQueries({ queryKey: ["invoice-prep-eligible"] });
+      // Invoice creation makes jobs leave the prep list AND can change
+      // their queue membership (e.g. "Completed not invoiced" → invoiced).
+      // Use the centralised event so every admin-visible surface refreshes.
+      invalidateForEvent(queryClient, "invoice_created");
     },
   });
 }

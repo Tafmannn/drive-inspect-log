@@ -69,7 +69,7 @@ export function ControlPodReview() {
       const { completeJobRpc } = await import("@/lib/api");
       await completeJobRpc(jobId, "Confirmed via Control POD review");
       toast({ title: "Review confirmed — job completed" });
-      invalidateForEvent(qc, "job_status_changed", [["job", jobId]]);
+      invalidateForEvent(qc, "pod_approved", [["job", jobId]]);
     } catch (e: any) {
       toast({ title: "Failed", description: e.message, variant: "destructive" });
     } finally {

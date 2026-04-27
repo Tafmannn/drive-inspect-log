@@ -12,6 +12,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
+import { useRefetchOnFocus } from "@/hooks/useRefetchOnFocus";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
@@ -246,6 +247,7 @@ export function AdminPodReview() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { data, isLoading, error } = usePodReviewData();
+  useRefetchOnFocus([["admin-pod-review"], ["closure-review-queue"], ["closure-review-kpis"]]);
   const [filter, setFilter] = useState<BandFilter>("all");
   const [search, setSearch] = useState("");
   const [confirming, setConfirming] = useState<string | null>(null);
@@ -260,7 +262,7 @@ export function AdminPodReview() {
       const { completeJobRpc } = await import("@/lib/api");
       await completeJobRpc(jobId, "Confirmed via Admin POD review");
       toast({ title: "Review confirmed — job completed" });
-      invalidateForEvent(qc, "job_status_changed", [["job", jobId]]);
+      invalidateForEvent(qc, "pod_approved", [["job", jobId]]);
     } catch (e: any) {
       toast({ title: "Failed", description: e.message, variant: "destructive" });
     } finally {
