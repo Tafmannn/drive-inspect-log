@@ -51,6 +51,7 @@ import { getStatusStyle, ADMIN_ALLOWED_TRANSITIONS } from "@/lib/statusConfig";
 import { UKPlate } from "@/components/UKPlate";
 import { PhotoViewer } from "@/components/PhotoViewer";
 import { resolveMediaUrlAsync } from "@/lib/mediaResolver";
+import { PricingSuggestionPanel } from "@/components/PricingSuggestionPanel";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -502,6 +503,23 @@ export const JobDetail = () => {
               </Button>
             )}
           </div>
+
+          {/* Admin-only: Pricing suggestion (advisory) */}
+          {canAdmin && (
+            <PricingSuggestionPanel
+              jobId={job.id}
+              orgId={(job as { org_id?: string }).org_id ?? null}
+              currentTotalPrice={(job as { total_price?: number | null }).total_price ?? null}
+              inputs={{
+                routeMiles: (job as { route_distance_miles?: number | null }).route_distance_miles
+                  ?? (job as { distance_miles?: number | null }).distance_miles
+                  ?? null,
+                urgency: ((job as { priority?: string }).priority || "").toLowerCase() === "urgent"
+                  ? "urgent"
+                  : "standard",
+              }}
+            />
+          )}
 
           {/* Admin-only: Edit + Delete + Status Change */}
           {canAdmin && (

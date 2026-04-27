@@ -27,6 +27,7 @@ import { logClientEvent } from "@/lib/logger";
 import { supabase } from "@/integrations/supabase/client";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ClientPickerCombobox } from "@/features/clients/components/ClientPickerCombobox";
+import { PricingSuggestionPanel } from "@/components/PricingSuggestionPanel";
 type ErrorMap = Record<string, string>;
 
 interface JobFormDraft {
@@ -1265,6 +1266,17 @@ export const JobForm = () => {
               )}
             </div>
           )}
+
+          {/* Pricing Suggestion (admin advisory only) */}
+          <PricingSuggestionPanel
+            jobId={isEdit ? jobId ?? null : null}
+            orgId={(existingJob as { org_id?: string } | undefined)?.org_id ?? null}
+            currentTotalPrice={(existingJob as { total_price?: number | null } | undefined)?.total_price ?? null}
+            inputs={{
+              routeMiles: routeResult?.valid ? routeResult.distanceMiles : null,
+              urgency: "standard",
+            }}
+          />
 
           <Button
             className="w-full"
