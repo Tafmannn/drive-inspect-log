@@ -351,22 +351,76 @@ export async function rollbackInspectionSubmission(
 
 // ─── Photos ──────────────────────────────────────────────────────────
 
-export async function insertPhoto(payload: Omit<Photo, 'id' | 'created_at'>): Promise<Photo> {
+/**
+ * Insert a photo row, tagged with the job's active run_id.
+ *
+ * Run-id resolution priority:
+ *   1. payload.run_id when supplied by the caller (e.g. retryUpload passes
+ *      the run captured at queue time so a reopened job cannot inherit it).
+ *   2. job.current_run_id read from Postgres at insert time.
+ *
+ * If the caller did NOT supply a run_id and the lookup fails or returns
+ * null, we fail safely with RUN_UNVERIFIED rather than attaching evidence
+ * to an unknown run. Direct callers that genuinely have no run context
+ * (legacy admin tooling) can opt out by passing `run_id: null` explicitly
+ * — the explicit null signals "I accept legacy null-run insertion".
+ */
+export async function insertPhoto(
+  payload: Omit<Photo, 'id' | 'created_at'> & { run_id?: string | null },
+): Promise<Photo> {
   const orgId = await getOrgId();
-  // Tag the photo with the job's current run so reopened jobs can isolate
-  // evidence by active run. Best-effort: if the lookup fails (offline /
-  // RLS edge case) we still insert without run_id rather than blocking POD.
+  const callerProvidedRun = Object.prototype.hasOwnProperty.call(payload, 'run_id');
   let runId: string | null = (payload as any).run_id ?? null;
-  if (!runId) {
+
+  if (!callerProvidedRun) {
     try {
-      const { data } = await supabase.from('jobs').select('current_run_id').eq('id', payload.job_id).maybeSingle();
+      const { data, error } = await supabase
+        .from('jobs')
+        .select('current_run_id')
+        .eq('id', payload.job_id)
+        .maybeSingle();
+      if (error) throw error;
       runId = (data as any)?.current_run_id ?? null;
-    } catch {
-      /* best-effort */
+      if (!runId) {
+        void logClientEvent('photo_insert_run_missing', 'warn', {
+          jobId: payload.job_id,
+          source: 'storage',
+          type: 'upload',
+          context: { reason: 'job_has_no_current_run_id' },
+        });
+        throw new Error('RUN_UNVERIFIED: job has no current_run_id');
+      }
+    } catch (e) {
+      void logClientEvent('photo_insert_run_lookup_failed', 'error', {
+        jobId: payload.job_id,
+        source: 'storage',
+        type: 'upload',
+        context: { error: e instanceof Error ? e.message : String(e) },
+      });
+      throw new Error('RUN_UNVERIFIED: could not resolve current_run_id');
     }
   }
-  const { data, error } = await supabase.from('photos').insert({ ...payload, org_id: orgId, run_id: runId } as any).select().single();
+
+  const { run_id: _ignored, ...rest } = payload as any;
+  const { data, error } = await supabase
+    .from('photos')
+    .insert({ ...rest, org_id: orgId, run_id: runId } as any)
+    .select()
+    .single();
   if (error) throw error;
+
+  // Defensive integrity check: server echoed run_id should match what we
+  // intended to write. A mismatch would indicate trigger interference.
+  const writtenRun = (data as any)?.run_id ?? null;
+  if (runId && writtenRun && writtenRun !== runId) {
+    void logClientEvent('photo_insert_run_mismatch', 'error', {
+      jobId: payload.job_id,
+      source: 'storage',
+      type: 'upload',
+      context: { intended: runId, written: writtenRun, photoId: (data as any)?.id },
+    });
+  }
+
   return data as Photo;
 }
 
