@@ -17,6 +17,7 @@ import { rankJobs, type RankedJob } from "@/lib/executionRanking";
 import { deriveJobSummaries, type DriverJobSummary } from "@/lib/driverJobSummary";
 import { logDeviation } from "@/lib/deviationApi";
 import { useAuth } from "@/context/AuthContext";
+import { RoleScope } from "@/components/ui-kit";
 
 export const JobList = () => {
   const navigate = useNavigate();
