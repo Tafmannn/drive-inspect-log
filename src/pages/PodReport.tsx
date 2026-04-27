@@ -600,56 +600,34 @@ export const PodReport = () => {
 
               {/* Stage 4 — POD readiness advisory. Visible to admins so they
                   can see exactly why a POD cannot be approved/closed. */}
-              {(isAdmin || isSuperAdmin) && (
-                <Card
-                  className={
-                    "p-3 print:hidden border " +
-                    (podReadiness.health.level === "green"
-                      ? "border-emerald-300 bg-emerald-50"
-                      : podReadiness.health.level === "amber"
-                      ? "border-amber-300 bg-amber-50"
-                      : "border-red-300 bg-red-50")
-                  }
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="text-xs font-semibold uppercase tracking-wider">
-                      Evidence Health: {podReadiness.health.level}
-                    </div>
-                    <div className="text-[11px] text-muted-foreground">
-                      {podReadiness.photoSummary.pickupCount} pickup ·{" "}
-                      {podReadiness.photoSummary.deliveryCount} delivery ·{" "}
-                      {podReadiness.photoSummary.duplicateCount} dup
-                    </div>
-                  </div>
-                  <div className="mt-1 text-[11px] space-y-0.5">
-                    <div>
-                      Safe to approve:{" "}
-                      <span className="font-medium">
-                        {podReadiness.safeToApprove ? "Yes" : "No"}
-                      </span>{" "}
-                      · Safe to close job:{" "}
-                      <span className="font-medium">
-                        {podReadiness.safeToCloseJob ? "Yes" : "No"}
+              <RoleScope admin>
+                <div className="print:hidden">
+                  <EvidenceHealthBanner
+                    level={podReadiness.health.level}
+                    title="POD Readiness"
+                    blockers={podReadiness.blockers.slice(0, 3)}
+                    warnings={podReadiness.warnings.slice(0, 3)}
+                    summary={`${podReadiness.photoSummary.pickupCount} pickup · ${podReadiness.photoSummary.deliveryCount} delivery · ${podReadiness.photoSummary.duplicateCount} dup`}
+                    footer={
+                      <span>
+                        Safe to approve:{" "}
+                        <span className="font-semibold text-foreground">
+                          {podReadiness.safeToApprove ? "Yes" : "No"}
+                        </span>{" "}
+                        · Safe to close job:{" "}
+                        <span className="font-semibold text-foreground">
+                          {podReadiness.safeToCloseJob ? "Yes" : "No"}
+                        </span>
+                        {podReadiness.missingSections.length > 0 && (
+                          <>
+                            {" "}· Missing: {podReadiness.missingSections.join(", ")}
+                          </>
+                        )}
                       </span>
-                    </div>
-                    {podReadiness.missingSections.length > 0 && (
-                      <div>
-                        Missing: {podReadiness.missingSections.join(", ")}
-                      </div>
-                    )}
-                    {podReadiness.blockers.slice(0, 3).map((b) => (
-                      <div key={b.code} className="text-red-700">
-                        • {b.message}
-                      </div>
-                    ))}
-                    {podReadiness.warnings.slice(0, 3).map((w) => (
-                      <div key={w.code} className="text-amber-700">
-                        • {w.message}
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
+                    }
+                  />
+                </div>
+              </RoleScope>
 
               {/* Confirm Review Button — admin only, for reviewable statuses,
                   AND only when POD readiness is safe to approve. */}
@@ -673,7 +651,7 @@ export const PodReport = () => {
                     Confirm Review — Mark Complete
                   </Button>
                   {!podReadiness.safeToApprove && (
-                    <p className="text-[11px] text-red-700 mt-1">
+                    <p className="text-[11px] text-destructive mt-1">
                       Approval is blocked while evidence health is{" "}
                       {podReadiness.health.level}.
                     </p>
