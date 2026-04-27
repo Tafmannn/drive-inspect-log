@@ -947,7 +947,8 @@ export async function retryJobUploads(
   const all = await loadAll();
   const targets = all.filter(
     (u) =>
-      u.jobId === jobId && (u.state === "ready" || u.state === "failed"),
+      u.jobId === jobId &&
+      (u.state === "ready" || u.state === "failed" || u.state === "blocked"),
   );
 
   let succeeded = 0;
