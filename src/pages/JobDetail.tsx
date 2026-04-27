@@ -40,7 +40,7 @@ import { createQrConfirmation, getQrConfirmationsForJob, buildQrUrl, type QrConf
 import { QrDisplayModal } from "@/components/QrDisplayModal";
 import { useAuth } from "@/context/AuthContext";
 import { getStatusStyle } from "@/lib/statusConfig";
-import { UKPlate } from "@/components/UKPlate";
+
 import { PhotoViewer } from "@/components/PhotoViewer";
 import { resolveMediaUrlAsync } from "@/lib/mediaResolver";
 import { PricingSuggestionPanel } from "@/components/PricingSuggestionPanel";
