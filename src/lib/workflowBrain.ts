@@ -610,8 +610,8 @@ export function getWorkflowBrain(input: BrainInput): WorkflowBrain {
     rawStatus === JOB_STATUS.POD_READY ||
     rawStatus === JOB_STATUS.COMPLETED;
 
-  const podReady =
-    podRelevant && podBlockerCodes.length === 0 && rawStatus !== JOB_STATUS.CANCELLED;
+  // podRelevant already excludes CANCELLED via the status whitelist above.
+  const podReady = podRelevant && podBlockerCodes.length === 0;
 
   const podReadiness: ReadinessGate = {
     ready: podReady,
