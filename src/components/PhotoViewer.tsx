@@ -5,6 +5,8 @@ import { ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut, Download, Loader2 } from
 import { toast } from "@/hooks/use-toast";
 
 interface PhotoItem {
+  /** Stable identity (photo row id). Falls back to url+index when absent. */
+  id?: string;
   url: string;
   label?: string;
 }
@@ -22,6 +24,13 @@ export const PhotoViewer = ({ photos, title, totalExpected, onRetry }: PhotoView
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [zoom, setZoom] = useState(1);
   const [downloading, setDownloading] = useState(false);
+  // Track which thumbnails failed to load so we render a single, idempotent
+  // placeholder per photo. The previous implementation imperatively appended
+  // a <div> on every onError fire which, combined with React re-renders,
+  // could stack hundreds of placeholder boxes ("282 preview boxes" bug).
+  const [failedKeys, setFailedKeys] = useState<Set<string>>(new Set());
+
+  const keyFor = (p: PhotoItem, idx: number) => p.id ?? `${p.url}#${idx}`;
 
   const openPhoto = (idx: number) => {
     setSelectedIndex(idx);
@@ -56,7 +65,6 @@ export const PhotoViewer = ({ photos, title, totalExpected, onRetry }: PhotoView
 
     setDownloading(true);
     try {
-      // Fetch via proxy to handle CORS/signed URLs
       const response = await fetch(photo.url, { mode: "cors" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const blob = await response.blob();
@@ -76,7 +84,6 @@ export const PhotoViewer = ({ photos, title, totalExpected, onRetry }: PhotoView
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error("[PhotoViewer] Download failed", err);
-      // Fallback: open in new tab
       try {
         window.open(photo.url, "_blank");
       } catch {
@@ -90,6 +97,15 @@ export const PhotoViewer = ({ photos, title, totalExpected, onRetry }: PhotoView
   const hasMissing = totalExpected != null && totalExpected > photos.length;
 
   if (photos.length === 0 && !hasMissing) return null;
+
+  const markFailed = (key: string) => {
+    setFailedKeys((prev) => {
+      if (prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
+  };
 
   return (
     <div className="space-y-2">
@@ -112,33 +128,36 @@ export const PhotoViewer = ({ photos, title, totalExpected, onRetry }: PhotoView
         </p>
       )}
       <div className="grid grid-cols-4 gap-2">
-        {photos.map((photo, idx) => (
-          <button
-            key={idx}
-            onClick={() => openPhoto(idx)}
-            className="relative aspect-square rounded-md overflow-hidden border border-border bg-muted hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            <img
-              src={photo.url}
-              alt={photo.label || `Photo ${idx + 1}`}
-              className="w-full h-full object-cover"
-              loading="lazy"
-              onError={(e) => {
-                const target = e.currentTarget;
-                target.style.display = 'none';
-                const placeholder = document.createElement('div');
-                placeholder.className = 'absolute inset-0 flex items-center justify-center bg-muted text-muted-foreground text-[10px] text-center p-1';
-                placeholder.textContent = 'Image unavailable';
-                target.parentNode?.appendChild(placeholder);
-              }}
-            />
-            {photo.label && (
-              <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] px-1 py-0.5 truncate">
-                {photo.label}
-              </span>
-            )}
-          </button>
-        ))}
+        {photos.map((photo, idx) => {
+          const k = keyFor(photo, idx);
+          const failed = failedKeys.has(k);
+          return (
+            <button
+              key={k}
+              onClick={() => openPhoto(idx)}
+              className="relative aspect-square rounded-md overflow-hidden border border-border bg-muted hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              {failed ? (
+                <div className="absolute inset-0 flex items-center justify-center bg-muted text-muted-foreground text-[10px] text-center p-1">
+                  Image unavailable
+                </div>
+              ) : (
+                <img
+                  src={photo.url}
+                  alt={photo.label || `Photo ${idx + 1}`}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                  onError={() => markFailed(k)}
+                />
+              )}
+              {photo.label && (
+                <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] px-1 py-0.5 truncate">
+                  {photo.label}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       <Dialog open={selectedIndex !== null} onOpenChange={() => close()}>
