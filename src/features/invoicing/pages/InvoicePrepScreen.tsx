@@ -139,6 +139,9 @@ export function InvoicePrepScreen() {
 
   // Toggle helpers
   const toggleJob = (id: string) => {
+    // Stage 5 — never allow selection of jobs that are not invoice-ready.
+    const job = jobs.find((j) => j.id === id);
+    if (job && job.readiness && !job.readiness.ready) return;
     setSelectedJobIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -148,10 +151,11 @@ export function InvoicePrepScreen() {
   };
 
   const toggleAll = () => {
-    if (selectedJobIds.size === jobs.length) {
+    const readyJobs = jobs.filter((j) => j.readiness?.ready);
+    if (selectedJobIds.size === readyJobs.length && readyJobs.length > 0) {
       setSelectedJobIds(new Set());
     } else {
-      setSelectedJobIds(new Set(jobs.map((j) => j.id)));
+      setSelectedJobIds(new Set(readyJobs.map((j) => j.id)));
     }
   };
 
