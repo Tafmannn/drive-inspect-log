@@ -45,9 +45,10 @@ import {
   type EligibleJob,
 } from "../hooks/useInvoicePrepData";
 import { useCreateInvoice } from "../hooks/useCreateInvoice";
-import { WarningCallout } from "@/components/ui-kit";
+import { WarningCallout, RoleScope } from "@/components/ui-kit";
 import { useClients } from "@/hooks/useClients";
 import { useAuth } from "@/context/AuthContext";
+import { useEvidenceOverrides } from "@/hooks/useEvidenceOverrides";
 import { toast } from "@/hooks/use-toast";
 import {
   FileText,
@@ -138,11 +139,22 @@ export function InvoicePrepScreen() {
     [selectedJobs, vatRate]
   );
 
+  // Admin override (UI-only): allow selecting jobs that are not invoice-ready.
+  // Acknowledgements are scoped to this Invoice Prep screen and persist for
+  // the session. Already-invoiced rows can never be overridden.
+  const invoiceOverrides = useEvidenceOverrides("invoice-prep");
+  const isOverridden = (jobId: string) => invoiceOverrides.isAcknowledged(jobId);
+
+  const isJobSelectable = (job: EligibleJob) => {
+    if (job.readiness?.alreadyInvoiced) return false;
+    if (job.readiness?.ready) return true;
+    return isOverridden(job.id);
+  };
+
   // Toggle helpers
   const toggleJob = (id: string) => {
-    // Stage 5 — never allow selection of jobs that are not invoice-ready.
     const job = jobs.find((j) => j.id === id);
-    if (job && job.readiness && !job.readiness.ready) return;
+    if (job && !isJobSelectable(job)) return;
     setSelectedJobIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -152,11 +164,11 @@ export function InvoicePrepScreen() {
   };
 
   const toggleAll = () => {
-    const readyJobs = jobs.filter((j) => j.readiness?.ready);
-    if (selectedJobIds.size === readyJobs.length && readyJobs.length > 0) {
+    const selectable = jobs.filter(isJobSelectable);
+    if (selectedJobIds.size === selectable.length && selectable.length > 0) {
       setSelectedJobIds(new Set());
     } else {
-      setSelectedJobIds(new Set(readyJobs.map((j) => j.id)));
+      setSelectedJobIds(new Set(selectable.map((j) => j.id)));
     }
   };
 
