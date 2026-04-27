@@ -101,7 +101,9 @@ export function useEligibleJobs(
 
       if (!clientJobs.length) return [];
 
-      // 3. Exclude jobs already in invoice_items
+      // 3. Look up which jobs are already in invoice_items (do NOT drop —
+      //    we surface them in the UI with an "Already invoiced" badge so
+      //    admins can see the history rather than silently filtering).
       const jobIds = clientJobs.map((j) => j.id);
       const { data: invoiced } = await supabase
         .from("invoice_items")
@@ -109,27 +111,32 @@ export function useEligibleJobs(
         .in("job_id", jobIds);
 
       const invoicedIds = new Set((invoiced ?? []).map((r: any) => r.job_id));
-      const eligible = clientJobs.filter((j) => !invoicedIds.has(j.id));
 
-      // 4. Get receipt counts from expenses
-      if (eligible.length > 0) {
-        const eligibleIds = eligible.map((j) => j.id);
+      // 4. Receipt counts from expenses (used by readiness warnings + UI)
+      const countMap = new Map<string, number>();
+      if (clientJobs.length > 0) {
         const { data: expenses } = await supabase
           .from("expenses")
           .select("job_id")
-          .in("job_id", eligibleIds)
+          .in("job_id", jobIds)
           .eq("is_hidden", false);
-
-        const countMap = new Map<string, number>();
         (expenses ?? []).forEach((e: any) => {
           countMap.set(e.job_id, (countMap.get(e.job_id) ?? 0) + 1);
         });
-        eligible.forEach((j) => {
-          j.receiptCount = countMap.get(j.id) ?? 0;
+      }
+
+      // 5. Annotate every row with strict invoice readiness so the UI
+      //    can render an exact reason badge per row.
+      for (const j of clientJobs) {
+        j.receiptCount = countMap.get(j.id) ?? 0;
+        j.readiness = evaluateInvoiceReadiness({
+          job: j,
+          alreadyInvoiced: invoicedIds.has(j.id),
+          receiptCount: j.receiptCount,
         });
       }
 
-      return eligible;
+      return clientJobs;
     },
     enabled: !!client,
     staleTime: 15_000,
