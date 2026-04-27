@@ -47,7 +47,49 @@ function filterDrivers(drivers: AdminDriverRow[], filter: DriverFilter): AdminDr
 
 /* ─── Driver Card ───────────────────────────────────────────────── */
 
-function DriverCard({ driver }: { driver: AdminDriverRow }) {
+function PerformanceStrip({ perf }: { perf: DriverPerformance | undefined }) {
+  if (!perf || perf.totalJobs === 0) return null;
+  const riskTone =
+    perf.riskLevel === "high"
+      ? "border-destructive/40 bg-destructive/5 text-destructive"
+      : perf.riskLevel === "medium"
+        ? "border-warning/40 bg-warning/5 text-warning"
+        : "border-success/30 bg-success/5 text-success";
+  const RiskIcon = perf.riskLevel === "high" ? AlertOctagon : perf.riskLevel === "medium" ? AlertTriangle : CheckCircle2;
+  const completionPct = Math.round(perf.completionRate * 100);
+
+  return (
+    <div className="space-y-2 pt-2 border-t border-border/60">
+      <div className="grid grid-cols-3 gap-2 text-[11px]">
+        <div className="rounded-md bg-muted/40 px-2 py-1.5">
+          <div className="font-semibold tabular-nums text-foreground">{perf.completedJobs}</div>
+          <div className="text-muted-foreground">Completed</div>
+        </div>
+        <div className="rounded-md bg-muted/40 px-2 py-1.5">
+          <div className="font-semibold tabular-nums text-foreground">{completionPct}%</div>
+          <div className="text-muted-foreground">Completion</div>
+        </div>
+        <div className="rounded-md bg-muted/40 px-2 py-1.5">
+          <div className={cn("font-semibold tabular-nums", perf.podRejectionCount > 0 ? "text-destructive" : "text-foreground")}>
+            {perf.podRejectionCount}
+          </div>
+          <div className="text-muted-foreground">POD issues</div>
+        </div>
+      </div>
+      <div className={cn("flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-medium", riskTone)}>
+        <RiskIcon className="h-3 w-3" />
+        <span className="capitalize">{perf.riskLevel} risk</span>
+        {perf.riskReasons.length > 0 && (
+          <span className="text-muted-foreground font-normal truncate">
+            · {perf.riskReasons.slice(0, 2).join(", ")}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DriverCard({ driver, perf }: { driver: AdminDriverRow; perf?: DriverPerformance }) {
   const hasRisk = driver.licenceExpiring || driver.missingPlate;
   const statusStyle = driver.latestJobStatus ? getStatusStyle(driver.latestJobStatus) : null;
 
