@@ -131,7 +131,7 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit Client" : "New Client"}</DialogTitle>
         </DialogHeader>
