@@ -29,31 +29,25 @@ import { useJob, useDeleteJob, useAdminChangeStatus, useActiveJobs } from "@/hoo
 import { useJobExpenses } from "@/hooks/useExpenses";
 import { evaluateExecutableState, type ExecutableState } from "@/lib/executionRanking";
 import {
-  Phone, MapPin, Building, Edit, ClipboardCheck, Truck,
+  Phone, MapPin, Building, ClipboardCheck, Truck,
   FileText, Receipt, QrCode, Navigation, AlertTriangle, ChevronRight,
-  Trash2, RefreshCw, Images, Loader2,
+  Images, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel,
-  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
-  AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { createQrConfirmation, getQrConfirmationsForJob, buildQrUrl, type QrConfirmation } from "@/lib/qrApi";
 import { QrDisplayModal } from "@/components/QrDisplayModal";
 import { useAuth } from "@/context/AuthContext";
-import { getStatusStyle, ADMIN_ALLOWED_TRANSITIONS } from "@/lib/statusConfig";
+import { getStatusStyle } from "@/lib/statusConfig";
 import { UKPlate } from "@/components/UKPlate";
 import { PhotoViewer } from "@/components/PhotoViewer";
 import { resolveMediaUrlAsync } from "@/lib/mediaResolver";
 import { PricingSuggestionPanel } from "@/components/PricingSuggestionPanel";
 import { PricingAuditTimeline } from "@/components/PricingAuditTimeline";
-import { RoleScope } from "@/components/ui-kit";
+import { RoleScope, EvidenceHealthBanner } from "@/components/ui-kit";
+import { JobAdminControls } from "@/features/jobs/components/JobAdminControls";
+import { evaluateEvidenceHealth } from "@/lib/evidenceHealth";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -136,8 +130,6 @@ export const JobDetail = () => {
   const [qrConfirmations, setQrConfirmations] = useState<QrConfirmation[]>([]);
   const [generatingQr, setGeneratingQr] = useState(false);
   const [qrModal, setQrModal] = useState<{ open: boolean; url: string; eventType: string }>({ open: false, url: "", eventType: "" });
-  const [selectedStatus, setSelectedStatus] = useState<string>("");
-  const [changingStatus, setChangingStatus] = useState(false);
   const [resolvedPhotos, setResolvedPhotos] = useState<Record<string, string>>({});
   const [photosLoading, setPhotosLoading] = useState(false);
   const [photoRetryCount, setPhotoRetryCount] = useState(0);
@@ -210,17 +202,14 @@ export const JobDetail = () => {
     }
   };
 
-  const handleChangeStatus = async () => {
-    if (!jobId || !selectedStatus || changingStatus) return;
-    setChangingStatus(true);
+  const handleChangeStatus = async (newStatus: string) => {
+    if (!jobId || !newStatus) return;
     try {
-      await changeStatus.mutateAsync({ jobId, newStatus: selectedStatus });
-      toast({ title: `Status changed to ${selectedStatus.replace(/_/g, " ")}` });
-      setSelectedStatus("");
+      await changeStatus.mutateAsync({ jobId, newStatus });
+      toast({ title: `Status changed to ${newStatus.replace(/_/g, " ")}` });
     } catch (e: any) {
       toast({ title: "Status change failed", description: e.message, variant: "destructive" });
-    } finally {
-      setChangingStatus(false);
+      throw e;
     }
   };
 
@@ -276,6 +265,16 @@ export const JobDetail = () => {
   const restrictions: string[] = [];
   if (job.earliest_delivery_date) restrictions.push(`Do not deliver before ${job.earliest_delivery_date}`);
   if (job.caz_ulez_flag) restrictions.push(`CAZ/ULEZ: ${job.caz_ulez_flag}`);
+
+  // Admin-only evidence health snapshot (presentational; PodReport remains
+  // the authoritative gate for closure / PDF generation).
+  const evidenceHealth = canAdmin
+    ? evaluateEvidenceHealth({
+        currentRunId: (job as { current_run_id?: string | null }).current_run_id ?? null,
+        photos: (job.photos as any[]) ?? [],
+        inspections: (job.inspections as any[]) ?? [],
+      })
+    : null;
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -506,8 +505,18 @@ export const JobDetail = () => {
             )}
           </div>
 
-          {/* Admin-only: Pricing suggestion (advisory) + audit timeline */}
+          {/* Admin-only operational intelligence + controls */}
           <RoleScope admin>
+            {evidenceHealth && (
+              <EvidenceHealthBanner
+                level={evidenceHealth.level}
+                title="Evidence Health"
+                blockers={evidenceHealth.blockers.map((b) => ({ code: b.code, message: b.message }))}
+                warnings={evidenceHealth.warnings.map((w) => ({ code: w.code, message: w.message }))}
+                summary={`${evidenceHealth.photoSummary.pickupCount} pickup · ${evidenceHealth.photoSummary.deliveryCount} delivery`}
+                hideWhenGreen
+              />
+            )}
             <PricingSuggestionPanel
               jobId={job.id}
               orgId={(job as { org_id?: string }).org_id ?? null}
@@ -523,68 +532,17 @@ export const JobDetail = () => {
               }}
             />
             <PricingAuditTimeline jobId={job.id} />
+            <JobAdminControls
+              jobId={job.id}
+              jobStatus={job.status}
+              onChangeStatus={handleChangeStatus}
+              onDelete={handleDeleteJob}
+            />
           </RoleScope>
 
-          {/* Admin-only: Edit + Delete + Status Change */}
-          {canAdmin && (
-            <div className="space-y-2">
-              <Button variant="outline" className="w-full min-h-[44px] rounded-lg" onClick={() => navigate(withFrom(`/jobs/${job.id}/edit`, searchParams))}>
-                <Edit className="h-4 w-4 mr-1.5" /> Edit Job
-              </Button>
-
-              {/* Status Change */}
-              {ADMIN_ALLOWED_TRANSITIONS[job.status]?.length > 0 && (
-                <div className="flex gap-2">
-                  <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                    <SelectTrigger className="flex-1 min-h-[44px] rounded-lg">
-                      <SelectValue placeholder="Change status…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ADMIN_ALLOWED_TRANSITIONS[job.status].map((s) => (
-                        <SelectItem key={s} value={s}>
-                          {s.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    variant="outline"
-                    className="min-h-[44px] min-w-[44px] rounded-lg"
-                    disabled={!selectedStatus || changingStatus}
-                    onClick={handleChangeStatus}
-                  >
-                    {changingStatus ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                  </Button>
-                </div>
-              )}
-
-              {/* Delete Job */}
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="outline" className="w-full min-h-[44px] rounded-lg text-destructive border-destructive/30 hover:bg-destructive/10">
-                    <Trash2 className="h-4 w-4 mr-1.5" /> Delete Job
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete this job?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This will archive the job and remove it from all active lists. This action can be undone by a super admin.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDeleteJob} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                      Delete
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
-          )}
-
           {/* Admin Photos Section */}
-          {canAdmin && job.photos && job.photos.length > 0 && (
+          <RoleScope admin>
+          {job.photos && job.photos.length > 0 && (
             <Section>
               <SectionLabel icon={Images}>Inspection Photos</SectionLabel>
               {photosLoading && (
@@ -631,6 +589,7 @@ export const JobDetail = () => {
               />
             </Section>
           )}
+          </RoleScope>
         </div>
       </div>
 
