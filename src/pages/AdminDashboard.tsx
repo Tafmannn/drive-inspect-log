@@ -724,6 +724,9 @@ export const AdminDashboard = () => {
           />
         </div>
 
+        {/* Tier 3.5 — Operations Buckets overview */}
+        <OperationsBuckets />
+
         {/* Tier 4 — Management Routes */}
         <ManagementRoutes />
       </div>
