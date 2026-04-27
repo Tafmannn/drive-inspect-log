@@ -757,8 +757,16 @@ export async function generatePodPdf(
   const pickupDamages = job.damage_items.filter((d) => pickup && d.inspection_id === pickup.id);
   const deliveryDamages = job.damage_items.filter((d) => delivery && d.inspection_id === delivery.id);
 
-  const pickupPhotos = job.photos.filter((p) => p.type.startsWith("pickup_"));
-  const deliveryPhotos = job.photos.filter((p) => p.type.startsWith("delivery_"));
+  // Canonicalise once: drop archived, isolate to current_run_id, dedupe by
+  // strongest identity. This stops the PDF from rendering repeated
+  // "Photo unavailable" placeholders for the same physical asset and
+  // prevents stale-run leakage on reopened jobs.
+  const canonicalPhotos = canonicalisePhotos(
+    job.photos,
+    (job as any).current_run_id ?? null,
+  );
+  const pickupPhotos = canonicalPhotos.filter((p) => p.type.startsWith("pickup_"));
+  const deliveryPhotos = canonicalPhotos.filter((p) => p.type.startsWith("delivery_"));
 
   const imageCache = await buildImageCache(pickupPhotos, deliveryPhotos, pickup, delivery, { jobId: job.id });
   const logo = await loadLogo();
