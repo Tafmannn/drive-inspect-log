@@ -26,6 +26,7 @@ import { Sparkles, Loader2, AlertTriangle, Check, TrendingUp, TrendingDown } fro
 import { suggestJobPrice, type PricingInputs, type PricingSuggestion } from "@/lib/pricingBrain";
 import { loadPricingDefaults } from "@/lib/pricingDefaults";
 import { computePriceDelta } from "@/lib/pricingDelta";
+import { getActiveClientRateCard, type ClientRateCard } from "@/lib/clientApi";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
@@ -35,10 +36,12 @@ export interface PricingSuggestionPanelProps {
   jobId?: string | null;
   /** Org ID — required for snapshot insert. */
   orgId?: string | null;
+  /** Client ID — when provided, the active rate card (if any) is applied. */
+  clientId?: string | null;
   /** Current persisted total price on the job (advisory display). */
   currentTotalPrice?: number | null;
   /** Pricing inputs (route miles, urgency, rate card, etc.). */
-  inputs: Omit<PricingInputs, "minimumCharge" | "ratePerMile"> & {
+  inputs: Omit<PricingInputs, "minimumCharge" | "ratePerMile" | "clientRateCard"> & {
     /** Optional explicit overrides — usually leave undefined to let
      *  app_settings.pricing_defaults flow through. */
     minimumChargeOverride?: number | null;
