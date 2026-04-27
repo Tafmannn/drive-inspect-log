@@ -482,10 +482,9 @@ export const InspectionFlow = () => {
         clientDamageId?: string;
       };
       const queued: QueuedHandle[] = [];
-      const submissionSessionId =
-        (typeof crypto !== "undefined" && "randomUUID" in crypto)
-          ? crypto.randomUUID()
-          : `sess-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      // Submission session ID is security-sensitive: it correlates client
+      // photo uploads with a server-side inspection ledger. Use crypto only.
+      const submissionSessionId = safeRandomId();
 
       const failPreflight = (err: unknown, queuedSoFar: number) => {
         const failure = logStorageSubmitFailure(err, {
