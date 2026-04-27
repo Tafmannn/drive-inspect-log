@@ -757,6 +757,7 @@ export const PodReport = () => {
                   onRetry={handleRetryPhotos}
                   photos={pickupPhotos
                     .map((p) => ({
+                      id: p.id,
                       url: resolvedPhotos[p.id] || "",
                       label:
                         p.label ||
@@ -771,6 +772,7 @@ export const PodReport = () => {
                   onRetry={handleRetryPhotos}
                   photos={deliveryPhotos
                     .map((p) => ({
+                      id: p.id,
                       url: resolvedPhotos[p.id] || "",
                       label:
                         p.label ||
@@ -785,6 +787,7 @@ export const PodReport = () => {
                   onRetry={handleRetryPhotos}
                   photos={damagePhotos
                     .map((p) => ({
+                      id: p.id,
                       url: resolvedPhotos[p.id] || "",
                       label: p.label || "Damage",
                     }))
