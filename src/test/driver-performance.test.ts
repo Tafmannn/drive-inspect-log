@@ -181,7 +181,7 @@ describe("driverPerformance — risk model", () => {
 describe("driverPerformance — privacy / multi-driver", () => {
   it("calculateAllDriverPerformance keeps each driver's data isolated", () => {
     const jobs: DriverPerfJob[] = [
-      baseJob({ driver_id: "alice", status: "completed", evidenceHealth: ev("green") }),
+      baseJob({ driver_id: "alice", status: "completed", evidenceHealth: ev("green"), has_driver_signature: true, has_customer_signature: true }),
       baseJob({ driver_id: "bob", status: "completed", evidenceHealth: ev("critical") }),
       baseJob({ driver_id: "bob", status: "completed", evidenceHealth: ev("critical") }),
     ];
