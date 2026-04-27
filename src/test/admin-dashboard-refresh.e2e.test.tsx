@@ -153,7 +153,7 @@ describe("Admin dashboard refresh after pod_approved", () => {
     const wrapper = makeWrapper(qc);
 
     // Stage 1 — initial server state: 1 job in POD review.
-    queueInitialServerState();
+    setInitialServerState();
 
     const kpis = renderHook(() => useAdminJobQueueKpis(), { wrapper });
     const queues = renderHook(() => useAdminJobQueues(), { wrapper });
@@ -167,7 +167,7 @@ describe("Admin dashboard refresh after pod_approved", () => {
 
     // Stage 2 — admin "approves" POD; queue the new server state, then
     // fire the same invalidation event the real mutation would emit.
-    queueRefreshedServerState();
+    setRefreshedServerState();
 
     await act(async () => {
       invalidateForEvent(qc, "pod_approved");
