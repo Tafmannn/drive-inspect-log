@@ -398,3 +398,415 @@ export function deriveWorkflowStateFromJob(
     pendingUploads: extra?.pendingUploads,
   });
 }
+
+// ════════════════════════════════════════════════════════════════════
+// Stage 1 — getWorkflowBrain (Axentra OS workflow intelligence layer)
+// ════════════════════════════════════════════════════════════════════
+//
+// Public API used by dashboard cards, driver job cards and the admin
+// job list. Returns a richer shape than `deriveWorkflowState`:
+//
+//   • driverNextAction / adminNextAction — split because driver and
+//     admin look at the same job through very different lenses.
+//   • podReadiness / invoiceReadiness — explicit gates with
+//     human-friendly reasons.
+//   • riskLevel — single ordinal badge so cards can surface trouble
+//     without duplicating gate logic.
+//   • blockers / warnings — separated. Blockers stop progression;
+//     warnings are advisory and never stop progression.
+//   • debug — small, opt-out-able diagnostic payload for support tooling.
+//
+// Hard rules from the brief:
+//   • delivery_complete is NOT completed.
+//   • pod_ready is NOT completed.
+//   • Only completed/closed jobs can ever be invoice-ready.
+//   • Unknown statuses do NOT crash. They return a warning and a safe
+//     "unknown" phase so the UI can render gracefully.
+//   • No new database statuses invented.
+
+const KNOWN_STATUSES: ReadonlySet<string> = new Set(
+  Object.values(JOB_STATUS) as string[],
+);
+
+export type RiskLevel = "none" | "low" | "medium" | "high";
+
+export interface BrainAction {
+  /** Human-friendly CTA. NEVER raw status text. */
+  label: string;
+  /** Stable machine code so cards can branch without parsing copy. */
+  code:
+    | "start_pickup"
+    | "continue_pickup"
+    | "start_delivery"
+    | "continue_delivery"
+    | "deliver_in_transit"
+    | "review_pod"
+    | "raise_invoice"
+    | "view_pod"
+    | "assign_driver"
+    | "investigate"
+    | "none";
+  /** Optional route hint. Cards may ignore and use their own routing. */
+  route?: string;
+  disabled?: boolean;
+  reason?: string;
+}
+
+export interface ReadinessGate {
+  ready: boolean;
+  blockers: string[];
+}
+
+export interface WorkflowBrain {
+  /** Same phase taxonomy as deriveWorkflowState, plus "unknown". */
+  phase: WorkflowPhase | "unknown";
+  /** Action the driver should take next. Null = nothing for driver to do. */
+  driverNextAction: BrainAction | null;
+  /** Action an admin should take next. Null = nothing for admin to do. */
+  adminNextAction: BrainAction | null;
+  podReadiness: ReadinessGate;
+  invoiceReadiness: ReadinessGate;
+  riskLevel: RiskLevel;
+  /** Human-friendly. Stop-the-world conditions. NO JSON. */
+  blockers: string[];
+  /** Human-friendly. Advisory only — never block progression. */
+  warnings: string[];
+  debug: {
+    rawStatus: string;
+    statusKnown: boolean;
+    podBlockerCodes: string[];
+    invoiceBlockerCodes: string[];
+  };
+}
+
+/**
+ * Lightweight job shape accepted by getWorkflowBrain. We only need the
+ * fields actually consulted, which lets callers pass admin-list rows
+ * (subset of Job) without casting.
+ */
+export interface BrainJobLike {
+  id: string;
+  status: string;
+  driver_id?: string | null;
+  current_run_id?: string | null;
+  has_pickup_inspection?: boolean;
+  has_delivery_inspection?: boolean;
+  pod_pdf_url?: string | null;
+  total_price?: number | null;
+  admin_rate?: number | null;
+  client_id?: string | null;
+  client_name?: string | null;
+  external_job_number?: string | null;
+}
+
+export interface BrainInput {
+  job: BrainJobLike;
+  inspections?: Inspection[] | null;
+  photos?: Photo[] | null;
+  siblingJobs?: Job[];
+  pendingUploads?: { failedCount: number; blockedCount?: number } | null;
+  /**
+   * Optional admin POD approval signal. The schema does not yet have an
+   * explicit "POD approved" column — admins approve by closing the job
+   * (status → completed) or by adding a separate review record. Until
+   * that column exists, callers can pass `podApproved: true` when they
+   * have first-hand knowledge (e.g. AdminPodReview just clicked
+   * "Approve"). Defaults to: approved iff status === completed.
+   */
+  podApproved?: boolean;
+}
+
+function pricingPresent(job: BrainJobLike): boolean {
+  // Either a customer-facing total or an admin-set rate counts as
+  // "priced". Both are nullable in the DB; treat 0 as "not priced".
+  const total = typeof job.total_price === "number" ? job.total_price : null;
+  const admin = typeof job.admin_rate === "number" ? job.admin_rate : null;
+  return (total !== null && total > 0) || (admin !== null && admin > 0);
+}
+
+function clientPresent(job: BrainJobLike): boolean {
+  if (job.client_id && job.client_id.trim().length > 0) return true;
+  if (job.client_name && job.client_name.trim().length > 0) return true;
+  return false;
+}
+
+export function getWorkflowBrain(input: BrainInput): WorkflowBrain {
+  const { job, inspections, photos, siblingJobs, pendingUploads, podApproved } =
+    input;
+
+  const rawStatus = job.status ?? "";
+  const statusKnown = KNOWN_STATUSES.has(rawStatus);
+  const warnings: string[] = [];
+  const blockers: string[] = [];
+
+  if (!statusKnown) {
+    warnings.push(
+      `Unknown job status "${rawStatus || "(empty)"}". The workflow intelligence layer cannot make progression decisions for this job.`,
+    );
+    return {
+      phase: "unknown",
+      driverNextAction: null,
+      adminNextAction: {
+        label: "Investigate job",
+        code: "investigate",
+        route: `/jobs/${job.id}`,
+      },
+      podReadiness: {
+        ready: false,
+        blockers: ["Status is unknown — POD readiness cannot be determined."],
+      },
+      invoiceReadiness: {
+        ready: false,
+        blockers: ["Status is unknown — invoice readiness cannot be determined."],
+      },
+      riskLevel: "medium",
+      blockers,
+      warnings,
+      debug: {
+        rawStatus,
+        statusKnown: false,
+        podBlockerCodes: ["status_unknown"],
+        invoiceBlockerCodes: ["status_unknown"],
+      },
+    };
+  }
+
+  // Reuse the existing deriveWorkflowState for phase + readiness +
+  // evidence so we don't drift from the unit-tested base layer.
+  const base = deriveWorkflowState({
+    job: job as Job & { current_run_id?: string | null },
+    inspections: inspections ?? [],
+    photos: photos ?? [],
+    siblingJobs,
+    pendingUploads,
+  });
+
+  // Carry through human-friendly base blockers as warnings if they're
+  // advisory (active-job lock is the most common one and is genuinely
+  // blocking — keep it as a blocker).
+  const lock = base.blockers.find((b) => b.code === "active_job_lock");
+  if (lock) blockers.push(lock.message);
+
+  // ── POD readiness ─────────────────────────────────────────────────
+  const podBlockerCodes: string[] = [];
+  const podBlockerMessages: string[] = [];
+  for (const b of base.blockers) {
+    if (
+      b.code === "missing_delivery_inspection" ||
+      b.code === "missing_delivery_photos" ||
+      b.code === "missing_driver_signature" ||
+      b.code === "missing_customer_signature" ||
+      b.code === "blocked_uploads" ||
+      b.code === "stale_run_evidence"
+    ) {
+      podBlockerCodes.push(b.code);
+      podBlockerMessages.push(b.message);
+    }
+  }
+  // POD has no meaning before delivery_in_progress.
+  const podRelevant =
+    rawStatus === JOB_STATUS.DELIVERY_IN_PROGRESS ||
+    rawStatus === JOB_STATUS.DELIVERY_COMPLETE ||
+    rawStatus === JOB_STATUS.POD_READY ||
+    rawStatus === JOB_STATUS.COMPLETED;
+
+  const podReady =
+    podRelevant && podBlockerCodes.length === 0 && rawStatus !== JOB_STATUS.CANCELLED;
+
+  const podReadiness: ReadinessGate = {
+    ready: podReady,
+    blockers: podRelevant
+      ? podBlockerMessages
+      : ["POD is not yet relevant for this stage."],
+  };
+
+  // ── Invoice readiness ─────────────────────────────────────────────
+  // Hard rule: only completed/closed jobs can be invoice-ready.
+  const invoiceBlockerCodes: string[] = [];
+  const invoiceBlockerMessages: string[] = [];
+
+  const isCompleted = rawStatus === JOB_STATUS.COMPLETED;
+  if (!isCompleted) {
+    invoiceBlockerCodes.push("not_completed");
+    if (
+      rawStatus === JOB_STATUS.POD_READY ||
+      rawStatus === JOB_STATUS.DELIVERY_COMPLETE
+    ) {
+      invoiceBlockerMessages.push(
+        "Job is awaiting admin review. It must be closed before invoicing.",
+      );
+    } else {
+      invoiceBlockerMessages.push("Job must be completed before invoicing.");
+    }
+  }
+  if (!pricingPresent(job)) {
+    invoiceBlockerCodes.push("missing_price");
+    invoiceBlockerMessages.push("Job has no agreed price or admin rate.");
+  }
+  if (!clientPresent(job)) {
+    invoiceBlockerCodes.push("missing_client");
+    invoiceBlockerMessages.push("Job has no billable client on record.");
+  }
+  // POD approval signal. Defaults to "approved iff completed".
+  const podApprovedResolved = podApproved ?? isCompleted;
+  if (isCompleted && !podApprovedResolved) {
+    invoiceBlockerCodes.push("pod_not_approved");
+    invoiceBlockerMessages.push("POD has not been approved by an admin.");
+  }
+
+  const invoiceReadiness: ReadinessGate = {
+    ready: invoiceBlockerCodes.length === 0,
+    blockers: invoiceBlockerMessages,
+  };
+
+  // ── Driver next action ────────────────────────────────────────────
+  let driverNextAction: BrainAction | null = null;
+  if (rawStatus === JOB_STATUS.CANCELLED) {
+    driverNextAction = null;
+  } else if (
+    rawStatus === JOB_STATUS.COMPLETED ||
+    rawStatus === JOB_STATUS.ARCHIVED ||
+    rawStatus === JOB_STATUS.POD_READY ||
+    rawStatus === JOB_STATUS.DELIVERY_COMPLETE
+  ) {
+    // Driver is done with this job — admin owns it now.
+    driverNextAction = null;
+  } else if (!job.driver_id) {
+    driverNextAction = null;
+  } else if (lock) {
+    driverNextAction = {
+      label: "Locked",
+      code: "none",
+      disabled: true,
+      reason: lock.message,
+    };
+  } else if (rawStatus === JOB_STATUS.PICKUP_IN_PROGRESS) {
+    driverNextAction = {
+      label: "Continue pickup inspection",
+      code: "continue_pickup",
+      route: `/inspection/${job.id}/pickup`,
+    };
+  } else if (
+    rawStatus === JOB_STATUS.READY_FOR_PICKUP ||
+    rawStatus === JOB_STATUS.ASSIGNED ||
+    rawStatus === JOB_STATUS.NEW
+  ) {
+    driverNextAction = {
+      label: "Start pickup inspection",
+      code: "start_pickup",
+      route: `/inspection/${job.id}/pickup`,
+    };
+  } else if (rawStatus === JOB_STATUS.DELIVERY_IN_PROGRESS) {
+    driverNextAction = {
+      label: "Continue delivery inspection",
+      code: "continue_delivery",
+      route: `/inspection/${job.id}/delivery`,
+    };
+  } else if (
+    rawStatus === JOB_STATUS.IN_TRANSIT ||
+    rawStatus === JOB_STATUS.PICKUP_COMPLETE
+  ) {
+    driverNextAction = {
+      label: "Start delivery inspection",
+      code: "start_delivery",
+      route: `/inspection/${job.id}/delivery`,
+    };
+  }
+
+  // ── Admin next action ─────────────────────────────────────────────
+  let adminNextAction: BrainAction | null = null;
+  if (rawStatus === JOB_STATUS.CANCELLED) {
+    adminNextAction = null;
+  } else if (
+    rawStatus === JOB_STATUS.DELIVERY_COMPLETE ||
+    rawStatus === JOB_STATUS.POD_READY
+  ) {
+    adminNextAction = {
+      label: "Review POD",
+      code: "review_pod",
+      route: `/admin/pod-review?jobId=${job.id}`,
+    };
+  } else if (rawStatus === JOB_STATUS.COMPLETED) {
+    if (invoiceReadiness.ready) {
+      adminNextAction = {
+        label: "Raise invoice",
+        code: "raise_invoice",
+        route: `/admin/invoices/new?jobId=${job.id}`,
+      };
+    } else {
+      adminNextAction = {
+        label: "View POD",
+        code: "view_pod",
+        route: `/pod-report/${job.id}`,
+        disabled: false,
+        reason: invoiceBlockerMessages[0],
+      };
+    }
+  } else if (!job.driver_id && rawStatus !== JOB_STATUS.DRAFT) {
+    adminNextAction = {
+      label: "Assign driver",
+      code: "assign_driver",
+      route: `/admin/jobs?filter=unassigned&jobId=${job.id}`,
+    };
+  }
+
+  // ── Risk level ────────────────────────────────────────────────────
+  let riskLevel: RiskLevel = "none";
+  if (lock) riskLevel = "high";
+  else if (
+    rawStatus === JOB_STATUS.FAILED ||
+    rawStatus === JOB_STATUS.INCOMPLETE
+  ) {
+    riskLevel = "high";
+  } else if (
+    pendingUploads &&
+    ((pendingUploads.blockedCount ?? 0) > 0 || pendingUploads.failedCount > 0)
+  ) {
+    riskLevel = "medium";
+  } else if (podRelevant && podBlockerCodes.length > 0) {
+    riskLevel = "medium";
+  } else if (
+    !job.driver_id &&
+    rawStatus !== JOB_STATUS.DRAFT &&
+    rawStatus !== JOB_STATUS.CANCELLED &&
+    rawStatus !== JOB_STATUS.COMPLETED
+  ) {
+    riskLevel = "low";
+  }
+
+  // ── Advisory warnings (do not block) ──────────────────────────────
+  if (rawStatus === JOB_STATUS.DRAFT) {
+    warnings.push("Job is still a draft — it will not appear in driver queues.");
+  }
+  if (
+    rawStatus === JOB_STATUS.COMPLETED &&
+    !invoiceReadiness.ready &&
+    invoiceBlockerCodes.includes("missing_price")
+  ) {
+    warnings.push("This completed job has no price set — invoicing is blocked.");
+  }
+  if (
+    rawStatus === JOB_STATUS.COMPLETED &&
+    !invoiceReadiness.ready &&
+    invoiceBlockerCodes.includes("missing_client")
+  ) {
+    warnings.push("This completed job has no client on record — invoicing is blocked.");
+  }
+
+  return {
+    phase: base.phase,
+    driverNextAction,
+    adminNextAction,
+    podReadiness,
+    invoiceReadiness,
+    riskLevel,
+    blockers,
+    warnings,
+    debug: {
+      rawStatus,
+      statusKnown: true,
+      podBlockerCodes,
+      invoiceBlockerCodes,
+    },
+  };
+}
