@@ -160,8 +160,9 @@ describe("operationsBuckets — Stage 6 classifier", () => {
     });
     const r = classifyJobsIntoBuckets([{ job }]);
     expect(r.byKey.missing_signatures.count).toBe(1);
-    expect(r.byKey.blocked_evidence.count).toBe(1);
+    // Missing signature also escalates evidence — must not be ready_to_close.
     expect(r.byKey.ready_to_close.count).toBe(0);
+    expect(r.byKey.ready_to_invoice.count).toBe(0);
   });
 
   it("cancelled job → cancelled_archived only", () => {
