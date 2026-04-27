@@ -2064,6 +2064,10 @@ export type Database = {
       is_protected_user: { Args: { p_user_id: string }; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
       job_current_run_id: { Args: { p_job_id: string }; Returns: string }
+      link_unlinked_photos_to_inspection: {
+        Args: { p_inspection_type: string; p_job_id: string; p_org_id: string }
+        Returns: undefined
+      }
       next_job_number: { Args: never; Returns: string }
       normalize_client_name: { Args: { input: string }; Returns: string }
       reopen_job: {
