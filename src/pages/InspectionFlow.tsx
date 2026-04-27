@@ -505,10 +505,9 @@ export const InspectionFlow = () => {
         probeLocalStorageHealth().then(setStorageHealth).catch(() => {});
       };
 
-      const newClientId = () =>
-        (typeof crypto !== "undefined" && "randomUUID" in crypto)
-          ? crypto.randomUUID()
-          : `cid-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      // Client photo IDs key the upload ledger and storage paths — must be
+      // cryptographically strong to prevent collisions across concurrent submissions.
+      const newClientId = () => safeRandomId();
 
       try {
         const queueRunId: string | null = (job as any)?.current_run_id ?? null;
