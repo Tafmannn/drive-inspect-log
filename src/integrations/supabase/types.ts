@@ -137,42 +137,60 @@ export type Database = {
       clients: {
         Row: {
           address: string | null
+          agreed_price: number | null
           company: string | null
           created_at: string
           email: string | null
           id: string
           is_active: boolean
+          minimum_charge: number | null
           name: string
           notes: string | null
           org_id: string
           phone: string | null
+          rate_card_active: boolean
+          rate_card_notes: string | null
+          rate_per_mile: number | null
           updated_at: string
+          waiting_rate_per_hour: number | null
         }
         Insert: {
           address?: string | null
+          agreed_price?: number | null
           company?: string | null
           created_at?: string
           email?: string | null
           id?: string
           is_active?: boolean
+          minimum_charge?: number | null
           name: string
           notes?: string | null
           org_id: string
           phone?: string | null
+          rate_card_active?: boolean
+          rate_card_notes?: string | null
+          rate_per_mile?: number | null
           updated_at?: string
+          waiting_rate_per_hour?: number | null
         }
         Update: {
           address?: string | null
+          agreed_price?: number | null
           company?: string | null
           created_at?: string
           email?: string | null
           id?: string
           is_active?: boolean
+          minimum_charge?: number | null
           name?: string
           notes?: string | null
           org_id?: string
           phone?: string | null
+          rate_card_active?: boolean
+          rate_card_notes?: string | null
+          rate_per_mile?: number | null
           updated_at?: string
+          waiting_rate_per_hour?: number | null
         }
         Relationships: [
           {

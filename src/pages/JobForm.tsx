@@ -1271,6 +1271,7 @@ export const JobForm = () => {
           <PricingSuggestionPanel
             jobId={isEdit ? jobId ?? null : null}
             orgId={(existingJob as { org_id?: string } | undefined)?.org_id ?? null}
+            clientId={(existingJob as { client_id?: string | null } | undefined)?.client_id ?? null}
             currentTotalPrice={(existingJob as { total_price?: number | null } | undefined)?.total_price ?? null}
             inputs={{
               routeMiles: routeResult?.valid ? routeResult.distanceMiles : null,
