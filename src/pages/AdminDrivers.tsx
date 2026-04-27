@@ -156,6 +156,9 @@ function DriverCard({ driver, perf }: { driver: AdminDriverRow; perf?: DriverPer
           )}
         </div>
       )}
+
+      {/* Performance strip (admin-only via parent gate) */}
+      <PerformanceStrip perf={perf} />
     </div>
   );
 }
