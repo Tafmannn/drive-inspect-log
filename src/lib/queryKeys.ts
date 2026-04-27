@@ -35,6 +35,20 @@ export const qk = {
     counts: () => [...qk.jobs.all, "counts"] as const,
   },
 
+  /**
+   * Admin operational queues / KPIs — every key the Admin dashboard reads
+   * from. Centralised so `invalidateAdminOperationalQueues` can bust them
+   * all in one call after any admin mutation.
+   */
+  adminOps: {
+    operationsBuckets: ["admin-operations-buckets"] as const,
+    missingEvidence: ["admin-missing-evidence-count"] as const,
+    complianceCounts: ["admin-compliance-counts"] as const,
+    podReview: ["admin-pod-review"] as const,
+    closureReviewQueue: ["closure-review-queue"] as const,
+    closureReviewKpis: ["closure-review-kpis"] as const,
+  },
+
   drivers: {
     all: ["drivers"] as const,
     admin: () => [...qk.drivers.all, "admin"] as const,
@@ -80,6 +94,8 @@ export const qk = {
   invoicing: {
     all: ["invoicing"] as const,
     eligibleJobs: () => [...qk.invoicing.all, "prep-eligible"] as const,
+    /** Legacy ad-hoc key still used by useEligibleJobs/useCreateInvoice. */
+    prepEligibleLegacy: ["invoice-prep-eligible"] as const,
   },
 
   control: {
