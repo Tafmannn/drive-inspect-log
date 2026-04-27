@@ -93,7 +93,7 @@ describe("Stage 8 wiring — pricing brain is advisory only", () => {
     const job = baseJob({ total_price: null });
     const r = evaluateInvoiceReadiness({ job, alreadyInvoiced: false, receiptCount: 1 });
     expect(r.ready).toBe(false);
-    expect(r.blockers.some((b) => b.toLowerCase().includes("price"))).toBe(true);
+    expect(r.blockers.some((b) => b.code === "missing_price")).toBe(true);
   });
 
   it("invoice readiness uses total_price (not the suggestion) when both differ", () => {
