@@ -484,9 +484,17 @@ export function InvoicePrepScreen() {
                             </span>
                             <Badge
                               variant="outline"
-                              className="ml-2 text-[9px] text-success border-success/30 bg-success/5"
+                              className={cn(
+                                "ml-2 text-[9px]",
+                                job.readiness?.alreadyInvoiced
+                                  ? "text-muted-foreground border-muted-foreground/30 bg-muted/40"
+                                  : job.readiness?.ready
+                                  ? "text-success border-success/30 bg-success/5"
+                                  : "text-destructive border-destructive/30 bg-destructive/5",
+                              )}
+                              title={job.readiness?.primaryReason}
                             >
-                              {job.status.replace(/_/g, " ")}
+                              {job.readiness?.primaryReason ?? job.status.replace(/_/g, " ")}
                             </Badge>
                           </div>
                         </TableCell>
