@@ -1268,6 +1268,17 @@ export const JobForm = () => {
             </div>
           )}
 
+          {/* Pricing Suggestion (admin advisory only) */}
+          <PricingSuggestionPanel
+            jobId={isEdit ? jobId ?? null : null}
+            orgId={(existingJob as { org_id?: string } | undefined)?.org_id ?? null}
+            currentTotalPrice={(existingJob as { total_price?: number | null } | undefined)?.total_price ?? null}
+            inputs={{
+              routeMiles: routeResult?.valid ? routeResult.distanceMiles : null,
+              urgency: "standard",
+            }}
+          />
+
           <Button
             className="w-full"
             size="lg"
