@@ -82,20 +82,42 @@ export function EvidenceHealthBanner({
   footer,
   hideWhenGreen,
   className,
+  acknowledgedCodes = [],
+  onAcknowledge,
+  onUnacknowledge,
+  overrideLabel = "Acknowledge",
 }: EvidenceHealthBannerProps) {
-  if (hideWhenGreen && level === "green" && blockers.length === 0 && warnings.length === 0) {
+  const ackSet = new Set(acknowledgedCodes);
+  const activeBlockers = blockers.filter((b) => !ackSet.has(b.code));
+  const ackBlockers = blockers.filter((b) => ackSet.has(b.code));
+
+  // Visual downgrade: if the source said red/critical but every blocker has
+  // been acknowledged by an admin, present the banner one tone lighter.
+  // The underlying readiness flags are unchanged — the call site decides
+  // what to unlock.
+  const allAcknowledged = blockers.length > 0 && activeBlockers.length === 0;
+  const effectiveLevel: EvidenceLevel = allAcknowledged && (level === "red" || level === "critical")
+    ? "amber"
+    : level;
+
+  if (hideWhenGreen && effectiveLevel === "green" && blockers.length === 0 && warnings.length === 0) {
     return null;
   }
 
   return (
     <SectionCard className={className}>
       <SectionHeader
-        icon={LEVEL_ICON[level]}
+        icon={LEVEL_ICON[effectiveLevel]}
         eyebrow="Operational health"
         title={title}
         right={
           <>
-            <StatusPill tone={LEVEL_TONE[level]}>{LEVEL_LABEL[level]}</StatusPill>
+            <StatusPill tone={LEVEL_TONE[effectiveLevel]}>{LEVEL_LABEL[effectiveLevel]}</StatusPill>
+            {allAcknowledged && (
+              <StatusPill tone="info" aria-label="Admin override active">
+                Override
+              </StatusPill>
+            )}
             {summary && (
               <span className="text-[11px] text-muted-foreground hidden sm:inline">
                 {summary}
@@ -109,13 +131,67 @@ export function EvidenceHealthBanner({
         <p className="text-[11px] text-muted-foreground sm:hidden">{summary}</p>
       )}
 
-      {blockers.length > 0 && (
+      {activeBlockers.length > 0 && (
         <div className="space-y-1.5">
-          {blockers.map((b) => (
-            <WarningCallout key={`b-${b.code}`} severity="critical">
+          {activeBlockers.map((b) => (
+            <WarningCallout
+              key={`b-${b.code}`}
+              severity="critical"
+              action={
+                onAcknowledge ? (
+                  <RoleScope admin>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-7 px-2 text-[11px] gap-1 shrink-0"
+                      onClick={() => onAcknowledge(b.code)}
+                      aria-label={`${overrideLabel} blocker ${b.code}`}
+                    >
+                      <ShieldCheck className="h-3 w-3" />
+                      {overrideLabel}
+                    </Button>
+                  </RoleScope>
+                ) : undefined
+              }
+            >
               {b.message}
             </WarningCallout>
           ))}
+        </div>
+      )}
+
+      {ackBlockers.length > 0 && (
+        <div className="space-y-1 rounded-md border border-dashed border-border bg-muted/40 p-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+            <ShieldCheck className="h-3 w-3" />
+            Acknowledged by admin ({ackBlockers.length})
+          </p>
+          <ul className="space-y-1">
+            {ackBlockers.map((b) => (
+              <li
+                key={`ack-${b.code}`}
+                className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground"
+              >
+                <span className="truncate">{b.message}</span>
+                {onUnacknowledge && (
+                  <RoleScope admin>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 px-1.5 text-[10px] gap-1 shrink-0"
+                      onClick={() => onUnacknowledge(b.code)}
+                      aria-label={`Undo override for ${b.code}`}
+                    >
+                      <Undo2 className="h-3 w-3" />
+                      Undo
+                    </Button>
+                  </RoleScope>
+                )}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -137,3 +213,4 @@ export function EvidenceHealthBanner({
     </SectionCard>
   );
 }
+
