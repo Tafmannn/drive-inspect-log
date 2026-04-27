@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 export type StatusPillTone =
@@ -27,14 +27,16 @@ export function StatusPill({
   icon,
   children,
   className,
+  ...rest
 }: {
   tone?: StatusPillTone;
   icon?: ReactNode;
   children: ReactNode;
   className?: string;
-}) {
+} & Omit<HTMLAttributes<HTMLSpanElement>, "children">) {
   return (
     <span
+      {...rest}
       className={cn(
         "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
         toneStyles[tone],

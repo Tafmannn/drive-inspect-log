@@ -40,12 +40,12 @@ import { createQrConfirmation, getQrConfirmationsForJob, buildQrUrl, type QrConf
 import { QrDisplayModal } from "@/components/QrDisplayModal";
 import { useAuth } from "@/context/AuthContext";
 import { getStatusStyle } from "@/lib/statusConfig";
-import { UKPlate } from "@/components/UKPlate";
+
 import { PhotoViewer } from "@/components/PhotoViewer";
 import { resolveMediaUrlAsync } from "@/lib/mediaResolver";
 import { PricingSuggestionPanel } from "@/components/PricingSuggestionPanel";
 import { PricingAuditTimeline } from "@/components/PricingAuditTimeline";
-import { RoleScope, EvidenceHealthBanner } from "@/components/ui-kit";
+import { RoleScope, EvidenceHealthBanner, JobHeaderCard } from "@/components/ui-kit";
 import { JobAdminControls } from "@/features/jobs/components/JobAdminControls";
 import { evaluateEvidenceHealth } from "@/lib/evidenceHealth";
 
@@ -282,41 +282,21 @@ export const JobDetail = () => {
 
       <div className="p-4 space-y-3 max-w-lg mx-auto">
         {/* ── 1. HEADER ── */}
-        <Section>
-          <div className="flex items-center justify-between mb-3">
-            <span
-              style={{ backgroundColor: statusStyle.backgroundColor, color: statusStyle.color }}
-              className="inline-flex items-center rounded-full px-3 py-1 text-[13px] font-semibold uppercase leading-none"
-            >
-              {statusStyle.label}
-            </span>
-            <UKPlate reg={job.vehicle_reg} />
-          </div>
-          <div className="flex items-center justify-between gap-2 mb-1">
-            <p className="text-sm font-semibold text-foreground">Job {jobRef}</p>
-            <EvidenceStatusBadges jobId={job.id} />
-          </div>
-          <p className="text-sm text-foreground mt-0.5">
-            {job.vehicle_make} {job.vehicle_model}
-            <span className="text-muted-foreground"> — </span>
-            <span className="text-foreground">{job.vehicle_colour}</span>
-            {job.vehicle_year && <span className="text-muted-foreground"> ({job.vehicle_year})</span>}
-          </p>
-
-          {/* Client profile */}
-          {(job.client_company || job.client_name) && (
-            <div className="flex items-center gap-1.5 mt-1.5">
-              <Building className="h-3 w-3 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">
-                {job.client_company || job.client_name}
-                {job.client_email && ` · ${job.client_email}`}
-              </span>
-            </div>
-          )}
-
+        <JobHeaderCard
+          jobRef={jobRef}
+          vehicleReg={job.vehicle_reg}
+          status={statusStyle}
+          make={job.vehicle_make}
+          model={job.vehicle_model}
+          colour={job.vehicle_colour}
+          year={job.vehicle_year}
+          client={job.client_company || job.client_name}
+          clientEmail={job.client_email}
+          rightSlot={<EvidenceStatusBadges jobId={job.id} />}
+        >
           {/* Workflow progress */}
           {activeStep && (
-            <div className="flex items-center gap-1 mt-3">
+            <div className="flex items-center gap-1 mt-2">
               {STEPS.map((step) => {
                 const complete = isStepComplete(step, job.status);
                 const active = step === activeStep;
@@ -339,7 +319,7 @@ export const JobDetail = () => {
               })}
             </div>
           )}
-        </Section>
+        </JobHeaderCard>
 
         {/* ── 2. ALERT STRIP ── */}
         {restrictions.length > 0 && (
