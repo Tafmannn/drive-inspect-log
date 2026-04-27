@@ -195,6 +195,106 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
               rows={2}
             />
           </div>
+
+          {canEditRateCard && (
+            <div className="rounded-lg border border-border p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Tag className="h-4 w-4 text-primary" />
+                  <h4 className="text-sm font-semibold">Rate card (admin)</h4>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="rate-card-active"
+                    checked={form.rate_card_active}
+                    onCheckedChange={(v) =>
+                      setForm((f) => ({ ...f, rate_card_active: v }))
+                    }
+                  />
+                  <Label
+                    htmlFor="rate-card-active"
+                    className="text-xs text-muted-foreground cursor-pointer"
+                  >
+                    Active
+                  </Label>
+                </div>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Used by pricing suggestions only — never applied to invoices automatically.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="rc-rpm" className="text-xs">Rate £/mile</Label>
+                  <Input
+                    id="rc-rpm"
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={form.rate_per_mile}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, rate_per_mile: e.target.value }))
+                    }
+                    placeholder="e.g. 1.40"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="rc-min" className="text-xs">Minimum charge £</Label>
+                  <Input
+                    id="rc-min"
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={form.minimum_charge}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, minimum_charge: e.target.value }))
+                    }
+                    placeholder="e.g. 75"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="rc-flat" className="text-xs">Flat agreed price £</Label>
+                  <Input
+                    id="rc-flat"
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={form.agreed_price}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, agreed_price: e.target.value }))
+                    }
+                    placeholder="optional"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="rc-wait" className="text-xs">Waiting £/hour</Label>
+                  <Input
+                    id="rc-wait"
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={form.waiting_rate_per_hour}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, waiting_rate_per_hour: e.target.value }))
+                    }
+                    placeholder="e.g. 25"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="rc-notes" className="text-xs">Rate card notes</Label>
+                <Textarea
+                  id="rc-notes"
+                  value={form.rate_card_notes}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, rate_card_notes: e.target.value }))
+                  }
+                  placeholder="Internal notes about this rate card..."
+                  rows={2}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="flex justify-end gap-2 pt-2">
             <Button
               type="button"
