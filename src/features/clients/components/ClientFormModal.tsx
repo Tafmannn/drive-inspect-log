@@ -19,6 +19,12 @@ import {
 } from "@/lib/clientApi";
 import { useAuth } from "@/context/AuthContext";
 import { Loader2, Tag } from "lucide-react";
+import {
+  SectionCard,
+  SectionHeader,
+  StatusPill,
+  AdvisoryNote,
+} from "@/components/ui-kit";
 
 interface Props {
   open: boolean;
@@ -220,31 +226,30 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
           </div>
 
           {canEditRateCard && (
-            <div className="rounded-lg border border-border p-3 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Tag className="h-4 w-4 text-primary" />
-                  <h4 className="text-sm font-semibold">Rate card (admin)</h4>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Switch
-                    id="rate-card-active"
-                    checked={form.rate_card_active}
-                    onCheckedChange={(v) =>
-                      setForm((f) => ({ ...f, rate_card_active: v }))
-                    }
-                  />
-                  <Label
-                    htmlFor="rate-card-active"
-                    className="text-xs text-muted-foreground cursor-pointer"
-                  >
-                    Active
-                  </Label>
-                </div>
-              </div>
-              <p className="text-[11px] text-muted-foreground">
+            <SectionCard className="p-3">
+              <SectionHeader
+                icon={<Tag className="h-4 w-4" />}
+                eyebrow="Pricing"
+                title="Rate card"
+                adminOnly
+                right={
+                  <>
+                    <StatusPill tone={form.rate_card_active ? "success" : "neutral"}>
+                      {form.rate_card_active ? "Active" : "Inactive"}
+                    </StatusPill>
+                    <Switch
+                      id="rate-card-active"
+                      checked={form.rate_card_active}
+                      onCheckedChange={(v) =>
+                        setForm((f) => ({ ...f, rate_card_active: v }))
+                      }
+                    />
+                  </>
+                }
+              />
+              <AdvisoryNote>
                 Used by pricing suggestions only — never applied to invoices automatically.
-              </p>
+              </AdvisoryNote>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label htmlFor="rc-rpm" className="text-xs">Rate £/mile</Label>
@@ -315,7 +320,7 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
                   rows={2}
                 />
               </div>
-            </div>
+            </SectionCard>
           )}
 
           <div className="flex justify-end gap-2 pt-2">

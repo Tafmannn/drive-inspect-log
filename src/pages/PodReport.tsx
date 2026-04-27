@@ -28,6 +28,7 @@ import { completeJobRpc } from "@/lib/api";
 import { openPodEmail, generatePodEmailBody } from "@/lib/podEmail";
 import { sharePodPdf, emailPodPdf } from "@/lib/podPdf";
 import { FUEL_PERCENT_TO_LABEL } from "@/lib/types";
+import { evaluatePodReadiness } from "@/lib/podReadiness";
 import { toast } from "@/hooks/use-toast";
 import { getStatusStyle } from "@/lib/statusConfig";
 import { UKPlate } from "@/components/UKPlate";

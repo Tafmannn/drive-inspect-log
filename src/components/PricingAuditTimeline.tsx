@@ -9,10 +9,17 @@
  * Read-only. No mutations. Does not affect invoicing.
  */
 import { useEffect, useState } from "react";
-import { History, Loader2, Sparkles, AlertTriangle } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { History, Loader2, Sparkles } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  SectionCard,
+  SectionHeader,
+  StatusPill,
+  WarningCallout,
+  AdvisoryNote,
+  EmptyHint,
+} from "@/components/ui-kit";
 
 interface SnapshotRow {
   id: string;
@@ -123,19 +130,29 @@ export function PricingAuditTimeline({ jobId }: PricingAuditTimelineProps) {
   if (!isAdmin && !isSuperAdmin) return null;
 
   return (
-    <div className="rounded-lg border border-border p-4 space-y-3">
-      <div className="flex items-center gap-2">
-        <History className="h-4 w-4 text-primary" />
-        <h3 className="font-semibold text-sm">Pricing Audit Timeline</h3>
-        {loading && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
-      </div>
+    <SectionCard>
+      <SectionHeader
+        icon={<History className="h-4 w-4" />}
+        eyebrow="Audit"
+        title="Pricing Audit Timeline"
+        adminOnly
+        right={
+          loading ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+          ) : null
+        }
+      />
 
       {error && (
-        <p className="text-xs text-destructive">Could not load pricing history: {error}</p>
+        <WarningCallout severity="critical">
+          Could not load pricing history: {error}
+        </WarningCallout>
       )}
 
       {!loading && rows && rows.length === 0 && (
-        <p className="text-xs text-muted-foreground">No pricing suggestions recorded for this job yet.</p>
+        <EmptyHint icon={<Sparkles className="h-3.5 w-3.5" />}>
+          No pricing suggestions recorded for this job yet.
+        </EmptyHint>
       )}
 
       {rows && rows.length > 0 && (
@@ -151,12 +168,18 @@ export function PricingAuditTimeline({ jobId }: PricingAuditTimelineProps) {
                 ? "Unknown user"
                 : "System";
 
+            const confidenceTone =
+              r.confidence === "high"
+                ? "success"
+                : r.confidence === "medium"
+                  ? "info"
+                  : "warning";
+
             return (
               <li key={r.id} className="relative">
-                <span className="absolute -left-[1.4rem] top-1.5 h-2.5 w-2.5 rounded-full bg-primary" />
-                <div className="flex flex-wrap items-baseline gap-2">
-                  <Sparkles className="h-3 w-3 text-primary" />
-                  <span className="text-xs font-medium">
+                <span className="absolute -left-[1.4rem] top-1.5 h-2.5 w-2.5 rounded-full bg-primary ring-2 ring-background" />
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                  <span className="text-sm font-semibold text-foreground">
                     Applied {fmtGbp(r.applied_price ?? r.suggested_price)}
                   </span>
                   {typeof r.suggested_price === "number" &&
@@ -167,12 +190,10 @@ export function PricingAuditTimeline({ jobId }: PricingAuditTimelineProps) {
                       </span>
                     )}
                   {r.confidence && (
-                    <Badge variant="outline" className="text-[10px] capitalize px-1.5 py-0">
-                      {r.confidence}
-                    </Badge>
+                    <StatusPill tone={confidenceTone}>{r.confidence}</StatusPill>
                   )}
                 </div>
-                <div className="text-[11px] text-muted-foreground mt-0.5">
+                <div className="text-[11px] text-muted-foreground mt-0.5 truncate">
                   {fmtDate(r.created_at)} · {creatorLabel} · {r.source}
                 </div>
 
@@ -185,14 +206,11 @@ export function PricingAuditTimeline({ jobId }: PricingAuditTimelineProps) {
                 )}
 
                 {warnings.length > 0 && (
-                  <div className="mt-1 space-y-0.5">
+                  <div className="mt-1.5 space-y-1">
                     {warnings.map((w, i) => (
-                      <div
-                        key={i}
-                        className="flex items-start gap-1.5 text-[11px] text-orange-600 dark:text-orange-400"
-                      >
-                        <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" /> <span>{w}</span>
-                      </div>
+                      <WarningCallout key={i} severity="warning">
+                        {w}
+                      </WarningCallout>
                     ))}
                   </div>
                 )}
@@ -208,9 +226,7 @@ export function PricingAuditTimeline({ jobId }: PricingAuditTimelineProps) {
         </ol>
       )}
 
-      <p className="text-[10px] text-muted-foreground italic">
-        Audit trail only — never used as the invoice total.
-      </p>
-    </div>
+      <AdvisoryNote>Audit trail only — never used as the invoice total.</AdvisoryNote>
+    </SectionCard>
   );
 }
