@@ -26,7 +26,15 @@ export function useDriverPerformance(driverIds: string[] | undefined) {
 
   return useQuery({
     enabled: isAdmin && !!driverIds && driverIds.length > 0,
-    queryKey: ["driver-performance", (driverIds ?? []).slice().sort().join(",")],
+    queryKey: [
+      "driver-performance",
+      (driverIds ?? [])
+        .slice()
+        .sort((a, b) =>
+          String(a ?? "").localeCompare(String(b ?? ""), "en-GB", { sensitivity: "base" }),
+        )
+        .join(","),
+    ],
     queryFn: async (): Promise<Record<string, DriverPerformance>> => {
       const ids = driverIds ?? [];
       if (ids.length === 0) return {};
