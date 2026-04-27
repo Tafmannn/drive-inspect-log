@@ -26,6 +26,8 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
   const isEdit = !!client;
   const createMutation = useCreateClient();
   const updateMutation = useUpdateClient();
+  const { isAdmin, isSuperAdmin } = useAuth();
+  const canEditRateCard = isAdmin || isSuperAdmin;
 
   const [form, setForm] = useState({
     name: "",
@@ -34,6 +36,12 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
     phone: "",
     address: "",
     notes: "",
+    rate_card_active: false,
+    rate_per_mile: "",
+    minimum_charge: "",
+    agreed_price: "",
+    waiting_rate_per_hour: "",
+    rate_card_notes: "",
   });
 
   useEffect(() => {
@@ -45,11 +53,29 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
         phone: client.phone ?? "",
         address: client.address ?? "",
         notes: client.notes ?? "",
+        rate_card_active: !!client.rate_card_active,
+        rate_per_mile: client.rate_per_mile != null ? String(client.rate_per_mile) : "",
+        minimum_charge: client.minimum_charge != null ? String(client.minimum_charge) : "",
+        agreed_price: client.agreed_price != null ? String(client.agreed_price) : "",
+        waiting_rate_per_hour:
+          client.waiting_rate_per_hour != null ? String(client.waiting_rate_per_hour) : "",
+        rate_card_notes: client.rate_card_notes ?? "",
       });
     } else {
-      setForm({ name: "", company: "", email: "", phone: "", address: "", notes: "" });
+      setForm({
+        name: "", company: "", email: "", phone: "", address: "", notes: "",
+        rate_card_active: false, rate_per_mile: "", minimum_charge: "",
+        agreed_price: "", waiting_rate_per_hour: "", rate_card_notes: "",
+      });
     }
   }, [client, open]);
+
+  const parseNum = (v: string): number | null => {
+    const t = v.trim();
+    if (!t) return null;
+    const n = Number(t);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,7 +84,7 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
       return;
     }
 
-    const payload = {
+    const basePayload = {
       name: form.name.trim(),
       company: form.company.trim() || null,
       email: form.email.trim() || null,
@@ -67,6 +93,21 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
       notes: form.notes.trim() || null,
       is_active: true,
     };
+
+    // Only admins can write rate card fields. For drivers (or non-admins), the
+    // existing rate card values on the row are left untouched.
+    const rateCardPayload = canEditRateCard
+      ? {
+          rate_card_active: form.rate_card_active,
+          rate_per_mile: parseNum(form.rate_per_mile),
+          minimum_charge: parseNum(form.minimum_charge),
+          agreed_price: parseNum(form.agreed_price),
+          waiting_rate_per_hour: parseNum(form.waiting_rate_per_hour),
+          rate_card_notes: form.rate_card_notes.trim() || null,
+        }
+      : {};
+
+    const payload = { ...basePayload, ...rateCardPayload };
 
     try {
       if (isEdit && client) {
