@@ -38,6 +38,7 @@ import { useAuth } from "@/context/AuthContext";
 import type { Photo } from "@/lib/types";
 import { canonicalisePhotos } from "@/lib/photoDedupe";
 import { evaluateEvidenceHealth } from "@/lib/evidenceHealth";
+import { useEvidenceOverrides } from "@/hooks/useEvidenceOverrides";
 
 const fuelLabel = (pct: number | null | undefined): string => {
   if (pct == null) return "N/A";
@@ -465,6 +466,22 @@ export const PodReport = () => {
     photos: job.photos,
     inspections: job.inspections,
   });
+
+  // Session-scoped admin override for blockers. When every blocker is
+  // acknowledged, an admin can approve POD even if readiness was red.
+  const evidenceOverrides = useEvidenceOverrides(job.id);
+  const allBlockerCodes = [
+    ...podReadiness.blockers.map((b) => b.code),
+    ...evidenceHealth.blockers.map((b) => b.code),
+  ];
+  const uniqueBlockerCodes = Array.from(new Set(allBlockerCodes));
+  const hasUnackedBlocker = uniqueBlockerCodes.some(
+    (c) => !evidenceOverrides.acknowledgedCodes.includes(c),
+  );
+  const overrideActive =
+    uniqueBlockerCodes.length > 0 && !hasUnackedBlocker;
+  const effectiveSafeToApprove =
+    podReadiness.safeToApprove || overrideActive;
 
   const DetailRow = ({ label, value }: { label: string; value: string }) => (
     <div className="flex justify-between py-1">
