@@ -444,11 +444,9 @@ export async function stagePendingUpload(
 ): Promise<PendingUpload> {
   const blob = await compressToBlob(file);
 
-  const id =
-    "pu_" +
-    (crypto.randomUUID
-      ? crypto.randomUUID()
-      : Math.random().toString(36).slice(2));
+  // Upload reference IDs are security-sensitive (used in storage paths and
+  // server-side ledger lookups). Always use a cryptographically-strong source.
+  const id = "pu_" + safeRandomId();
 
   const item: PendingUpload = {
     id,
