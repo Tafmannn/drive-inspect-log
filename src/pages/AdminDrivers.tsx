@@ -12,11 +12,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { UKPlate } from "@/components/UKPlate";
 import { useAdminDrivers, type AdminDriverRow, type DriverFilter } from "@/hooks/useAdminDrivers";
+import { useDriverPerformance } from "@/hooks/useDriverPerformance";
+import type { DriverPerformance } from "@/lib/driverPerformance";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { getStatusStyle } from "@/lib/statusConfig";
 import {
   AlertTriangle, Phone, Truck, User, ShieldAlert, CreditCard,
+  Activity, CheckCircle2, AlertOctagon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
