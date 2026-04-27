@@ -549,7 +549,8 @@ export const JobDetail = () => {
           </RoleScope>
 
           {/* Admin Photos Section */}
-          {canAdmin && job.photos && job.photos.length > 0 && (
+          <RoleScope admin>
+          {job.photos && job.photos.length > 0 && (
             <Section>
               <SectionLabel icon={Images}>Inspection Photos</SectionLabel>
               {photosLoading && (
@@ -596,6 +597,7 @@ export const JobDetail = () => {
               />
             </Section>
           )}
+          </RoleScope>
         </div>
       </div>
 
