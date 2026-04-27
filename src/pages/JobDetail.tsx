@@ -29,25 +29,17 @@ import { useJob, useDeleteJob, useAdminChangeStatus, useActiveJobs } from "@/hoo
 import { useJobExpenses } from "@/hooks/useExpenses";
 import { evaluateExecutableState, type ExecutableState } from "@/lib/executionRanking";
 import {
-  Phone, MapPin, Building, Edit, ClipboardCheck, Truck,
+  Phone, MapPin, Building, ClipboardCheck, Truck,
   FileText, Receipt, QrCode, Navigation, AlertTriangle, ChevronRight,
-  Trash2, RefreshCw, Images, Loader2,
+  Images, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel,
-  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
-  AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { createQrConfirmation, getQrConfirmationsForJob, buildQrUrl, type QrConfirmation } from "@/lib/qrApi";
 import { QrDisplayModal } from "@/components/QrDisplayModal";
 import { useAuth } from "@/context/AuthContext";
-import { getStatusStyle, ADMIN_ALLOWED_TRANSITIONS } from "@/lib/statusConfig";
+import { getStatusStyle } from "@/lib/statusConfig";
 import { UKPlate } from "@/components/UKPlate";
 import { PhotoViewer } from "@/components/PhotoViewer";
 import { resolveMediaUrlAsync } from "@/lib/mediaResolver";
