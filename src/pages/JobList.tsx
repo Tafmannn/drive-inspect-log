@@ -77,7 +77,7 @@ export const JobList = () => {
   return (
     <div className="min-h-screen bg-background pb-20">
       <AppHeader title="My Jobs" showBack onBack={() => navigate("/")}>
-        {(isAdmin || isSuperAdmin) && (
+        <RoleScope admin>
           <Button
             size="sm"
             variant="ghost"
@@ -86,7 +86,7 @@ export const JobList = () => {
           >
             <Plus className="w-6 h-6 stroke-[2]" />
           </Button>
-        )}
+        </RoleScope>
       </AppHeader>
 
       <div className="p-4 max-w-lg mx-auto">
@@ -104,11 +104,11 @@ export const JobList = () => {
                 }
               </p>
             </div>
-            {(isAdmin || isSuperAdmin) && (
+            <RoleScope admin>
               <Button onClick={() => navigate("/jobs/new")} className="min-h-[44px] rounded-lg">
                 Create Job
               </Button>
-            )}
+            </RoleScope>
           </div>
         )}
 
