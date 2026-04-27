@@ -4,6 +4,7 @@ import type { JobWithRelations } from "./types";
 import { FUEL_PERCENT_TO_LABEL } from "./types";
 import { CHECKLIST_FIELDS } from "./inspectionFields";
 import { resolveImageUrlAsync } from "./gcsProxyUrl";
+import { canonicalisePhotos } from "./photoDedupe";
 
 const MARGIN = 20;
 const HEADER_HEIGHT = 30;
