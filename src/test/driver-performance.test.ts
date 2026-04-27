@@ -10,14 +10,14 @@ import type { EvidenceHealthResult } from "@/lib/evidenceHealth";
 const ev = (level: EvidenceHealthResult["level"]): EvidenceHealthResult => ({
   level,
   canUseForPod: level === "green" || level === "amber",
+  canCloseJob: level === "green" || level === "amber",
   canInvoice: level === "green" || level === "amber",
   blockers: [],
   warnings: [],
-  photos: {
+  photoSummary: {
     totalRaw: 0, totalDeduped: 0, pickupCount: 0, deliveryCount: 0,
     legacyCount: 0, staleRunCount: 0, archivedCount: 0, missingUrlCount: 0, duplicateCount: 0,
-  } as any,
-  inspections: { hasPickup: true, hasDelivery: true, hasDriverSignature: true, hasCustomerSignature: true } as any,
+  },
 });
 
 const baseJob = (over: Partial<DriverPerfJob>): DriverPerfJob => ({
