@@ -13,6 +13,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { UKPlate } from "@/components/UKPlate";
 import { getStatusStyle } from "@/lib/statusConfig";
+import { getWorkflowBrain } from "@/lib/workflowBrain";
 import { isJobStale, isUnassigned, canReviewPod, humanAge } from "@/features/control/pages/jobs/jobsUtils";
 import {
   MapPin, UserPlus, Eye, ClipboardCheck, AlertTriangle, Clock, User,
@@ -50,6 +51,15 @@ export function AdminJobCard({ job, onView, onAssign, onPod }: AdminJobCardProps
   const stale = isJobStale(job);
   const unassigned = isUnassigned(job);
   const showPod = canReviewPod(job);
+
+  // Workflow brain (additive, optional). AdminJobRow is a subset of Job
+  // — the brain only consults the fields that are present and treats
+  // missing inspections/photos as "no extra evidence yet" (safe).
+  const brain = getWorkflowBrain({ job });
+  const brainBlocker = brain.blockers[0] ?? null;
+  const brainWarning = brain.warnings[0] ?? null;
+  const showRiskStrip =
+    brain.riskLevel === "high" || brain.riskLevel === "medium" || !!brainBlocker;
 
   return (
     <Card
@@ -99,6 +109,29 @@ export function AdminJobCard({ job, onView, onAssign, onPod }: AdminJobCardProps
           </span>
         </div>
       </div>
+
+      {/* ── BRAIN STRIP (phase + first blocker / warning) ── */}
+      {(showRiskStrip || brainWarning) && (
+        <div className="px-3 pb-1.5 flex items-center gap-1.5 flex-wrap">
+          {showRiskStrip && (
+            <span
+              className={
+                brain.riskLevel === "high" || brainBlocker
+                  ? "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide bg-destructive/10 text-destructive"
+                  : "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide bg-warning/15 text-warning"
+              }
+              aria-label={`Risk ${brain.riskLevel}`}
+            >
+              {brainBlocker ? "Blocked" : brain.riskLevel === "high" ? "Action needed" : "Heads up"}
+            </span>
+          )}
+          {(brainBlocker || brainWarning) && (
+            <span className="text-[11px] text-muted-foreground truncate">
+              {brainBlocker || brainWarning}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* ── ACTIONS ── */}
       <div className="px-3 pb-3 pt-1 flex items-center gap-2">

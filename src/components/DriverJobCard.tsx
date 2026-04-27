@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { getStatusStyle } from "@/lib/statusConfig";
 import type { DriverJobSummary } from "@/lib/driverJobSummary";
+import { getWorkflowBrain } from "@/lib/workflowBrain";
 
 interface DriverJobCardProps {
   summary: DriverJobSummary;
@@ -37,6 +38,14 @@ function mapsUrl(address: string): string {
 export function DriverJobCard({ summary, onPrimaryAction, onCardClick }: DriverJobCardProps) {
   const status = getStatusStyle(summary._raw.status);
   const initial = (summary.client_name || "?")[0].toUpperCase();
+
+  // ── Workflow brain (additive — never replaces existing CTA logic) ──
+  // Computed from the same Job already in scope. Pure, no IO.
+  const brain = getWorkflowBrain({ job: summary._raw });
+  const brainBlocker = brain.blockers[0] ?? null;
+  const brainWarning = brain.warnings[0] ?? null;
+  const showRiskStrip =
+    brain.riskLevel === "high" || brain.riskLevel === "medium" || !!brainBlocker;
 
   // Find the first "do_not_deliver_before" constraint for the warning strip
   const deliveryRestriction = summary.constraints.find(
@@ -68,14 +77,26 @@ export function DriverJobCard({ summary, onPrimaryAction, onCardClick }: DriverJ
         <UKPlate reg={summary.vehicle_reg} />
       </div>
 
-      {/* ── Status pill ── */}
-      <div className="px-3 pb-2">
+      {/* ── Status pill + brain phase chip ── */}
+      <div className="px-3 pb-2 flex items-center gap-1.5 flex-wrap">
         <span
           style={{ backgroundColor: status.backgroundColor, color: status.color }}
           className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide"
         >
           {status.label}
         </span>
+        {showRiskStrip && (
+          <span
+            className={
+              brain.riskLevel === "high"
+                ? "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide bg-destructive/10 text-destructive"
+                : "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide bg-warning/15 text-warning"
+            }
+            aria-label={`Risk ${brain.riskLevel}`}
+          >
+            {brain.riskLevel === "high" ? "Action needed" : "Heads up"}
+          </span>
+        )}
       </div>
 
       {/* ── Collect From ── */}
@@ -157,6 +178,24 @@ export function DriverJobCard({ summary, onPrimaryAction, onCardClick }: DriverJ
           </div>
         </div>
       </div>
+
+      {/* ── Brain blocker / warning strip (workflowBrain) ── */}
+      {brainBlocker && (
+        <div className="mx-3 mb-2 flex items-center gap-1.5 rounded bg-destructive/10 px-2 py-1.5">
+          <AlertTriangle className="h-3 w-3 shrink-0 text-destructive" />
+          <span className="text-[11px] font-medium text-destructive truncate">
+            {brainBlocker}
+          </span>
+        </div>
+      )}
+      {!brainBlocker && brainWarning && (
+        <div className="mx-3 mb-2 flex items-center gap-1.5 rounded bg-warning/10 px-2 py-1.5">
+          <AlertTriangle className="h-3 w-3 shrink-0 text-warning" />
+          <span className="text-[11px] font-medium text-warning truncate">
+            {brainWarning}
+          </span>
+        </div>
+      )}
 
       {/* ── Constraint warning strip ── */}
       {deliveryRestriction && (
