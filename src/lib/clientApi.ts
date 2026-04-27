@@ -16,6 +16,115 @@ export interface Client {
   updated_at: string;
 }
 
+/**
+ * Admin-only rate card stored in `client_rate_cards`.
+ * RLS: only admin/super_admin (org-scoped) can read or write.
+ * Drivers physically cannot fetch this — Supabase will return zero rows.
+ */
+export interface ClientRateCardRow {
+  client_id: string;
+  org_id: string;
+  rate_per_mile: number | null;
+  minimum_charge: number | null;
+  agreed_price: number | null;
+  waiting_rate_per_hour: number | null;
+  rate_card_active: boolean;
+  rate_card_notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ClientRateCard {
+  ratePerMile: number | null;
+  minimumCharge: number | null;
+  agreedPrice: number | null;
+  waitingRatePerHour: number | null;
+  notes: string | null;
+}
+
+export interface ClientRateCardInput {
+  rate_per_mile: number | null;
+  minimum_charge: number | null;
+  agreed_price: number | null;
+  waiting_rate_per_hour: number | null;
+  rate_card_active: boolean;
+  rate_card_notes: string | null;
+}
+
+/**
+ * Fetch the active rate card for a client.
+ *
+ * Drivers and non-admins are physically blocked by RLS on
+ * `client_rate_cards` — this function will return null for them.
+ */
+export async function getActiveClientRateCard(
+  clientId: string
+): Promise<ClientRateCard | null> {
+  if (!clientId) return null;
+  const { data, error } = await (supabase as any)
+    .from("client_rate_cards")
+    .select(
+      "rate_card_active, rate_per_mile, minimum_charge, agreed_price, waiting_rate_per_hour, rate_card_notes"
+    )
+    .eq("client_id", clientId)
+    .maybeSingle();
+  if (error || !data) return null;
+  const row = data as {
+    rate_card_active: boolean | null;
+    rate_per_mile: number | null;
+    minimum_charge: number | null;
+    agreed_price: number | null;
+    waiting_rate_per_hour: number | null;
+    rate_card_notes: string | null;
+  };
+  if (!row.rate_card_active) return null;
+  return {
+    ratePerMile: row.rate_per_mile,
+    minimumCharge: row.minimum_charge,
+    agreedPrice: row.agreed_price,
+    waitingRatePerHour: row.waiting_rate_per_hour,
+    notes: row.rate_card_notes,
+  };
+}
+
+/**
+ * Fetch the full rate card row (for admin edit UI). Returns null if
+ * none exists OR if the caller is not allowed by RLS.
+ */
+export async function getClientRateCardRow(
+  clientId: string
+): Promise<ClientRateCardRow | null> {
+  if (!clientId) return null;
+  const { data, error } = await (supabase as any)
+    .from("client_rate_cards")
+    .select("*")
+    .eq("client_id", clientId)
+    .maybeSingle();
+  if (error || !data) return null;
+  return data as ClientRateCardRow;
+}
+
+/**
+ * Upsert a rate card. Admin-only via RLS — drivers will receive an error.
+ */
+export async function upsertClientRateCard(
+  clientId: string,
+  input: ClientRateCardInput
+): Promise<void> {
+  const orgId = await getOrgId();
+  const { error } = await (supabase as any)
+    .from("client_rate_cards")
+    .upsert(
+      {
+        client_id: clientId,
+        org_id: orgId,
+        ...input,
+      },
+      { onConflict: "client_id" }
+    );
+  if (error) throw error;
+}
+
 export type ClientInsert = Omit<Client, "id" | "org_id" | "created_at" | "updated_at">;
 export type ClientUpdate = Partial<ClientInsert>;
 
@@ -37,7 +146,6 @@ export async function listClients(opts?: {
 
   let results = (data ?? []) as Client[];
 
-  // Client-side search (name, company, email)
   if (opts?.search?.trim()) {
     const s = opts.search.toLowerCase();
     results = results.filter(
@@ -111,12 +219,10 @@ export async function linkJobToClient(
     .from("invoices")
     .update({ client_id: clientId } as any)
     .eq("job_id", jobId);
-  // Silently skip if no invoice exists yet — we update client_company on job directly
   if (error && error.code !== "PGRST116") {
     // ignore "0 rows" errors
   }
 
-  // Also set client_company + client_name + client_email on the job for display
   if (clientId) {
     const client = await getClient(clientId);
     await supabase
@@ -130,7 +236,6 @@ export async function linkJobToClient(
   }
 }
 
-/** Get client count stats */
 export async function getClientStats(): Promise<{
   total: number;
   active: number;

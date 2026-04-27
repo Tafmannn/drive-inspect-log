@@ -139,6 +139,9 @@ export function InvoicePrepScreen() {
 
   // Toggle helpers
   const toggleJob = (id: string) => {
+    // Stage 5 — never allow selection of jobs that are not invoice-ready.
+    const job = jobs.find((j) => j.id === id);
+    if (job && job.readiness && !job.readiness.ready) return;
     setSelectedJobIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -148,10 +151,11 @@ export function InvoicePrepScreen() {
   };
 
   const toggleAll = () => {
-    if (selectedJobIds.size === jobs.length) {
+    const readyJobs = jobs.filter((j) => j.readiness?.ready);
+    if (selectedJobIds.size === readyJobs.length && readyJobs.length > 0) {
       setSelectedJobIds(new Set());
     } else {
-      setSelectedJobIds(new Set(jobs.map((j) => j.id)));
+      setSelectedJobIds(new Set(readyJobs.map((j) => j.id)));
     }
   };
 
@@ -473,6 +477,7 @@ export function InvoicePrepScreen() {
                         <TableCell>
                           <Checkbox
                             checked={selectedJobIds.has(job.id)}
+                            disabled={!job.readiness?.ready}
                             onCheckedChange={() => toggleJob(job.id)}
                             aria-label={`Select job ${job.external_job_number || job.id.slice(0, 8)}`}
                           />
@@ -484,9 +489,17 @@ export function InvoicePrepScreen() {
                             </span>
                             <Badge
                               variant="outline"
-                              className="ml-2 text-[9px] text-success border-success/30 bg-success/5"
+                              className={cn(
+                                "ml-2 text-[9px]",
+                                job.readiness?.alreadyInvoiced
+                                  ? "text-muted-foreground border-muted-foreground/30 bg-muted/40"
+                                  : job.readiness?.ready
+                                  ? "text-success border-success/30 bg-success/5"
+                                  : "text-destructive border-destructive/30 bg-destructive/5",
+                              )}
+                              title={job.readiness?.primaryReason}
                             >
-                              {job.status.replace(/_/g, " ")}
+                              {job.readiness?.primaryReason ?? job.status.replace(/_/g, " ")}
                             </Badge>
                           </div>
                         </TableCell>

@@ -9,10 +9,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
 import { useCreateClient, useUpdateClient } from "@/hooks/useClients";
-import type { Client } from "@/lib/clientApi";
-import { Loader2 } from "lucide-react";
+import {
+  type Client,
+  getClientRateCardRow,
+  upsertClientRateCard,
+} from "@/lib/clientApi";
+import { useAuth } from "@/context/AuthContext";
+import { Loader2, Tag } from "lucide-react";
 
 interface Props {
   open: boolean;
@@ -24,6 +30,8 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
   const isEdit = !!client;
   const createMutation = useCreateClient();
   const updateMutation = useUpdateClient();
+  const { isAdmin, isSuperAdmin } = useAuth();
+  const canEditRateCard = isAdmin || isSuperAdmin;
 
   const [form, setForm] = useState({
     name: "",
@@ -32,22 +40,64 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
     phone: "",
     address: "",
     notes: "",
+    rate_card_active: false,
+    rate_per_mile: "",
+    minimum_charge: "",
+    agreed_price: "",
+    waiting_rate_per_hour: "",
+    rate_card_notes: "",
   });
 
   useEffect(() => {
+    let cancelled = false;
     if (client) {
-      setForm({
+      setForm((f) => ({
+        ...f,
         name: client.name,
         company: client.company ?? "",
         email: client.email ?? "",
         phone: client.phone ?? "",
         address: client.address ?? "",
         notes: client.notes ?? "",
-      });
+      }));
+      // Load rate card from admin-only table. Drivers will get null via RLS.
+      if (canEditRateCard) {
+        getClientRateCardRow(client.id)
+          .then((rc) => {
+            if (cancelled) return;
+            setForm((f) => ({
+              ...f,
+              rate_card_active: !!rc?.rate_card_active,
+              rate_per_mile: rc?.rate_per_mile != null ? String(rc.rate_per_mile) : "",
+              minimum_charge: rc?.minimum_charge != null ? String(rc.minimum_charge) : "",
+              agreed_price: rc?.agreed_price != null ? String(rc.agreed_price) : "",
+              waiting_rate_per_hour:
+                rc?.waiting_rate_per_hour != null ? String(rc.waiting_rate_per_hour) : "",
+              rate_card_notes: rc?.rate_card_notes ?? "",
+            }));
+          })
+          .catch(() => {
+            // Ignore — RLS denial or no row.
+          });
+      }
     } else {
-      setForm({ name: "", company: "", email: "", phone: "", address: "", notes: "" });
+      setForm({
+        name: "", company: "", email: "", phone: "", address: "", notes: "",
+        rate_card_active: false, rate_per_mile: "", minimum_charge: "",
+        agreed_price: "", waiting_rate_per_hour: "", rate_card_notes: "",
+      });
     }
-  }, [client, open]);
+    return () => {
+      cancelled = true;
+    };
+  }, [client, open, canEditRateCard]);
+
+  const parseNum = (v: string): number | null => {
+    const t = v.trim();
+    if (!t) return null;
+    const n = Number(t);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,13 +117,29 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
     };
 
     try {
+      let savedClientId: string;
       if (isEdit && client) {
         await updateMutation.mutateAsync({ id: client.id, input: payload });
-        toast({ title: "Client updated" });
+        savedClientId = client.id;
       } else {
-        await createMutation.mutateAsync(payload);
-        toast({ title: "Client created" });
+        const created = await createMutation.mutateAsync(payload);
+        savedClientId = (created as any)?.id;
       }
+
+      // Rate card lives in a separate admin-only table. Only attempt write
+      // when the actor is admin/super_admin — RLS will reject anyone else.
+      if (canEditRateCard && savedClientId) {
+        await upsertClientRateCard(savedClientId, {
+          rate_card_active: form.rate_card_active,
+          rate_per_mile: parseNum(form.rate_per_mile),
+          minimum_charge: parseNum(form.minimum_charge),
+          agreed_price: parseNum(form.agreed_price),
+          waiting_rate_per_hour: parseNum(form.waiting_rate_per_hour),
+          rate_card_notes: form.rate_card_notes.trim() || null,
+        });
+      }
+
+      toast({ title: isEdit ? "Client updated" : "Client created" });
       onOpenChange(false);
     } catch (err: any) {
       toast({
@@ -88,7 +154,7 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit Client" : "New Client"}</DialogTitle>
         </DialogHeader>
@@ -152,6 +218,106 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
               rows={2}
             />
           </div>
+
+          {canEditRateCard && (
+            <div className="rounded-lg border border-border p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Tag className="h-4 w-4 text-primary" />
+                  <h4 className="text-sm font-semibold">Rate card (admin)</h4>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="rate-card-active"
+                    checked={form.rate_card_active}
+                    onCheckedChange={(v) =>
+                      setForm((f) => ({ ...f, rate_card_active: v }))
+                    }
+                  />
+                  <Label
+                    htmlFor="rate-card-active"
+                    className="text-xs text-muted-foreground cursor-pointer"
+                  >
+                    Active
+                  </Label>
+                </div>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Used by pricing suggestions only — never applied to invoices automatically.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="rc-rpm" className="text-xs">Rate £/mile</Label>
+                  <Input
+                    id="rc-rpm"
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={form.rate_per_mile}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, rate_per_mile: e.target.value }))
+                    }
+                    placeholder="e.g. 1.40"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="rc-min" className="text-xs">Minimum charge £</Label>
+                  <Input
+                    id="rc-min"
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={form.minimum_charge}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, minimum_charge: e.target.value }))
+                    }
+                    placeholder="e.g. 75"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="rc-flat" className="text-xs">Flat agreed price £</Label>
+                  <Input
+                    id="rc-flat"
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={form.agreed_price}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, agreed_price: e.target.value }))
+                    }
+                    placeholder="optional"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="rc-wait" className="text-xs">Waiting £/hour</Label>
+                  <Input
+                    id="rc-wait"
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={form.waiting_rate_per_hour}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, waiting_rate_per_hour: e.target.value }))
+                    }
+                    placeholder="e.g. 25"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="rc-notes" className="text-xs">Rate card notes</Label>
+                <Textarea
+                  id="rc-notes"
+                  value={form.rate_card_notes}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, rate_card_notes: e.target.value }))
+                  }
+                  placeholder="Internal notes about this rate card..."
+                  rows={2}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="flex justify-end gap-2 pt-2">
             <Button
               type="button"
