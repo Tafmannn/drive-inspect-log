@@ -57,11 +57,32 @@ export interface PricingSuggestionPanelProps {
 export function PricingSuggestionPanel(props: PricingSuggestionPanelProps) {
   const { isAdmin, isSuperAdmin, user } = useAuth();
   const [suggestion, setSuggestion] = useState<PricingSuggestion | null>(null);
+  const [rateCard, setRateCard] = useState<ClientRateCard | null>(null);
   const [computing, setComputing] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // Stable JSON key for inputs (so effect re-runs only on real changes)
   const inputsKey = useMemo(() => JSON.stringify(props.inputs), [props.inputs]);
+  const clientId = props.clientId ?? null;
+
+  // Load active client rate card (admin/org-scoped via RLS).
+  useEffect(() => {
+    let cancelled = false;
+    if (!clientId) {
+      setRateCard(null);
+      return;
+    }
+    getActiveClientRateCard(clientId)
+      .then((rc) => {
+        if (!cancelled) setRateCard(rc);
+      })
+      .catch(() => {
+        if (!cancelled) setRateCard(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [clientId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -75,6 +96,13 @@ export function PricingSuggestionPanel(props: PricingSuggestionPanelProps) {
             props.inputs.minimumChargeOverride ?? defs.MIN_CHARGE,
           ratePerMile:
             props.inputs.ratePerMileOverride ?? defs.MIN_RATE_PER_MILE,
+          clientRateCard: rateCard
+            ? {
+                ratePerMile: rateCard.ratePerMile,
+                minimumCharge: rateCard.minimumCharge,
+                agreedPrice: rateCard.agreedPrice,
+              }
+            : null,
         };
         const s = suggestJobPrice(finalInputs);
         setSuggestion(s);
@@ -87,7 +115,7 @@ export function PricingSuggestionPanel(props: PricingSuggestionPanelProps) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inputsKey]);
+  }, [inputsKey, rateCard]);
 
   if (!isAdmin && !isSuperAdmin) return null;
 
