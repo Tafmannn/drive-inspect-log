@@ -249,6 +249,11 @@ export function PricingSuggestionPanel(props: PricingSuggestionPanelProps) {
             Save the job first to apply this suggestion.
           </span>
         )}
+        {props.jobId && !hasRouteMiles && (
+          <span className="text-xs text-muted-foreground self-center">
+            Add a valid route distance to enable this action.
+          </span>
+        )}
       </div>
 
       <p className="text-[10px] text-muted-foreground italic">
