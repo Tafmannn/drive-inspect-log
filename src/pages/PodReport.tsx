@@ -35,6 +35,7 @@ import { getChecklistItems } from "@/lib/inspectionFields";
 import { useAuth } from "@/context/AuthContext";
 import type { Photo } from "@/lib/types";
 import { canonicalisePhotos } from "@/lib/photoDedupe";
+import { evaluatePodReadiness } from "@/lib/podReadiness";
 
 const fuelLabel = (pct: number | null | undefined): string => {
   if (pct == null) return "N/A";
@@ -131,6 +132,9 @@ export const PodReport = () => {
   const [downloadingPhotos, setDownloadingPhotos] = useState(false);
   const [confirmingReview, setConfirmingReview] = useState(false);
 
+  // Note: actual gating uses podReadiness below — this only enables the
+  // button shell for admins on the right job statuses. Approval still
+  // requires `safeToApprove` to be true.
   const canConfirmReview = (isAdmin || isSuperAdmin) && job &&
     ["pod_ready", "delivery_complete"].includes(job.status);
 
@@ -441,6 +445,14 @@ export const PodReport = () => {
   const pickupChecklistItems = getChecklistItems(pickup);
   const deliveryChecklistItems = getChecklistItems(delivery);
 
+  // Stage 4 — POD operational readiness. Pure, no IO. Used for the
+  // advisory banner AND to gate the "Confirm Review" completion button.
+  const podReadiness = evaluatePodReadiness({
+    currentRunId: (job as any).current_run_id ?? null,
+    photos: job.photos,
+    inspections: job.inspections,
+  });
+
   const DetailRow = ({ label, value }: { label: string; value: string }) => (
     <div className="flex justify-between py-1">
       <span className="text-xs text-muted-foreground">{label}</span>
@@ -562,13 +574,72 @@ export const PodReport = () => {
                 />
               </Card>
 
-              {/* Confirm Review Button — admin only, for reviewable statuses */}
+              {/* Stage 4 — POD readiness advisory. Visible to admins so they
+                  can see exactly why a POD cannot be approved/closed. */}
+              {(isAdmin || isSuperAdmin) && (
+                <Card
+                  className={
+                    "p-3 print:hidden border " +
+                    (podReadiness.health.level === "green"
+                      ? "border-emerald-300 bg-emerald-50"
+                      : podReadiness.health.level === "amber"
+                      ? "border-amber-300 bg-amber-50"
+                      : "border-red-300 bg-red-50")
+                  }
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs font-semibold uppercase tracking-wider">
+                      Evidence Health: {podReadiness.health.level}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {podReadiness.photoSummary.pickupCount} pickup ·{" "}
+                      {podReadiness.photoSummary.deliveryCount} delivery ·{" "}
+                      {podReadiness.photoSummary.duplicateCount} dup
+                    </div>
+                  </div>
+                  <div className="mt-1 text-[11px] space-y-0.5">
+                    <div>
+                      Safe to approve:{" "}
+                      <span className="font-medium">
+                        {podReadiness.safeToApprove ? "Yes" : "No"}
+                      </span>{" "}
+                      · Safe to close job:{" "}
+                      <span className="font-medium">
+                        {podReadiness.safeToCloseJob ? "Yes" : "No"}
+                      </span>
+                    </div>
+                    {podReadiness.missingSections.length > 0 && (
+                      <div>
+                        Missing: {podReadiness.missingSections.join(", ")}
+                      </div>
+                    )}
+                    {podReadiness.blockers.slice(0, 3).map((b) => (
+                      <div key={b.code} className="text-red-700">
+                        • {b.message}
+                      </div>
+                    ))}
+                    {podReadiness.warnings.slice(0, 3).map((w) => (
+                      <div key={w.code} className="text-amber-700">
+                        • {w.message}
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {/* Confirm Review Button — admin only, for reviewable statuses,
+                  AND only when POD readiness is safe to approve. */}
               {canConfirmReview && (
                 <div className="print:hidden">
                   <Button
                     className="w-full min-h-[48px] text-sm font-semibold gap-2"
                     onClick={handleConfirmReview}
-                    disabled={confirmingReview}
+                    disabled={confirmingReview || !podReadiness.safeToApprove}
+                    title={
+                      !podReadiness.safeToApprove
+                        ? "Resolve evidence blockers before approving"
+                        : undefined
+                    }
                   >
                     {confirmingReview ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -577,6 +648,12 @@ export const PodReport = () => {
                     )}
                     Confirm Review — Mark Complete
                   </Button>
+                  {!podReadiness.safeToApprove && (
+                    <p className="text-[11px] text-red-700 mt-1">
+                      Approval is blocked while evidence health is{" "}
+                      {podReadiness.health.level}.
+                    </p>
+                  )}
                 </div>
               )}
 
