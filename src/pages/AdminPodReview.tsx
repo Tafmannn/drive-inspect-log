@@ -246,6 +246,7 @@ export function AdminPodReview() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { data, isLoading, error } = usePodReviewData();
+  useRefetchOnFocus([["admin-pod-review"], ["closure-review-queue"], ["closure-review-kpis"]]);
   const [filter, setFilter] = useState<BandFilter>("all");
   const [search, setSearch] = useState("");
   const [confirming, setConfirming] = useState<string | null>(null);
