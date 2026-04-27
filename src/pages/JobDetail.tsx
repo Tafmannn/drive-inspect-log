@@ -138,8 +138,6 @@ export const JobDetail = () => {
   const [qrConfirmations, setQrConfirmations] = useState<QrConfirmation[]>([]);
   const [generatingQr, setGeneratingQr] = useState(false);
   const [qrModal, setQrModal] = useState<{ open: boolean; url: string; eventType: string }>({ open: false, url: "", eventType: "" });
-  const [selectedStatus, setSelectedStatus] = useState<string>("");
-  const [changingStatus, setChangingStatus] = useState(false);
   const [resolvedPhotos, setResolvedPhotos] = useState<Record<string, string>>({});
   const [photosLoading, setPhotosLoading] = useState(false);
   const [photoRetryCount, setPhotoRetryCount] = useState(0);
