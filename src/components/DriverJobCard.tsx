@@ -77,14 +77,26 @@ export function DriverJobCard({ summary, onPrimaryAction, onCardClick }: DriverJ
         <UKPlate reg={summary.vehicle_reg} />
       </div>
 
-      {/* ── Status pill ── */}
-      <div className="px-3 pb-2">
+      {/* ── Status pill + brain phase chip ── */}
+      <div className="px-3 pb-2 flex items-center gap-1.5 flex-wrap">
         <span
           style={{ backgroundColor: status.backgroundColor, color: status.color }}
           className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide"
         >
           {status.label}
         </span>
+        {showRiskStrip && (
+          <span
+            className={
+              brain.riskLevel === "high"
+                ? "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide bg-destructive/10 text-destructive"
+                : "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide bg-warning/15 text-warning"
+            }
+            aria-label={`Risk ${brain.riskLevel}`}
+          >
+            {brain.riskLevel === "high" ? "Action needed" : "Heads up"}
+          </span>
+        )}
       </div>
 
       {/* ── Collect From ── */}
