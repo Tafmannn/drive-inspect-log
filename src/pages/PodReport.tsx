@@ -35,6 +35,7 @@ import { getChecklistItems } from "@/lib/inspectionFields";
 import { useAuth } from "@/context/AuthContext";
 import type { Photo } from "@/lib/types";
 import { canonicalisePhotos } from "@/lib/photoDedupe";
+import { evaluateEvidenceHealth } from "@/lib/evidenceHealth";
 
 const fuelLabel = (pct: number | null | undefined): string => {
   if (pct == null) return "N/A";
