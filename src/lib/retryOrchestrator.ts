@@ -245,5 +245,6 @@ export function __resetRetryOrchestratorForTests(): void {
   lastGlobalAt = 0;
   perJobInFlight.clear();
   sleepImpl = (ms) => new Promise((r) => setTimeout(r, ms));
+  // Restore default backoff jitter — non-security, timing decorrelation only.
   jitterImpl = () => Math.floor(Math.random() * 750);
 }
