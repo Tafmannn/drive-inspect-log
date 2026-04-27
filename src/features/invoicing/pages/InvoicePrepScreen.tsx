@@ -45,9 +45,10 @@ import {
   type EligibleJob,
 } from "../hooks/useInvoicePrepData";
 import { useCreateInvoice } from "../hooks/useCreateInvoice";
-import { WarningCallout } from "@/components/ui-kit";
+import { WarningCallout, RoleScope } from "@/components/ui-kit";
 import { useClients } from "@/hooks/useClients";
 import { useAuth } from "@/context/AuthContext";
+import { useEvidenceOverrides } from "@/hooks/useEvidenceOverrides";
 import { toast } from "@/hooks/use-toast";
 import {
   FileText,
@@ -138,11 +139,22 @@ export function InvoicePrepScreen() {
     [selectedJobs, vatRate]
   );
 
+  // Admin override (UI-only): allow selecting jobs that are not invoice-ready.
+  // Acknowledgements are scoped to this Invoice Prep screen and persist for
+  // the session. Already-invoiced rows can never be overridden.
+  const invoiceOverrides = useEvidenceOverrides("invoice-prep");
+  const isOverridden = (jobId: string) => invoiceOverrides.isAcknowledged(jobId);
+
+  const isJobSelectable = (job: EligibleJob) => {
+    if (job.readiness?.alreadyInvoiced) return false;
+    if (job.readiness?.ready) return true;
+    return isOverridden(job.id);
+  };
+
   // Toggle helpers
   const toggleJob = (id: string) => {
-    // Stage 5 — never allow selection of jobs that are not invoice-ready.
     const job = jobs.find((j) => j.id === id);
-    if (job && job.readiness && !job.readiness.ready) return;
+    if (job && !isJobSelectable(job)) return;
     setSelectedJobIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -152,11 +164,11 @@ export function InvoicePrepScreen() {
   };
 
   const toggleAll = () => {
-    const readyJobs = jobs.filter((j) => j.readiness?.ready);
-    if (selectedJobIds.size === readyJobs.length && readyJobs.length > 0) {
+    const selectable = jobs.filter(isJobSelectable);
+    if (selectedJobIds.size === selectable.length && selectable.length > 0) {
       setSelectedJobIds(new Set());
     } else {
-      setSelectedJobIds(new Set(readyJobs.map((j) => j.id)));
+      setSelectedJobIds(new Set(selectable.map((j) => j.id)));
     }
   };
 
@@ -440,7 +452,8 @@ export function InvoicePrepScreen() {
                       <TableHead className="w-10">
                         <Checkbox
                           checked={
-                            jobs.length > 0 && selectedJobIds.size === jobs.length
+                            jobs.filter(isJobSelectable).length > 0 &&
+                            selectedJobIds.size === jobs.filter(isJobSelectable).length
                           }
                           onCheckedChange={toggleAll}
                           aria-label="Select all"
@@ -478,30 +491,64 @@ export function InvoicePrepScreen() {
                         <TableCell>
                           <Checkbox
                             checked={selectedJobIds.has(job.id)}
-                            disabled={!job.readiness?.ready}
+                            disabled={!isJobSelectable(job)}
                             onCheckedChange={() => toggleJob(job.id)}
                             aria-label={`Select job ${job.external_job_number || job.id.slice(0, 8)}`}
                           />
                         </TableCell>
                         <TableCell>
-                          <div className="min-w-0">
+                          <div className="min-w-0 flex items-center flex-wrap gap-1.5">
                             <span className="text-sm font-medium text-foreground">
                               {job.external_job_number || job.id.slice(0, 8)}
                             </span>
                             <Badge
                               variant="outline"
                               className={cn(
-                                "ml-2 text-[9px]",
+                                "text-[9px]",
                                 job.readiness?.alreadyInvoiced
                                   ? "text-muted-foreground border-muted-foreground/30 bg-muted/40"
                                   : job.readiness?.ready
                                   ? "text-success border-success/30 bg-success/5"
+                                  : isOverridden(job.id)
+                                  ? "text-primary border-primary/30 bg-primary/5"
                                   : "text-destructive border-destructive/30 bg-destructive/5",
                               )}
                               title={job.readiness?.primaryReason}
                             >
-                              {job.readiness?.primaryReason ?? job.status.replace(/_/g, " ")}
+                              {isOverridden(job.id) && !job.readiness?.ready
+                                ? `Override · ${job.readiness?.primaryReason ?? "blocked"}`
+                                : job.readiness?.primaryReason ?? job.status.replace(/_/g, " ")}
                             </Badge>
+                            {!job.readiness?.ready && !job.readiness?.alreadyInvoiced && (
+                              <RoleScope admin>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant={isOverridden(job.id) ? "ghost" : "outline"}
+                                  className="h-6 px-2 text-[10px]"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (isOverridden(job.id)) {
+                                      invoiceOverrides.unacknowledge(job.id);
+                                      setSelectedJobIds((prev) => {
+                                        const next = new Set(prev);
+                                        next.delete(job.id);
+                                        return next;
+                                      });
+                                    } else {
+                                      invoiceOverrides.acknowledge(job.id);
+                                    }
+                                  }}
+                                  aria-label={
+                                    isOverridden(job.id)
+                                      ? `Remove override for job ${job.external_job_number || job.id.slice(0, 8)}`
+                                      : `Override readiness for job ${job.external_job_number || job.id.slice(0, 8)}`
+                                  }
+                                >
+                                  {isOverridden(job.id) ? "Undo override" : "Override"}
+                                </Button>
+                              </RoleScope>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>

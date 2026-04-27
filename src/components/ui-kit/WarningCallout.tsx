@@ -31,10 +31,13 @@ export function WarningCallout({
   severity = "warning",
   children,
   className,
+  action,
 }: {
   severity?: WarningCalloutSeverity;
   children: ReactNode;
   className?: string;
+  /** Optional right-aligned slot (e.g. an admin override button). */
+  action?: ReactNode;
 }) {
   const s = styles[severity];
   return (
@@ -47,6 +50,7 @@ export function WarningCallout({
     >
       {s.icon}
       <div className="min-w-0 flex-1 break-words">{children}</div>
+      {action && <div className="shrink-0 flex items-center">{action}</div>}
     </div>
   );
 }

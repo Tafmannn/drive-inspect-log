@@ -48,6 +48,7 @@ import { PricingAuditTimeline } from "@/components/PricingAuditTimeline";
 import { RoleScope, EvidenceHealthBanner, JobHeaderCard } from "@/components/ui-kit";
 import { JobAdminControls } from "@/features/jobs/components/JobAdminControls";
 import { evaluateEvidenceHealth } from "@/lib/evidenceHealth";
+import { useEvidenceOverrides } from "@/hooks/useEvidenceOverrides";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -276,6 +277,9 @@ export const JobDetail = () => {
       })
     : null;
 
+  // Session-scoped admin override for Operational Health blockers.
+  const evidenceOverrides = useEvidenceOverrides(job.id);
+
   return (
     <div className="min-h-screen bg-background pb-20">
       <AppHeader title={`Job ${jobRef}`} showBack onBack={goBack} />
@@ -495,6 +499,9 @@ export const JobDetail = () => {
                 warnings={evidenceHealth.warnings.map((w) => ({ code: w.code, message: w.message }))}
                 summary={`${evidenceHealth.photoSummary.pickupCount} pickup · ${evidenceHealth.photoSummary.deliveryCount} delivery`}
                 hideWhenGreen
+                acknowledgedCodes={evidenceOverrides.acknowledgedCodes}
+                onAcknowledge={evidenceOverrides.acknowledge}
+                onUnacknowledge={evidenceOverrides.unacknowledge}
               />
             )}
             <PricingSuggestionPanel

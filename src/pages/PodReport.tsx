@@ -38,6 +38,7 @@ import { useAuth } from "@/context/AuthContext";
 import type { Photo } from "@/lib/types";
 import { canonicalisePhotos } from "@/lib/photoDedupe";
 import { evaluateEvidenceHealth } from "@/lib/evidenceHealth";
+import { useEvidenceOverrides } from "@/hooks/useEvidenceOverrides";
 
 const fuelLabel = (pct: number | null | undefined): string => {
   if (pct == null) return "N/A";
@@ -466,6 +467,22 @@ export const PodReport = () => {
     inspections: job.inspections,
   });
 
+  // Session-scoped admin override for blockers. When every blocker is
+  // acknowledged, an admin can approve POD even if readiness was red.
+  const evidenceOverrides = useEvidenceOverrides(job.id);
+  const allBlockerCodes = [
+    ...podReadiness.blockers.map((b) => b.code),
+    ...evidenceHealth.blockers.map((b) => b.code),
+  ];
+  const uniqueBlockerCodes = Array.from(new Set(allBlockerCodes));
+  const hasUnackedBlocker = uniqueBlockerCodes.some(
+    (c) => !evidenceOverrides.acknowledgedCodes.includes(c),
+  );
+  const overrideActive =
+    uniqueBlockerCodes.length > 0 && !hasUnackedBlocker;
+  const effectiveSafeToApprove =
+    podReadiness.safeToApprove || overrideActive;
+
   const DetailRow = ({ label, value }: { label: string; value: string }) => (
     <div className="flex justify-between py-1">
       <span className="text-xs text-muted-foreground">{label}</span>
@@ -533,6 +550,9 @@ export const PodReport = () => {
                 blockers={evidenceHealth.blockers}
                 warnings={evidenceHealth.warnings}
                 hideWhenGreen
+                acknowledgedCodes={evidenceOverrides.acknowledgedCodes}
+                onAcknowledge={evidenceOverrides.acknowledge}
+                onUnacknowledge={evidenceOverrides.unacknowledge}
               />
             </div>
           </RoleScope>
@@ -608,15 +628,21 @@ export const PodReport = () => {
                     blockers={podReadiness.blockers.slice(0, 3)}
                     warnings={podReadiness.warnings.slice(0, 3)}
                     summary={`${podReadiness.photoSummary.pickupCount} pickup · ${podReadiness.photoSummary.deliveryCount} delivery · ${podReadiness.photoSummary.duplicateCount} dup`}
+                    acknowledgedCodes={evidenceOverrides.acknowledgedCodes}
+                    onAcknowledge={evidenceOverrides.acknowledge}
+                    onUnacknowledge={evidenceOverrides.unacknowledge}
                     footer={
                       <span>
                         Safe to approve:{" "}
                         <span className="font-semibold text-foreground">
-                          {podReadiness.safeToApprove ? "Yes" : "No"}
-                        </span>{" "}
+                          {effectiveSafeToApprove ? "Yes" : "No"}
+                        </span>
+                        {overrideActive && (
+                          <span className="text-primary"> (admin override)</span>
+                        )}{" "}
                         · Safe to close job:{" "}
                         <span className="font-semibold text-foreground">
-                          {podReadiness.safeToCloseJob ? "Yes" : "No"}
+                          {podReadiness.safeToCloseJob || overrideActive ? "Yes" : "No"}
                         </span>
                         {podReadiness.missingSections.length > 0 && (
                           <>
@@ -630,17 +656,20 @@ export const PodReport = () => {
               </RoleScope>
 
               {/* Confirm Review Button — admin only, for reviewable statuses,
-                  AND only when POD readiness is safe to approve. */}
+                  AND only when POD readiness is safe to approve (or admin
+                  has explicitly acknowledged every blocker). */}
               {canConfirmReview && (
                 <div className="print:hidden">
                   <Button
                     className="w-full min-h-[48px] text-sm font-semibold gap-2"
                     onClick={handleConfirmReview}
-                    disabled={confirmingReview || !podReadiness.safeToApprove}
+                    disabled={confirmingReview || !effectiveSafeToApprove}
                     title={
-                      !podReadiness.safeToApprove
-                        ? "Resolve evidence blockers before approving"
-                        : undefined
+                      !effectiveSafeToApprove
+                        ? "Resolve or acknowledge evidence blockers before approving"
+                        : overrideActive
+                          ? "Approving with admin override — blockers were acknowledged"
+                          : undefined
                     }
                   >
                     {confirmingReview ? (
@@ -649,11 +678,16 @@ export const PodReport = () => {
                       <CheckCircle className="h-4 w-4" />
                     )}
                     Confirm Review — Mark Complete
+                    {overrideActive && !podReadiness.safeToApprove && (
+                      <span className="ml-1 text-[10px] font-normal opacity-80">
+                        (override)
+                      </span>
+                    )}
                   </Button>
-                  {!podReadiness.safeToApprove && (
+                  {!effectiveSafeToApprove && (
                     <p className="text-[11px] text-destructive mt-1">
                       Approval is blocked while evidence health is{" "}
-                      {podReadiness.health.level}.
+                      {podReadiness.health.level}. Acknowledge each blocker above to override.
                     </p>
                   )}
                 </div>
