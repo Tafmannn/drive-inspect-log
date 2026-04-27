@@ -148,7 +148,7 @@ export const PodReport = () => {
       // Centralized validated completion path — writes activity log
       // and enforces transition. Direct status updates are forbidden.
       await completeJobRpc(job.id, "Confirmed via POD report");
-      invalidateForEvent(qc, "job_status_changed", [["job", job.id]]);
+      invalidateForEvent(qc, "pod_approved", [["job", job.id]]);
       toast({ title: "Review confirmed — job completed" });
     } catch (e: any) {
       toast({ title: "Failed to confirm", description: e.message, variant: "destructive" });
