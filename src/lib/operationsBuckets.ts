@@ -294,9 +294,9 @@ function classifyOne(input: BucketJobInput, now: Date): BucketJobAssignment {
   const failedUpload = evidence.blockers.some(
     (b) => b.code === "failed_uploads",
   );
-  const staleRun =
-    evidence.blockers.some((b) => b.code === "stale_run_evidence") ||
-    evidence.warnings.some((w) => w.code === "evidence_mismatch");
+  const staleRun = evidence.blockers.some(
+    (b) => b.code === "stale_run_evidence" || b.code === "evidence_mismatch",
+  );
 
   // Missing signatures — check both inspections.
   const inspections = (job.inspections ?? []) as Inspection[];
