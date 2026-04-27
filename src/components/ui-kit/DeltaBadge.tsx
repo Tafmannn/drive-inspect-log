@@ -2,7 +2,7 @@ import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type DeltaDirection = "higher" | "lower" | "equal" | "unknown";
-type DeltaSeverity = "none" | "minor" | "moderate" | "major";
+type DeltaSeverity = "none" | "minor" | "notable" | "moderate" | "major" | "unknown";
 
 interface DeltaBadgeProps {
   direction: DeltaDirection;
