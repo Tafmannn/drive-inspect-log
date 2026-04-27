@@ -25,22 +25,36 @@ import {
 import React from "react";
 
 // ── Mock the Supabase client ────────────────────────────────────────
-// We model a tiny chainable query builder that resolves with whatever
-// `nextResponse` is currently configured. Each call shifts the queue.
+// We classify each query as either a "list" (queue cards — uses
+// `.limit()` and asks for `data`) or a "count" (KPI tile — uses
+// `head: true` and asks for `count`). The mock dispatches to the
+// currently configured server state for that classification, so the
+// test result is independent of which hook refetches first after the
+// invalidation event.
 
-type QueuedResponse = {
-  data?: unknown;
-  count?: number;
-  error?: { message: string } | null;
+type ServerState = {
+  jobs: any[];
+  podReviewCount: number;
 };
 
-const responseQueue: QueuedResponse[] = [];
+let serverState: ServerState = { jobs: [], podReviewCount: 0 };
 
 function makeBuilder() {
+  let isHead = false;
+  let isList = false;
+  let podReviewQuery = false;
   const builder: any = {
-    select: vi.fn(() => builder),
+    select: vi.fn((_: string, opts?: { head?: boolean }) => {
+      if (opts?.head) isHead = true;
+      return builder;
+    }),
     eq: vi.fn(() => builder),
-    in: vi.fn(() => builder),
+    in: vi.fn((_col: string, vals: string[]) => {
+      // The KPI hook fires 4 head-counts; the only one we need to
+      // distinguish is "POD review" (uses PENDING_STATUSES).
+      if (isHead && vals?.includes("pod_ready")) podReviewQuery = true;
+      return builder;
+    }),
     is: vi.fn(() => builder),
     not: vi.fn(() => builder),
     or: vi.fn(() => builder),
@@ -48,11 +62,21 @@ function makeBuilder() {
     lt: vi.fn(() => builder),
     gt: vi.fn(() => builder),
     order: vi.fn(() => builder),
-    limit: vi.fn(() => builder),
-    // Allow `await builder` to resolve with the next queued response.
-    then: (onFulfilled: (v: QueuedResponse) => unknown) => {
-      const next = responseQueue.shift() ?? { data: [], count: 0, error: null };
-      return Promise.resolve(next).then(onFulfilled);
+    limit: vi.fn(() => {
+      isList = true;
+      return builder;
+    }),
+    then: (onFulfilled: (v: any) => unknown) => {
+      let resp: any;
+      if (isList) {
+        resp = { data: serverState.jobs, error: null };
+      } else if (podReviewQuery) {
+        resp = { count: serverState.podReviewCount, error: null };
+      } else {
+        // All other KPI counts unused by this test — return 0.
+        resp = { count: 0, error: null };
+      }
+      return Promise.resolve(resp).then(onFulfilled);
     },
   };
   return builder;
