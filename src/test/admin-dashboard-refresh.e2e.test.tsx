@@ -124,28 +124,13 @@ const completedJob = {
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-function queueInitialServerState() {
-  // useAdminJobQueueKpis fires 4 count queries (active, podReview,
-  // unassigned, stale) — POD review starts at 1.
-  responseQueue.push(
-    { count: 0, error: null }, // active
-    { count: 1, error: null }, // podReview ← the one we'll clear
-    { count: 0, error: null }, // unassigned
-    { count: 0, error: null }, // stale
-  );
-  // useAdminJobQueues fires one list query.
-  responseQueue.push({ data: [reviewJob], error: null });
+function setInitialServerState() {
+  serverState = { jobs: [reviewJob], podReviewCount: 1 };
 }
 
-function queueRefreshedServerState() {
-  // After approval the POD count is 0, and the job has moved to completed.
-  responseQueue.push(
-    { count: 0, error: null }, // active
-    { count: 0, error: null }, // podReview
-    { count: 0, error: null }, // unassigned
-    { count: 0, error: null }, // stale
-  );
-  responseQueue.push({ data: [completedJob], error: null });
+function setRefreshedServerState() {
+  // After approval the POD count is 0 and the job has moved to completed.
+  serverState = { jobs: [completedJob], podReviewCount: 0 };
 }
 
 function makeWrapper(qc: QueryClient) {
@@ -158,7 +143,7 @@ function makeWrapper(qc: QueryClient) {
 
 describe("Admin dashboard refresh after pod_approved", () => {
   beforeEach(() => {
-    responseQueue.length = 0;
+    serverState = { jobs: [], podReviewCount: 0 };
   });
 
   it("refreshes KPI counts and queue cards from server state", async () => {
