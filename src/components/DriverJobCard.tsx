@@ -39,6 +39,14 @@ export function DriverJobCard({ summary, onPrimaryAction, onCardClick }: DriverJ
   const status = getStatusStyle(summary._raw.status);
   const initial = (summary.client_name || "?")[0].toUpperCase();
 
+  // ── Workflow brain (additive — never replaces existing CTA logic) ──
+  // Computed from the same Job already in scope. Pure, no IO.
+  const brain = getWorkflowBrain({ job: summary._raw });
+  const brainBlocker = brain.blockers[0] ?? null;
+  const brainWarning = brain.warnings[0] ?? null;
+  const showRiskStrip =
+    brain.riskLevel === "high" || brain.riskLevel === "medium" || !!brainBlocker;
+
   // Find the first "do_not_deliver_before" constraint for the warning strip
   const deliveryRestriction = summary.constraints.find(
     (c) => c.kind === "do_not_deliver_before"
