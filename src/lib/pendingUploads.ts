@@ -68,7 +68,15 @@ export type PendingUploadState =
   | "ready"
   | "uploading"
   | "uploaded"
-  | "failed";
+  | "failed"
+  /**
+   * "blocked" — the worker could not verify the job's current_run_id and
+   * the queued item carries a runId. Refusing to upload protects against
+   * attaching evidence to a reopened (newer) run. Surfaces in Pending
+   * Uploads with a clear reason; user can retry once connectivity
+   * returns or the job is reachable again.
+   */
+  | "blocked";
 
 /**
  * Stale-staged TTL. Items left in "staged" longer than this are purged
