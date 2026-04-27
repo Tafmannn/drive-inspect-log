@@ -179,6 +179,24 @@ export function DriverJobCard({ summary, onPrimaryAction, onCardClick }: DriverJ
         </div>
       </div>
 
+      {/* ── Brain blocker / warning strip (workflowBrain) ── */}
+      {brainBlocker && (
+        <div className="mx-3 mb-2 flex items-center gap-1.5 rounded bg-destructive/10 px-2 py-1.5">
+          <AlertTriangle className="h-3 w-3 shrink-0 text-destructive" />
+          <span className="text-[11px] font-medium text-destructive truncate">
+            {brainBlocker}
+          </span>
+        </div>
+      )}
+      {!brainBlocker && brainWarning && (
+        <div className="mx-3 mb-2 flex items-center gap-1.5 rounded bg-warning/10 px-2 py-1.5">
+          <AlertTriangle className="h-3 w-3 shrink-0 text-warning" />
+          <span className="text-[11px] font-medium text-warning truncate">
+            {brainWarning}
+          </span>
+        </div>
+      )}
+
       {/* ── Constraint warning strip ── */}
       {deliveryRestriction && (
         <div className="mx-3 mb-2 flex items-center gap-1.5 rounded bg-destructive/10 px-2 py-1.5">
