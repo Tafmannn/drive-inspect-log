@@ -52,6 +52,15 @@ export function AdminJobCard({ job, onView, onAssign, onPod }: AdminJobCardProps
   const unassigned = isUnassigned(job);
   const showPod = canReviewPod(job);
 
+  // Workflow brain (additive, optional). AdminJobRow is a subset of Job
+  // — the brain only consults the fields that are present and treats
+  // missing inspections/photos as "no extra evidence yet" (safe).
+  const brain = getWorkflowBrain({ job });
+  const brainBlocker = brain.blockers[0] ?? null;
+  const brainWarning = brain.warnings[0] ?? null;
+  const showRiskStrip =
+    brain.riskLevel === "high" || brain.riskLevel === "medium" || !!brainBlocker;
+
   return (
     <Card
       className="p-0 border border-border overflow-hidden cursor-pointer active:bg-muted/50 transition-colors"
