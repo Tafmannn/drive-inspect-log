@@ -203,6 +203,8 @@ export function AdminDrivers() {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
   const { data: drivers, isLoading } = useAdminDrivers();
+  const driverUserIds = (drivers ?? []).map(d => d.userId).filter(Boolean);
+  const { data: perfMap } = useDriverPerformance(driverUserIds);
   const [filter, setFilter] = useState<DriverFilter>("all");
 
   if (!isAdmin) {
