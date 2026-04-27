@@ -522,6 +522,9 @@ export const JobDetail = () => {
             />
           )}
 
+          {/* Admin-only: Pricing audit timeline (read-only) */}
+          {canAdmin && <PricingAuditTimeline jobId={job.id} />}
+
           {/* Admin-only: Edit + Delete + Status Change */}
           {canAdmin && (
             <div className="space-y-2">
