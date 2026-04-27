@@ -17,6 +17,9 @@ let _counter = 0;
 /** Collision-resistant unique ID. Deterministic prefix for debuggability. */
 function uniqueExcId(category: string, jobId?: string): string {
   _counter += 1;
+  // NOTE: Math.random is acceptable here — this ID is a UI-only React `key`
+  // for exception list rendering. It never reaches the network, storage,
+  // auth, or any security-sensitive surface.
   const rand = Math.random().toString(36).slice(2, 8);
   return `${category}-${jobId?.slice(0, 8) ?? "global"}-${_counter}-${rand}`;
 }
