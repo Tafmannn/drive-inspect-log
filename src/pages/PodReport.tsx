@@ -550,6 +550,9 @@ export const PodReport = () => {
                 blockers={evidenceHealth.blockers}
                 warnings={evidenceHealth.warnings}
                 hideWhenGreen
+                acknowledgedCodes={evidenceOverrides.acknowledgedCodes}
+                onAcknowledge={evidenceOverrides.acknowledge}
+                onUnacknowledge={evidenceOverrides.unacknowledge}
               />
             </div>
           </RoleScope>
