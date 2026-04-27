@@ -132,6 +132,9 @@ export const PodReport = () => {
   const [downloadingPhotos, setDownloadingPhotos] = useState(false);
   const [confirmingReview, setConfirmingReview] = useState(false);
 
+  // Note: actual gating uses podReadiness below — this only enables the
+  // button shell for admins on the right job statuses. Approval still
+  // requires `safeToApprove` to be true.
   const canConfirmReview = (isAdmin || isSuperAdmin) && job &&
     ["pod_ready", "delivery_complete"].includes(job.status);
 
