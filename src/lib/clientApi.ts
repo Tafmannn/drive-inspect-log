@@ -14,6 +14,55 @@ export interface Client {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  // Rate card (admin-only fields)
+  rate_per_mile: number | null;
+  minimum_charge: number | null;
+  agreed_price: number | null;
+  waiting_rate_per_hour: number | null;
+  rate_card_active: boolean;
+  rate_card_notes: string | null;
+}
+
+export interface ClientRateCard {
+  ratePerMile: number | null;
+  minimumCharge: number | null;
+  agreedPrice: number | null;
+  waitingRatePerHour: number | null;
+  notes: string | null;
+}
+
+/**
+ * Fetch the active rate card for a client (admin/org-scoped via RLS).
+ * Returns null if the client has no active rate card or if any error occurs.
+ */
+export async function getActiveClientRateCard(
+  clientId: string
+): Promise<ClientRateCard | null> {
+  if (!clientId) return null;
+  const { data, error } = await supabase
+    .from("clients")
+    .select(
+      "rate_card_active, rate_per_mile, minimum_charge, agreed_price, waiting_rate_per_hour, rate_card_notes"
+    )
+    .eq("id", clientId)
+    .maybeSingle();
+  if (error || !data) return null;
+  const row = data as {
+    rate_card_active: boolean | null;
+    rate_per_mile: number | null;
+    minimum_charge: number | null;
+    agreed_price: number | null;
+    waiting_rate_per_hour: number | null;
+    rate_card_notes: string | null;
+  };
+  if (!row.rate_card_active) return null;
+  return {
+    ratePerMile: row.rate_per_mile,
+    minimumCharge: row.minimum_charge,
+    agreedPrice: row.agreed_price,
+    waitingRatePerHour: row.waiting_rate_per_hour,
+    notes: row.rate_card_notes,
+  };
 }
 
 export type ClientInsert = Omit<Client, "id" | "org_id" | "created_at" | "updated_at">;
