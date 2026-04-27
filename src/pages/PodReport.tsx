@@ -131,6 +131,10 @@ export const PodReport = () => {
   const updateJob = useUpdateJob();
   const qc = useQueryClient();
 
+  // Hook MUST be declared before any early return to keep hook order
+  // stable across loading → loaded transitions (React invariant).
+  const evidenceOverrides = useEvidenceOverrides(jobId ?? "");
+
   const [pdfLoading, setPdfLoading] = useState(false);
   const [downloadingPhotos, setDownloadingPhotos] = useState(false);
   const [confirmingReview, setConfirmingReview] = useState(false);
