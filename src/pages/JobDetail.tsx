@@ -495,6 +495,9 @@ export const JobDetail = () => {
                 warnings={evidenceHealth.warnings.map((w) => ({ code: w.code, message: w.message }))}
                 summary={`${evidenceHealth.photoSummary.pickupCount} pickup · ${evidenceHealth.photoSummary.deliveryCount} delivery`}
                 hideWhenGreen
+                acknowledgedCodes={evidenceOverrides.acknowledgedCodes}
+                onAcknowledge={evidenceOverrides.acknowledge}
+                onUnacknowledge={evidenceOverrides.unacknowledge}
               />
             )}
             <PricingSuggestionPanel
