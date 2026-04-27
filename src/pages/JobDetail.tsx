@@ -53,6 +53,7 @@ import { PhotoViewer } from "@/components/PhotoViewer";
 import { resolveMediaUrlAsync } from "@/lib/mediaResolver";
 import { PricingSuggestionPanel } from "@/components/PricingSuggestionPanel";
 import { PricingAuditTimeline } from "@/components/PricingAuditTimeline";
+import { RoleScope } from "@/components/ui-kit";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -505,8 +506,8 @@ export const JobDetail = () => {
             )}
           </div>
 
-          {/* Admin-only: Pricing suggestion (advisory) */}
-          {canAdmin && (
+          {/* Admin-only: Pricing suggestion (advisory) + audit timeline */}
+          <RoleScope admin>
             <PricingSuggestionPanel
               jobId={job.id}
               orgId={(job as { org_id?: string }).org_id ?? null}
@@ -521,10 +522,8 @@ export const JobDetail = () => {
                   : "standard",
               }}
             />
-          )}
-
-          {/* Admin-only: Pricing audit timeline (read-only) */}
-          {canAdmin && <PricingAuditTimeline jobId={job.id} />}
+            <PricingAuditTimeline jobId={job.id} />
+          </RoleScope>
 
           {/* Admin-only: Edit + Delete + Status Change */}
           {canAdmin && (

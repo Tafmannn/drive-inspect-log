@@ -15,3 +15,6 @@ export type { WarningCalloutSeverity } from "./WarningCallout";
 export { AdvisoryNote } from "./AdvisoryNote";
 export { EmptyHint } from "./EmptyHint";
 export { DeltaBadge } from "./DeltaBadge";
+export { RoleScope } from "./RoleScope";
+export { EvidenceHealthBanner } from "./EvidenceHealthBanner";
+export type { EvidenceLevel } from "./EvidenceHealthBanner";

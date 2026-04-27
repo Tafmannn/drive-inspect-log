@@ -45,6 +45,7 @@ import {
   type EligibleJob,
 } from "../hooks/useInvoicePrepData";
 import { useCreateInvoice } from "../hooks/useCreateInvoice";
+import { WarningCallout } from "@/components/ui-kit";
 import { useClients } from "@/hooks/useClients";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "@/hooks/use-toast";
@@ -547,15 +548,11 @@ export function InvoicePrepScreen() {
         <>
           {/* Warnings */}
           {preview.warnings.length > 0 && (
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {preview.warnings.map((w, i) => (
-                <div
-                  key={i}
-                  className="flex items-start gap-2.5 p-3 rounded-lg border border-warning/30 bg-warning/5"
-                >
-                  <AlertTriangle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
-                  <p className="text-xs text-warning font-medium">{w}</p>
-                </div>
+                <WarningCallout key={i} severity="warning">
+                  {w}
+                </WarningCallout>
               ))}
             </div>
           )}
