@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
+import { invalidateForEvent } from "@/lib/mutationEvents";
 import { toast } from "@/hooks/use-toast";
 import { Check, Clock, Loader2, AlertTriangle } from "lucide-react";
 import type { AttentionException } from "../types/exceptionTypes";
@@ -116,8 +117,12 @@ export function AttentionQueue({ exceptions, showOrg, loading, acknowledged = fa
           acknowledgedCount: (old.acknowledgedCount ?? 0) + 1,
         };
       });
-      // Then refetch to ensure consistency
-      qc.invalidateQueries({ queryKey: ["attention-center"] });
+      // Then refetch every admin operational surface to ensure consistency
+      // — the resolved exception may also affect Needs Action / POD review /
+      // operations bucket counts.
+      invalidateForEvent(qc, "evidence_resolved", [
+        ackDialog.exception.jobId ? ["job", ackDialog.exception.jobId] : ["attention-center"],
+      ]);
     } catch (e: any) {
       toast({ title: "Failed", description: e.message, variant: "destructive" });
     } finally {
