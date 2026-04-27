@@ -1,15 +1,24 @@
 /**
  * Hook: useInvoicePrepData
  * Fetches eligible (completed, uninvoiced) jobs for a given client.
- * A job is "eligible" when:
- *   1. status is a terminal state (completed, pod_ready, delivery_complete)
+ *
+ * Stage 5 — strict invoice readiness:
+ *   1. status MUST be 'completed' (or 'closed'). pod_ready / delivery_complete
+ *      are NEVER invoice-ready — admin must review the POD first which
+ *      transitions the job to 'completed' via complete_job RPC.
  *   2. is_hidden = false
  *   3. not already linked to an invoice_items row
  *   4. client_company or client_name matches the selected client
+ *   5. Each row carries a readinessReason so the UI can render a clear badge.
  */
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Client } from "@/lib/clientApi";
+import {
+  evaluateInvoiceReadiness,
+  INVOICEABLE_STATUSES,
+  type InvoiceReadinessResult,
+} from "@/lib/invoiceReadiness";
 
 export interface EligibleJob {
   id: string;
@@ -21,15 +30,22 @@ export interface EligibleJob {
   completed_at: string | null;
   total_price: number | null;
   distance_miles: number | null;
+  client_id: string | null;
   client_company: string | null;
   client_name: string | null;
   client_email: string | null;
+  client_phone: string | null;
   status: string;
   // receipt count from expenses
   receiptCount?: number;
+  // Stage 5 readiness — populated below.
+  readiness?: InvoiceReadinessResult;
 }
 
-const TERMINAL_STATUSES = ["completed", "pod_ready", "delivery_complete"];
+// Only jobs in a true terminal state are surfaced. POD-ready and
+// delivery-complete are intentionally excluded (Stage 5 rule).
+const TERMINAL_STATUSES = [...INVOICEABLE_STATUSES];
+
 
 export function useEligibleJobs(
   client: Client | null,
