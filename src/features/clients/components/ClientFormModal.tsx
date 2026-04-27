@@ -9,10 +9,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
 import { useCreateClient, useUpdateClient } from "@/hooks/useClients";
 import type { Client } from "@/lib/clientApi";
-import { Loader2 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { Loader2, Tag } from "lucide-react";
 
 interface Props {
   open: boolean;
