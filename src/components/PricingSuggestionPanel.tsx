@@ -120,24 +120,23 @@ export function PricingSuggestionPanel(props: PricingSuggestionPanelProps) {
       if (jobErr) throw jobErr;
 
       // 2. snapshot for audit
-      const snapshotRow = {
-        org_id: props.orgId,
-        job_id: props.jobId,
-        created_by: user?.id ?? null,
-        suggested_price: suggestion.suggestedPrice,
-        applied_price: suggestion.suggestedPrice,
-        confidence: suggestion.confidence,
-        reasons: suggestion.reasons as unknown as Record<string, unknown>,
-        warnings: suggestion.warnings as unknown as Record<string, unknown>,
-        missing_inputs: suggestion.missingInputs as unknown as Record<string, unknown>,
-        breakdown: suggestion.breakdown as unknown as Record<string, unknown>,
-        inputs: props.inputs as unknown as Record<string, unknown>,
-        is_final_invoice_price: false,
-        source: "admin_accept",
-      };
       const { error: snapErr } = await supabase
         .from("pricing_snapshots")
-        .insert(snapshotRow);
+        .insert({
+          org_id: props.orgId,
+          job_id: props.jobId,
+          created_by: user?.id ?? null,
+          suggested_price: suggestion.suggestedPrice,
+          applied_price: suggestion.suggestedPrice,
+          confidence: suggestion.confidence,
+          reasons: suggestion.reasons as unknown as never,
+          warnings: suggestion.warnings as unknown as never,
+          missing_inputs: suggestion.missingInputs as unknown as never,
+          breakdown: suggestion.breakdown as unknown as never,
+          inputs: props.inputs as unknown as never,
+          is_final_invoice_price: false,
+          source: "admin_accept",
+        });
       if (snapErr) throw snapErr;
 
       toast({ title: `Suggested price £${suggestion.suggestedPrice.toFixed(2)} applied.` });
