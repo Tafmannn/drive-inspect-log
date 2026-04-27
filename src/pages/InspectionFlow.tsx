@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useJob, useSubmitInspection } from "@/hooks/useJobs";
 import { storageService } from "@/lib/storage";
+import { safeRandomId } from "@/lib/safeRandomId";
 import {
   stagePendingUpload,
   promoteSubmissionSession,
