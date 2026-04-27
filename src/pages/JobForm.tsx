@@ -28,7 +28,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ClientPickerCombobox } from "@/features/clients/components/ClientPickerCombobox";
 import { PricingSuggestionPanel } from "@/components/PricingSuggestionPanel";
-import { useAuth } from "@/context/AuthContext";
 type ErrorMap = Record<string, string>;
 
 interface JobFormDraft {
