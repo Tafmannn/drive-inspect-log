@@ -473,7 +473,7 @@ export const PodReport = () => {
 
   // Session-scoped admin override for blockers. When every blocker is
   // acknowledged, an admin can approve POD even if readiness was red.
-  const evidenceOverrides = useEvidenceOverrides(job.id);
+  // (Hook itself is declared above the early return for hook-order stability.)
   const allBlockerCodes = [
     ...podReadiness.blockers.map((b) => b.code),
     ...evidenceHealth.blockers.map((b) => b.code),
