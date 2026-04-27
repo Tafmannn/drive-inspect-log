@@ -131,6 +131,10 @@ export const PodReport = () => {
   const updateJob = useUpdateJob();
   const qc = useQueryClient();
 
+  // Hook MUST be declared before any early return to keep hook order
+  // stable across loading → loaded transitions (React invariant).
+  const evidenceOverrides = useEvidenceOverrides(jobId ?? "");
+
   const [pdfLoading, setPdfLoading] = useState(false);
   const [downloadingPhotos, setDownloadingPhotos] = useState(false);
   const [confirmingReview, setConfirmingReview] = useState(false);
@@ -469,7 +473,7 @@ export const PodReport = () => {
 
   // Session-scoped admin override for blockers. When every blocker is
   // acknowledged, an admin can approve POD even if readiness was red.
-  const evidenceOverrides = useEvidenceOverrides(job.id);
+  // (Hook itself is declared above the early return for hook-order stability.)
   const allBlockerCodes = [
     ...podReadiness.blockers.map((b) => b.code),
     ...evidenceHealth.blockers.map((b) => b.code),
