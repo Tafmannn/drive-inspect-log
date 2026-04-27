@@ -512,6 +512,27 @@ export const PodReport = () => {
 
       <main className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto py-6 px-3 sm:px-6 space-y-4 print:py-0 print:px-0">
+          {(isAdmin || isSuperAdmin) && evidenceHealth.level !== "green" && (
+            <div
+              className={`print:hidden rounded-md border px-3 py-2 text-xs space-y-1 ${
+                evidenceHealth.level === "amber"
+                  ? "border-amber-300 bg-amber-50 text-amber-900"
+                  : "border-destructive bg-destructive/10 text-destructive"
+              }`}
+              role="status"
+              aria-live="polite"
+            >
+              <div className="font-semibold uppercase tracking-wide">
+                Evidence: {evidenceHealth.level}
+              </div>
+              {evidenceHealth.blockers.map((b) => (
+                <div key={`b-${b.code}`}>• {b.message}</div>
+              ))}
+              {evidenceHealth.warnings.map((w) => (
+                <div key={`w-${w.code}`}>• {w.message}</div>
+              ))}
+            </div>
+          )}
           <Card className="border border-border shadow-sm print:shadow-none print:border-none">
             <div className="flex items-center justify-between px-6 py-4 bg-foreground text-background rounded-t-lg print:rounded-none">
               <div className="flex flex-col">
