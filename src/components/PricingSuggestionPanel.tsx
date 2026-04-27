@@ -176,7 +176,7 @@ export function PricingSuggestionPanel(props: PricingSuggestionPanelProps) {
           warnings: suggestion.warnings as unknown as never,
           missing_inputs: suggestion.missingInputs as unknown as never,
           breakdown: suggestion.breakdown as unknown as never,
-          inputs: props.inputs as unknown as never,
+          inputs: { ...props.inputs, clientId: props.clientId ?? null, clientRateCard: rateCard } as unknown as never,
           is_final_invoice_price: false,
           source: "admin_accept",
         });
