@@ -212,17 +212,14 @@ export const JobDetail = () => {
     }
   };
 
-  const handleChangeStatus = async () => {
-    if (!jobId || !selectedStatus || changingStatus) return;
-    setChangingStatus(true);
+  const handleChangeStatus = async (newStatus: string) => {
+    if (!jobId || !newStatus) return;
     try {
-      await changeStatus.mutateAsync({ jobId, newStatus: selectedStatus });
-      toast({ title: `Status changed to ${selectedStatus.replace(/_/g, " ")}` });
-      setSelectedStatus("");
+      await changeStatus.mutateAsync({ jobId, newStatus });
+      toast({ title: `Status changed to ${newStatus.replace(/_/g, " ")}` });
     } catch (e: any) {
       toast({ title: "Status change failed", description: e.message, variant: "destructive" });
-    } finally {
-      setChangingStatus(false);
+      throw e;
     }
   };
 
