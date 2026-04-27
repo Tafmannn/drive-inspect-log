@@ -18,6 +18,8 @@ import { UKPlate } from "@/components/UKPlate";
 import { useAuth } from "@/context/AuthContext";
 import { useAdminJobQueues, useAdminJobQueueKpis } from "@/hooks/useAdminJobQueues";
 import { useAdminMissingEvidence, useAdminComplianceCounts } from "@/hooks/useAdminDashboardData";
+import { useAdminOperationsBuckets } from "@/hooks/useAdminOperationsBuckets";
+import { BUCKET_DEFS, type BucketKey } from "@/lib/operationsBuckets";
 import { useAttentionData } from "@/features/attention/hooks/useAttentionData";
 import { AssignDriverModal } from "@/features/control/components/AssignDriverModal";
 import { getStatusStyle } from "@/lib/statusConfig";
@@ -570,6 +572,74 @@ function QueuePreviewSection({
   );
 }
 
+// ── Tier 3.5: Operations Buckets (command-centre overview) ───────────
+
+const BUCKET_ORDER: BucketKey[] = [
+  "todays_active",
+  "needs_driver_action",
+  "needs_admin_review",
+  "blocked_evidence",
+  "ready_to_close",
+  "ready_to_invoice",
+  "completed_not_invoiced",
+  "failed_uploads",
+  "cancelled_archived",
+];
+
+const PRIORITY_STYLES: Record<string, string> = {
+  critical: "border-destructive/30 bg-destructive/5 text-destructive",
+  high: "border-warning/30 bg-warning/5 text-warning",
+  medium: "border-border bg-card text-foreground",
+  low: "border-border bg-muted/30 text-muted-foreground",
+};
+
+function OperationsBuckets() {
+  const navigate = useNavigate();
+  const { data: counts, isLoading } = useAdminOperationsBuckets();
+
+  return (
+    <section className="space-y-1.5">
+      <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+        Operations Buckets
+      </h3>
+      <div className="grid grid-cols-2 gap-1.5">
+        {BUCKET_ORDER.map((key) => {
+          const def = BUCKET_DEFS[key];
+          const value = counts ? (counts as any)[key] ?? 0 : 0;
+          const muted = value === 0;
+          return (
+            <button
+              key={key}
+              onClick={() => def.defaultRoute && navigate(def.defaultRoute)}
+              disabled={!def.defaultRoute}
+              className={cn(
+                "flex flex-col items-start gap-0.5 rounded-lg border px-2.5 py-2 text-left transition-colors active:bg-muted/50",
+                muted ? "border-border bg-card text-muted-foreground" : PRIORITY_STYLES[def.priority],
+              )}
+            >
+              <div className="flex items-center justify-between w-full">
+                <span className="text-[10px] font-bold uppercase tracking-wider truncate">
+                  {def.label}
+                </span>
+                {isLoading ? (
+                  <Skeleton className="h-4 w-6" />
+                ) : (
+                  <span className="text-sm font-bold tabular-nums shrink-0 ml-1">
+                    {value}
+                  </span>
+                )}
+              </div>
+              <span className="text-[9px] text-muted-foreground line-clamp-2">
+                {def.reason}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 // ── Tier 4: Management Routes ────────────────────────────────────────
 
 function ManagementRoutes() {
@@ -653,6 +723,9 @@ export const AdminDashboard = () => {
             onViewAll={() => navigate("/admin/jobs?filter=review")}
           />
         </div>
+
+        {/* Tier 3.5 — Operations Buckets overview */}
+        <OperationsBuckets />
 
         {/* Tier 4 — Management Routes */}
         <ManagementRoutes />
