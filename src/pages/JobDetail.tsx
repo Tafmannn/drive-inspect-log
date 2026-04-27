@@ -233,6 +233,10 @@ export const JobDetail = () => {
     }
   };
 
+  // Session-scoped admin override for Operational Health blockers.
+  // Must be called before any early return to keep hook order stable.
+  const evidenceOverrides = useEvidenceOverrides(jobId ?? "");
+
   // ── Loading / Error ──
   if (isLoading || !job) {
     return (
@@ -277,8 +281,6 @@ export const JobDetail = () => {
       })
     : null;
 
-  // Session-scoped admin override for Operational Health blockers.
-  const evidenceOverrides = useEvidenceOverrides(job.id);
 
   return (
     <div className="min-h-screen bg-background pb-20">
