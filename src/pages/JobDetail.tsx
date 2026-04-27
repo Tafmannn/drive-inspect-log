@@ -52,6 +52,7 @@ import { UKPlate } from "@/components/UKPlate";
 import { PhotoViewer } from "@/components/PhotoViewer";
 import { resolveMediaUrlAsync } from "@/lib/mediaResolver";
 import { PricingSuggestionPanel } from "@/components/PricingSuggestionPanel";
+import { PricingAuditTimeline } from "@/components/PricingAuditTimeline";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -520,6 +521,9 @@ export const JobDetail = () => {
               }}
             />
           )}
+
+          {/* Admin-only: Pricing audit timeline (read-only) */}
+          {canAdmin && <PricingAuditTimeline jobId={job.id} />}
 
           {/* Admin-only: Edit + Delete + Status Change */}
           {canAdmin && (

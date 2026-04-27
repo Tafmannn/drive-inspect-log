@@ -22,9 +22,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Loader2, AlertTriangle, Check } from "lucide-react";
+import { Sparkles, Loader2, AlertTriangle, Check, TrendingUp, TrendingDown } from "lucide-react";
 import { suggestJobPrice, type PricingInputs, type PricingSuggestion } from "@/lib/pricingBrain";
 import { loadPricingDefaults } from "@/lib/pricingDefaults";
+import { computePriceDelta } from "@/lib/pricingDelta";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
@@ -87,10 +88,21 @@ export function PricingSuggestionPanel(props: PricingSuggestionPanelProps) {
 
   if (!isAdmin && !isSuperAdmin) return null;
 
+  const hasRouteMiles =
+    typeof props.inputs.routeMiles === "number" &&
+    Number.isFinite(props.inputs.routeMiles) &&
+    props.inputs.routeMiles > 0;
+
+  const delta = computePriceDelta(
+    props.currentTotalPrice ?? null,
+    suggestion?.suggestedPrice ?? null,
+  );
+
   const canSave =
     !!props.jobId &&
     !!props.orgId &&
     typeof suggestion?.suggestedPrice === "number" &&
+    hasRouteMiles &&
     !saving;
 
   const handleAccept = async () => {
@@ -161,14 +173,39 @@ export function PricingSuggestionPanel(props: PricingSuggestionPanelProps) {
       </div>
 
       {suggestion?.suggestedPrice != null ? (
-        <div className="flex items-baseline gap-2 flex-wrap">
-          <span className="text-2xl font-bold">£{suggestion.suggestedPrice.toFixed(2)}</span>
-          <Badge variant="outline" className="capitalize">{suggestion.confidence} confidence</Badge>
-          {typeof props.currentTotalPrice === "number" && props.currentTotalPrice > 0 && (
-            <span className="text-xs text-muted-foreground">
-              Current: £{props.currentTotalPrice.toFixed(2)}
-            </span>
-          )}
+        <div className="space-y-1.5">
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className="text-2xl font-bold">£{suggestion.suggestedPrice.toFixed(2)}</span>
+            <Badge variant="outline" className="capitalize">{suggestion.confidence} confidence</Badge>
+            {typeof props.currentTotalPrice === "number" && props.currentTotalPrice > 0 && (
+              <span className="text-xs text-muted-foreground">
+                Current: £{props.currentTotalPrice.toFixed(2)}
+              </span>
+            )}
+          </div>
+          {delta.direction === "higher" || delta.direction === "lower" ? (
+            <div
+              className={`flex items-center gap-1.5 text-xs ${
+                delta.warn
+                  ? "text-orange-600 dark:text-orange-400"
+                  : "text-muted-foreground"
+              }`}
+            >
+              {delta.direction === "higher" ? (
+                <TrendingUp className="h-3 w-3" />
+              ) : (
+                <TrendingDown className="h-3 w-3" />
+              )}
+              <span>{delta.label}</span>
+              {delta.warn && (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 capitalize">
+                  {delta.severity} swing
+                </Badge>
+              )}
+            </div>
+          ) : delta.direction === "equal" ? (
+            <p className="text-xs text-muted-foreground">{delta.label}</p>
+          ) : null}
         </div>
       ) : (
         <p className="text-sm text-muted-foreground">No suggestion available — see missing inputs below.</p>
@@ -210,6 +247,11 @@ export function PricingSuggestionPanel(props: PricingSuggestionPanelProps) {
         {!props.jobId && (
           <span className="text-xs text-muted-foreground self-center">
             Save the job first to apply this suggestion.
+          </span>
+        )}
+        {props.jobId && !hasRouteMiles && (
+          <span className="text-xs text-muted-foreground self-center">
+            Add a valid route distance to enable this action.
           </span>
         )}
       </div>
