@@ -186,21 +186,22 @@ export const PhotoViewer = ({ photos, title, totalExpected, onRetry }: PhotoView
             {/* Image */}
             <div className="flex-1 flex items-center justify-center overflow-auto touch-pinch-zoom">
               {selectedIndex !== null && (
-                <img
-                  src={photos[selectedIndex].url}
-                  alt={photos[selectedIndex].label || "Photo"}
-                  className="max-w-full max-h-full object-contain transition-transform duration-200"
-                  style={{ transform: `scale(${zoom})` }}
-                  draggable={false}
-                  onError={(e) => {
-                    const target = e.currentTarget;
-                    target.style.display = 'none';
-                    const placeholder = document.createElement('div');
-                    placeholder.className = 'flex items-center justify-center text-white text-sm';
-                    placeholder.textContent = 'Image could not be loaded';
-                    target.parentNode?.appendChild(placeholder);
-                  }}
-                />
+                failedKeys.has(keyFor(photos[selectedIndex], selectedIndex)) ? (
+                  <div className="flex items-center justify-center text-white text-sm">
+                    Image could not be loaded
+                  </div>
+                ) : (
+                  <img
+                    src={photos[selectedIndex].url}
+                    alt={photos[selectedIndex].label || "Photo"}
+                    className="max-w-full max-h-full object-contain transition-transform duration-200"
+                    style={{ transform: `scale(${zoom})` }}
+                    draggable={false}
+                    onError={() =>
+                      markFailed(keyFor(photos[selectedIndex], selectedIndex))
+                    }
+                  />
+                )
               )}
             </div>
 
