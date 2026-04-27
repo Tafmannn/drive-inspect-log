@@ -510,6 +510,7 @@ export const JobDetail = () => {
             <PricingSuggestionPanel
               jobId={job.id}
               orgId={(job as { org_id?: string }).org_id ?? null}
+              clientId={(job as { client_id?: string | null }).client_id ?? null}
               currentTotalPrice={(job as { total_price?: number | null }).total_price ?? null}
               inputs={{
                 routeMiles: (job as { route_distance_miles?: number | null }).route_distance_miles
