@@ -279,6 +279,16 @@ export const JobDetail = () => {
   if (job.earliest_delivery_date) restrictions.push(`Do not deliver before ${job.earliest_delivery_date}`);
   if (job.caz_ulez_flag) restrictions.push(`CAZ/ULEZ: ${job.caz_ulez_flag}`);
 
+  // Admin-only evidence health snapshot (presentational; PodReport remains
+  // the authoritative gate for closure / PDF generation).
+  const evidenceHealth = canAdmin
+    ? evaluateEvidenceHealth({
+        currentRunId: (job as { current_run_id?: string | null }).current_run_id ?? null,
+        photos: (job.photos as any[]) ?? [],
+        inspections: (job.inspections as any[]) ?? [],
+      })
+    : null;
+
   return (
     <div className="min-h-screen bg-background pb-20">
       <AppHeader title={`Job ${jobRef}`} showBack onBack={goBack} />
