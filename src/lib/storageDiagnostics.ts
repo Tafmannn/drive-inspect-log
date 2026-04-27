@@ -200,6 +200,8 @@ export async function probeLocalStorageHealth(): Promise<StorageHealth> {
     return { status: "blocked", failure };
   }
 
+  // Probe payload — used purely for an IndexedDB round-trip equality check.
+  // Not security-sensitive: never persisted, never transmitted, never an ID.
   const payload = `probe-${Date.now()}-${Math.random()}`;
   try {
     await set(PROBE_KEY, payload, PROBE_STORE);
