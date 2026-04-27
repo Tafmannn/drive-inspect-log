@@ -868,7 +868,7 @@ export async function retryAllPending(options?: {
   // STAGED items are NEVER picked up by the worker — they are not
   // "uploadable" until promoteSubmissionSession() flips them to ready.
   const targets = all.filter(
-    (u) => u.state === "ready" || u.state === "failed",
+    (u) => u.state === "ready" || u.state === "failed" || u.state === "blocked",
   );
 
   let succeeded = 0;
