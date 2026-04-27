@@ -34,6 +34,7 @@ import { UKPlate } from "@/components/UKPlate";
 import { getChecklistItems } from "@/lib/inspectionFields";
 import { useAuth } from "@/context/AuthContext";
 import type { Photo } from "@/lib/types";
+import { canonicalisePhotos } from "@/lib/photoDedupe";
 
 const fuelLabel = (pct: number | null | undefined): string => {
   if (pct == null) return "N/A";
@@ -426,9 +427,16 @@ export const PodReport = () => {
   const deliveryDamages = job.damage_items.filter(
     (d) => delivery && d.inspection_id === delivery.id
   );
-  const pickupPhotos = job.photos.filter((p) => p.type.startsWith("pickup_"));
-  const deliveryPhotos = job.photos.filter((p) => p.type.startsWith("delivery_"));
-  const damagePhotos = job.photos.filter((p) => p.type === "damage_close_up");
+  // Canonicalise once: drop archived, isolate to current_run_id, dedupe by
+  // strongest identity. Prevents the "duplicate placeholder boxes" bug
+  // and stops legacy null-run photos flooding a reopened job's POD.
+  const canonicalPhotos = canonicalisePhotos(
+    job.photos,
+    (job as any).current_run_id ?? null,
+  );
+  const pickupPhotos = canonicalPhotos.filter((p) => p.type.startsWith("pickup_"));
+  const deliveryPhotos = canonicalPhotos.filter((p) => p.type.startsWith("delivery_"));
+  const damagePhotos = canonicalPhotos.filter((p) => p.type === "damage_close_up");
 
   const pickupChecklistItems = getChecklistItems(pickup);
   const deliveryChecklistItems = getChecklistItems(delivery);
@@ -749,6 +757,7 @@ export const PodReport = () => {
                   onRetry={handleRetryPhotos}
                   photos={pickupPhotos
                     .map((p) => ({
+                      id: p.id,
                       url: resolvedPhotos[p.id] || "",
                       label:
                         p.label ||
@@ -763,6 +772,7 @@ export const PodReport = () => {
                   onRetry={handleRetryPhotos}
                   photos={deliveryPhotos
                     .map((p) => ({
+                      id: p.id,
                       url: resolvedPhotos[p.id] || "",
                       label:
                         p.label ||
@@ -777,6 +787,7 @@ export const PodReport = () => {
                   onRetry={handleRetryPhotos}
                   photos={damagePhotos
                     .map((p) => ({
+                      id: p.id,
                       url: resolvedPhotos[p.id] || "",
                       label: p.label || "Damage",
                     }))

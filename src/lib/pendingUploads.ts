@@ -68,7 +68,15 @@ export type PendingUploadState =
   | "ready"
   | "uploading"
   | "uploaded"
-  | "failed";
+  | "failed"
+  /**
+   * "blocked" — the worker could not verify the job's current_run_id and
+   * the queued item carries a runId. Refusing to upload protects against
+   * attaching evidence to a reopened (newer) run. Surfaces in Pending
+   * Uploads with a clear reason; user can retry once connectivity
+   * returns or the job is reachable again.
+   */
+  | "blocked";
 
 /**
  * Stale-staged TTL. Items left in "staged" longer than this are purged
@@ -670,6 +678,9 @@ export async function retryUpload(
 
     // STAGED items are NEVER uploadable. This is the central guarantee
     // that a failed submit cannot leak orphan evidence.
+    // Allowed entry states for a worker pass: "ready" (normal queue),
+    // "failed" (user-initiated retry), "blocked" (run unverified — user
+    // or background retry attempting to re-verify).
     if (
       candidate.state === "staged" ||
       candidate.state === "uploading" ||
@@ -678,32 +689,72 @@ export async function retryUpload(
       return false;
     }
 
+    // Run-id verification. We compare the queued runId to the job's
+    // current_run_id and branch into three outcomes:
+    //   • matches → continue with upload, passing runId to insertPhoto.
+    //   • differs (job has been reopened) → purge; the stale evidence
+    //     must NEVER attach to the new run.
+    //   • cannot verify (network/RLS) → mark "blocked" instead of
+    //     uploading. The item stays in IDB and is surfaced in Pending
+    //     Uploads with a clear reason. The user can retry later.
+    let verifiedRunId: string | null = null;
     if (candidate.runId) {
+      let currentRun: string | null = null;
+      let verifyFailed = false;
       try {
         const { supabase } = await import("@/integrations/supabase/client");
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from("jobs")
           .select("current_run_id")
           .eq("id", candidate.jobId)
           .maybeSingle();
-        const currentRun = (data as any)?.current_run_id ?? null;
-        if (!currentRun || currentRun !== candidate.runId) {
-          void logClientEvent("photo_upload_failed", "warn", {
-            jobId: candidate.jobId,
-            source: "storage",
-            type: "upload",
-            context: {
-              reason: "stale_run_purged",
-              pendingId: id,
-              queuedRun: candidate.runId,
-              currentRun,
-            },
-          });
-          await removeOne(id);
-          return false;
-        }
-      } catch {
-        // If we can't verify, fall through to normal retry.
+        if (error) throw error;
+        currentRun = (data as any)?.current_run_id ?? null;
+      } catch (e) {
+        verifyFailed = true;
+        void logClientEvent("photo_upload_failed", "warn", {
+          jobId: candidate.jobId,
+          source: "storage",
+          type: "upload",
+          context: {
+            reason: "run_verify_failed",
+            pendingId: id,
+            queuedRun: candidate.runId,
+            error: e instanceof Error ? e.message : String(e),
+          },
+        });
+      }
+
+      if (!verifyFailed && currentRun && currentRun === candidate.runId) {
+        verifiedRunId = candidate.runId;
+      } else if (!verifyFailed) {
+        // Definitive mismatch (or job has no current_run_id at all):
+        // purge — evidence must not attach to a different run.
+        void logClientEvent("photo_upload_failed", "warn", {
+          jobId: candidate.jobId,
+          source: "storage",
+          type: "upload",
+          context: {
+            reason: "stale_run_purged",
+            pendingId: id,
+            queuedRun: candidate.runId,
+            currentRun,
+          },
+        });
+        await removeOne(id);
+        notifyEvidenceQueueChanged();
+        return false;
+      } else {
+        // Verification failed — keep the item, mark blocked, surface to user.
+        await updateOne(id, (u) => ({
+          ...u,
+          state: "blocked",
+          status: "failed",
+          errorMessage:
+            "Run unverified — left queued. Will retry once the job is reachable.",
+        }));
+        notifyEvidenceQueueChanged();
+        return false;
       }
     }
 
@@ -736,7 +787,13 @@ export async function retryUpload(
       `jobs/${existing.jobId}/${existing.inspectionType}/${existing.photoType}/${existing.id}`,
     );
 
-    await insertPhoto({
+    // Pass the verified runId straight through. insertPhoto preserves it
+    // verbatim when supplied (caller-provided values bypass the lookup).
+    // If the queue item carries no runId at all (legacy pre-runId queue),
+    // we omit the field and let insertPhoto resolve it server-side; that
+    // resolution path now fails-safe with RUN_UNVERIFIED if the job has
+    // no current_run_id.
+    const photoPayload: any = {
       job_id: existing.jobId,
       inspection_id: existing.inspectionId ?? null,
       type: existing.photoType,
@@ -745,7 +802,11 @@ export async function retryUpload(
       backend: stored.backend,
       backend_ref: stored.backendRef ?? null,
       label: existing.label,
-    });
+    };
+    if (verifiedRunId) {
+      photoPayload.run_id = verifiedRunId;
+    }
+    await insertPhoto(photoPayload);
 
     if (existing.photoType === "damage_close_up" && existing.damageItemId) {
       try {
@@ -807,7 +868,7 @@ export async function retryAllPending(options?: {
   // STAGED items are NEVER picked up by the worker — they are not
   // "uploadable" until promoteSubmissionSession() flips them to ready.
   const targets = all.filter(
-    (u) => u.state === "ready" || u.state === "failed",
+    (u) => u.state === "ready" || u.state === "failed" || u.state === "blocked",
   );
 
   let succeeded = 0;
@@ -841,7 +902,7 @@ export async function getPendingUploadsByJob(): Promise<JobUploadSummary[]> {
   // an internal in-flight state and must not be displayed as pending
   // uploads (they would be misleading — they cannot be uploaded).
   const all = (await loadAll()).filter(
-    (u) => u.state === "ready" || u.state === "failed",
+    (u) => u.state === "ready" || u.state === "failed" || u.state === "blocked",
   );
 
   const map = new Map<string, JobUploadSummary>();
@@ -861,7 +922,8 @@ export async function getPendingUploadsByJob(): Promise<JobUploadSummary[]> {
     }
 
     if (u.state === "ready") entry.pendingCount++;
-    if (u.state === "failed") {
+    // "blocked" surfaces as failed in the UI so it gets visible attention.
+    if (u.state === "failed" || u.state === "blocked") {
       entry.failedCount++;
       if (u.errorMessage) {
         const errTime = u.completedAt || u.createdAt;
@@ -885,7 +947,8 @@ export async function retryJobUploads(
   const all = await loadAll();
   const targets = all.filter(
     (u) =>
-      u.jobId === jobId && (u.state === "ready" || u.state === "failed"),
+      u.jobId === jobId &&
+      (u.state === "ready" || u.state === "failed" || u.state === "blocked"),
   );
 
   let succeeded = 0;

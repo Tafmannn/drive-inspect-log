@@ -177,6 +177,10 @@ export interface Photo {
   backend_ref: string | null;
   label: string | null;
   created_at: string;
+  /** Per-run isolation tag — null on legacy rows that pre-date run_id. */
+  run_id?: string | null;
+  /** Soft-archive marker set when an admin reopens a job. */
+  archived_at?: string | null;
 }
 
 export interface JobActivityLog {
