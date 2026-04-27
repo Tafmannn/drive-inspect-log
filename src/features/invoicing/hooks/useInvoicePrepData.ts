@@ -65,7 +65,7 @@ export function useEligibleJobs(
       let query = supabase
         .from("jobs")
         .select(
-          "id, external_job_number, vehicle_reg, vehicle_make, vehicle_model, job_date, completed_at, total_price, distance_miles, client_company, client_name, client_email, status"
+          "id, external_job_number, vehicle_reg, vehicle_make, vehicle_model, job_date, completed_at, total_price, distance_miles, client_id, client_company, client_name, client_email, client_phone, status"
         )
         .eq("is_hidden", false)
         .in("status", TERMINAL_STATUSES)
