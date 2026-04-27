@@ -452,7 +452,8 @@ export function InvoicePrepScreen() {
                       <TableHead className="w-10">
                         <Checkbox
                           checked={
-                            jobs.length > 0 && selectedJobIds.size === jobs.length
+                            jobs.filter(isJobSelectable).length > 0 &&
+                            selectedJobIds.size === jobs.filter(isJobSelectable).length
                           }
                           onCheckedChange={toggleAll}
                           aria-label="Select all"
