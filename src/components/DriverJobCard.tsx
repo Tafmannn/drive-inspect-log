@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { getStatusStyle } from "@/lib/statusConfig";
 import type { DriverJobSummary } from "@/lib/driverJobSummary";
+import { getWorkflowBrain } from "@/lib/workflowBrain";
 
 interface DriverJobCardProps {
   summary: DriverJobSummary;
