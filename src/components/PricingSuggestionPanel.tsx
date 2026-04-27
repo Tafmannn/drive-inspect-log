@@ -22,9 +22,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Loader2, AlertTriangle, Check } from "lucide-react";
+import { Sparkles, Loader2, AlertTriangle, Check, TrendingUp, TrendingDown } from "lucide-react";
 import { suggestJobPrice, type PricingInputs, type PricingSuggestion } from "@/lib/pricingBrain";
 import { loadPricingDefaults } from "@/lib/pricingDefaults";
+import { computePriceDelta } from "@/lib/pricingDelta";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
