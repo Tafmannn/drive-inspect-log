@@ -902,7 +902,7 @@ export async function getPendingUploadsByJob(): Promise<JobUploadSummary[]> {
   // an internal in-flight state and must not be displayed as pending
   // uploads (they would be misleading — they cannot be uploaded).
   const all = (await loadAll()).filter(
-    (u) => u.state === "ready" || u.state === "failed",
+    (u) => u.state === "ready" || u.state === "failed" || u.state === "blocked",
   );
 
   const map = new Map<string, JobUploadSummary>();
@@ -922,7 +922,8 @@ export async function getPendingUploadsByJob(): Promise<JobUploadSummary[]> {
     }
 
     if (u.state === "ready") entry.pendingCount++;
-    if (u.state === "failed") {
+    // "blocked" surfaces as failed in the UI so it gets visible attention.
+    if (u.state === "failed" || u.state === "blocked") {
       entry.failedCount++;
       if (u.errorMessage) {
         const errTime = u.completedAt || u.createdAt;
