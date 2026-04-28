@@ -105,6 +105,7 @@ export interface PendingUpload {
    */
   state: PendingUploadState;
   errorMessage?: string | null;
+  lastErrorAt?: string | null;
 
   /**
    * Raw image blob, kept until the upload succeeds.
@@ -130,9 +131,11 @@ export interface PendingUpload {
 
   /**
    * Set when the failure is classified as deterministic (RLS, foreign
-   * key, validation). Items with this flag are NOT picked up by
-   * `retryAllPending` / `retryJobUploads` (auto retry) but CAN still
-   * be retried via `retryUpload(id)` directly from the per-item UI.
+   * key, validation, permanently bad payload). Items with this flag are
+   * NOT picked up by `retryAllPending` / `retryJobUploads` (auto retry)
+   * but CAN still be retried via `retryUpload(id)` directly from the
+   * per-item UI. Transient network/browser failures must never be parked
+   * here just because they have many attempts.
    */
   needsAttention?: boolean;
 
@@ -193,6 +196,9 @@ function isDeterministicFailure(message: string): boolean {
     m.includes("duplicate key") ||
     m.includes("permission denied") ||
     m.includes("invalid input syntax") ||
+    m.includes("file too large") ||
+    m.includes("file is empty") ||
+    m.includes("content type not allowed") ||
     m.includes("run_unverified") ||
     m.includes("linkage_patch_failed") ||
     m.includes("damage_item_missing") ||
@@ -202,6 +208,26 @@ function isDeterministicFailure(message: string): boolean {
     m.includes("403") ||
     m.includes("404") ||
     m.includes("422")
+  );
+}
+
+function isTransientUploadFailure(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes("load failed") ||
+    m.includes("failed to fetch") ||
+    m.includes("network") ||
+    m.includes("networkerror") ||
+    m.includes("timeout") ||
+    m.includes("timed out") ||
+    m.includes("econnreset") ||
+    m.includes("offline") ||
+    m.includes("rate_limited") ||
+    m.includes("429") ||
+    m.includes("500") ||
+    m.includes("502") ||
+    m.includes("503") ||
+    m.includes("504")
   );
 }
 
@@ -217,7 +243,13 @@ function isDeterministicFailure(message: string): boolean {
  */
 function normaliseRow(raw: any): PendingUpload {
   if (!raw) return raw;
-  if (raw.state) return raw as PendingUpload;
+  if (raw.state) {
+    const row = raw as PendingUpload;
+    if (row.needsAttention && row.errorMessage && isTransientUploadFailure(row.errorMessage)) {
+      return { ...row, needsAttention: false };
+    }
+    return row;
+  }
   // Legacy migration path
   let state: PendingUploadState;
   switch (raw.status) {
@@ -424,8 +456,9 @@ async function migrateLegacyIfNeeded(): Promise<void> {
             createdAt: legacy.createdAt,
             completedAt: legacy.completedAt ?? null,
             status: legacy.status ?? "pending",
-            state: legacy.status === "done" ? "uploaded" : "ready",
+    state: legacy.status === "done" ? "uploaded" : "ready",
             errorMessage: legacy.errorMessage ?? null,
+    lastErrorAt: legacy.lastErrorAt ?? null,
             fileBlob: blob,
             fileName: `${legacy.id}.jpg`,
             inspectionId: legacy.inspectionId ?? null,
@@ -800,6 +833,7 @@ export async function retryUpload(
           ...u,
           state: "blocked",
           status: "failed",
+        lastErrorAt: new Date().toISOString(),
           errorMessage:
             "Run unverified — left queued. Will retry once the job is reachable.",
         }));
@@ -825,6 +859,7 @@ export async function retryUpload(
         completedAt: u.completedAt ?? new Date().toISOString(),
         errorMessage: null,
       }));
+      notifyEvidenceQueueChanged();
       return true;
     }
 
@@ -946,20 +981,24 @@ export async function retryUpload(
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Upload failed";
     const deterministic = isDeterministicFailure(msg);
+    const transient = isTransientUploadFailure(msg);
+    const nowIso = new Date().toISOString();
 
     await updateOne(id, (u) => ({
       ...u,
       state: "failed",
       status: "failed",
       errorMessage: msg,
+      lastErrorAt: nowIso,
       attempts: (u.attempts ?? 0) + 1,
-      // Mark deterministic failures as needs-attention so the auto-retry
-      // loops (Retry All / online drainer) skip them. The per-item Retry
-      // button still works as a manual escape hatch.
+      // Only deterministic failures are parked for manual attention.
+      // Browser/network failures like Safari "Load failed" stay eligible
+      // for Retry All / online auto-drain forever, preserving evidence and
+      // preventing a misleading "No items needed retry" toast.
       needsAttention: deterministic
         ? true
-        : (u.attempts ?? 0) + 1 >= 5
-          ? true
+        : transient
+          ? false
           : u.needsAttention ?? false,
     }));
     notifyEvidenceQueueChanged();
@@ -1083,7 +1122,7 @@ export async function getPendingUploadsByJob(): Promise<JobUploadSummary[]> {
         createdAt: u.createdAt,
       });
       if (u.errorMessage) {
-        const errTime = u.completedAt || u.createdAt;
+        const errTime = u.lastErrorAt || u.completedAt || u.createdAt;
         if (!entry.lastErrorAt || errTime > entry.lastErrorAt) {
           entry.lastErrorAt = errTime;
         }

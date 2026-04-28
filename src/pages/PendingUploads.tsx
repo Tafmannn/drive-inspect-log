@@ -27,6 +27,7 @@ import { triggerRetry, type RetryResult } from "@/lib/retryOrchestrator";
 import { AlertTriangle, Loader2, RefreshCw, Trash2, Upload } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { QueuedSubmissionsSection } from "@/components/QueuedSubmissionsSection";
+import { useEvidenceQueueVersion } from "@/lib/evidenceQueueBus";
 
 /**
  * Translate a structured RetryResult into honest, human-readable
@@ -82,6 +83,7 @@ export const PendingUploads = () => {
   const [retryingAll, setRetryingAll] = useState(false);
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
   const [confirmDiscardId, setConfirmDiscardId] = useState<string | null>(null);
+  const evidenceQueueVersion = useEvidenceQueueVersion();
 
   const refresh = async () => {
     setLoading(true);
@@ -99,7 +101,7 @@ export const PendingUploads = () => {
     }
   };
 
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { refresh(); }, [evidenceQueueVersion]);
 
   const handleRetryJob = async (jobId: string) => {
     setRetryingJob(jobId);
