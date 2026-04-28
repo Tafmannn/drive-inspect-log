@@ -14,6 +14,7 @@ import { triggerRetry, type RetryResult } from "@/lib/retryOrchestrator";
 
 import { Loader2, RefreshCw, Upload } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { QueuedSubmissionsSection } from "@/components/QueuedSubmissionsSection";
 
 /**
  * Translate a structured RetryResult into honest, human-readable
