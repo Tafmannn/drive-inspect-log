@@ -140,8 +140,11 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
       const orgLookup = new Map<string, string>();
       for (const o of orgs) orgLookup.set(o.id, o.name);
 
-      // Driver name lookup keyed by driver_profile.id (for documents.related_id)
+      // Driver lookups keyed by driver_profile.id (for documents.related_id):
+      //  - name for display
+      //  - user_id for routing to /admin/drivers/:userId
       const driverNameByProfileId = new Map<string, string>();
+      const driverUserIdByProfileId = new Map<string, string>();
       if (docs.some((d) => d.related_type === "driver")) {
         const driverProfileIds = Array.from(
           new Set(docs.filter((d) => d.related_type === "driver").map((d) => d.related_id))
@@ -149,10 +152,11 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
         if (driverProfileIds.length > 0) {
           const { data: profileRows } = await supabase
             .from("driver_profiles")
-            .select("id, full_name")
+            .select("id, user_id, full_name")
             .in("id", driverProfileIds);
           for (const r of profileRows ?? []) {
             if (r.full_name) driverNameByProfileId.set(r.id, r.full_name);
+            if (r.user_id) driverUserIdByProfileId.set(r.id, r.user_id);
           }
         }
       }
@@ -163,7 +167,13 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
         ...deriveEvidenceExceptions(completedJobs, inspections, logEntries, orgLookup),
         ...deriveSyncExceptions(logEntries),
         ...deriveStateExceptions(logEntries),
-        ...deriveComplianceExceptions(docs, drivers, driverNameByProfileId, orgLookup),
+        ...deriveComplianceExceptions(
+          docs,
+          drivers,
+          driverNameByProfileId,
+          orgLookup,
+          driverUserIdByProfileId,
+        ),
       ]);
 
       // Build a set of jobIds that an admin has explicitly resolved
