@@ -827,6 +827,10 @@ export const InspectionFlow = () => {
         });
         if (dk) clearDraft(dk);
         if (jobId) void clearPhotoDraft(type, jobId);
+        try { sessionStorage.removeItem(sessionKey); } catch { /* ignore */ }
+        navigate(`/jobs/${jobId}`);
+        return;
+      }
 
       const inspectionId: string | null = submitResultTyped?.inspectionId ?? null;
       const damageItemIds: string[] = submitResultTyped?.damageItemIds ?? [];
