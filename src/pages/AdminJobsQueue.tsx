@@ -47,15 +47,18 @@ const FILTERS: { value: QueueFilter; label: string; icon: React.ComponentType<{ 
 
 export function AdminJobsQueue() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const [searchParams] = useSearchParams();
-  const { data: queues, isLoading, error } = useAdminJobQueues();
+  const { data: queues, isLoading, error, refetch } = useAdminJobQueues();
   const { data: kpis } = useAdminJobQueueKpis();
+  useRefetchOnFocus(refetch);
   const initialFilter = (searchParams.get("filter") as QueueFilter) || "all";
   const validFilters: QueueFilter[] = ["all", "attention", "stale", "unassigned", "evidence", "in_progress", "review", "completed"];
   const [filter, setFilter] = useState<QueueFilter>(
     validFilters.includes(initialFilter) ? initialFilter : "all"
   );
   const [search, setSearch] = useState("");
+  const [dismissingId, setDismissingId] = useState<string | null>(null);
   const [assignTarget, setAssignTarget] = useState<{
     jobId: string; jobRef: string; driverId: string | null;
   } | null>(null);
@@ -68,6 +71,27 @@ export function AdminJobsQueue() {
       driverId: job.driver_id,
     }),
     onPod: (job: AdminJobRow) => navigate(`/jobs/${job.id}/pod`),
+  };
+
+  const handleDismissEvidence = async (job: AdminJobRow) => {
+    const ref = job.external_job_number || `Job ${job.id.slice(0, 8)}`;
+    if (!window.confirm(`Remove ${ref} from the Missing Evidence queue?\n\nThis records an admin acknowledgement and hides the job from this list. It does not change the job status or evidence on file.`)) {
+      return;
+    }
+    setDismissingId(job.id);
+    try {
+      await acknowledgeMissingEvidence(job.id);
+      invalidateAdminOperationalQueues(qc, job.id);
+      toast({ title: `${ref} removed from Missing Evidence queue.` });
+    } catch (err) {
+      toast({
+        title: "Couldn't dismiss this job.",
+        description: err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDismissingId(null);
+    }
   };
 
   // Search filter
