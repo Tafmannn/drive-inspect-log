@@ -35,6 +35,7 @@ interface Props {
 
 export function ClientFormModal({ open, onOpenChange, client }: Props) {
   const isEdit = !!client;
+  const navigate = useNavigate();
   const createMutation = useCreateClient();
   const updateMutation = useUpdateClient();
   const { isAdmin, isSuperAdmin } = useAuth();
@@ -43,6 +44,8 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
   const [form, setForm] = useState({
     name: "",
     company: "",
+    billing_email: "",
+    client_type: "",
     email: "",
     phone: "",
     address: "",
