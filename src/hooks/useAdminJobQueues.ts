@@ -15,6 +15,7 @@ import {
   resolveDriverName,
   staleThresholdIso,
 } from "@/features/jobs/selectors";
+import { listAcknowledgedEvidenceJobIds } from "@/lib/evidenceAckApi";
 import type { AdminJobRow } from "@/components/AdminJobCard";
 
 export interface AdminJobQueues {
@@ -61,6 +62,19 @@ export function useAdminJobQueues() {
 
       // Group via shared selector — guarantees same definitions as Control Jobs
       const queues = groupJobsByQueue(rows);
+
+      // Filter out jobs whose missing-evidence blocker has been explicitly
+      // dismissed by an admin. Read-only failure is non-fatal — the queue
+      // still renders the unfiltered list rather than crashing.
+      try {
+        const dismissed = await listAcknowledgedEvidenceJobIds();
+        if (dismissed.size > 0) {
+          queues.missingEvidence = queues.missingEvidence.filter((j) => !dismissed.has(j.id));
+        }
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn("[useAdminJobQueues] could not load evidence acks", e);
+      }
 
       // Cap completed to recent
       queues.completed = queues.completed.slice(0, 20);
