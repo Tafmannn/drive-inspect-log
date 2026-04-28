@@ -206,6 +206,8 @@ export function ControlCompliance() {
         />
       </ControlSection>
 
+      <ComplianceDigest exceptions={complianceAlerts} loading={attentionLoading} />
+
       <div className="grid lg:grid-cols-2 gap-4">
         <ControlSection
           title="Recent Inspections"
