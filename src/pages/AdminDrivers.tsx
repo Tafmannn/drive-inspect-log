@@ -179,7 +179,11 @@ function DriverCard({ driver, perf, onOpen }: { driver: AdminDriverRow; perf?: D
 
       {/* Performance strip (admin-only via parent gate) */}
       <PerformanceStrip perf={perf} />
-    </div>
+
+      <div className="flex items-center justify-end pt-1 text-[11px] font-medium text-muted-foreground">
+        View profile <ChevronRight className="h-3 w-3 ml-0.5" />
+      </div>
+    </button>
   );
 }
 
