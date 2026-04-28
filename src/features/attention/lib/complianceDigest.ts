@@ -82,6 +82,7 @@ export function groupComplianceDigest(exceptions: AttentionException[]): DigestG
     let group = map.get(key);
     if (!group) {
       group = {
+        id: key,
         entityType: entity.type,
         entityId: entity.id,
         entityName: entity.name,
