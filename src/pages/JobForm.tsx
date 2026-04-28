@@ -75,6 +75,13 @@ export const JobForm = () => {
   // Client linking state
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
 
+  // Admin-only pricing state (manual override + per-job rate overrides)
+  const { isAdmin, isSuperAdmin } = useAuth();
+  const canEditPricing = isAdmin || isSuperAdmin;
+  const [adminPriceInput, setAdminPriceInput] = useState<string>("");
+  const [ratePerMileInput, setRatePerMileInput] = useState<string>("");
+  const [minimumChargeInput, setMinimumChargeInput] = useState<string>("");
+
   // Fetch active drivers for picker
   const { data: activeDrivers } = useQuery({
     queryKey: ["job-form-drivers"],
