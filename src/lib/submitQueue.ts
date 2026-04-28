@@ -297,6 +297,26 @@ export async function discardSubmission(id: string): Promise<void> {
   await removeOne(id);
 }
 
+/**
+ * Mark a queued submission as `failed_needs_attention` with the
+ * supplied error message. Called by InspectionFlow immediately after
+ * enqueuing a submission whose RPC already failed deterministically
+ * (RLS, validation, type-check, etc.) so the auto-drainer doesn't
+ * burn retries on a known-broken payload.
+ */
+export async function markSubmissionNeedsAttention(
+  id: string,
+  errorMessage: string,
+): Promise<void> {
+  await updateOne(id, (q) => ({
+    ...q,
+    status: "failed_needs_attention",
+    attempts: q.attempts + 1,
+    lastError: errorMessage,
+    lastAttemptAt: new Date().toISOString(),
+  }));
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // Drain
 // ─────────────────────────────────────────────────────────────────────
