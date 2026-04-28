@@ -326,6 +326,7 @@ export function ControlOverview() {
           </div>
         )}
       </ControlSection>
+      </div>
 
       {/* D. Unassigned Queue — highest dispatch priority */}
       {(unassigned?.length ?? 0) > 0 && (
