@@ -13,6 +13,7 @@
 
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRefetchOnFocus } from "@/hooks/useRefetchOnFocus";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
@@ -23,9 +24,12 @@ import { useAdminJobQueues, useAdminJobQueueKpis } from "@/hooks/useAdminJobQueu
 import { AssignDriverModal } from "@/features/control/components/AssignDriverModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { acknowledgeMissingEvidence } from "@/lib/evidenceAckApi";
+import { invalidateAdminOperationalQueues } from "@/lib/mutationEvents";
+import { toast } from "@/hooks/use-toast";
 import {
   AlertTriangle, Truck, ClipboardCheck, CheckCircle, Search,
-  UserX, Clock, ImageOff,
+  UserX, Clock, ImageOff, ShieldCheck,
 } from "lucide-react";
 
 type QueueFilter = "all" | "attention" | "stale" | "unassigned" | "evidence" | "in_progress" | "review" | "completed";
