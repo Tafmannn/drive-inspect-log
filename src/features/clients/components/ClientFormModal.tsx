@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Dialog,
   DialogContent,
@@ -34,6 +35,7 @@ interface Props {
 
 export function ClientFormModal({ open, onOpenChange, client }: Props) {
   const isEdit = !!client;
+  const navigate = useNavigate();
   const createMutation = useCreateClient();
   const updateMutation = useUpdateClient();
   const { isAdmin, isSuperAdmin } = useAuth();
@@ -42,6 +44,8 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
   const [form, setForm] = useState({
     name: "",
     company: "",
+    billing_email: "",
+    client_type: "",
     email: "",
     phone: "",
     address: "",
@@ -61,6 +65,8 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
         ...f,
         name: client.name,
         company: client.company ?? "",
+        billing_email: (client as any).billing_email ?? "",
+        client_type: (client as any).client_type ?? "",
         email: client.email ?? "",
         phone: client.phone ?? "",
         address: client.address ?? "",
@@ -88,7 +94,8 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
       }
     } else {
       setForm({
-        name: "", company: "", email: "", phone: "", address: "", notes: "",
+        name: "", company: "", billing_email: "", client_type: "",
+        email: "", phone: "", address: "", notes: "",
         rate_card_active: false, rate_per_mile: "", minimum_charge: "",
         agreed_price: "", waiting_rate_per_hour: "", rate_card_notes: "",
       });
@@ -107,14 +114,37 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim()) {
-      toast({ title: "Name is required", variant: "destructive" });
+
+    const trimmedCompany = form.company.trim();
+    const trimmedBillingEmail = form.billing_email.trim();
+    const trimmedClientType = form.client_type.trim();
+    const trimmedName = form.name.trim();
+
+    // Quick-create requirements (Phase 3): company + billing email + client type
+    if (!isEdit) {
+      if (!trimmedCompany) {
+        toast({ title: "Company name is required", variant: "destructive" });
+        return;
+      }
+      if (!trimmedBillingEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedBillingEmail)) {
+        toast({ title: "A valid billing email is required", variant: "destructive" });
+        return;
+      }
+      if (!trimmedClientType) {
+        toast({ title: "Client type is required", variant: "destructive" });
+        return;
+      }
+    } else if (!trimmedName && !trimmedCompany) {
+      toast({ title: "Name or company is required", variant: "destructive" });
       return;
     }
 
-    const payload = {
-      name: form.name.trim(),
-      company: form.company.trim() || null,
+    // Default contact name to company name when blank, so legacy contact-name field is satisfied.
+    const payload: Record<string, unknown> = {
+      name: trimmedName || trimmedCompany,
+      company: trimmedCompany || null,
+      billing_email: trimmedBillingEmail || null,
+      client_type: trimmedClientType || null,
       email: form.email.trim() || null,
       phone: form.phone.trim() || null,
       address: form.address.trim() || null,
@@ -125,10 +155,10 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
     try {
       let savedClientId: string;
       if (isEdit && client) {
-        await updateMutation.mutateAsync({ id: client.id, input: payload });
+        await updateMutation.mutateAsync({ id: client.id, input: payload as any });
         savedClientId = client.id;
       } else {
-        const created = await createMutation.mutateAsync(payload);
+        const created = await createMutation.mutateAsync(payload as any);
         savedClientId = (created as any)?.id;
       }
 
@@ -147,6 +177,11 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
 
       toast({ title: isEdit ? "Client updated" : "Client created" });
       onOpenChange(false);
+
+      // After fresh creation, route to profile completion.
+      if (!isEdit && savedClientId) {
+        navigate(`/control/clients/${savedClientId}/complete?created=1`);
+      }
     } catch (err: any) {
       toast({
         title: "Save failed",
@@ -166,21 +201,51 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="client-name">Name *</Label>
-            <Input
-              id="client-name"
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              placeholder="Contact name"
-            />
-          </div>
-          <div>
-            <Label htmlFor="client-company">Company</Label>
+            <Label htmlFor="client-company">Company {!isEdit && "*"}</Label>
             <Input
               id="client-company"
               value={form.company}
               onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
               placeholder="Company name"
+              autoFocus={!isEdit}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="client-billing-email">Billing email {!isEdit && "*"}</Label>
+              <Input
+                id="client-billing-email"
+                type="email"
+                value={form.billing_email}
+                onChange={(e) => setForm((f) => ({ ...f, billing_email: e.target.value }))}
+                placeholder="billing@example.com"
+              />
+            </div>
+            <div>
+              <Label htmlFor="client-type">Client type {!isEdit && "*"}</Label>
+              <select
+                id="client-type"
+                value={form.client_type}
+                onChange={(e) => setForm((f) => ({ ...f, client_type: e.target.value }))}
+                className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">Select…</option>
+                <option value="dealer">Dealer</option>
+                <option value="auction">Auction</option>
+                <option value="leasing">Leasing</option>
+                <option value="trade">Trade</option>
+                <option value="private">Private</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="client-name">Primary contact name</Label>
+            <Input
+              id="client-name"
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="Optional — defaults to company"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
