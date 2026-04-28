@@ -20,6 +20,13 @@ export interface AdminDriverRow {
   licenceExpiring: boolean;
   tradePlateNumber: string | null;
   missingPlate: boolean;
+  // Raw completion-relevant fields (used by scoreDriver in lists/details)
+  fullNameRaw: string | null;
+  licenceNumber: string | null;
+  rightToWork: string | null;
+  homePostcode: string | null;
+  payoutTerms: string | null;
+  bankCaptured: boolean;
 }
 
 export type DriverFilter = "all" | "active" | "with-jobs" | "no-jobs" | "licence-expiring" | "missing-plate";
@@ -33,7 +40,7 @@ export function useAdminDrivers() {
       // Fetch drivers and active jobs in parallel
       const [driversRes, jobsRes] = await Promise.all([
         supabase.from("driver_profiles")
-          .select("id, user_id, full_name, display_name, phone, is_active, licence_expiry, trade_plate_number")
+          .select("id, user_id, full_name, display_name, phone, is_active, licence_expiry, licence_number, trade_plate_number, right_to_work, home_postcode, payout_terms, bank_captured")
           .order("full_name", { ascending: true }),
         supabase.from("jobs")
           .select("driver_id, vehicle_reg, status, updated_at")
@@ -80,6 +87,12 @@ export function useAdminDrivers() {
           licenceExpiring,
           tradePlateNumber: d.trade_plate_number,
           missingPlate,
+          fullNameRaw: d.full_name,
+          licenceNumber: (d as any).licence_number ?? null,
+          rightToWork: (d as any).right_to_work ?? null,
+          homePostcode: (d as any).home_postcode ?? null,
+          payoutTerms: (d as any).payout_terms ?? null,
+          bankCaptured: !!(d as any).bank_captured,
         };
       });
 
