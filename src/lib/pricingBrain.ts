@@ -299,9 +299,9 @@ export function suggestJobPrice(inputs: PricingInputs): PricingSuggestion {
     }
   }
 
-  if (missingInputs.includes("caz_risk") && miles > 50) {
-    warnings.push("CAZ/ULEZ exposure unknown for a long route — verify before quoting");
-  }
+  // CAZ/ULEZ is only flagged when the caller explicitly tells us the
+  // route enters a zone. We never warn merely because miles are large
+  // and CAZ data is missing — see product rule.
 
   return {
     suggestedPrice: round2(suggested),
