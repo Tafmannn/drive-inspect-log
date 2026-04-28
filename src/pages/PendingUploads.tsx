@@ -3,16 +3,28 @@ import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { EvidenceStatusBadges } from "@/components/EvidenceStatusBadges";
 import { useNavigate } from "react-router-dom";
 import {
   getPendingUploadsByJob,
   pruneDone,
+  retrySingleUpload,
+  discardPendingUpload,
   type JobUploadSummary,
 } from "@/lib/pendingUploads";
 import { triggerRetry, type RetryResult } from "@/lib/retryOrchestrator";
 
-import { Loader2, RefreshCw, Upload } from "lucide-react";
+import { AlertTriangle, Loader2, RefreshCw, Trash2, Upload } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { QueuedSubmissionsSection } from "@/components/QueuedSubmissionsSection";
 
