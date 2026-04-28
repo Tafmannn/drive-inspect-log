@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as api from "@/lib/api";
 import { getPendingJobCount } from "@/lib/pendingUploads";
+import { useEvidenceQueueVersion } from "@/lib/evidenceQueueBus";
 import { supabase } from "@/integrations/supabase/client";
 import { ACTIVE_STATUSES, JOB_STATUS } from "@/lib/statusConfig";
 import { invalidateForEvent } from "@/lib/mutationEvents";
@@ -19,8 +20,9 @@ export interface DashboardCounts {
  * to only that driver's assigned jobs.
  */
 export function useDashboardCounts(driverProfileId?: string | null) {
+  const evidenceQueueVersion = useEvidenceQueueVersion();
   return useQuery({
-    queryKey: ["dashboard-counts", driverProfileId ?? "all"],
+    queryKey: ["dashboard-counts", driverProfileId ?? "all", evidenceQueueVersion],
     queryFn: async () => {
       const fourteenDaysAgo = new Date();
       fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
