@@ -249,9 +249,59 @@ export const InspectionFlow = () => {
 
   const handleDiscardDraft = () => {
     if (dk) clearDraft(dk);
+    if (jobId) void clearPhotoDraft(type, jobId);
     markSessionActive();
     setShowDraftPrompt(false);
   };
+
+  // ─── PHOTO DRAFT REHYDRATION ───
+  // Files (camera captures) cannot be persisted to localStorage. They live
+  // in IndexedDB via photoDraftStore. On mount, pull any stored blobs back
+  // into form state and recreate fresh blob: object URLs for previews.
+  // This runs once per (jobId, type) — guarded so we never overwrite
+  // newly captured photos in this session.
+  const photosHydrated = useRef(false);
+  useEffect(() => {
+    if (!jobId || photosHydrated.current) return;
+    photosHydrated.current = true;
+    let cancelled = false;
+    (async () => {
+      const draft = await loadPhotoDraft(type, jobId);
+      if (cancelled || !draft) return;
+      setFormState((prev) => {
+        // Don't clobber anything captured in this session.
+        const nextStandardPhotos = { ...prev.standardPhotos };
+        const nextStandardUrls = { ...prev.standardPhotoUrls };
+        for (const stored of draft.standardPhotos) {
+          if (nextStandardPhotos[stored.key]) continue;
+          const file = storedToFile(stored);
+          nextStandardPhotos[stored.key] = file;
+          nextStandardUrls[stored.key] = URL.createObjectURL(file);
+        }
+        const existingTempIds = new Set(prev.additionalPhotos.map((p) => p.tempId));
+        const restoredAdditional: AdditionalPhotoDraft[] = draft.additionalPhotos
+          .filter((p) => !existingTempIds.has(p.tempId))
+          .map((p) => {
+            const file = storedToFile(p);
+            return {
+              tempId: p.tempId,
+              file,
+              label: p.label,
+              previewUrl: URL.createObjectURL(file),
+            };
+          });
+        return {
+          ...prev,
+          standardPhotos: nextStandardPhotos,
+          standardPhotoUrls: nextStandardUrls,
+          additionalPhotos: [...prev.additionalPhotos, ...restoredAdditional],
+        };
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [jobId, type]);
 
   // ─── AUTO-POPULATE: prefill driver/customer names ───
   useEffect(() => {
