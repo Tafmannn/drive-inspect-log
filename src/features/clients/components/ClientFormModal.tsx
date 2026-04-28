@@ -114,14 +114,37 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim()) {
-      toast({ title: "Name is required", variant: "destructive" });
+
+    const trimmedCompany = form.company.trim();
+    const trimmedBillingEmail = form.billing_email.trim();
+    const trimmedClientType = form.client_type.trim();
+    const trimmedName = form.name.trim();
+
+    // Quick-create requirements (Phase 3): company + billing email + client type
+    if (!isEdit) {
+      if (!trimmedCompany) {
+        toast({ title: "Company name is required", variant: "destructive" });
+        return;
+      }
+      if (!trimmedBillingEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedBillingEmail)) {
+        toast({ title: "A valid billing email is required", variant: "destructive" });
+        return;
+      }
+      if (!trimmedClientType) {
+        toast({ title: "Client type is required", variant: "destructive" });
+        return;
+      }
+    } else if (!trimmedName && !trimmedCompany) {
+      toast({ title: "Name or company is required", variant: "destructive" });
       return;
     }
 
-    const payload = {
-      name: form.name.trim(),
-      company: form.company.trim() || null,
+    // Default contact name to company name when blank, so legacy contact-name field is satisfied.
+    const payload: Record<string, unknown> = {
+      name: trimmedName || trimmedCompany,
+      company: trimmedCompany || null,
+      billing_email: trimmedBillingEmail || null,
+      client_type: trimmedClientType || null,
       email: form.email.trim() || null,
       phone: form.phone.trim() || null,
       address: form.address.trim() || null,
@@ -132,10 +155,10 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
     try {
       let savedClientId: string;
       if (isEdit && client) {
-        await updateMutation.mutateAsync({ id: client.id, input: payload });
+        await updateMutation.mutateAsync({ id: client.id, input: payload as any });
         savedClientId = client.id;
       } else {
-        const created = await createMutation.mutateAsync(payload);
+        const created = await createMutation.mutateAsync(payload as any);
         savedClientId = (created as any)?.id;
       }
 
@@ -154,6 +177,11 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
 
       toast({ title: isEdit ? "Client updated" : "Client created" });
       onOpenChange(false);
+
+      // After fresh creation, route to profile completion.
+      if (!isEdit && savedClientId) {
+        navigate(`/control/clients/${savedClientId}/complete?created=1`);
+      }
     } catch (err: any) {
       toast({
         title: "Save failed",
