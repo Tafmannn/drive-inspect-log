@@ -243,7 +243,13 @@ function isTransientUploadFailure(message: string): boolean {
  */
 function normaliseRow(raw: any): PendingUpload {
   if (!raw) return raw;
-  if (raw.state) return raw as PendingUpload;
+  if (raw.state) {
+    const row = raw as PendingUpload;
+    if (row.needsAttention && row.errorMessage && isTransientUploadFailure(row.errorMessage)) {
+      return { ...row, needsAttention: false };
+    }
+    return row;
+  }
   // Legacy migration path
   let state: PendingUploadState;
   switch (raw.status) {
@@ -450,8 +456,9 @@ async function migrateLegacyIfNeeded(): Promise<void> {
             createdAt: legacy.createdAt,
             completedAt: legacy.completedAt ?? null,
             status: legacy.status ?? "pending",
-            state: legacy.status === "done" ? "uploaded" : "ready",
+    state: legacy.status === "done" ? "uploaded" : "ready",
             errorMessage: legacy.errorMessage ?? null,
+    lastErrorAt: legacy.lastErrorAt ?? null,
             fileBlob: blob,
             fileName: `${legacy.id}.jpg`,
             inspectionId: legacy.inspectionId ?? null,
@@ -1115,7 +1122,7 @@ export async function getPendingUploadsByJob(): Promise<JobUploadSummary[]> {
         createdAt: u.createdAt,
       });
       if (u.errorMessage) {
-        const errTime = u.completedAt || u.createdAt;
+        const errTime = u.lastErrorAt || u.completedAt || u.createdAt;
         if (!entry.lastErrorAt || errTime > entry.lastErrorAt) {
           entry.lastErrorAt = errTime;
         }
