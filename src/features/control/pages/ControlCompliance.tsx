@@ -2,11 +2,12 @@
  * Compliance Control Page — /control/compliance
  * Inspection audits, damage tracking, and operational compliance.
  */
+import { useNavigate } from "react-router-dom";
 import { ControlShell, ControlHeader, ControlSection } from "../components/shared/ControlShell";
 import { KpiStrip } from "../components/shared/KpiStrip";
 import { CompactTable, type CompactColumn } from "../components/shared/CompactTable";
 import { Badge } from "@/components/ui/badge";
-import { ShieldCheck, FileWarning, ClipboardCheck } from "lucide-react";
+import { ShieldCheck, FileWarning, ClipboardCheck, AlertTriangle } from "lucide-react";
 import {
   useComplianceKpis,
   useRecentInspections,
@@ -14,6 +15,8 @@ import {
   type RecentInspectionRow,
   type OutstandingDamageRow,
 } from "../hooks/useControlComplianceData";
+import { useAttentionData } from "@/features/attention/hooks/useAttentionData";
+import type { AttentionException } from "@/features/attention/types/exceptionTypes";
 import { format } from "date-fns";
 
 function timeAgo(iso: string): string {
