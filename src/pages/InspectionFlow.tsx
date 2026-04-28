@@ -619,7 +619,7 @@ export const InspectionFlow = () => {
           jobNumber: job?.external_job_number ?? null,
           vehicleReg: job?.vehicle_reg ?? null,
           inspectionType: type,
-          runId: queueRunId,
+          runId: ((job as any)?.current_run_id ?? null) as string | null,
           inspectionPayload: inspPayload as any,
           damageItems: damageItemsPayload as any,
           driverSignatureBlob: driverBlob,
