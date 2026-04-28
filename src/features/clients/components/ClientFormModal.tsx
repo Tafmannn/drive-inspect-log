@@ -65,6 +65,8 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
         ...f,
         name: client.name,
         company: client.company ?? "",
+        billing_email: (client as any).billing_email ?? "",
+        client_type: (client as any).client_type ?? "",
         email: client.email ?? "",
         phone: client.phone ?? "",
         address: client.address ?? "",
@@ -92,7 +94,8 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
       }
     } else {
       setForm({
-        name: "", company: "", email: "", phone: "", address: "", notes: "",
+        name: "", company: "", billing_email: "", client_type: "",
+        email: "", phone: "", address: "", notes: "",
         rate_card_active: false, rate_per_mile: "", minimum_charge: "",
         agreed_price: "", waiting_rate_per_hour: "", rate_card_notes: "",
       });
