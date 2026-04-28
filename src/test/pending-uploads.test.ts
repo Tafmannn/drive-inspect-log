@@ -315,6 +315,36 @@ describe("pendingUploads — stale staged TTL", () => {
 // ─── Misc preserved coverage ─────────────────────────────────────────
 
 describe("pendingUploads — misc operations", () => {
+  it("keeps Safari/browser Load failed errors eligible for bulk retry", async () => {
+    mockUpload.mockRejectedValue(new Error("Upload failed: Load failed"));
+
+    const item = await stagePendingUpload(makeFile(), {
+      submissionSessionId: SESSION_A,
+      clientPhotoId: "cpid-load-failed",
+      jobId: "J",
+      inspectionType: "delivery",
+      photoType: "delivery_exterior_front",
+      label: null,
+    });
+    await promoteSubmissionSession(SESSION_A, {
+      inspectionId: "i1",
+      damageIdMap: {},
+    });
+
+    for (let i = 0; i < 6; i++) {
+      // eslint-disable-next-line no-await-in-loop
+      await retryUpload(item.id);
+    }
+
+    const [afterFailures] = await getAllPendingUploads();
+    expect(afterFailures.attempts).toBe(6);
+    expect(afterFailures.needsAttention).not.toBe(true);
+
+    const bulk = await retryAllPending();
+    expect(bulk.failed).toBe(1);
+    expect(mockUpload).toHaveBeenCalledTimes(7);
+  });
+
   it("deletePendingUpload removes the item from the queue", async () => {
     const item = await stagePendingUpload(makeFile(), {
       submissionSessionId: SESSION_A,
