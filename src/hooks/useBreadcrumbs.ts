@@ -107,6 +107,17 @@ export function useBreadcrumbs(): Crumb[] {
           label = "Inspection";
         } else if (segments[i - 1] === "invoice" && segments[i] !== "new") {
           label = "Invoice";
+        } else if (segments[i - 1] === "drivers" && /^[0-9a-f-]{20,}$/i.test(segments[i])) {
+          label = "Driver";
+        } else if (segments[i - 1] === "users" && /^[0-9a-f-]{20,}$/i.test(segments[i])) {
+          label = "User";
+        } else if (segments[i - 1] === "orgs" && /^[0-9a-f-]{20,}$/i.test(segments[i])) {
+          label = "Organisation";
+        } else if (segments[i - 1] === "clients" && /^[0-9a-f-]{20,}$/i.test(segments[i])) {
+          label = "Client";
+        } else if (/^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(segments[i]) || /^[0-9a-f]{32}$/i.test(segments[i])) {
+          // Generic UUID fallback — never display raw UUIDs to users
+          label = "Detail";
         } else {
           // Capitalize as fallback
           label = segments[i].charAt(0).toUpperCase() + segments[i].slice(1).replace(/-/g, " ");
