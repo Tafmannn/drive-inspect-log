@@ -13,7 +13,7 @@ export function ControlShell({
 }) {
   return (
     <div className={cn("flex-1 overflow-y-auto", className)}>
-      <div className="mx-auto max-w-[1600px] p-5 lg:p-6 space-y-5">
+      <div className="mx-auto max-w-[1600px] p-4 lg:p-6 space-y-4 lg:space-y-5">
         {children}
       </div>
     </div>
