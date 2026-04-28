@@ -786,7 +786,7 @@ async function buildImageCache(
             jobId: meta?.jobId,
             message: `${finalMissing.length}/${uniquePhotoUrls.length} POD photos failed to load after retries`,
             source: "storage",
-            type: "render",
+            type: "upload",
             context: {
               orgId: meta?.orgId,
               missingCount: finalMissing.length,
