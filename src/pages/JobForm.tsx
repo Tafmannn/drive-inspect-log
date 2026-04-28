@@ -396,6 +396,16 @@ export const JobForm = () => {
         setSelectedDriverId(existingJob.driver_id);
         setSelectedDriverName(existingJob.driver_name ?? null);
       }
+
+      // Hydrate client + pricing fields
+      const ej = existingJob as {
+        client_id?: string | null;
+        total_price?: number | null;
+        rate_per_mile?: number | null;
+      };
+      if (ej.client_id) setSelectedClientId(ej.client_id);
+      if (typeof ej.total_price === "number") setAdminPriceInput(String(ej.total_price));
+      if (typeof ej.rate_per_mile === "number") setRatePerMileInput(String(ej.rate_per_mile));
     }
   }, [isEdit, existingJob]);
 
