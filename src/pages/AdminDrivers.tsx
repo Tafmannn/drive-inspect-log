@@ -280,7 +280,7 @@ export function AdminDrivers() {
               <p className="text-center py-8 text-sm text-muted-foreground">No drivers match this filter.</p>
             ) : (
               <div className="space-y-3">
-                {filtered.map(d => <DriverCard key={d.id} driver={d} perf={perfMap?.[d.userId]} />)}
+                {filtered.map(d => <DriverCard key={d.id} driver={d} perf={perfMap?.[d.userId]} onOpen={() => navigate(`/admin/drivers/${d.userId}`)} />)}
               </div>
             )}
           </>
