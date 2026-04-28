@@ -440,28 +440,47 @@ export const InspectionFlow = () => {
         // (offline / RLS edge), fall through — the server RPC will
         // still raise INSPECTION_ALREADY_SUBMITTED for blocking statuses.
       }
-      // ── 1) Upload signatures (critical for POD — do these synchronously) ──
-      // Use eagerly-captured File objects stored when the user left the signature step.
-      // Falls back to ref.toFile() only if files weren't captured (e.g. direct submit).
+      // ── 1) Capture signature File objects (no upload yet) ──
+      // We always capture the Files first so that if we end up enqueuing
+      // for offline submit, the raw signature blobs can be persisted to
+      // IndexedDB and uploaded later by the queue drainer.
       let driverSigUrl: string | null = null;
       let customerSigUrl: string | null = null;
 
       const driverFile = driverSigFile ?? (driverSigRef.current && driverSigned ? await driverSigRef.current.toFile("driver.png") : null);
-      if (driverFile) {
-        const result = await storageService.uploadImage(
-          driverFile,
-          "jobs/" + jobId + "/signatures/" + type + "/driver"
-        );
-        driverSigUrl = result.url;
-      }
-
       const customerFile = customerSigFile ?? (customerSigRef.current && customerSigned ? await customerSigRef.current.toFile("customer.png") : null);
-      if (customerFile) {
-        const result = await storageService.uploadImage(
-          customerFile,
-          "jobs/" + jobId + "/signatures/" + type + "/customer"
-        );
-        customerSigUrl = result.url;
+
+      // If we know we're offline, skip the signature upload attempt
+      // entirely — we'll enqueue the blobs and the queue drainer will
+      // upload them once connectivity returns.
+      const startedOffline = typeof navigator !== "undefined" && navigator.onLine === false;
+
+      if (!startedOffline) {
+        try {
+          if (driverFile) {
+            const result = await storageService.uploadImage(
+              driverFile,
+              "jobs/" + jobId + "/signatures/" + type + "/driver"
+            );
+            driverSigUrl = result.url;
+          }
+          if (customerFile) {
+            const result = await storageService.uploadImage(
+              customerFile,
+              "jobs/" + jobId + "/signatures/" + type + "/customer"
+            );
+            customerSigUrl = result.url;
+          }
+        } catch (sigErr) {
+          // Network drop during signature upload → fall through to the
+          // offline-enqueue path below (we still need to stage photos
+          // first, then enqueue with the un-uploaded sig blobs).
+          if (!isNetworkError(sigErr)) {
+            throw sigErr;
+          }
+          driverSigUrl = null;
+          customerSigUrl = null;
+        }
       }
 
       // ── 2) Build damage items payload ──
