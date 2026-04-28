@@ -201,21 +201,51 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="client-name">Name *</Label>
-            <Input
-              id="client-name"
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              placeholder="Contact name"
-            />
-          </div>
-          <div>
-            <Label htmlFor="client-company">Company</Label>
+            <Label htmlFor="client-company">Company {!isEdit && "*"}</Label>
             <Input
               id="client-company"
               value={form.company}
               onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
               placeholder="Company name"
+              autoFocus={!isEdit}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="client-billing-email">Billing email {!isEdit && "*"}</Label>
+              <Input
+                id="client-billing-email"
+                type="email"
+                value={form.billing_email}
+                onChange={(e) => setForm((f) => ({ ...f, billing_email: e.target.value }))}
+                placeholder="billing@example.com"
+              />
+            </div>
+            <div>
+              <Label htmlFor="client-type">Client type {!isEdit && "*"}</Label>
+              <select
+                id="client-type"
+                value={form.client_type}
+                onChange={(e) => setForm((f) => ({ ...f, client_type: e.target.value }))}
+                className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">Select…</option>
+                <option value="dealer">Dealer</option>
+                <option value="auction">Auction</option>
+                <option value="leasing">Leasing</option>
+                <option value="trade">Trade</option>
+                <option value="private">Private</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="client-name">Primary contact name</Label>
+            <Input
+              id="client-name"
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="Optional — defaults to company"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
