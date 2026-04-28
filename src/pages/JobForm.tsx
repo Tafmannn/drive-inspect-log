@@ -505,6 +505,10 @@ export const JobForm = () => {
         route_eta_minutes: routeResult.etaMinutes,
         maps_validated: true,
       } : {}),
+      ...(canEditPricing ? {
+        total_price: parseNumOrNull(adminPriceInput),
+        rate_per_mile: parseNumOrNull(ratePerMileInput),
+      } : {}),
     };
 
     try {
