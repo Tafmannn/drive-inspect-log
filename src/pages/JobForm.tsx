@@ -82,6 +82,13 @@ export const JobForm = () => {
   const [ratePerMileInput, setRatePerMileInput] = useState<string>("");
   const [minimumChargeInput, setMinimumChargeInput] = useState<string>("");
 
+  const parseNumOrNull = (v: string): number | null => {
+    const t = v.trim();
+    if (!t) return null;
+    const n = Number(t);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
+
   // Fetch active drivers for picker
   const { data: activeDrivers } = useQuery({
     queryKey: ["job-form-drivers"],
