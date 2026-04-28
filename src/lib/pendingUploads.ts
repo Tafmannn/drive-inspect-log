@@ -828,6 +828,50 @@ export async function retryUpload(
       return true;
     }
 
+    // ── Pre-flight referential checks ────────────────────────────────
+    // Catch the most common deterministic causes of repeat failures
+    // BEFORE we burn a storage upload + RPC round-trip on them. If the
+    // inspection or linked damage_item this photo points at no longer
+    // exists, retrying will fail forever — so fail fast with a clear
+    // message and let the per-item UI surface a Discard action.
+    try {
+      const { supabase: sb } = await import("@/integrations/supabase/client");
+
+      if (existing.inspectionId) {
+        const { data: insRow, error: insErr } = await sb
+          .from("inspections")
+          .select("id")
+          .eq("id", existing.inspectionId)
+          .maybeSingle();
+        if (insErr) throw insErr;
+        if (!insRow) {
+          throw new Error(
+            "INSPECTION_MISSING: linked inspection no longer exists. Discard this upload.",
+          );
+        }
+      }
+
+      if (
+        existing.photoType === "damage_close_up" &&
+        existing.damageItemId
+      ) {
+        const { data: dmgRow, error: dmgErr } = await sb
+          .from("damage_items")
+          .select("id")
+          .eq("id", existing.damageItemId)
+          .maybeSingle();
+        if (dmgErr) throw dmgErr;
+        if (!dmgRow) {
+          throw new Error(
+            "DAMAGE_ITEM_MISSING: linked damage entry no longer exists. Discard this upload.",
+          );
+        }
+      }
+    } catch (preflightErr) {
+      // Re-throw so the unified catch block below classifies + tags it.
+      throw preflightErr;
+    }
+
     const file = new File([existing.fileBlob], existing.fileName, {
       type: existing.fileBlob.type || "image/jpeg",
     });
