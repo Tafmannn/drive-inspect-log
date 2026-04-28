@@ -349,6 +349,12 @@ export const InspectionFlow = () => {
       standardPhotos: { ...prev.standardPhotos, [photoKey]: file },
       standardPhotoUrls: { ...prev.standardPhotoUrls, [photoKey]: url },
     }));
+    // Persist the File blob so the photo survives an exit/reopen of the
+    // app. Best-effort — the in-memory File is still authoritative for
+    // the current session.
+    if (jobId) {
+      void savePhotoDraftStandard(type, jobId, photoKey, file);
+    }
   };
 
   const addAdditionalPhoto = (file: File, label: string) => {
@@ -362,6 +368,9 @@ export const InspectionFlow = () => {
       ...prev,
       additionalPhotos: [...prev.additionalPhotos, draft],
     }));
+    if (jobId) {
+      void savePhotoDraftAdditional(type, jobId, draft.tempId, file, label);
+    }
   };
 
   const removeAdditionalPhoto = (tempId: string) => {
@@ -371,6 +380,9 @@ export const InspectionFlow = () => {
         (p) => p.tempId !== tempId
       ),
     }));
+    if (jobId) {
+      void removePhotoDraftAdditional(type, jobId, tempId);
+    }
   };
 
   // ───────────────── SIGNATURE HELPERS (using SignaturePad refs) ─────────────────
