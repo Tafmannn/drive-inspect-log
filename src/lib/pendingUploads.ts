@@ -1005,19 +1005,31 @@ export async function retryAllPending(options?: {
 // Job-level grouping
 // ─────────────────────────────────────────────────────────────
 
+/** Per-failed-item details surfaced in the per-job card. */
+export interface FailedUploadDetail {
+  id: string;
+  photoType: PhotoType | string;
+  label: string | null;
+  errorMessage: string | null;
+  attempts: number;
+  needsAttention: boolean;
+  createdAt: string;
+}
+
 export interface JobUploadSummary {
   jobId: string;
   jobNumber: string | null;
   vehicleReg: string | null;
   pendingCount: number;
   failedCount: number;
+  needsAttentionCount: number;
   lastErrorAt: string | null;
+  failedItems: FailedUploadDetail[];
 }
 
 export async function getPendingUploadsByJob(): Promise<JobUploadSummary[]> {
-  // Only "ready" + "failed" surface to the user. "staged" items are
-  // an internal in-flight state and must not be displayed as pending
-  // uploads (they would be misleading — they cannot be uploaded).
+  // Only "ready" + "failed" + "blocked" surface to the user. "staged"
+  // items are an internal in-flight state and must not be displayed.
   const all = (await loadAll()).filter(
     (u) => u.state === "ready" || u.state === "failed" || u.state === "blocked",
   );
@@ -1033,7 +1045,9 @@ export async function getPendingUploadsByJob(): Promise<JobUploadSummary[]> {
         vehicleReg: u.vehicleReg ?? null,
         pendingCount: 0,
         failedCount: 0,
+        needsAttentionCount: 0,
         lastErrorAt: null,
+        failedItems: [],
       };
       map.set(u.jobId, entry);
     }
@@ -1042,6 +1056,16 @@ export async function getPendingUploadsByJob(): Promise<JobUploadSummary[]> {
     // "blocked" surfaces as failed in the UI so it gets visible attention.
     if (u.state === "failed" || u.state === "blocked") {
       entry.failedCount++;
+      if (u.needsAttention) entry.needsAttentionCount++;
+      entry.failedItems.push({
+        id: u.id,
+        photoType: u.photoType,
+        label: u.label ?? null,
+        errorMessage: u.errorMessage ?? null,
+        attempts: u.attempts ?? 0,
+        needsAttention: !!u.needsAttention,
+        createdAt: u.createdAt,
+      });
       if (u.errorMessage) {
         const errTime = u.completedAt || u.createdAt;
         if (!entry.lastErrorAt || errTime > entry.lastErrorAt) {
@@ -1058,14 +1082,42 @@ export async function getPendingJobCount(): Promise<number> {
   return (await getPendingUploadsByJob()).length;
 }
 
+/**
+ * Manually retry a single queued upload by id. Bypasses the
+ * `needsAttention` skip applied to bulk retries — manual taps are the
+ * escape hatch for deterministic failures the user has investigated.
+ * Also clears the `needsAttention` flag so the next attempt starts clean.
+ */
+export async function retrySingleUpload(id: string): Promise<boolean> {
+  await updateOne(id, (u) => ({
+    ...u,
+    needsAttention: false,
+    errorMessage: u.errorMessage,
+  }));
+  return retryUpload(id);
+}
+
+/**
+ * Permanently remove a single queued upload (used by the per-item
+ * Discard action in PendingUploads). This is destructive — the photo
+ * blob and metadata are dropped from IDB.
+ */
+export async function discardPendingUpload(id: string): Promise<void> {
+  await removeOne(id);
+  notifyEvidenceQueueChanged();
+}
+
 export async function retryJobUploads(
   jobId: string,
 ): Promise<{ succeeded: number; failed: number }> {
   const all = await loadAll();
+  // Skip needsAttention items in the bulk per-job retry too — those
+  // require explicit user action via the per-item Retry button.
   const targets = all.filter(
     (u) =>
       u.jobId === jobId &&
-      (u.state === "ready" || u.state === "failed" || u.state === "blocked"),
+      (u.state === "ready" || u.state === "failed" || u.state === "blocked") &&
+      !u.needsAttention,
   );
 
   let succeeded = 0;
