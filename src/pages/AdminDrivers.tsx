@@ -19,9 +19,11 @@ import { useAuth } from "@/context/AuthContext";
 import { getStatusStyle } from "@/lib/statusConfig";
 import {
   AlertTriangle, Phone, Truck, User, ShieldAlert, CreditCard,
-  Activity, CheckCircle2, AlertOctagon,
+  Activity, CheckCircle2, AlertOctagon, ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { scoreDriver } from "@/features/onboarding/lib/completion";
+import { CompletionBadge } from "@/features/onboarding/components/CompletionBadge";
 
 /* ─── Filter pills ──────────────────────────────────────────────── */
 
@@ -89,12 +91,27 @@ function PerformanceStrip({ perf }: { perf: DriverPerformance | undefined }) {
   );
 }
 
-function DriverCard({ driver, perf }: { driver: AdminDriverRow; perf?: DriverPerformance }) {
+function DriverCard({ driver, perf, onOpen }: { driver: AdminDriverRow; perf?: DriverPerformance; onOpen: () => void }) {
   const hasRisk = driver.licenceExpiring || driver.missingPlate;
   const statusStyle = driver.latestJobStatus ? getStatusStyle(driver.latestJobStatus) : null;
+  const completion = scoreDriver({
+    full_name: driver.fullNameRaw,
+    phone: driver.phone,
+    licence_number: driver.licenceNumber,
+    licence_expiry: driver.licenceExpiry,
+    right_to_work: driver.rightToWork,
+    home_postcode: driver.homePostcode,
+    payout_terms: driver.payoutTerms,
+    bank_captured: driver.bankCaptured,
+    trade_plate_number: driver.tradePlateNumber,
+  });
 
   return (
-    <div className="rounded-xl border bg-card p-4 space-y-3">
+    <button
+      type="button"
+      onClick={onOpen}
+      className="w-full text-left rounded-xl border bg-card p-4 space-y-3 transition-colors hover:bg-muted/30 active:bg-muted/40"
+    >
       {/* Header row */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
@@ -106,15 +123,18 @@ function DriverCard({ driver, perf }: { driver: AdminDriverRow; perf?: DriverPer
               {driver.displayName || driver.fullName}
             </p>
             {driver.phone && (
-              <a href={`tel:${driver.phone}`} className="text-xs text-muted-foreground flex items-center gap-1">
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
                 <Phone className="h-3 w-3" /> {driver.phone}
-              </a>
+              </span>
             )}
           </div>
         </div>
-        <Badge variant={driver.isActive ? "default" : "secondary"} className="shrink-0 text-[11px]">
-          {driver.isActive ? "Active" : "Inactive"}
-        </Badge>
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <CompletionBadge result={completion} />
+          <Badge variant={driver.isActive ? "default" : "secondary"} className="text-[11px]">
+            {driver.isActive ? "Active" : "Inactive"}
+          </Badge>
+        </div>
       </div>
 
       {/* Workload row */}
