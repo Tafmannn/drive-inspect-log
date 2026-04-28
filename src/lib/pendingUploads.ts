@@ -121,6 +121,22 @@ export interface PendingUpload {
   damageItemId?: string | null;
 
   /**
+   * Number of upload attempts that have ended in `failed`. Used to
+   * de-prioritise items that keep failing for the same deterministic
+   * reason so they stop blocking Retry All but remain visible and
+   * manually retriable in the per-item UI.
+   */
+  attempts?: number;
+
+  /**
+   * Set when the failure is classified as deterministic (RLS, foreign
+   * key, validation). Items with this flag are NOT picked up by
+   * `retryAllPending` / `retryJobUploads` (auto retry) but CAN still
+   * be retried via `retryUpload(id)` directly from the per-item UI.
+   */
+  needsAttention?: boolean;
+
+  /**
    * Job's `current_run_id` at the time this photo was queued.
    * The retry worker compares to job's *current* run before uploading.
    */
@@ -154,6 +170,40 @@ export interface PendingUpload {
 // ─────────────────────────────────────────────────────────────
 
 const inFlight = new Set<string>();
+
+// ─────────────────────────────────────────────────────────────
+// Deterministic error classification
+// ─────────────────────────────────────────────────────────────
+// A "deterministic" failure is one where retrying without changing
+// anything will keep failing: RLS denies, FK violations, missing
+// inspection/run, validation/check constraint errors, payload-shape
+// errors. We tag items with these as `needsAttention` so the auto
+// retry loop stops re-running them on every focus/online event.
+//
+// Network/timeout/5xx errors are NOT deterministic — those stay in
+// the regular `failed` lane and keep getting retried.
+function isDeterministicFailure(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes("row-level security") ||
+    m.includes("rls") ||
+    m.includes("violates foreign key") ||
+    m.includes("violates check constraint") ||
+    m.includes("violates not-null") ||
+    m.includes("duplicate key") ||
+    m.includes("permission denied") ||
+    m.includes("invalid input syntax") ||
+    m.includes("run_unverified") ||
+    m.includes("linkage_patch_failed") ||
+    m.includes("damage_item_missing") ||
+    m.includes("inspection_missing") ||
+    m.includes("400") ||
+    m.includes("401") ||
+    m.includes("403") ||
+    m.includes("404") ||
+    m.includes("422")
+  );
+}
 
 // ─────────────────────────────────────────────────────────────
 // IndexedDB helpers
@@ -778,6 +828,66 @@ export async function retryUpload(
       return true;
     }
 
+    // ── Pre-flight referential checks ────────────────────────────────
+    // Catch the most common deterministic causes of repeat failures
+    // BEFORE we burn a storage upload + RPC round-trip on them. If the
+    // inspection or linked damage_item this photo points at no longer
+    // exists, retrying will fail forever — so fail fast with a clear
+    // message and let the per-item UI surface a Discard action.
+    //
+    // IMPORTANT: only a *definitive* "not found" is treated as a hard
+    // error. Lookup errors (network, RLS) are swallowed so we don't
+    // turn a transient blip into a permanently-stuck item — the real
+    // upload attempt below will still classify those correctly.
+    try {
+      const { supabase: sb } = await import("@/integrations/supabase/client");
+
+      if (existing.inspectionId) {
+        try {
+          const { data: insRow, error: insErr } = await sb
+            .from("inspections")
+            .select("id")
+            .eq("id", existing.inspectionId)
+            .maybeSingle();
+          if (!insErr && insRow === null) {
+            throw new Error(
+              "INSPECTION_MISSING: linked inspection no longer exists. Discard this upload.",
+            );
+          }
+        } catch (e) {
+          if (e instanceof Error && e.message.startsWith("INSPECTION_MISSING")) {
+            throw e;
+          }
+          // swallow lookup error — fall through to real upload
+        }
+      }
+
+      if (
+        existing.photoType === "damage_close_up" &&
+        existing.damageItemId
+      ) {
+        try {
+          const { data: dmgRow, error: dmgErr } = await sb
+            .from("damage_items")
+            .select("id")
+            .eq("id", existing.damageItemId)
+            .maybeSingle();
+          if (!dmgErr && dmgRow === null) {
+            throw new Error(
+              "DAMAGE_ITEM_MISSING: linked damage entry no longer exists. Discard this upload.",
+            );
+          }
+        } catch (e) {
+          if (e instanceof Error && e.message.startsWith("DAMAGE_ITEM_MISSING")) {
+            throw e;
+          }
+          // swallow lookup error — fall through to real upload
+        }
+      }
+    } catch (preflightErr) {
+      throw preflightErr;
+    }
+
     const file = new File([existing.fileBlob], existing.fileName, {
       type: existing.fileBlob.type || "image/jpeg",
     });
@@ -835,12 +945,22 @@ export async function retryUpload(
     return true;
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Upload failed";
+    const deterministic = isDeterministicFailure(msg);
 
     await updateOne(id, (u) => ({
       ...u,
       state: "failed",
       status: "failed",
       errorMessage: msg,
+      attempts: (u.attempts ?? 0) + 1,
+      // Mark deterministic failures as needs-attention so the auto-retry
+      // loops (Retry All / online drainer) skip them. The per-item Retry
+      // button still works as a manual escape hatch.
+      needsAttention: deterministic
+        ? true
+        : (u.attempts ?? 0) + 1 >= 5
+          ? true
+          : u.needsAttention ?? false,
     }));
     notifyEvidenceQueueChanged();
 
@@ -850,7 +970,12 @@ export async function retryUpload(
       jobId: item?.jobId,
       source: "storage",
       type: "upload",
-      context: { pendingId: id, error: msg },
+      context: {
+        pendingId: id,
+        error: msg,
+        deterministic,
+        attempts: item?.attempts ?? null,
+      },
     });
 
     return false;
@@ -867,8 +992,16 @@ export async function retryAllPending(options?: {
   const all = await loadAll();
   // STAGED items are NEVER picked up by the worker — they are not
   // "uploadable" until promoteSubmissionSession() flips them to ready.
+  // `needsAttention` items are skipped here too: they have a
+  // deterministic failure (RLS / FK / validation) and would just keep
+  // failing on every focus/online drain. The user must retry them
+  // explicitly from the per-item UI.
   const targets = all.filter(
-    (u) => u.state === "ready" || u.state === "failed" || u.state === "blocked",
+    (u) =>
+      (u.state === "ready" ||
+        u.state === "failed" ||
+        u.state === "blocked") &&
+      !u.needsAttention,
   );
 
   let succeeded = 0;
@@ -888,19 +1021,31 @@ export async function retryAllPending(options?: {
 // Job-level grouping
 // ─────────────────────────────────────────────────────────────
 
+/** Per-failed-item details surfaced in the per-job card. */
+export interface FailedUploadDetail {
+  id: string;
+  photoType: PhotoType | string;
+  label: string | null;
+  errorMessage: string | null;
+  attempts: number;
+  needsAttention: boolean;
+  createdAt: string;
+}
+
 export interface JobUploadSummary {
   jobId: string;
   jobNumber: string | null;
   vehicleReg: string | null;
   pendingCount: number;
   failedCount: number;
+  needsAttentionCount: number;
   lastErrorAt: string | null;
+  failedItems: FailedUploadDetail[];
 }
 
 export async function getPendingUploadsByJob(): Promise<JobUploadSummary[]> {
-  // Only "ready" + "failed" surface to the user. "staged" items are
-  // an internal in-flight state and must not be displayed as pending
-  // uploads (they would be misleading — they cannot be uploaded).
+  // Only "ready" + "failed" + "blocked" surface to the user. "staged"
+  // items are an internal in-flight state and must not be displayed.
   const all = (await loadAll()).filter(
     (u) => u.state === "ready" || u.state === "failed" || u.state === "blocked",
   );
@@ -916,7 +1061,9 @@ export async function getPendingUploadsByJob(): Promise<JobUploadSummary[]> {
         vehicleReg: u.vehicleReg ?? null,
         pendingCount: 0,
         failedCount: 0,
+        needsAttentionCount: 0,
         lastErrorAt: null,
+        failedItems: [],
       };
       map.set(u.jobId, entry);
     }
@@ -925,6 +1072,16 @@ export async function getPendingUploadsByJob(): Promise<JobUploadSummary[]> {
     // "blocked" surfaces as failed in the UI so it gets visible attention.
     if (u.state === "failed" || u.state === "blocked") {
       entry.failedCount++;
+      if (u.needsAttention) entry.needsAttentionCount++;
+      entry.failedItems.push({
+        id: u.id,
+        photoType: u.photoType,
+        label: u.label ?? null,
+        errorMessage: u.errorMessage ?? null,
+        attempts: u.attempts ?? 0,
+        needsAttention: !!u.needsAttention,
+        createdAt: u.createdAt,
+      });
       if (u.errorMessage) {
         const errTime = u.completedAt || u.createdAt;
         if (!entry.lastErrorAt || errTime > entry.lastErrorAt) {
@@ -941,14 +1098,42 @@ export async function getPendingJobCount(): Promise<number> {
   return (await getPendingUploadsByJob()).length;
 }
 
+/**
+ * Manually retry a single queued upload by id. Bypasses the
+ * `needsAttention` skip applied to bulk retries — manual taps are the
+ * escape hatch for deterministic failures the user has investigated.
+ * Also clears the `needsAttention` flag so the next attempt starts clean.
+ */
+export async function retrySingleUpload(id: string): Promise<boolean> {
+  await updateOne(id, (u) => ({
+    ...u,
+    needsAttention: false,
+    errorMessage: u.errorMessage,
+  }));
+  return retryUpload(id);
+}
+
+/**
+ * Permanently remove a single queued upload (used by the per-item
+ * Discard action in PendingUploads). This is destructive — the photo
+ * blob and metadata are dropped from IDB.
+ */
+export async function discardPendingUpload(id: string): Promise<void> {
+  await removeOne(id);
+  notifyEvidenceQueueChanged();
+}
+
 export async function retryJobUploads(
   jobId: string,
 ): Promise<{ succeeded: number; failed: number }> {
   const all = await loadAll();
+  // Skip needsAttention items in the bulk per-job retry too — those
+  // require explicit user action via the per-item Retry button.
   const targets = all.filter(
     (u) =>
       u.jobId === jobId &&
-      (u.state === "ready" || u.state === "failed" || u.state === "blocked"),
+      (u.state === "ready" || u.state === "failed" || u.state === "blocked") &&
+      !u.needsAttention,
   );
 
   let succeeded = 0;
