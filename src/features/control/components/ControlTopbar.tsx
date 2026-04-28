@@ -9,9 +9,11 @@ import { NotificationsPopover } from "./NotificationsPopover";
 export function ControlTopbar({
   title,
   actions,
+  leading,
 }: {
   title?: string;
   actions?: React.ReactNode;
+  leading?: React.ReactNode;
 }) {
   const { userName } = useControlAccess();
   const [cmdOpen, setCmdOpen] = useState(false);
@@ -30,10 +32,18 @@ export function ControlTopbar({
 
   return (
     <>
-      <header className="h-14 shrink-0 border-b bg-card flex items-center justify-between px-6 gap-4">
-        {/* Left: breadcrumb / title */}
-        <div className="flex items-center gap-3 min-w-0">
-          <Breadcrumbs compact />
+      <header className="h-14 shrink-0 border-b bg-card flex items-center justify-between px-4 lg:px-6 gap-2 lg:gap-4">
+        {/* Left: leading slot (mobile menu) + breadcrumb / title */}
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          {leading}
+          <div className="min-w-0 hidden sm:block">
+            <Breadcrumbs compact />
+          </div>
+          {title && (
+            <span className="sm:hidden text-sm font-semibold truncate text-foreground">
+              {title}
+            </span>
+          )}
         </div>
 
         {/* Right: actions */}
