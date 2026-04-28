@@ -47,6 +47,7 @@ import OrganisationProfileDetail from "./features/onboarding/pages/OrganisationP
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { useEffect } from "react";
 import { installRetryTriggers, triggerRetry } from "@/lib/retryOrchestrator";
+import { installSubmitQueueDrainer, drainSubmitQueue } from "@/lib/submitQueue";
 import { Loader2 } from "lucide-react";
 
 /* ── Command Center imports ── */
@@ -77,16 +78,24 @@ function BackgroundUploader() {
   const { authLoading, user } = useAuth();
 
   // Retry on auth-ready (initial app boot + later sign-ins).
+  // Drain queued offline submissions FIRST so their photos get
+  // promoted before the photo-upload worker picks anything up.
   useEffect(() => {
     if (authLoading || !user) return;
-    void triggerRetry("auth_ready");
+    void drainSubmitQueue().finally(() => {
+      void triggerRetry("auth_ready");
+    });
   }, [authLoading, user]);
 
   // Install global online/visibility/focus triggers exactly once per
   // app lifetime so a returning driver auto-flushes their queue.
   useEffect(() => {
-    const cleanup = installRetryTriggers();
-    return cleanup;
+    const cleanupRetry = installRetryTriggers();
+    const cleanupSubmit = installSubmitQueueDrainer();
+    return () => {
+      cleanupRetry();
+      cleanupSubmit();
+    };
   }, []);
 
   return null;
