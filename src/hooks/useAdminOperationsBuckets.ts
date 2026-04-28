@@ -10,6 +10,7 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { listAcknowledgedEvidenceJobIds } from "@/lib/evidenceAckApi";
 
 export interface OperationsBucketCounts {
   todays_active: number;
@@ -92,17 +93,31 @@ export function useAdminOperationsBuckets() {
             .in("status", ADMIN_REVIEW_STATUSES),
         ),
         // Blocked by evidence — proxy: review/completed status with a
-        // missing pickup or delivery inspection flag.
-        safeCount(
-          supabase
+        // missing pickup or delivery inspection flag. Returns ids so we
+        // can subtract admin-resolved acks below (keeps this tile in
+        // sync with the Missing Evidence queue's "Mark resolved" action).
+        (async () => {
+          const { data, error } = await supabase
             .from("jobs")
-            .select("id", { count: "exact", head: true })
+            .select("id")
             .eq("is_hidden", false)
             .in("status", [...ADMIN_REVIEW_STATUSES, ...TERMINAL_STATUSES])
             .or(
               "has_pickup_inspection.eq.false,has_delivery_inspection.eq.false",
-            ),
-        ),
+            );
+          if (error) {
+            console.warn("[buckets] blocked_evidence query failed", error.message);
+            return 0;
+          }
+          const ids = (data ?? []).map((r) => r.id as string);
+          let dismissed: Set<string> = new Set();
+          try {
+            dismissed = await listAcknowledgedEvidenceJobIds();
+          } catch {
+            /* non-fatal */
+          }
+          return ids.filter((id) => !dismissed.has(id)).length;
+        })(),
         // Ready to invoice — completed/closed, with price and client and
         // both inspections present. We don't try to filter "not yet
         // invoiced" here (requires invoice_items join); the finance page
