@@ -1,0 +1,2 @@
+ALTER TABLE public.attention_acknowledgements REPLICA IDENTITY FULL;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.attention_acknowledgements;
