@@ -1298,16 +1298,76 @@ export const JobForm = () => {
             </div>
           )}
 
+          {/* Admin-only pricing controls */}
+          {canEditPricing && (
+            <SectionCard className="p-4 space-y-3">
+              <SectionHeader
+                icon={<PoundSterling className="h-4 w-4" />}
+                eyebrow="Pricing"
+                title="Job price"
+                adminOnly
+                right={<StatusPill tone={adminPriceInput.trim() ? "success" : "neutral"}>{adminPriceInput.trim() ? "Manual" : "Not set"}</StatusPill>}
+              />
+              <AdvisoryNote>
+                Manually set the final job price here. This is what invoices will use. Leave per-mile / minimum blank to fall back to the client rate card or org defaults.
+              </AdvisoryNote>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <Label htmlFor="job-total-price" className="text-xs">Job price £ (final)</Label>
+                  <Input
+                    id="job-total-price"
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    inputMode="decimal"
+                    value={adminPriceInput}
+                    onChange={(e) => setAdminPriceInput(e.target.value)}
+                    placeholder="e.g. 250.00"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="job-rate-per-mile" className="text-xs">Rate £/mile (override)</Label>
+                  <Input
+                    id="job-rate-per-mile"
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    inputMode="decimal"
+                    value={ratePerMileInput}
+                    onChange={(e) => setRatePerMileInput(e.target.value)}
+                    placeholder="defaults to client/org"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="job-min-charge" className="text-xs">Min charge £ (override)</Label>
+                  <Input
+                    id="job-min-charge"
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    inputMode="decimal"
+                    value={minimumChargeInput}
+                    onChange={(e) => setMinimumChargeInput(e.target.value)}
+                    placeholder="defaults to client/org"
+                  />
+                </div>
+              </div>
+            </SectionCard>
+          )}
+
           {/* Pricing Suggestion (admin advisory only) */}
           <PricingSuggestionPanel
             jobId={isEdit ? jobId ?? null : null}
             orgId={(existingJob as { org_id?: string } | undefined)?.org_id ?? null}
-            clientId={(existingJob as { client_id?: string | null } | undefined)?.client_id ?? null}
-            currentTotalPrice={(existingJob as { total_price?: number | null } | undefined)?.total_price ?? null}
+            clientId={selectedClientId ?? (existingJob as { client_id?: string | null } | undefined)?.client_id ?? null}
+            currentTotalPrice={parseNumOrNull(adminPriceInput) ?? (existingJob as { total_price?: number | null } | undefined)?.total_price ?? null}
             inputs={{
               routeMiles: routeResult?.valid ? routeResult.distanceMiles : null,
               urgency: "standard",
+              ratePerMileOverride: parseNumOrNull(ratePerMileInput),
+              minimumChargeOverride: parseNumOrNull(minimumChargeInput),
             }}
+            onAccepted={(p) => setAdminPriceInput(String(p))}
           />
 
           <Button
