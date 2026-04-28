@@ -12,13 +12,26 @@ type JobRow = Tables<"jobs">;
 
 /* ── helpers ────────────────────────────────────────────────────── */
 
-let _counter = 0;
+function stablePart(value: string | undefined, fallback: string): string {
+  const text = (value ?? fallback).toLowerCase().trim();
+  const slug = text.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return slug || fallback;
+}
 
-/** Collision-resistant unique ID. Deterministic prefix for debuggability. */
-function uniqueExcId(category: string, jobId?: string): string {
-  _counter += 1;
-  const rand = Math.random().toString(36).slice(2, 8);
-  return `${category}-${jobId?.slice(0, 8) ?? "global"}-${_counter}-${rand}`;
+function hashText(value: string): string {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = Math.imul(31, hash) + value.charCodeAt(i) | 0;
+  }
+  return Math.abs(hash).toString(36);
+}
+
+/** Stable ID so acknowledgements survive refetches/navigation. */
+function stableExcId(partial: Omit<AttentionException, "id">): string {
+  const jobPart = partial.jobId ?? "global";
+  const titlePart = stablePart(partial.title, "exception");
+  const detailPart = hashText(partial.detail ?? "");
+  return `${partial.category}:${jobPart}:${titlePart}:${detailPart}`;
 }
 
 function minutesAgo(iso: string): number {
@@ -28,7 +41,7 @@ function minutesAgo(iso: string): number {
 function exc(
   partial: Omit<AttentionException, "id">,
 ): AttentionException {
-  return { ...partial, id: uniqueExcId(partial.category, partial.jobId) };
+  return { ...partial, id: stableExcId(partial) };
 }
 
 /* ── Timing exceptions ─────────────────────────────────────────── */
