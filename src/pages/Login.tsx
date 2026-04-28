@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, Mail, Lock } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { TEST_CREDENTIALS, hasTestCredentials } from "@/dev/testCredentials";
 
 export const Login = () => {
   const navigate = useNavigate();
@@ -154,6 +155,20 @@ export const Login = () => {
               {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Sign in
             </Button>
+
+            {/* Dev-only quick fill */}
+            {import.meta.env.DEV && hasTestCredentials() && (
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail(TEST_CREDENTIALS.email);
+                  setPassword(TEST_CREDENTIALS.password);
+                }}
+                className="w-full text-[11px] uppercase tracking-[0.18em] text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                Fill test credentials (dev)
+              </button>
+            )}
           </form>
 
           {/* Footer */}
