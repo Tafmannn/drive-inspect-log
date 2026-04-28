@@ -45,6 +45,7 @@ import { PhotoViewer } from "@/components/PhotoViewer";
 import { resolveMediaUrlAsync } from "@/lib/mediaResolver";
 import { PricingSuggestionPanel } from "@/components/PricingSuggestionPanel";
 import { PricingAuditTimeline } from "@/components/PricingAuditTimeline";
+import { JobPriceEditor } from "@/components/JobPriceEditor";
 import { RoleScope, EvidenceHealthBanner, JobHeaderCard } from "@/components/ui-kit";
 import { JobAdminControls } from "@/features/jobs/components/JobAdminControls";
 import { evaluateEvidenceHealth } from "@/lib/evidenceHealth";
