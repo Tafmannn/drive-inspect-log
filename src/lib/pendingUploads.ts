@@ -826,6 +826,7 @@ export async function retryUpload(
           ...u,
           state: "blocked",
           status: "failed",
+        lastErrorAt: new Date().toISOString(),
           errorMessage:
             "Run unverified — left queued. Will retry once the job is reachable.",
         }));
@@ -851,6 +852,7 @@ export async function retryUpload(
         completedAt: u.completedAt ?? new Date().toISOString(),
         errorMessage: null,
       }));
+      notifyEvidenceQueueChanged();
       return true;
     }
 
@@ -972,20 +974,24 @@ export async function retryUpload(
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Upload failed";
     const deterministic = isDeterministicFailure(msg);
+    const transient = isTransientUploadFailure(msg);
+    const nowIso = new Date().toISOString();
 
     await updateOne(id, (u) => ({
       ...u,
       state: "failed",
       status: "failed",
       errorMessage: msg,
+      lastErrorAt: nowIso,
       attempts: (u.attempts ?? 0) + 1,
-      // Mark deterministic failures as needs-attention so the auto-retry
-      // loops (Retry All / online drainer) skip them. The per-item Retry
-      // button still works as a manual escape hatch.
+      // Only deterministic failures are parked for manual attention.
+      // Browser/network failures like Safari "Load failed" stay eligible
+      // for Retry All / online auto-drain forever, preserving evidence and
+      // preventing a misleading "No items needed retry" toast.
       needsAttention: deterministic
         ? true
-        : (u.attempts ?? 0) + 1 >= 5
-          ? true
+        : transient
+          ? false
           : u.needsAttention ?? false,
     }));
     notifyEvidenceQueueChanged();
