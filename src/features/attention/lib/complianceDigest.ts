@@ -8,6 +8,7 @@ import type { AttentionException } from "../types/exceptionTypes";
 export type DigestEntityType = "driver" | "client" | "organisation" | "other";
 
 export interface DigestGroup {
+  id: string;
   entityType: DigestEntityType;
   entityId: string;
   entityName: string;
