@@ -929,12 +929,22 @@ export async function retryUpload(
     return true;
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Upload failed";
+    const deterministic = isDeterministicFailure(msg);
 
     await updateOne(id, (u) => ({
       ...u,
       state: "failed",
       status: "failed",
       errorMessage: msg,
+      attempts: (u.attempts ?? 0) + 1,
+      // Mark deterministic failures as needs-attention so the auto-retry
+      // loops (Retry All / online drainer) skip them. The per-item Retry
+      // button still works as a manual escape hatch.
+      needsAttention: deterministic
+        ? true
+        : (u.attempts ?? 0) + 1 >= 5
+          ? true
+          : u.needsAttention ?? false,
     }));
     notifyEvidenceQueueChanged();
 
@@ -944,7 +954,12 @@ export async function retryUpload(
       jobId: item?.jobId,
       source: "storage",
       type: "upload",
-      context: { pendingId: id, error: msg },
+      context: {
+        pendingId: id,
+        error: msg,
+        deterministic,
+        attempts: item?.attempts ?? null,
+      },
     });
 
     return false;
