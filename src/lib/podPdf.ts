@@ -740,6 +740,66 @@ async function buildImageCache(
     }),
   ]);
 
+  // Retry pass: a transient network blip during the burst above can silently
+  // drop photos from the POD (rendered as "Photo unavailable"). Mirror the
+  // JobDetail gallery behaviour and try failed images again, with one short
+  // pause and one final attempt. This is bounded to the URLs we already
+  // failed, so cost is proportional to the failure rate, not the photo count.
+  const failedPhotoUrls = uniquePhotoUrls.filter((u) => !imageCache.get(u));
+  const failedSigEntries = Array.from(sigUrlMap.entries()).filter(
+    ([origUrl]) => !imageCache.get(origUrl),
+  );
+
+  if (failedPhotoUrls.length > 0 || failedSigEntries.length > 0) {
+    debugLog("Retrying failed POD images", {
+      photos: failedPhotoUrls.length,
+      signatures: failedSigEntries.length,
+    });
+    await new Promise((r) => setTimeout(r, 800));
+    await Promise.allSettled([
+      ...failedPhotoUrls.map(async (url) => {
+        const image = await loadImage(url, { isSignature: false });
+        if (image) imageCache.set(url, image);
+      }),
+      ...failedSigEntries.map(async ([origUrl, resolvedUrl]) => {
+        const image = await loadImage(resolvedUrl, { isSignature: true });
+        if (image) imageCache.set(origUrl, image);
+      }),
+    ]);
+
+    // Final attempt for anything still missing — re-resolve the URL in case
+    // the original signed URL has expired between attempts.
+    const stillFailed = uniquePhotoUrls.filter((u) => !imageCache.get(u));
+    if (stillFailed.length > 0) {
+      await new Promise((r) => setTimeout(r, 1500));
+      await Promise.allSettled(
+        stillFailed.map(async (url) => {
+          const image = await loadImage(url, { isSignature: false });
+          if (image) imageCache.set(url, image);
+        }),
+      );
+      const finalMissing = uniquePhotoUrls.filter((u) => !imageCache.get(u));
+      if (finalMissing.length > 0) {
+        try {
+          const { logClientEvent } = await import("./logger");
+          void logClientEvent("pod_pdf_photo_missing", "warn", {
+            jobId: meta?.jobId,
+            message: `${finalMissing.length}/${uniquePhotoUrls.length} POD photos failed to load after retries`,
+            source: "storage",
+            type: "upload",
+            context: {
+              orgId: meta?.orgId,
+              missingCount: finalMissing.length,
+              totalCount: uniquePhotoUrls.length,
+            },
+          });
+        } catch {
+          // best-effort logging
+        }
+      }
+    }
+  }
+
   return imageCache;
 }
 
