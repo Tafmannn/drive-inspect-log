@@ -172,6 +172,40 @@ export interface PendingUpload {
 const inFlight = new Set<string>();
 
 // ─────────────────────────────────────────────────────────────
+// Deterministic error classification
+// ─────────────────────────────────────────────────────────────
+// A "deterministic" failure is one where retrying without changing
+// anything will keep failing: RLS denies, FK violations, missing
+// inspection/run, validation/check constraint errors, payload-shape
+// errors. We tag items with these as `needsAttention` so the auto
+// retry loop stops re-running them on every focus/online event.
+//
+// Network/timeout/5xx errors are NOT deterministic — those stay in
+// the regular `failed` lane and keep getting retried.
+function isDeterministicFailure(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes("row-level security") ||
+    m.includes("rls") ||
+    m.includes("violates foreign key") ||
+    m.includes("violates check constraint") ||
+    m.includes("violates not-null") ||
+    m.includes("duplicate key") ||
+    m.includes("permission denied") ||
+    m.includes("invalid input syntax") ||
+    m.includes("run_unverified") ||
+    m.includes("linkage_patch_failed") ||
+    m.includes("damage_item_missing") ||
+    m.includes("inspection_missing") ||
+    m.includes("400") ||
+    m.includes("401") ||
+    m.includes("403") ||
+    m.includes("404") ||
+    m.includes("422")
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // IndexedDB helpers
 // ─────────────────────────────────────────────────────────────
 
