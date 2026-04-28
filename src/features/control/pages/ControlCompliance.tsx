@@ -16,6 +16,7 @@ import {
   type OutstandingDamageRow,
 } from "../hooks/useControlComplianceData";
 import { useAttentionData } from "@/features/attention/hooks/useAttentionData";
+import { ComplianceDigest } from "@/features/attention/components/ComplianceDigest";
 import type { AttentionException } from "@/features/attention/types/exceptionTypes";
 import { format } from "date-fns";
 
@@ -204,6 +205,8 @@ export function ControlCompliance() {
           onRowClick={(e) => e.actionRoute && navigate(e.actionRoute)}
         />
       </ControlSection>
+
+      <ComplianceDigest exceptions={complianceAlerts} loading={attentionLoading} />
 
       <div className="grid lg:grid-cols-2 gap-4">
         <ControlSection

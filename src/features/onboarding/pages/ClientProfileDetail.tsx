@@ -53,6 +53,20 @@ export default function ClientProfileDetail() {
     return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
   }
 
+  if (!client) {
+    return (
+      <div className="min-h-screen bg-background">
+        <AppHeader title="Client Profile" showBack onBack={() => navigate("/control/clients")} />
+        <div className="p-6 max-w-lg mx-auto text-center space-y-3">
+          <AlertTriangle className="w-8 h-8 mx-auto text-muted-foreground" />
+          <h2 className="text-lg font-semibold">Client not found</h2>
+          <p className="text-sm text-muted-foreground">This client may have been removed or the link is no longer valid.</p>
+          <Button variant="outline" onClick={() => navigate("/control/clients")}>Back to clients</Button>
+        </div>
+        <BottomNav />
+      </div>
+    );
+  }
   const completion = scoreClient(client);
 
   return (

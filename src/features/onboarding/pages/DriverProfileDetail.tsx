@@ -69,6 +69,25 @@ export default function DriverProfileDetail() {
     );
   }
 
+  if (!driver && !profile) {
+    return (
+      <div className="min-h-screen bg-background">
+        <AppHeader title="Driver Profile" showBack onBack={() => navigate("/admin/drivers")} />
+        <div className="p-6 max-w-lg mx-auto text-center space-y-3">
+          <AlertTriangle className="w-8 h-8 mx-auto text-muted-foreground" />
+          <h2 className="text-lg font-semibold">Driver not found</h2>
+          <p className="text-sm text-muted-foreground">
+            This driver may have been archived or the link is no longer valid.
+          </p>
+          <Button variant="outline" onClick={() => navigate("/admin/drivers")}>
+            Back to drivers
+          </Button>
+        </div>
+        <BottomNav />
+      </div>
+    );
+  }
+
   const completion = scoreDriver(driver);
   const name = driver?.full_name || profile?.full_name || profile?.email || "Driver";
 
