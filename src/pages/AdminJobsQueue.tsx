@@ -29,6 +29,7 @@ import { qk } from "@/lib/queryKeys";
 import { acknowledgeMissingEvidence } from "@/lib/evidenceAckApi";
 import { invalidateAdminOperationalQueues } from "@/lib/mutationEvents";
 import { toast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   AlertTriangle, Truck, ClipboardCheck, CheckCircle, Search,
   UserX, Clock, ImageOff, ShieldCheck,
@@ -50,6 +51,7 @@ const FILTERS: { value: QueueFilter; label: string; icon: React.ComponentType<{ 
 export function AdminJobsQueue() {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const confirm = useConfirm();
   const [searchParams] = useSearchParams();
   const { data: queues, isLoading, error } = useAdminJobQueues();
   const { data: kpis } = useAdminJobQueueKpis();
@@ -79,9 +81,15 @@ export function AdminJobsQueue() {
 
   const handleDismissEvidence = async (job: AdminJobRow) => {
     const ref = job.external_job_number || `Job ${job.id.slice(0, 8)}`;
-    if (!window.confirm(`Remove ${ref} from the Missing Evidence queue?\n\nThis records an admin acknowledgement and hides the job from this list. It does not change the job status or evidence on file.`)) {
-      return;
-    }
+    const ok = await confirm({
+      title: `Remove ${ref} from Missing Evidence queue?`,
+      description:
+        "This records an admin acknowledgement and hides the job from this queue. It does not change the job status or evidence on file.",
+      confirmLabel: "Confirm Removal",
+      cancelLabel: "Cancel",
+      tone: "danger",
+    });
+    if (!ok) return;
     setDismissingId(job.id);
     try {
       await acknowledgeMissingEvidence(job.id);
