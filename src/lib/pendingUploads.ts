@@ -834,20 +834,31 @@ export async function retryUpload(
     // inspection or linked damage_item this photo points at no longer
     // exists, retrying will fail forever — so fail fast with a clear
     // message and let the per-item UI surface a Discard action.
+    //
+    // IMPORTANT: only a *definitive* "not found" is treated as a hard
+    // error. Lookup errors (network, RLS) are swallowed so we don't
+    // turn a transient blip into a permanently-stuck item — the real
+    // upload attempt below will still classify those correctly.
     try {
       const { supabase: sb } = await import("@/integrations/supabase/client");
 
       if (existing.inspectionId) {
-        const { data: insRow, error: insErr } = await sb
-          .from("inspections")
-          .select("id")
-          .eq("id", existing.inspectionId)
-          .maybeSingle();
-        if (insErr) throw insErr;
-        if (!insRow) {
-          throw new Error(
-            "INSPECTION_MISSING: linked inspection no longer exists. Discard this upload.",
-          );
+        try {
+          const { data: insRow, error: insErr } = await sb
+            .from("inspections")
+            .select("id")
+            .eq("id", existing.inspectionId)
+            .maybeSingle();
+          if (!insErr && insRow === null) {
+            throw new Error(
+              "INSPECTION_MISSING: linked inspection no longer exists. Discard this upload.",
+            );
+          }
+        } catch (e) {
+          if (e instanceof Error && e.message.startsWith("INSPECTION_MISSING")) {
+            throw e;
+          }
+          // swallow lookup error — fall through to real upload
         }
       }
 
@@ -855,20 +866,25 @@ export async function retryUpload(
         existing.photoType === "damage_close_up" &&
         existing.damageItemId
       ) {
-        const { data: dmgRow, error: dmgErr } = await sb
-          .from("damage_items")
-          .select("id")
-          .eq("id", existing.damageItemId)
-          .maybeSingle();
-        if (dmgErr) throw dmgErr;
-        if (!dmgRow) {
-          throw new Error(
-            "DAMAGE_ITEM_MISSING: linked damage entry no longer exists. Discard this upload.",
-          );
+        try {
+          const { data: dmgRow, error: dmgErr } = await sb
+            .from("damage_items")
+            .select("id")
+            .eq("id", existing.damageItemId)
+            .maybeSingle();
+          if (!dmgErr && dmgRow === null) {
+            throw new Error(
+              "DAMAGE_ITEM_MISSING: linked damage entry no longer exists. Discard this upload.",
+            );
+          }
+        } catch (e) {
+          if (e instanceof Error && e.message.startsWith("DAMAGE_ITEM_MISSING")) {
+            throw e;
+          }
+          // swallow lookup error — fall through to real upload
         }
       }
     } catch (preflightErr) {
-      // Re-throw so the unified catch block below classifies + tags it.
       throw preflightErr;
     }
 
