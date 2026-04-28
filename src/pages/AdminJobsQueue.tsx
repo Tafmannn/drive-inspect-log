@@ -13,6 +13,7 @@
 
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRefetchOnFocus } from "@/hooks/useRefetchOnFocus";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
@@ -23,9 +24,13 @@ import { useAdminJobQueues, useAdminJobQueueKpis } from "@/hooks/useAdminJobQueu
 import { AssignDriverModal } from "@/features/control/components/AssignDriverModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { qk } from "@/lib/queryKeys";
+import { acknowledgeMissingEvidence } from "@/lib/evidenceAckApi";
+import { invalidateAdminOperationalQueues } from "@/lib/mutationEvents";
+import { toast } from "@/hooks/use-toast";
 import {
   AlertTriangle, Truck, ClipboardCheck, CheckCircle, Search,
-  UserX, Clock, ImageOff,
+  UserX, Clock, ImageOff, ShieldCheck,
 } from "lucide-react";
 
 type QueueFilter = "all" | "attention" | "stale" | "unassigned" | "evidence" | "in_progress" | "review" | "completed";
@@ -43,15 +48,18 @@ const FILTERS: { value: QueueFilter; label: string; icon: React.ComponentType<{ 
 
 export function AdminJobsQueue() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const [searchParams] = useSearchParams();
   const { data: queues, isLoading, error } = useAdminJobQueues();
   const { data: kpis } = useAdminJobQueueKpis();
+  useRefetchOnFocus([qk.jobs.adminQueues(), qk.jobs.adminQueueKpis()]);
   const initialFilter = (searchParams.get("filter") as QueueFilter) || "all";
   const validFilters: QueueFilter[] = ["all", "attention", "stale", "unassigned", "evidence", "in_progress", "review", "completed"];
   const [filter, setFilter] = useState<QueueFilter>(
     validFilters.includes(initialFilter) ? initialFilter : "all"
   );
   const [search, setSearch] = useState("");
+  const [dismissingId, setDismissingId] = useState<string | null>(null);
   const [assignTarget, setAssignTarget] = useState<{
     jobId: string; jobRef: string; driverId: string | null;
   } | null>(null);
@@ -64,6 +72,27 @@ export function AdminJobsQueue() {
       driverId: job.driver_id,
     }),
     onPod: (job: AdminJobRow) => navigate(`/jobs/${job.id}/pod`),
+  };
+
+  const handleDismissEvidence = async (job: AdminJobRow) => {
+    const ref = job.external_job_number || `Job ${job.id.slice(0, 8)}`;
+    if (!window.confirm(`Remove ${ref} from the Missing Evidence queue?\n\nThis records an admin acknowledgement and hides the job from this list. It does not change the job status or evidence on file.`)) {
+      return;
+    }
+    setDismissingId(job.id);
+    try {
+      await acknowledgeMissingEvidence(job.id);
+      invalidateAdminOperationalQueues(qc, job.id);
+      toast({ title: `${ref} removed from Missing Evidence queue.` });
+    } catch (err) {
+      toast({
+        title: "Couldn't dismiss this job.",
+        description: err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDismissingId(null);
+    }
   };
 
   // Search filter
@@ -177,6 +206,9 @@ export function AdminJobsQueue() {
                 jobs={filterJobs(queues.missingEvidence)}
                 emptyText="No evidence gaps found."
                 actions={actions}
+                onDismiss={handleDismissEvidence}
+                dismissingId={dismissingId}
+                dismissLabel="Mark resolved"
               />
             )}
             {(filter === "all" || filter === "in_progress") && (
@@ -268,6 +300,9 @@ function QueueSection({
   emptyText,
   actions,
   collapsible,
+  onDismiss,
+  dismissingId,
+  dismissLabel,
 }: {
   title: string;
   icon: React.ComponentType<{ className?: string }>;
@@ -280,6 +315,9 @@ function QueueSection({
     onPod: (job: AdminJobRow) => void;
   };
   collapsible?: boolean;
+  onDismiss?: (job: AdminJobRow) => void | Promise<void>;
+  dismissingId?: string | null;
+  dismissLabel?: string;
 }) {
   const [collapsed, setCollapsed] = useState(collapsible ? true : false);
   const count = jobs.length;
@@ -308,13 +346,32 @@ function QueueSection({
           ) : (
             <div className="space-y-2">
               {jobs.map((job) => (
-                <AdminJobCard
-                  key={job.id}
-                  job={job}
-                  onView={actions.onView}
-                  onAssign={actions.onAssign}
-                  onPod={actions.onPod}
-                />
+                <div key={job.id} className="space-y-1">
+                  <AdminJobCard
+                    job={job}
+                    onView={actions.onView}
+                    onAssign={actions.onAssign}
+                    onPod={actions.onPod}
+                  />
+                  {onDismiss && (
+                    <div className="flex justify-end">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8 px-2.5 text-[11px] gap-1 rounded-lg"
+                        disabled={dismissingId === job.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void onDismiss(job);
+                        }}
+                      >
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        {dismissingId === job.id ? "Removing…" : (dismissLabel ?? "Dismiss")}
+                      </Button>
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           )}
