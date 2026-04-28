@@ -28,7 +28,7 @@ import {
   promoteSubmissionSession,
   discardSubmissionSession,
 } from "@/lib/pendingUploads";
-import { enqueueSubmission, isNetworkError } from "@/lib/submitQueue";
+import { enqueueSubmission, isNetworkError, markSubmissionNeedsAttention } from "@/lib/submitQueue";
 import { toast } from "@/hooks/use-toast";
 import { logClientEvent } from "@/lib/logger";
 import type {
