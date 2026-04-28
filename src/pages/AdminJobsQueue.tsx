@@ -206,6 +206,9 @@ export function AdminJobsQueue() {
                 jobs={filterJobs(queues.missingEvidence)}
                 emptyText="No evidence gaps found."
                 actions={actions}
+                onDismiss={handleDismissEvidence}
+                dismissingId={dismissingId}
+                dismissLabel="Mark resolved"
               />
             )}
             {(filter === "all" || filter === "in_progress") && (
