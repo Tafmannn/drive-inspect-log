@@ -15,6 +15,7 @@ import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRefetchOnFocus } from "@/hooks/useRefetchOnFocus";
+import { useEvidenceAckRealtime } from "@/hooks/useEvidenceAckRealtime";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
@@ -53,6 +54,8 @@ export function AdminJobsQueue() {
   const { data: queues, isLoading, error } = useAdminJobQueues();
   const { data: kpis } = useAdminJobQueueKpis();
   useRefetchOnFocus([qk.jobs.adminQueues(), qk.jobs.adminQueueKpis()]);
+  // Live updates when any admin acks/un-acks a missing-evidence blocker.
+  useEvidenceAckRealtime();
   const initialFilter = (searchParams.get("filter") as QueueFilter) || "all";
   const validFilters: QueueFilter[] = ["all", "attention", "stale", "unassigned", "evidence", "in_progress", "review", "completed"];
   const [filter, setFilter] = useState<QueueFilter>(

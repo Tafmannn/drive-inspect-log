@@ -10,6 +10,7 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useRefetchOnFocus } from "@/hooks/useRefetchOnFocus";
+import { useEvidenceAckRealtime } from "@/hooks/useEvidenceAckRealtime";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
@@ -693,6 +694,8 @@ export const AdminDashboard = () => {
     ["admin-pod-review"],
     ["attention-center"],
   ]);
+  // Live updates when evidence acks change in any tab/admin session.
+  useEvidenceAckRealtime();
 
   if (!isAdmin) {
     return (
