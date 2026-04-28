@@ -694,6 +694,8 @@ export const AdminDashboard = () => {
     ["admin-pod-review"],
     ["attention-center"],
   ]);
+  // Live updates when evidence acks change in any tab/admin session.
+  useEvidenceAckRealtime();
 
   if (!isAdmin) {
     return (
