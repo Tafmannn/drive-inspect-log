@@ -16,6 +16,7 @@ import {
   type OutstandingDamageRow,
 } from "../hooks/useControlComplianceData";
 import { useAttentionData } from "@/features/attention/hooks/useAttentionData";
+import { ComplianceDigest } from "@/features/attention/components/ComplianceDigest";
 import type { AttentionException } from "@/features/attention/types/exceptionTypes";
 import { format } from "date-fns";
 
