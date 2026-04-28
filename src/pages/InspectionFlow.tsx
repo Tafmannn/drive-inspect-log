@@ -28,6 +28,7 @@ import {
   promoteSubmissionSession,
   discardSubmissionSession,
 } from "@/lib/pendingUploads";
+import { enqueueSubmission, isNetworkError } from "@/lib/submitQueue";
 import { toast } from "@/hooks/use-toast";
 import { logClientEvent } from "@/lib/logger";
 import type {
@@ -439,28 +440,47 @@ export const InspectionFlow = () => {
         // (offline / RLS edge), fall through — the server RPC will
         // still raise INSPECTION_ALREADY_SUBMITTED for blocking statuses.
       }
-      // ── 1) Upload signatures (critical for POD — do these synchronously) ──
-      // Use eagerly-captured File objects stored when the user left the signature step.
-      // Falls back to ref.toFile() only if files weren't captured (e.g. direct submit).
+      // ── 1) Capture signature File objects (no upload yet) ──
+      // We always capture the Files first so that if we end up enqueuing
+      // for offline submit, the raw signature blobs can be persisted to
+      // IndexedDB and uploaded later by the queue drainer.
       let driverSigUrl: string | null = null;
       let customerSigUrl: string | null = null;
 
       const driverFile = driverSigFile ?? (driverSigRef.current && driverSigned ? await driverSigRef.current.toFile("driver.png") : null);
-      if (driverFile) {
-        const result = await storageService.uploadImage(
-          driverFile,
-          "jobs/" + jobId + "/signatures/" + type + "/driver"
-        );
-        driverSigUrl = result.url;
-      }
-
       const customerFile = customerSigFile ?? (customerSigRef.current && customerSigned ? await customerSigRef.current.toFile("customer.png") : null);
-      if (customerFile) {
-        const result = await storageService.uploadImage(
-          customerFile,
-          "jobs/" + jobId + "/signatures/" + type + "/customer"
-        );
-        customerSigUrl = result.url;
+
+      // If we know we're offline, skip the signature upload attempt
+      // entirely — we'll enqueue the blobs and the queue drainer will
+      // upload them once connectivity returns.
+      const startedOffline = typeof navigator !== "undefined" && navigator.onLine === false;
+
+      if (!startedOffline) {
+        try {
+          if (driverFile) {
+            const result = await storageService.uploadImage(
+              driverFile,
+              "jobs/" + jobId + "/signatures/" + type + "/driver"
+            );
+            driverSigUrl = result.url;
+          }
+          if (customerFile) {
+            const result = await storageService.uploadImage(
+              customerFile,
+              "jobs/" + jobId + "/signatures/" + type + "/customer"
+            );
+            customerSigUrl = result.url;
+          }
+        } catch (sigErr) {
+          // Network drop during signature upload → fall through to the
+          // offline-enqueue path below (we still need to stage photos
+          // first, then enqueue with the un-uploaded sig blobs).
+          if (!isNetworkError(sigErr)) {
+            throw sigErr;
+          }
+          driverSigUrl = null;
+          customerSigUrl = null;
+        }
       }
 
       // ── 2) Build damage items payload ──
@@ -571,12 +591,71 @@ export const InspectionFlow = () => {
         return;
       }
 
-      // ── 4) Submit inspection metadata atomically (RPC writes 1 transaction) ──
+      // ── 4) Build the RPC payload (used by both online RPC and the offline queue) ──
       const inspPayload = buildInspectionPayload(type, formState, {
         driverSignatureUrl: driverSigUrl,
         customerSignatureUrl: customerSigUrl,
       });
 
+      // Helper to durably enqueue this submission for the offline queue
+      // drainer. Photos remain in IndexedDB under the same
+      // submissionSessionId — the drainer will promote them once the
+      // RPC commits. Signature blobs are stored on the queue entry so
+      // the drainer can upload them when connectivity returns.
+      const enqueueAndExit = async (reason: "offline" | "network_drop") => {
+        const damageClientIdOrder: string[] = queued
+          .filter((q) => q.kind === "damage")
+          .sort((a, b) => a.index - b.index)
+          .map((q) => q.clientDamageId ?? "");
+
+        const driverBlob: Blob | null =
+          driverSigUrl ? null : (driverFile ?? null);
+        const customerBlob: Blob | null =
+          customerSigUrl ? null : (customerFile ?? null);
+
+        await enqueueSubmission({
+          submissionSessionId,
+          jobId: jobId!,
+          jobNumber: job?.external_job_number ?? null,
+          vehicleReg: job?.vehicle_reg ?? null,
+          inspectionType: type,
+          runId: ((job as any)?.current_run_id ?? null) as string | null,
+          inspectionPayload: inspPayload as any,
+          damageItems: damageItemsPayload as any,
+          driverSignatureBlob: driverBlob,
+          customerSignatureBlob: customerBlob,
+          driverSignatureUrl: driverSigUrl,
+          customerSignatureUrl: customerSigUrl,
+          damageClientIdOrder,
+        });
+
+        const jobRef = job?.external_job_number || jobId!.slice(0, 8);
+        const label = type === "pickup" ? "Pickup" : "Delivery";
+        toast({
+          title:
+            reason === "offline"
+              ? `${label} saved offline for job ${jobRef}.`
+              : `${label} queued for job ${jobRef}.`,
+          description:
+            "It will submit automatically when your connection comes back.",
+        });
+        if (dk) clearDraft(dk);
+        try { sessionStorage.removeItem(sessionKey); } catch { /* ignore */ }
+        navigate(`/jobs/${jobId}`);
+      };
+
+      // ── 4a) OFFLINE / NETWORK-DROP SHORT-CIRCUIT ──
+      // If the device is offline (either at submit time or because the
+      // signature upload above caught a network error and zeroed the
+      // URLs), don't even attempt the RPC — enqueue and return.
+      const offlineNow =
+        typeof navigator !== "undefined" && navigator.onLine === false;
+      if (offlineNow || (startedOffline && !driverSigUrl && !customerSigUrl)) {
+        await enqueueAndExit("offline");
+        return;
+      }
+
+      // ── 4b) Submit inspection metadata atomically (RPC writes 1 transaction) ──
       let submitResultTyped: { inspectionId: string; damageItemIds: string[]; submissionSessionId?: string | null };
       try {
         const submitResult = await submitMutation.mutateAsync({
@@ -588,9 +667,17 @@ export const InspectionFlow = () => {
         });
         submitResultTyped = submitResult as typeof submitResultTyped;
       } catch (rpcErr) {
-        // RPC failed AFTER staging — discard staged items so they can never
-        // upload as orphans. No committed inspection exists, nothing to roll
-        // back server-side.
+        // Network drop during the RPC → enqueue and return. The RPC is
+        // idempotent on submission_session_id, so even if the server
+        // *did* commit before the response was lost, the drain replay
+        // will return the existing inspection id and we'll promote
+        // photos correctly.
+        if (isNetworkError(rpcErr)) {
+          await enqueueAndExit("network_drop");
+          return;
+        }
+        // Non-network failure (RLS, validation, INSPECTION_ALREADY_SUBMITTED)
+        // → discard staged items as before; nothing to retry online.
         try { await discardSubmissionSession(submissionSessionId); } catch { /* ignore */ }
         logStorageSubmitFailure(rpcErr, {
           jobId: jobId!,
