@@ -24,6 +24,7 @@ import { useAdminJobQueues, useAdminJobQueueKpis } from "@/hooks/useAdminJobQueu
 import { AssignDriverModal } from "@/features/control/components/AssignDriverModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { qk } from "@/lib/queryKeys";
 import { acknowledgeMissingEvidence } from "@/lib/evidenceAckApi";
 import { invalidateAdminOperationalQueues } from "@/lib/mutationEvents";
 import { toast } from "@/hooks/use-toast";
@@ -49,9 +50,9 @@ export function AdminJobsQueue() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [searchParams] = useSearchParams();
-  const { data: queues, isLoading, error, refetch } = useAdminJobQueues();
+  const { data: queues, isLoading, error } = useAdminJobQueues();
   const { data: kpis } = useAdminJobQueueKpis();
-  useRefetchOnFocus(refetch);
+  useRefetchOnFocus([qk.jobs.adminQueues(), qk.jobs.adminQueueKpis()]);
   const initialFilter = (searchParams.get("filter") as QueueFilter) || "all";
   const validFilters: QueueFilter[] = ["all", "attention", "stale", "unassigned", "evidence", "in_progress", "review", "completed"];
   const [filter, setFilter] = useState<QueueFilter>(
