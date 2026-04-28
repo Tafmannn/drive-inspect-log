@@ -60,7 +60,11 @@ const store = createStore("axentra-submit-queue", "v1");
 // Types
 // ─────────────────────────────────────────────────────────────────────
 
-export type SubmitQueueStatus = "queued" | "submitting" | "failed";
+export type SubmitQueueStatus =
+  | "queued"               // ready for the next drain attempt
+  | "submitting"           // a drain is currently in flight
+  | "failed"               // transient failure (e.g. network) — drain will auto-retry
+  | "failed_needs_attention"; // hard failure (RLS / validation / payload) — manual retry only
 
 /**
  * A queued submission entry. Note the signatures are stored as raw
