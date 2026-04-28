@@ -121,6 +121,22 @@ export interface PendingUpload {
   damageItemId?: string | null;
 
   /**
+   * Number of upload attempts that have ended in `failed`. Used to
+   * de-prioritise items that keep failing for the same deterministic
+   * reason so they stop blocking Retry All but remain visible and
+   * manually retriable in the per-item UI.
+   */
+  attempts?: number;
+
+  /**
+   * Set when the failure is classified as deterministic (RLS, foreign
+   * key, validation). Items with this flag are NOT picked up by
+   * `retryAllPending` / `retryJobUploads` (auto retry) but CAN still
+   * be retried via `retryUpload(id)` directly from the per-item UI.
+   */
+  needsAttention?: boolean;
+
+  /**
    * Job's `current_run_id` at the time this photo was queued.
    * The retry worker compares to job's *current* run before uploading.
    */
