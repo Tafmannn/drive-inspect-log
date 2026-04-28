@@ -33,6 +33,7 @@ const catEmoji: Record<string, string> = {
   evidence: "📎",
   sync: "🔄",
   state: "🔒",
+  compliance: "🛡",
 };
 
 function humanAge(isoDate: string): string {
