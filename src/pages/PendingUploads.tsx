@@ -192,7 +192,7 @@ export const PendingUploads = () => {
         {jobs.map((job) => {
           const totalPending = job.pendingCount + job.failedCount;
           const isRetrying = retryingJob === job.jobId;
-          const stuck = job.failedItems.filter((f) => f.needsAttention);
+          const stuck = (job.failedItems ?? []).filter((f) => f.needsAttention);
 
           return (
             <div key={job.jobId} className="p-4 rounded-xl bg-card border border-border shadow-sm space-y-3">
