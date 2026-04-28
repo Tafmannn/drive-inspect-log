@@ -105,6 +105,7 @@ export interface PendingUpload {
    */
   state: PendingUploadState;
   errorMessage?: string | null;
+  lastErrorAt?: string | null;
 
   /**
    * Raw image blob, kept until the upload succeeds.
@@ -130,9 +131,11 @@ export interface PendingUpload {
 
   /**
    * Set when the failure is classified as deterministic (RLS, foreign
-   * key, validation). Items with this flag are NOT picked up by
-   * `retryAllPending` / `retryJobUploads` (auto retry) but CAN still
-   * be retried via `retryUpload(id)` directly from the per-item UI.
+   * key, validation, permanently bad payload). Items with this flag are
+   * NOT picked up by `retryAllPending` / `retryJobUploads` (auto retry)
+   * but CAN still be retried via `retryUpload(id)` directly from the
+   * per-item UI. Transient network/browser failures must never be parked
+   * here just because they have many attempts.
    */
   needsAttention?: boolean;
 
@@ -193,6 +196,9 @@ function isDeterministicFailure(message: string): boolean {
     m.includes("duplicate key") ||
     m.includes("permission denied") ||
     m.includes("invalid input syntax") ||
+    m.includes("file too large") ||
+    m.includes("file is empty") ||
+    m.includes("content type not allowed") ||
     m.includes("run_unverified") ||
     m.includes("linkage_patch_failed") ||
     m.includes("damage_item_missing") ||
@@ -202,6 +208,26 @@ function isDeterministicFailure(message: string): boolean {
     m.includes("403") ||
     m.includes("404") ||
     m.includes("422")
+  );
+}
+
+function isTransientUploadFailure(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes("load failed") ||
+    m.includes("failed to fetch") ||
+    m.includes("network") ||
+    m.includes("networkerror") ||
+    m.includes("timeout") ||
+    m.includes("timed out") ||
+    m.includes("econnreset") ||
+    m.includes("offline") ||
+    m.includes("rate_limited") ||
+    m.includes("429") ||
+    m.includes("500") ||
+    m.includes("502") ||
+    m.includes("503") ||
+    m.includes("504")
   );
 }
 
