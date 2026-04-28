@@ -28,7 +28,7 @@ import {
   promoteSubmissionSession,
   discardSubmissionSession,
 } from "@/lib/pendingUploads";
-import { enqueueSubmission, isNetworkError } from "@/lib/submitQueue";
+import { enqueueSubmission, isNetworkError, markSubmissionNeedsAttention } from "@/lib/submitQueue";
 import { toast } from "@/hooks/use-toast";
 import { logClientEvent } from "@/lib/logger";
 import type {
@@ -676,9 +676,19 @@ export const InspectionFlow = () => {
           await enqueueAndExit("network_drop");
           return;
         }
-        // Non-network failure (RLS, validation, INSPECTION_ALREADY_SUBMITTED)
-        // → discard staged items as before; nothing to retry online.
-        try { await discardSubmissionSession(submissionSessionId); } catch { /* ignore */ }
+        // Non-network failure (RLS, validation, INSPECTION_ALREADY_SUBMITTED,
+        // missing org_id, type-check, etc.).
+        //
+        // SAFETY: we MUST NOT discard the staged evidence here. The driver
+        // has already completed the inspection — throwing it away because
+        // the server rejected the payload would force them to redo the
+        // entire walk-around. Instead we enqueue the submission with the
+        // exact error attached, then mark it `failed_needs_attention` so
+        // the auto-drainer leaves it alone and the driver can manually
+        // retry from Pending Uploads after the underlying issue is fixed.
+        const errorMessage =
+          rpcErr instanceof Error ? rpcErr.message : String(rpcErr);
+
         logStorageSubmitFailure(rpcErr, {
           jobId: jobId!,
           inspectionType: type,
@@ -686,12 +696,65 @@ export const InspectionFlow = () => {
           submissionSessionId,
           phase: "submit_rpc",
         });
+
+        try {
+          const damageClientIdOrder: string[] = queued
+            .filter((q) => q.kind === "damage")
+            .sort((a, b) => a.index - b.index)
+            .map((q) => q.clientDamageId ?? "");
+
+          const driverBlob: Blob | null =
+            driverSigUrl ? null : (driverFile ?? null);
+          const customerBlob: Blob | null =
+            customerSigUrl ? null : (customerFile ?? null);
+
+          const queuedEntry = await enqueueSubmission({
+            submissionSessionId,
+            jobId: jobId!,
+            jobNumber: job?.external_job_number ?? null,
+            vehicleReg: job?.vehicle_reg ?? null,
+            inspectionType: type,
+            runId: ((job as any)?.current_run_id ?? null) as string | null,
+            inspectionPayload: inspPayload as any,
+            damageItems: damageItemsPayload as any,
+            driverSignatureBlob: driverBlob,
+            customerSignatureBlob: customerBlob,
+            driverSignatureUrl: driverSigUrl,
+            customerSignatureUrl: customerSigUrl,
+            damageClientIdOrder,
+          });
+
+          // Immediately mark as needs-attention so the auto-drainer
+          // doesn't pick it up and burn retries on a deterministic
+          // failure. The driver retries manually from Pending Uploads.
+          await markSubmissionNeedsAttention(queuedEntry.id, errorMessage);
+        } catch (queueErr) {
+          // If even the local IDB enqueue fails we have nowhere to
+          // park the evidence — surface the original RPC error AND
+          // the queue write error and leave staged photos in place
+          // (do NOT discard) so a later session can still attempt to
+          // recover them.
+          const queueMsg =
+            queueErr instanceof Error ? queueErr.message : String(queueErr);
+          toast({
+            title: "Submission failed and could not be saved offline.",
+            description: `${errorMessage} (queue: ${queueMsg}). Your photos are still saved on this device — please try again before clearing the app.`,
+            variant: "destructive",
+          });
+          setSubmitting(false);
+          return;
+        }
+
+        const jobRef = job?.external_job_number || jobId!.slice(0, 8);
         toast({
-          title: "Submission failed.",
-          description: "The inspection was not submitted and queued evidence has been discarded. Please try again.",
+          title: `Submission failed for job ${jobRef}.`,
+          description:
+            `${errorMessage} — your inspection and photos are saved. Open Pending Uploads to retry once the issue is fixed.`,
           variant: "destructive",
         });
-        setSubmitting(false);
+        if (dk) clearDraft(dk);
+        try { sessionStorage.removeItem(sessionKey); } catch { /* ignore */ }
+        navigate(`/jobs/${jobId}`);
         return;
       }
 

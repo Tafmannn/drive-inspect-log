@@ -60,7 +60,11 @@ const store = createStore("axentra-submit-queue", "v1");
 // Types
 // ─────────────────────────────────────────────────────────────────────
 
-export type SubmitQueueStatus = "queued" | "submitting" | "failed";
+export type SubmitQueueStatus =
+  | "queued"               // ready for the next drain attempt
+  | "submitting"           // a drain is currently in flight
+  | "failed"               // transient failure (e.g. network) — drain will auto-retry
+  | "failed_needs_attention"; // hard failure (RLS / validation / payload) — manual retry only
 
 /**
  * A queued submission entry. Note the signatures are stored as raw
@@ -293,6 +297,26 @@ export async function discardSubmission(id: string): Promise<void> {
   await removeOne(id);
 }
 
+/**
+ * Mark a queued submission as `failed_needs_attention` with the
+ * supplied error message. Called by InspectionFlow immediately after
+ * enqueuing a submission whose RPC already failed deterministically
+ * (RLS, validation, type-check, etc.) so the auto-drainer doesn't
+ * burn retries on a known-broken payload.
+ */
+export async function markSubmissionNeedsAttention(
+  id: string,
+  errorMessage: string,
+): Promise<void> {
+  await updateOne(id, (q) => ({
+    ...q,
+    status: "failed_needs_attention",
+    attempts: q.attempts + 1,
+    lastError: errorMessage,
+    lastAttemptAt: new Date().toISOString(),
+  }));
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // Drain
 // ─────────────────────────────────────────────────────────────────────
@@ -330,7 +354,13 @@ export async function drainSubmitQueue(): Promise<DrainResult> {
 
   try {
     const all = await loadAllRaw();
-    const candidates = all.filter((q) => q.status === "queued" || q.status === "failed");
+    // Auto-drain only picks up entries that are network-class failures or
+    // freshly queued. Entries marked `failed_needs_attention` are hard
+    // failures (RLS, validation, type-check, missing org_id, etc.) — they
+    // need a human to fix the underlying issue and tap "Retry" manually.
+    const candidates = all.filter(
+      (q) => q.status === "queued" || q.status === "failed",
+    );
 
     for (const entry of candidates) {
       attempted++;
@@ -340,9 +370,13 @@ export async function drainSubmitQueue(): Promise<DrainResult> {
       } catch (e) {
         failed++;
         const message = e instanceof Error ? e.message : String(e);
+        const isNet = isNetworkError(e);
         await updateOne(entry.id, (q) => ({
           ...q,
-          status: "failed",
+          // Only auto-retry network-class failures. Everything else is
+          // promoted to `failed_needs_attention` so the driver sees the
+          // exact error and can decide whether to retry or discard.
+          status: isNet ? "failed" : "failed_needs_attention",
           attempts: q.attempts + 1,
           lastError: message,
           lastAttemptAt: new Date().toISOString(),
@@ -355,6 +389,7 @@ export async function drainSubmitQueue(): Promise<DrainResult> {
           context: {
             submissionSessionId: entry.submissionSessionId,
             attempts: entry.attempts + 1,
+            classification: isNet ? "network" : "needs_attention",
           },
         });
       }
@@ -364,6 +399,41 @@ export async function drainSubmitQueue(): Promise<DrainResult> {
   }
 
   return { attempted, succeeded, failed, skipped: false };
+}
+
+/**
+ * Manual retry of a single queued submission — used by the Pending
+ * Uploads UI after the driver has (presumably) addressed whatever
+ * caused the original hard failure. Unlike `drainSubmitQueue`, this
+ * will re-attempt entries marked `failed_needs_attention`.
+ *
+ * Throws on failure so the caller can surface the exact server error.
+ */
+export async function retrySubmission(id: string): Promise<void> {
+  const all = await loadAllRaw();
+  const entry = all.find((q) => q.id === id);
+  if (!entry) throw new Error("Submission not found in queue");
+  // Reset to "queued" so drainOne's status guard accepts it.
+  const reset = await updateOne(id, (q) => ({
+    ...q,
+    status: "queued",
+    lastError: null,
+  }));
+  if (!reset) throw new Error("Submission not found in queue");
+  try {
+    await drainOne(reset);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    const isNet = isNetworkError(e);
+    await updateOne(id, (q) => ({
+      ...q,
+      status: isNet ? "failed" : "failed_needs_attention",
+      attempts: q.attempts + 1,
+      lastError: message,
+      lastAttemptAt: new Date().toISOString(),
+    }));
+    throw e;
+  }
 }
 
 async function drainOne(entry: QueuedSubmission): Promise<void> {
