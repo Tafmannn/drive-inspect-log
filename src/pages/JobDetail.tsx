@@ -45,6 +45,7 @@ import { PhotoViewer } from "@/components/PhotoViewer";
 import { resolveMediaUrlAsync } from "@/lib/mediaResolver";
 import { PricingSuggestionPanel } from "@/components/PricingSuggestionPanel";
 import { PricingAuditTimeline } from "@/components/PricingAuditTimeline";
+import { JobPriceEditor } from "@/components/JobPriceEditor";
 import { RoleScope, EvidenceHealthBanner, JobHeaderCard } from "@/components/ui-kit";
 import { JobAdminControls } from "@/features/jobs/components/JobAdminControls";
 import { evaluateEvidenceHealth } from "@/lib/evidenceHealth";
@@ -506,6 +507,11 @@ export const JobDetail = () => {
                 onUnacknowledge={evidenceOverrides.unacknowledge}
               />
             )}
+            <JobPriceEditor
+              jobId={job.id}
+              initialTotalPrice={(job as { total_price?: number | null }).total_price ?? null}
+              initialRatePerMile={(job as { rate_per_mile?: number | null }).rate_per_mile ?? null}
+            />
             <PricingSuggestionPanel
               jobId={job.id}
               orgId={(job as { org_id?: string }).org_id ?? null}
@@ -518,6 +524,7 @@ export const JobDetail = () => {
                 urgency: ((job as { priority?: string }).priority || "").toLowerCase() === "urgent"
                   ? "urgent"
                   : "standard",
+                ratePerMileOverride: (job as { rate_per_mile?: number | null }).rate_per_mile ?? null,
               }}
             />
             <PricingAuditTimeline jobId={job.id} />

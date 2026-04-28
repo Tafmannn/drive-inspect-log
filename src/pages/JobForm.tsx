@@ -28,6 +28,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ClientPickerCombobox } from "@/features/clients/components/ClientPickerCombobox";
 import { PricingSuggestionPanel } from "@/components/PricingSuggestionPanel";
+import { useAuth } from "@/context/AuthContext";
+import { SectionCard, SectionHeader, AdvisoryNote, StatusPill } from "@/components/ui-kit";
+import { PoundSterling } from "lucide-react";
 type ErrorMap = Record<string, string>;
 
 interface JobFormDraft {
@@ -71,6 +74,20 @@ export const JobForm = () => {
 
   // Client linking state
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+
+  // Admin-only pricing state (manual override + per-job rate overrides)
+  const { isAdmin, isSuperAdmin } = useAuth();
+  const canEditPricing = isAdmin || isSuperAdmin;
+  const [adminPriceInput, setAdminPriceInput] = useState<string>("");
+  const [ratePerMileInput, setRatePerMileInput] = useState<string>("");
+  const [minimumChargeInput, setMinimumChargeInput] = useState<string>("");
+
+  const parseNumOrNull = (v: string): number | null => {
+    const t = v.trim();
+    if (!t) return null;
+    const n = Number(t);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
 
   // Fetch active drivers for picker
   const { data: activeDrivers } = useQuery({
@@ -386,6 +403,16 @@ export const JobForm = () => {
         setSelectedDriverId(existingJob.driver_id);
         setSelectedDriverName(existingJob.driver_name ?? null);
       }
+
+      // Hydrate client + pricing fields
+      const ej = existingJob as {
+        client_id?: string | null;
+        total_price?: number | null;
+        rate_per_mile?: number | null;
+      };
+      if (ej.client_id) setSelectedClientId(ej.client_id);
+      if (typeof ej.total_price === "number") setAdminPriceInput(String(ej.total_price));
+      if (typeof ej.rate_per_mile === "number") setRatePerMileInput(String(ej.rate_per_mile));
     }
   }, [isEdit, existingJob]);
 
@@ -484,6 +511,10 @@ export const JobForm = () => {
         route_distance_miles: routeResult.distanceMiles,
         route_eta_minutes: routeResult.etaMinutes,
         maps_validated: true,
+      } : {}),
+      ...(canEditPricing ? {
+        total_price: parseNumOrNull(adminPriceInput),
+        rate_per_mile: parseNumOrNull(ratePerMileInput),
       } : {}),
     };
 
@@ -1267,16 +1298,76 @@ export const JobForm = () => {
             </div>
           )}
 
+          {/* Admin-only pricing controls */}
+          {canEditPricing && (
+            <SectionCard className="p-4 space-y-3">
+              <SectionHeader
+                icon={<PoundSterling className="h-4 w-4" />}
+                eyebrow="Pricing"
+                title="Job price"
+                adminOnly
+                right={<StatusPill tone={adminPriceInput.trim() ? "success" : "neutral"}>{adminPriceInput.trim() ? "Manual" : "Not set"}</StatusPill>}
+              />
+              <AdvisoryNote>
+                Manually set the final job price here. This is what invoices will use. Leave per-mile / minimum blank to fall back to the client rate card or org defaults.
+              </AdvisoryNote>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <Label htmlFor="job-total-price" className="text-xs">Job price £ (final)</Label>
+                  <Input
+                    id="job-total-price"
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    inputMode="decimal"
+                    value={adminPriceInput}
+                    onChange={(e) => setAdminPriceInput(e.target.value)}
+                    placeholder="e.g. 250.00"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="job-rate-per-mile" className="text-xs">Rate £/mile (override)</Label>
+                  <Input
+                    id="job-rate-per-mile"
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    inputMode="decimal"
+                    value={ratePerMileInput}
+                    onChange={(e) => setRatePerMileInput(e.target.value)}
+                    placeholder="defaults to client/org"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="job-min-charge" className="text-xs">Min charge £ (override)</Label>
+                  <Input
+                    id="job-min-charge"
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    inputMode="decimal"
+                    value={minimumChargeInput}
+                    onChange={(e) => setMinimumChargeInput(e.target.value)}
+                    placeholder="defaults to client/org"
+                  />
+                </div>
+              </div>
+            </SectionCard>
+          )}
+
           {/* Pricing Suggestion (admin advisory only) */}
           <PricingSuggestionPanel
             jobId={isEdit ? jobId ?? null : null}
             orgId={(existingJob as { org_id?: string } | undefined)?.org_id ?? null}
-            clientId={(existingJob as { client_id?: string | null } | undefined)?.client_id ?? null}
-            currentTotalPrice={(existingJob as { total_price?: number | null } | undefined)?.total_price ?? null}
+            clientId={selectedClientId ?? (existingJob as { client_id?: string | null } | undefined)?.client_id ?? null}
+            currentTotalPrice={parseNumOrNull(adminPriceInput) ?? (existingJob as { total_price?: number | null } | undefined)?.total_price ?? null}
             inputs={{
               routeMiles: routeResult?.valid ? routeResult.distanceMiles : null,
               urgency: "standard",
+              ratePerMileOverride: parseNumOrNull(ratePerMileInput),
+              minimumChargeOverride: parseNumOrNull(minimumChargeInput),
             }}
+            onAccepted={(p) => setAdminPriceInput(String(p))}
           />
 
           <Button

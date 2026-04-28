@@ -70,15 +70,29 @@ describe("pricingBrain — missing inputs", () => {
     expect(r.warnings.join(" ")).toMatch(/Route distance unavailable/i);
   });
 
-  it("flags missing CAZ data without guessing", () => {
+  it("does not flag CAZ when not provided (route may not pass through one)", () => {
     const r = suggestJobPrice({ routeMiles: 100, ratePerMile: 1.5 });
-    expect(r.missingInputs).toContain("caz_risk");
+    expect(r.missingInputs).not.toContain("caz_risk");
+    expect(r.warnings.some(w => /CAZ/i.test(w))).toBe(false);
     expect(r.breakdown.caz).toBeUndefined();
   });
 
-  it("warns about CAZ exposure on long routes when unknown", () => {
+  it("does not warn about CAZ on long routes when caller has no CAZ data", () => {
     const r = suggestJobPrice({ routeMiles: 150, ratePerMile: 1.5 });
-    expect(r.warnings.some(w => /CAZ/i.test(w))).toBe(true);
+    expect(r.warnings.some(w => /CAZ/i.test(w))).toBe(false);
+  });
+
+  it("only adds CAZ cost when zoneCount > 0", () => {
+    const zero = suggestJobPrice({
+      routeMiles: 100, ratePerMile: 1.5,
+      cazRisk: { zoneCount: 0, estimatedCost: 0 },
+    });
+    expect(zero.breakdown.caz).toBeUndefined();
+    const some = suggestJobPrice({
+      routeMiles: 100, ratePerMile: 1.5,
+      cazRisk: { zoneCount: 1, estimatedCost: 12.5 },
+    });
+    expect(some.breakdown.caz).toBe(12.5);
   });
 });
 

@@ -224,16 +224,15 @@ export function suggestJobPrice(inputs: PricingInputs): PricingSuggestion {
     missingInputs.push("return_travel_estimate");
   }
 
-  if (inputs.cazRisk && isPositiveNumber(inputs.cazRisk.estimatedCost)) {
+  if (inputs.cazRisk && inputs.cazRisk.zoneCount > 0 && isPositiveNumber(inputs.cazRisk.estimatedCost)) {
     addOns += inputs.cazRisk.estimatedCost;
     breakdown.caz = round2(inputs.cazRisk.estimatedCost);
     reasons.push(
       `CAZ/ULEZ ${inputs.cazRisk.zoneCount} zone(s) +£${inputs.cazRisk.estimatedCost.toFixed(2)}`,
     );
-  } else if (inputs.cazRisk === undefined || inputs.cazRisk === null) {
-    missingInputs.push("caz_risk");
-    // Per rules: do not guess. No warning unless we know miles indicate risk.
   }
+  // Note: when cazRisk is null/undefined OR zoneCount=0, do nothing.
+  // We only flag CAZ/ULEZ when the route is known to enter such a zone.
 
   // ── Waiting time surcharge ────────────────────────────────────────
   if (isPositiveNumber(inputs.waitingMinutes)) {
@@ -300,9 +299,9 @@ export function suggestJobPrice(inputs: PricingInputs): PricingSuggestion {
     }
   }
 
-  if (missingInputs.includes("caz_risk") && miles > 50) {
-    warnings.push("CAZ/ULEZ exposure unknown for a long route — verify before quoting");
-  }
+  // CAZ/ULEZ is only flagged when the caller explicitly tells us the
+  // route enters a zone. We never warn merely because miles are large
+  // and CAZ data is missing — see product rule.
 
   return {
     suggestedPrice: round2(suggested),
