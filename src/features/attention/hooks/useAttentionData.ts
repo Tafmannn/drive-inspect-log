@@ -11,6 +11,7 @@ import {
   deriveEvidenceExceptions,
   deriveSyncExceptions,
   deriveStateExceptions,
+  deriveComplianceExceptions,
   sortExceptions,
 } from "../engine/exceptionEngine";
 import type { AttentionException, AttentionKpiData, AttentionFiltersState } from "../types/exceptionTypes";
@@ -47,6 +48,8 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
         logEntriesRes,
         orgsRes,
         acksRes,
+        docsRes,
+        driversRes,
       ] = await Promise.all([
         supabase.from("jobs").select("*")
           .eq("is_hidden", false)
@@ -81,6 +84,20 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
         supabase.from("attention_acknowledgements").select("*")
           .order("created_at", { ascending: false })
           .limit(1000),
+
+        // Onboarding documents with expiry within next 60d or already expired
+        supabase.from("onboarding_documents")
+          .select("id, related_type, related_id, document_type, expires_at, org_id")
+          .not("expires_at", "is", null)
+          .lte("expires_at", new Date(Date.now() + 60 * 86400_000).toISOString().slice(0, 10))
+          .limit(500),
+
+        // Active drivers for compliance gap detection
+        supabase.from("driver_profiles")
+          .select("user_id, full_name, org_id, licence_expiry, right_to_work, bank_captured, is_active, archived_at")
+          .is("archived_at", null)
+          .eq("is_active", true)
+          .limit(500),
       ]);
 
       const activeJobs = (activeJobsRes.data ?? []) as JobRow[];
@@ -88,6 +105,8 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
       const logEntries = (logEntriesRes.data ?? []) as any[];
       const orgs = (orgsRes as any).data ?? [];
       const acknowledgements = (acksRes.data ?? []) as AcknowledgementRow[];
+      const docs = (docsRes.data ?? []) as any[];
+      const drivers = (driversRes.data ?? []) as any[];
 
       // Build ack lookup: exception_id -> ack row (most recent)
       const ackMap = new Map<string, AcknowledgementRow>();
@@ -121,12 +140,30 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
       const orgLookup = new Map<string, string>();
       for (const o of orgs) orgLookup.set(o.id, o.name);
 
+      // Driver name lookup keyed by driver_profile.id (for documents.related_id)
+      const driverNameByProfileId = new Map<string, string>();
+      if (docs.some((d) => d.related_type === "driver")) {
+        const driverProfileIds = Array.from(
+          new Set(docs.filter((d) => d.related_type === "driver").map((d) => d.related_id))
+        );
+        if (driverProfileIds.length > 0) {
+          const { data: profileRows } = await supabase
+            .from("driver_profiles")
+            .select("id, full_name")
+            .in("id", driverProfileIds);
+          for (const r of profileRows ?? []) {
+            if (r.full_name) driverNameByProfileId.set(r.id, r.full_name);
+          }
+        }
+      }
+
       // Derive all exceptions
       let allExceptions: AttentionException[] = sortExceptions([
         ...deriveTimingExceptions(activeJobs, orgLookup),
         ...deriveEvidenceExceptions(completedJobs, inspections, logEntries, orgLookup),
         ...deriveSyncExceptions(logEntries),
         ...deriveStateExceptions(logEntries),
+        ...deriveComplianceExceptions(docs, drivers, driverNameByProfileId, orgLookup),
       ]);
 
       // Build a set of jobIds that an admin has explicitly resolved

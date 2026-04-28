@@ -275,7 +275,119 @@ export function deriveStateExceptions(
   return out;
 }
 
-/* ── Severity sort ─────────────────────────────────────────────── */
+/* ── Compliance exceptions (onboarding docs + driver profiles) ──── */
+
+interface OnboardingDocRow {
+  id: string;
+  related_type: string;
+  related_id: string;
+  document_type: string;
+  expires_at: string | null;
+  org_id: string;
+}
+
+interface DriverComplianceRow {
+  user_id: string;
+  full_name: string | null;
+  org_id: string;
+  licence_expiry: string | null;
+  right_to_work: string | null;
+  bank_captured: boolean | null;
+  is_active: boolean | null;
+  archived_at: string | null;
+}
+
+function daysUntil(iso: string): number {
+  return Math.floor((new Date(iso).getTime() - Date.now()) / 86_400_000);
+}
+
+export function deriveComplianceExceptions(
+  documents: OnboardingDocRow[],
+  drivers: DriverComplianceRow[],
+  driverNameLookup?: Map<string, string>,
+  orgLookup?: Map<string, string>,
+): AttentionException[] {
+  const out: AttentionException[] = [];
+  const warnDays = T.documentExpiryWarnDays;
+  const now = new Date().toISOString();
+
+  // Document expiry
+  for (const d of documents) {
+    if (!d.expires_at) continue;
+    const days = daysUntil(d.expires_at);
+    if (days > warnDays) continue;
+
+    const isDriver = d.related_type === "driver";
+    const subjectName = isDriver ? (driverNameLookup?.get(d.related_id) ?? "Driver") : d.related_type;
+    const orgName = orgLookup?.get(d.org_id);
+    const route = isDriver ? `/admin/drivers/${d.related_id}` : "/control/compliance";
+
+    const expired = days < 0;
+    out.push(exc({
+      jobId: undefined,
+      orgId: d.org_id,
+      orgName,
+      severity: expired ? "high" : days <= 7 ? "high" : "medium",
+      category: "compliance",
+      title: expired ? `Expired: ${d.document_type}` : `Expires in ${days}d: ${d.document_type}`,
+      detail: `${subjectName} — ${d.document_type}${expired ? " (overdue)" : ""}`,
+      createdAt: now,
+      actionLabel: "Review profile",
+      actionRoute: route,
+    }));
+  }
+
+  // Driver-level compliance gaps (active drivers only)
+  for (const drv of drivers) {
+    if (drv.archived_at || drv.is_active === false) continue;
+    const orgName = orgLookup?.get(drv.org_id);
+    const base = {
+      orgId: drv.org_id,
+      orgName,
+      jobId: undefined,
+      createdAt: now,
+      actionLabel: "Open driver",
+      actionRoute: `/admin/drivers/${drv.user_id}`,
+    };
+    const name = drv.full_name?.trim() || "Driver";
+
+    if (!drv.licence_expiry) {
+      out.push(exc({
+        ...base, severity: "medium", category: "compliance",
+        title: "Missing licence expiry",
+        detail: `${name} — no licence expiry on file`,
+      }));
+    } else {
+      const days = daysUntil(drv.licence_expiry);
+      if (days <= warnDays) {
+        out.push(exc({
+          ...base,
+          severity: days < 0 ? "high" : days <= 7 ? "high" : "medium",
+          category: "compliance",
+          title: days < 0 ? "Driving licence expired" : `Licence expires in ${days}d`,
+          detail: `${name} — licence ${days < 0 ? "overdue" : "renewal due"}`,
+        }));
+      }
+    }
+
+    if (!drv.right_to_work?.trim()) {
+      out.push(exc({
+        ...base, severity: "medium", category: "compliance",
+        title: "Right to work not captured",
+        detail: `${name} — RTW status missing`,
+      }));
+    }
+    if (!drv.bank_captured) {
+      out.push(exc({
+        ...base, severity: "low", category: "compliance",
+        title: "Bank details not captured",
+        detail: `${name} — payout details missing`,
+      }));
+    }
+  }
+
+  return out;
+}
 
 const SEV_ORDER: Record<ExceptionSeverity, number> = { critical: 0, high: 1, medium: 2, low: 3 };
 
