@@ -713,6 +713,9 @@ export const InspectionFlow = () => {
         });
         if (dk) clearDraft(dk);
         if (jobId) void clearPhotoDraft(type, jobId);
+        try { sessionStorage.removeItem(sessionKey); } catch { /* ignore */ }
+        navigate(`/jobs/${jobId}`);
+      };
 
       // ── 4a) OFFLINE / NETWORK-DROP SHORT-CIRCUIT ──
       // If the device is offline (either at submit time or because the
