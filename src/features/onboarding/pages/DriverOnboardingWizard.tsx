@@ -211,7 +211,7 @@ export default function DriverOnboardingWizard() {
 
       const { data: saved, error } = await supabase
         .from("driver_profiles")
-        .upsert(payload as never, { onConflict: "user_id" })
+        .upsert(payload as never, { onConflict: "user_id,org_id" })
         .select("id")
         .single();
       if (error) throw error;
