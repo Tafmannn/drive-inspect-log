@@ -306,6 +306,8 @@ export function deriveComplianceExceptions(
   drivers: DriverComplianceRow[],
   driverNameLookup?: Map<string, string>,
   orgLookup?: Map<string, string>,
+  /** driver_profiles.id → driver_profiles.user_id (route param for /admin/drivers/:userId) */
+  driverUserIdLookup?: Map<string, string>,
 ): AttentionException[] {
   const out: AttentionException[] = [];
   const warnDays = T.documentExpiryWarnDays;
@@ -317,10 +319,27 @@ export function deriveComplianceExceptions(
     const days = daysUntil(d.expires_at);
     if (days > warnDays) continue;
 
-    const isDriver = d.related_type === "driver";
-    const subjectName = isDriver ? (driverNameLookup?.get(d.related_id) ?? "Driver") : d.related_type;
     const orgName = orgLookup?.get(d.org_id);
-    const route = isDriver ? `/admin/drivers/${d.related_id}` : "/control/compliance";
+    let subjectName = d.related_type;
+    let route = "/control/compliance";
+    let actionLabel = "Open compliance";
+
+    if (d.related_type === "driver") {
+      subjectName = driverNameLookup?.get(d.related_id) ?? "Driver";
+      const userId = driverUserIdLookup?.get(d.related_id);
+      // If we cannot resolve the auth user_id, fall back to the drivers list
+      // rather than producing a route that yields a blank profile page.
+      route = userId ? `/admin/drivers/${userId}` : "/admin/drivers";
+      actionLabel = "Open driver";
+    } else if (d.related_type === "client") {
+      route = `/admin/clients/${d.related_id}`;
+      actionLabel = "Open client";
+      subjectName = "Client";
+    } else if (d.related_type === "organisation" || d.related_type === "org") {
+      route = `/super-admin/orgs/${d.related_id}`;
+      actionLabel = "Open organisation";
+      subjectName = "Organisation";
+    }
 
     const expired = days < 0;
     out.push(exc({
@@ -332,7 +351,7 @@ export function deriveComplianceExceptions(
       title: expired ? `Expired: ${d.document_type}` : `Expires in ${days}d: ${d.document_type}`,
       detail: `${subjectName} — ${d.document_type}${expired ? " (overdue)" : ""}`,
       createdAt: now,
-      actionLabel: "Review profile",
+      actionLabel,
       actionRoute: route,
     }));
   }
