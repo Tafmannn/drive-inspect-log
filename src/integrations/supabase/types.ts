@@ -1666,6 +1666,7 @@ export type Database = {
           run_id: string | null
           thumbnail_url: string | null
           type: string
+          updated_at: string
           url: string
         }
         Insert: {
@@ -1681,6 +1682,7 @@ export type Database = {
           run_id?: string | null
           thumbnail_url?: string | null
           type: string
+          updated_at?: string
           url: string
         }
         Update: {
@@ -1696,6 +1698,7 @@ export type Database = {
           run_id?: string | null
           thumbnail_url?: string | null
           type?: string
+          updated_at?: string
           url?: string
         }
         Relationships: [
