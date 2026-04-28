@@ -28,6 +28,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ClientPickerCombobox } from "@/features/clients/components/ClientPickerCombobox";
 import { PricingSuggestionPanel } from "@/components/PricingSuggestionPanel";
+import { useAuth } from "@/context/AuthContext";
+import { SectionCard, SectionHeader, AdvisoryNote, StatusPill } from "@/components/ui-kit";
+import { PoundSterling } from "lucide-react";
 type ErrorMap = Record<string, string>;
 
 interface JobFormDraft {
