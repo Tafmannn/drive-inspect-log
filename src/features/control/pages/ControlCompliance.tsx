@@ -97,10 +97,50 @@ const damageColumns: CompactColumn<OutstandingDamageRow>[] = [
   },
 ];
 
+const complianceAlertColumns: CompactColumn<AttentionException>[] = [
+  {
+    key: "severity",
+    header: "Sev",
+    className: "w-[64px]",
+    render: (e) => (
+      <Badge
+        variant={e.severity === "high" || e.severity === "critical" ? "destructive" : "secondary"}
+        className="text-[10px] uppercase"
+      >
+        {e.severity}
+      </Badge>
+    ),
+  },
+  {
+    key: "title",
+    header: "Issue",
+    render: (e) => (
+      <div className="min-w-0">
+        <div className="text-xs font-medium truncate">{e.title}</div>
+        <div className="text-[11px] text-muted-foreground truncate">{e.detail}</div>
+      </div>
+    ),
+  },
+];
+
 export function ControlCompliance() {
+  const navigate = useNavigate();
   const { data: kpis, isLoading: kpisLoading } = useComplianceKpis();
   const { data: inspections, isLoading: inspLoading } = useRecentInspections();
   const { data: damage, isLoading: dmgLoading } = useOutstandingDamage();
+  const { data: attention, isLoading: attentionLoading } = useAttentionData({
+    scope: "org",
+    filters: {
+      severity: "all",
+      category: "compliance",
+      orgId: "all",
+      dateFrom: "",
+      dateTo: "",
+    },
+  });
+
+  const complianceAlerts = attention?.exceptions ?? [];
+  const expiringDocs = complianceAlerts.filter((e) => e.title.toLowerCase().includes("expir")).length;
 
   const kpiItems = [
     {
@@ -116,6 +156,13 @@ export function ControlCompliance() {
       icon: FileWarning,
       variant: (kpis?.damageCount ?? 0) > 0 ? ("warning" as const) : ("default" as const),
       loading: kpisLoading,
+    },
+    {
+      label: "Compliance Alerts",
+      value: complianceAlerts.length,
+      icon: AlertTriangle,
+      variant: complianceAlerts.length > 0 ? ("warning" as const) : ("success" as const),
+      loading: attentionLoading,
     },
     {
       label: "Compliance Rate",
@@ -138,7 +185,25 @@ export function ControlCompliance() {
         subtitle="Inspection audits, damage tracking, and operational compliance"
       />
 
-      <KpiStrip items={kpiItems} className="grid-cols-3" />
+      <KpiStrip items={kpiItems} className="grid-cols-2 lg:grid-cols-4" />
+
+      <ControlSection
+        title="Compliance Alerts"
+        description={
+          expiringDocs > 0
+            ? `${expiringDocs} document(s) expiring or expired — tap a row to open the profile`
+            : "Expiring documents and incomplete driver compliance"
+        }
+        flush
+      >
+        <CompactTable
+          columns={complianceAlertColumns}
+          data={complianceAlerts.slice(0, 25)}
+          loading={attentionLoading}
+          emptyMessage="No compliance alerts. All documents are current."
+          onRowClick={(e) => e.actionRoute && navigate(e.actionRoute)}
+        />
+      </ControlSection>
 
       <div className="grid lg:grid-cols-2 gap-4">
         <ControlSection
