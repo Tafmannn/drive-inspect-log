@@ -229,15 +229,19 @@ export function ControlOverview() {
     []
   );
 
-  // ─── KPIs ─────────────────────────────────────────────────────────
+  // ─── KPIs (each tile routes to its filtered queue) ───────────────
+  const scrollToAttention = useCallback(() => {
+    document.getElementById("attention-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
   const kpiItems = [
-    { label: "Ready to Dispatch", value: kpis?.readyToDispatch, icon: Send, variant: "info" as const, loading: kpisLoading },
-    { label: "In Transit", value: kpis?.inTransit, icon: Truck, variant: "warning" as const, loading: kpisLoading },
-    { label: "Exceptions", value: highSevCount, icon: AlertTriangle, variant: highSevCount > 0 ? "destructive" as const : "default" as const, loading: attentionLoading },
-    { label: "POD Review", value: kpis?.podReview, icon: ClipboardCheck, variant: "default" as const, loading: kpisLoading },
-    { label: "Completed Today", value: kpis?.completedToday, icon: CheckCircle, variant: "success" as const, loading: kpisLoading },
-    { label: "Unassigned", value: kpis?.unassigned, icon: UserX, variant: kpis?.unassigned ? "warning" as const : "default" as const, loading: kpisLoading },
-    { label: "Stale (>24h)", value: kpis?.stale, icon: Clock, variant: kpis?.stale ? "warning" as const : "default" as const, loading: kpisLoading },
+    { label: "Ready to Dispatch", value: kpis?.readyToDispatch, icon: Send, variant: "info" as const, loading: kpisLoading, href: "/control/jobs?status=active" },
+    { label: "In Transit", value: kpis?.inTransit, icon: Truck, variant: "warning" as const, loading: kpisLoading, href: "/control/jobs?status=active" },
+    { label: "Exceptions", value: highSevCount, icon: AlertTriangle, variant: highSevCount > 0 ? "destructive" as const : "default" as const, loading: attentionLoading, onClick: scrollToAttention, ariaLabel: `Exceptions: ${highSevCount}. Jump to attention queue.` },
+    { label: "POD Review", value: kpis?.podReview, icon: ClipboardCheck, variant: "default" as const, loading: kpisLoading, href: "/control/pod-review" },
+    { label: "Completed Today", value: kpis?.completedToday, icon: CheckCircle, variant: "success" as const, loading: kpisLoading, href: "/control/jobs?status=completed" },
+    { label: "Unassigned", value: kpis?.unassigned, icon: UserX, variant: kpis?.unassigned ? "warning" as const : "default" as const, loading: kpisLoading, href: "/control/jobs?status=unassigned" },
+    { label: "Stale (>24h)", value: kpis?.stale, icon: Clock, variant: kpis?.stale ? "warning" as const : "default" as const, loading: kpisLoading, href: "/control/jobs?status=stale" },
   ];
 
   const quickActions = [
