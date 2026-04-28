@@ -44,6 +44,15 @@ import { StorageFailureCard } from "@/components/StorageFailureCard";
 import { useAuth } from "@/context/AuthContext";
 import { saveDraft, loadDraft, clearDraft, draftKey } from "@/lib/autosave";
 import {
+  loadPhotoDraft,
+  saveStandardPhoto as savePhotoDraftStandard,
+  removeStandardPhoto as removePhotoDraftStandard,
+  saveAdditionalPhoto as savePhotoDraftAdditional,
+  removeAdditionalPhoto as removePhotoDraftAdditional,
+  clearPhotoDraft,
+  storedToFile,
+} from "@/lib/photoDraftStore";
+import {
   probeLocalStorageHealth,
   logStorageSubmitFailure,
   type StorageHealth,
