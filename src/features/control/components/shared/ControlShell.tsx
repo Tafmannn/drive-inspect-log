@@ -33,7 +33,7 @@ export function ControlHeader({
   return (
     <div className="flex items-start justify-between gap-4">
       <div className="min-w-0">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground truncate">
+        <h1 className="text-2xl lg:text-xl font-semibold tracking-tight text-foreground truncate">
           {title}
         </h1>
         {subtitle && (
