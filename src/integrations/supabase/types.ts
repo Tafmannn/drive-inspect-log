@@ -181,43 +181,103 @@ export type Database = {
       }
       clients: {
         Row: {
+          account_status: string
           address: string | null
+          billing_address: string | null
+          billing_email: string | null
+          client_type: string | null
           company: string | null
+          company_number: string | null
+          contact_email: string | null
+          contact_mobile: string | null
+          contact_name: string | null
           created_at: string
+          credit_limit: number | null
           email: string | null
+          handover_requirements: string | null
           id: string
           is_active: boolean
+          main_phone: string | null
+          minimum_charge: number | null
           name: string
           notes: string | null
+          opening_hours: string | null
           org_id: string
+          payment_terms: string | null
           phone: string | null
+          rate_type: string | null
+          rate_value: number | null
+          signature_required: boolean
+          trading_name: string | null
           updated_at: string
+          vat_number: string | null
+          website: string | null
         }
         Insert: {
+          account_status?: string
           address?: string | null
+          billing_address?: string | null
+          billing_email?: string | null
+          client_type?: string | null
           company?: string | null
+          company_number?: string | null
+          contact_email?: string | null
+          contact_mobile?: string | null
+          contact_name?: string | null
           created_at?: string
+          credit_limit?: number | null
           email?: string | null
+          handover_requirements?: string | null
           id?: string
           is_active?: boolean
+          main_phone?: string | null
+          minimum_charge?: number | null
           name: string
           notes?: string | null
+          opening_hours?: string | null
           org_id: string
+          payment_terms?: string | null
           phone?: string | null
+          rate_type?: string | null
+          rate_value?: number | null
+          signature_required?: boolean
+          trading_name?: string | null
           updated_at?: string
+          vat_number?: string | null
+          website?: string | null
         }
         Update: {
+          account_status?: string
           address?: string | null
+          billing_address?: string | null
+          billing_email?: string | null
+          client_type?: string | null
           company?: string | null
+          company_number?: string | null
+          contact_email?: string | null
+          contact_mobile?: string | null
+          contact_name?: string | null
           created_at?: string
+          credit_limit?: number | null
           email?: string | null
+          handover_requirements?: string | null
           id?: string
           is_active?: boolean
+          main_phone?: string | null
+          minimum_charge?: number | null
           name?: string
           notes?: string | null
+          opening_hours?: string | null
           org_id?: string
+          payment_terms?: string | null
           phone?: string | null
+          rate_type?: string | null
+          rate_value?: number | null
+          signature_required?: boolean
+          trading_name?: string | null
           updated_at?: string
+          vat_number?: string | null
+          website?: string | null
         }
         Relationships: [
           {
@@ -228,6 +288,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      compliance_checks: {
+        Row: {
+          check_type: string
+          created_at: string
+          due_date: string | null
+          id: string
+          notes: string | null
+          org_id: string
+          related_id: string
+          related_type: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          check_type: string
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          org_id: string
+          related_id: string
+          related_type: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          check_type?: string
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          org_id?: string
+          related_id?: string
+          related_type?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       damage_items: {
         Row: {
@@ -382,28 +487,42 @@ export type Database = {
           archive_reason: string | null
           archived_at: string | null
           archived_by: string | null
+          automatic_capable: boolean
+          availability_notes: string | null
+          bank_captured: boolean
           city: string | null
           created_at: string
+          date_joined: string | null
           date_of_birth: string | null
           display_name: string | null
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
           employment_type: string | null
+          endorsements: string | null
+          ev_capable: boolean
           full_name: string
+          home_postcode: string | null
           id: string
           is_active: boolean
           licence_categories: string[] | null
           licence_expiry: string | null
           licence_number: string | null
+          manual_capable: boolean
+          max_daily_distance: number | null
           notes: string | null
           org_id: string
+          payout_terms: string | null
           phone: string | null
           postcode: string | null
+          preferred_regions: string[] | null
+          prestige_approved: boolean
           restore_note: string | null
           restored_at: string | null
           restored_by: string | null
+          right_to_work: string | null
           start_date: string | null
           trade_plate_number: string | null
+          unavailable_regions: string[] | null
           updated_at: string
           user_id: string
         }
@@ -413,28 +532,42 @@ export type Database = {
           archive_reason?: string | null
           archived_at?: string | null
           archived_by?: string | null
+          automatic_capable?: boolean
+          availability_notes?: string | null
+          bank_captured?: boolean
           city?: string | null
           created_at?: string
+          date_joined?: string | null
           date_of_birth?: string | null
           display_name?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
           employment_type?: string | null
+          endorsements?: string | null
+          ev_capable?: boolean
           full_name?: string
+          home_postcode?: string | null
           id?: string
           is_active?: boolean
           licence_categories?: string[] | null
           licence_expiry?: string | null
           licence_number?: string | null
+          manual_capable?: boolean
+          max_daily_distance?: number | null
           notes?: string | null
           org_id: string
+          payout_terms?: string | null
           phone?: string | null
           postcode?: string | null
+          preferred_regions?: string[] | null
+          prestige_approved?: boolean
           restore_note?: string | null
           restored_at?: string | null
           restored_by?: string | null
+          right_to_work?: string | null
           start_date?: string | null
           trade_plate_number?: string | null
+          unavailable_regions?: string[] | null
           updated_at?: string
           user_id: string
         }
@@ -444,28 +577,42 @@ export type Database = {
           archive_reason?: string | null
           archived_at?: string | null
           archived_by?: string | null
+          automatic_capable?: boolean
+          availability_notes?: string | null
+          bank_captured?: boolean
           city?: string | null
           created_at?: string
+          date_joined?: string | null
           date_of_birth?: string | null
           display_name?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
           employment_type?: string | null
+          endorsements?: string | null
+          ev_capable?: boolean
           full_name?: string
+          home_postcode?: string | null
           id?: string
           is_active?: boolean
           licence_categories?: string[] | null
           licence_expiry?: string | null
           licence_number?: string | null
+          manual_capable?: boolean
+          max_daily_distance?: number | null
           notes?: string | null
           org_id?: string
+          payout_terms?: string | null
           phone?: string | null
           postcode?: string | null
+          preferred_regions?: string[] | null
+          prestige_approved?: boolean
           restore_note?: string | null
           restored_at?: string | null
           restored_by?: string | null
+          right_to_work?: string | null
           start_date?: string | null
           trade_plate_number?: string | null
+          unavailable_regions?: string[] | null
           updated_at?: string
           user_id?: string
         }
@@ -1274,21 +1421,111 @@ export type Database = {
           },
         ]
       }
-      organisations: {
+      onboarding_documents: {
         Row: {
           created_at: string
+          document_type: string
+          expires_at: string | null
+          file_name: string
+          file_url: string
           id: string
-          name: string
+          org_id: string
+          related_id: string
+          related_type: string
+          updated_at: string
+          uploaded_by: string | null
         }
         Insert: {
           created_at?: string
+          document_type: string
+          expires_at?: string | null
+          file_name: string
+          file_url: string
           id?: string
-          name: string
+          org_id: string
+          related_id: string
+          related_type: string
+          updated_at?: string
+          uploaded_by?: string | null
         }
         Update: {
           created_at?: string
+          document_type?: string
+          expires_at?: string | null
+          file_name?: string
+          file_url?: string
           id?: string
+          org_id?: string
+          related_id?: string
+          related_type?: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
+      organisations: {
+        Row: {
+          billing_plan: string | null
+          branding_name: string | null
+          company_number: string | null
+          created_at: string
+          id: string
+          legal_name: string | null
+          logo_url: string | null
+          main_contact_email: string | null
+          main_contact_name: string | null
+          main_contact_phone: string | null
+          max_users: number | null
+          name: string
+          notes: string | null
+          primary_colour: string | null
+          registered_address: string | null
+          status: string
+          trading_address: string | null
+          updated_at: string
+          vat_number: string | null
+        }
+        Insert: {
+          billing_plan?: string | null
+          branding_name?: string | null
+          company_number?: string | null
+          created_at?: string
+          id?: string
+          legal_name?: string | null
+          logo_url?: string | null
+          main_contact_email?: string | null
+          main_contact_name?: string | null
+          main_contact_phone?: string | null
+          max_users?: number | null
+          name: string
+          notes?: string | null
+          primary_colour?: string | null
+          registered_address?: string | null
+          status?: string
+          trading_address?: string | null
+          updated_at?: string
+          vat_number?: string | null
+        }
+        Update: {
+          billing_plan?: string | null
+          branding_name?: string | null
+          company_number?: string | null
+          created_at?: string
+          id?: string
+          legal_name?: string | null
+          logo_url?: string | null
+          main_contact_email?: string | null
+          main_contact_name?: string | null
+          main_contact_phone?: string | null
+          max_users?: number | null
           name?: string
+          notes?: string | null
+          primary_colour?: string | null
+          registered_address?: string | null
+          status?: string
+          trading_address?: string | null
+          updated_at?: string
+          vat_number?: string | null
         }
         Relationships: []
       }
@@ -1715,14 +1952,17 @@ export type Database = {
           activated_at: string | null
           activated_by: string | null
           auth_user_id: string
+          avatar_url: string | null
           created_at: string
           display_name: string | null
           email: string
           first_name: string | null
+          full_name: string | null
           id: string
           internal_notes: string | null
           is_protected: boolean
           last_name: string | null
+          mobile: string | null
           org_id: string | null
           permissions: Json
           phone: string | null
@@ -1738,14 +1978,17 @@ export type Database = {
           activated_at?: string | null
           activated_by?: string | null
           auth_user_id: string
+          avatar_url?: string | null
           created_at?: string
           display_name?: string | null
           email: string
           first_name?: string | null
+          full_name?: string | null
           id?: string
           internal_notes?: string | null
           is_protected?: boolean
           last_name?: string | null
+          mobile?: string | null
           org_id?: string | null
           permissions?: Json
           phone?: string | null
@@ -1761,14 +2004,17 @@ export type Database = {
           activated_at?: string | null
           activated_by?: string | null
           auth_user_id?: string
+          avatar_url?: string | null
           created_at?: string
           display_name?: string | null
           email?: string
           first_name?: string | null
+          full_name?: string | null
           id?: string
           internal_notes?: string | null
           is_protected?: boolean
           last_name?: string | null
+          mobile?: string | null
           org_id?: string | null
           permissions?: Json
           phone?: string | null
@@ -1982,14 +2228,17 @@ export type Database = {
           activated_at: string | null
           activated_by: string | null
           auth_user_id: string
+          avatar_url: string | null
           created_at: string
           display_name: string | null
           email: string
           first_name: string | null
+          full_name: string | null
           id: string
           internal_notes: string | null
           is_protected: boolean
           last_name: string | null
+          mobile: string | null
           org_id: string | null
           permissions: Json
           phone: string | null
@@ -2019,28 +2268,42 @@ export type Database = {
           archive_reason: string | null
           archived_at: string | null
           archived_by: string | null
+          automatic_capable: boolean
+          availability_notes: string | null
+          bank_captured: boolean
           city: string | null
           created_at: string
+          date_joined: string | null
           date_of_birth: string | null
           display_name: string | null
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
           employment_type: string | null
+          endorsements: string | null
+          ev_capable: boolean
           full_name: string
+          home_postcode: string | null
           id: string
           is_active: boolean
           licence_categories: string[] | null
           licence_expiry: string | null
           licence_number: string | null
+          manual_capable: boolean
+          max_daily_distance: number | null
           notes: string | null
           org_id: string
+          payout_terms: string | null
           phone: string | null
           postcode: string | null
+          preferred_regions: string[] | null
+          prestige_approved: boolean
           restore_note: string | null
           restored_at: string | null
           restored_by: string | null
+          right_to_work: string | null
           start_date: string | null
           trade_plate_number: string | null
+          unavailable_regions: string[] | null
           updated_at: string
           user_id: string
         }
@@ -2197,28 +2460,42 @@ export type Database = {
           archive_reason: string | null
           archived_at: string | null
           archived_by: string | null
+          automatic_capable: boolean
+          availability_notes: string | null
+          bank_captured: boolean
           city: string | null
           created_at: string
+          date_joined: string | null
           date_of_birth: string | null
           display_name: string | null
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
           employment_type: string | null
+          endorsements: string | null
+          ev_capable: boolean
           full_name: string
+          home_postcode: string | null
           id: string
           is_active: boolean
           licence_categories: string[] | null
           licence_expiry: string | null
           licence_number: string | null
+          manual_capable: boolean
+          max_daily_distance: number | null
           notes: string | null
           org_id: string
+          payout_terms: string | null
           phone: string | null
           postcode: string | null
+          preferred_regions: string[] | null
+          prestige_approved: boolean
           restore_note: string | null
           restored_at: string | null
           restored_by: string | null
+          right_to_work: string | null
           start_date: string | null
           trade_plate_number: string | null
+          unavailable_regions: string[] | null
           updated_at: string
           user_id: string
         }
@@ -2266,14 +2543,17 @@ export type Database = {
           activated_at: string | null
           activated_by: string | null
           auth_user_id: string
+          avatar_url: string | null
           created_at: string
           display_name: string | null
           email: string
           first_name: string | null
+          full_name: string | null
           id: string
           internal_notes: string | null
           is_protected: boolean
           last_name: string | null
+          mobile: string | null
           org_id: string | null
           permissions: Json
           phone: string | null
