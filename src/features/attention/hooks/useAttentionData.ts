@@ -129,11 +129,32 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
         ...deriveStateExceptions(logEntries),
       ]);
 
+      // Build a set of jobIds that an admin has explicitly resolved
+      // via the "Mark resolved" action on the Missing Evidence queue.
+      // Those acks live in the same `attention_acknowledgements` table
+      // under exception_id `evidence:<jobId>`. When present, we suppress
+      // ALL evidence exceptions for that job from the dashboard, so the
+      // single resolution action clears every related surface.
+      const evidenceAckedJobIds = new Set<string>();
+      const EVIDENCE_PREFIX = "evidence:";
+      for (const ack of acknowledgements) {
+        if (typeof ack.exception_id !== "string") continue;
+        if (!ack.exception_id.startsWith(EVIDENCE_PREFIX)) continue;
+        if (ack.snoozed_until && ack.snoozed_until <= now) continue;
+        const jobId = ack.job_id ?? ack.exception_id.slice(EVIDENCE_PREFIX.length);
+        if (jobId) evidenceAckedJobIds.add(jobId);
+      }
+
       // Separate acknowledged vs active
       const activeExceptions: AttentionException[] = [];
       const acknowledgedExceptions: AttentionException[] = [];
 
       for (const ex of allExceptions) {
+        // Job-scoped evidence resolution → treat as acknowledged.
+        if (ex.category === "evidence" && ex.jobId && evidenceAckedJobIds.has(ex.jobId)) {
+          acknowledgedExceptions.push(ex);
+          continue;
+        }
         const ack = ackMap.get(ex.id);
         if (ack) {
           // If snoozed and snooze hasn't expired, treat as acknowledged
