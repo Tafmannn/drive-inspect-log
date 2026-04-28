@@ -500,6 +500,7 @@ export const InspectionFlow = () => {
             description: "Returning you to the job.",
           });
           if (dk) clearDraft(dk);
+          if (jobId) void clearPhotoDraft(type, jobId);
           try { sessionStorage.removeItem(sessionKey); } catch { /* ignore */ }
           setSubmitting(false);
           submitInFlight.current = false;
@@ -711,9 +712,7 @@ export const InspectionFlow = () => {
             "It will submit automatically when your connection comes back.",
         });
         if (dk) clearDraft(dk);
-        try { sessionStorage.removeItem(sessionKey); } catch { /* ignore */ }
-        navigate(`/jobs/${jobId}`);
-      };
+        if (jobId) void clearPhotoDraft(type, jobId);
 
       // ── 4a) OFFLINE / NETWORK-DROP SHORT-CIRCUIT ──
       // If the device is offline (either at submit time or because the
@@ -824,10 +823,7 @@ export const InspectionFlow = () => {
           variant: "destructive",
         });
         if (dk) clearDraft(dk);
-        try { sessionStorage.removeItem(sessionKey); } catch { /* ignore */ }
-        navigate(`/jobs/${jobId}`);
-        return;
-      }
+        if (jobId) void clearPhotoDraft(type, jobId);
 
       const inspectionId: string | null = submitResultTyped?.inspectionId ?? null;
       const damageItemIds: string[] = submitResultTyped?.damageItemIds ?? [];
@@ -940,9 +936,7 @@ export const InspectionFlow = () => {
       const label = type === "pickup" ? "Pickup" : "Delivery";
       toast({ title: `${label} completed for job ${jobRef}.` });
       if (dk) clearDraft(dk);
-      try { sessionStorage.removeItem(sessionKey); } catch { /* ignore */ }
-      navigate(`/jobs/${jobId}`);
-    } catch {
+      if (jobId) void clearPhotoDraft(type, jobId);
       toast({ title: "Submission failed. Please try again.", variant: "destructive" });
     } finally {
       setSubmitting(false);
