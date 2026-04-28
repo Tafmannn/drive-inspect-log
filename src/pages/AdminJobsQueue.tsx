@@ -300,6 +300,9 @@ function QueueSection({
   emptyText,
   actions,
   collapsible,
+  onDismiss,
+  dismissingId,
+  dismissLabel,
 }: {
   title: string;
   icon: React.ComponentType<{ className?: string }>;
@@ -312,6 +315,9 @@ function QueueSection({
     onPod: (job: AdminJobRow) => void;
   };
   collapsible?: boolean;
+  onDismiss?: (job: AdminJobRow) => void | Promise<void>;
+  dismissingId?: string | null;
+  dismissLabel?: string;
 }) {
   const [collapsed, setCollapsed] = useState(collapsible ? true : false);
   const count = jobs.length;
@@ -340,13 +346,32 @@ function QueueSection({
           ) : (
             <div className="space-y-2">
               {jobs.map((job) => (
-                <AdminJobCard
-                  key={job.id}
-                  job={job}
-                  onView={actions.onView}
-                  onAssign={actions.onAssign}
-                  onPod={actions.onPod}
-                />
+                <div key={job.id} className="space-y-1">
+                  <AdminJobCard
+                    job={job}
+                    onView={actions.onView}
+                    onAssign={actions.onAssign}
+                    onPod={actions.onPod}
+                  />
+                  {onDismiss && (
+                    <div className="flex justify-end">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8 px-2.5 text-[11px] gap-1 rounded-lg"
+                        disabled={dismissingId === job.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void onDismiss(job);
+                        }}
+                      >
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        {dismissingId === job.id ? "Removing…" : (dismissLabel ?? "Dismiss")}
+                      </Button>
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           )}
