@@ -283,6 +283,7 @@ export function ControlOverview() {
       <QuickActionsBar actions={quickActions} sticky />
 
       {/* C. Attention Queue */}
+      <div id="attention-section" className="scroll-mt-20">
       <ControlSection
         title="Attention Required"
         description={`${exceptions.length} active exception${exceptions.length !== 1 ? "s" : ""}`}
