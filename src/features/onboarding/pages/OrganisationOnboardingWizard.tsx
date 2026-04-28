@@ -148,7 +148,7 @@ export default function OrganisationOnboardingWizard() {
     if (step < STEPS.length) setStep(step + 1);
     else {
       toast({ title: "Organisation onboarding saved" });
-      navigate("/super-admin");
+      navigate(`/super-admin/orgs/${orgId}`);
     }
   };
 
@@ -184,7 +184,7 @@ export default function OrganisationOnboardingWizard() {
       saving={saving}
       isFirst={step === 1}
       isLast={step === STEPS.length}
-      exitTo="/super-admin"
+      exitTo={`/super-admin/orgs/${orgId}`}
       banner={banner}
     >
       {step === 1 && (
