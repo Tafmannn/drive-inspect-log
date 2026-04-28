@@ -937,6 +937,9 @@ export const InspectionFlow = () => {
       toast({ title: `${label} completed for job ${jobRef}.` });
       if (dk) clearDraft(dk);
       if (jobId) void clearPhotoDraft(type, jobId);
+      try { sessionStorage.removeItem(sessionKey); } catch { /* ignore */ }
+      navigate(`/jobs/${jobId}`);
+    } catch {
       toast({ title: "Submission failed. Please try again.", variant: "destructive" });
     } finally {
       setSubmitting(false);
