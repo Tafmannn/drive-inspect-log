@@ -247,18 +247,36 @@ export function ControlOverview() {
     { label: "Expenses", icon: Receipt, onClick: () => navigate("/control/finance") },
   ];
 
+  // ─── Live status chip ────────────────────────────────────────────
+  const criticalCount = exceptions.filter(e => e.severity === "critical").length;
+  const statusChip =
+    criticalCount > 0
+      ? { label: "Critical", className: "bg-destructive/10 text-destructive border-destructive/30" }
+      : highSevCount > 0
+      ? { label: "Attention Required", className: "bg-warning/10 text-warning border-warning/30" }
+      : { label: "All Clear", className: "bg-success/10 text-success border-success/30" };
+
   return (
     <ControlShell>
       <ControlHeader
         title="Command Center"
         subtitle="Organisation dispatch & operational control"
+        actions={
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusChip.className}`}
+            aria-live="polite"
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-current" />
+            {statusChip.label}
+          </span>
+        }
       />
 
-      {/* A. KPI Strip */}
-      <KpiStrip items={kpiItems} className="grid-cols-2 lg:grid-cols-7" />
+      {/* A. KPI Strip — responsive 2 / 3 / 6 col */}
+      <KpiStrip items={kpiItems} />
 
-      {/* B. Quick Actions */}
-      <QuickActionsBar actions={quickActions} />
+      {/* B. Quick Actions — sticky horizontal scroll on mobile */}
+      <QuickActionsBar actions={quickActions} sticky />
 
       {/* C. Attention Queue */}
       <ControlSection

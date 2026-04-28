@@ -33,7 +33,12 @@ export function KpiStrip({
   className?: string;
 }) {
   return (
-    <div className={cn("grid gap-3", className)} style={{ gridTemplateColumns: `repeat(${Math.min(items.length, 6)}, minmax(0, 1fr))` }}>
+    <div
+      className={cn(
+        "grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6",
+        className,
+      )}
+    >
       {items.map((item, i) => (
         <KpiCard key={i} {...item} />
       ))}
@@ -43,17 +48,17 @@ export function KpiStrip({
 
 function KpiCard({ label, value, icon: Icon, variant = "default", loading }: KpiItem) {
   return (
-    <div className="rounded-lg border bg-card p-3.5 flex items-center gap-3 min-w-0">
+    <div className="rounded-xl border bg-card p-4 flex items-center gap-3 min-w-0 h-full shadow-sm">
       {Icon && (
-        <div className={cn("h-9 w-9 rounded-md flex items-center justify-center shrink-0", iconBg[variant])}>
-          <Icon className="h-4 w-4" />
+        <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center shrink-0", iconBg[variant])}>
+          <Icon className="h-5 w-5" />
         </div>
       )}
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         {loading ? (
           <Skeleton className="h-7 w-14 mb-1" />
         ) : (
-          <p className={cn("text-xl font-semibold tabular-nums leading-tight", variantStyles[variant])}>
+          <p className={cn("text-2xl font-semibold tabular-nums leading-tight", variantStyles[variant])}>
             {value ?? "—"}
           </p>
         )}
