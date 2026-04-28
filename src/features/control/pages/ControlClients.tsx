@@ -45,6 +45,7 @@ export function ControlClients() {
   const [search, setSearch] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const navigate = useNavigate();
   const [editingClient, setEditingClient] = useState<Client | null>(null);
 
   const { data: clients, isLoading } = useClients({
