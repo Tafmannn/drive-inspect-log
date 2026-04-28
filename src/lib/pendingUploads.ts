@@ -976,8 +976,16 @@ export async function retryAllPending(options?: {
   const all = await loadAll();
   // STAGED items are NEVER picked up by the worker — they are not
   // "uploadable" until promoteSubmissionSession() flips them to ready.
+  // `needsAttention` items are skipped here too: they have a
+  // deterministic failure (RLS / FK / validation) and would just keep
+  // failing on every focus/online drain. The user must retry them
+  // explicitly from the per-item UI.
   const targets = all.filter(
-    (u) => u.state === "ready" || u.state === "failed" || u.state === "blocked",
+    (u) =>
+      (u.state === "ready" ||
+        u.state === "failed" ||
+        u.state === "blocked") &&
+      !u.needsAttention,
   );
 
   let succeeded = 0;
