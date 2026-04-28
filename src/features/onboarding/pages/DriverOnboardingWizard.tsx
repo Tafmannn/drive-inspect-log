@@ -251,7 +251,7 @@ export default function DriverOnboardingWizard() {
       setStep(step + 1);
     } else {
       toast({ title: "Driver onboarding saved" });
-      navigate("/admin/drivers");
+      navigate(`/admin/drivers/${userId}`);
     }
   };
 
@@ -301,7 +301,7 @@ export default function DriverOnboardingWizard() {
       saving={saving}
       isFirst={step === 1}
       isLast={step === STEPS.length}
-      exitTo="/admin/drivers"
+      exitTo={`/admin/drivers/${userId}`}
       banner={banner}
       nextLabel={step === STEPS.length ? "Finish" : undefined}
     >

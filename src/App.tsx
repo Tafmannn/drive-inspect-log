@@ -41,6 +41,9 @@ import NotFound from "./pages/NotFound";
 import DriverOnboardingWizard from "./features/onboarding/pages/DriverOnboardingWizard";
 import ClientOnboardingWizard from "./features/onboarding/pages/ClientOnboardingWizard";
 import OrganisationOnboardingWizard from "./features/onboarding/pages/OrganisationOnboardingWizard";
+import DriverProfileDetail from "./features/onboarding/pages/DriverProfileDetail";
+import ClientProfileDetail from "./features/onboarding/pages/ClientProfileDetail";
+import OrganisationProfileDetail from "./features/onboarding/pages/OrganisationProfileDetail";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { useEffect } from "react";
 import { installRetryTriggers, triggerRetry } from "@/lib/retryOrchestrator";
@@ -217,8 +220,11 @@ const App = () => {
                 <Route path="/admin/pod-review" element={<ProtectedRoute><AdminRoute><AdminPodReview /></AdminRoute></ProtectedRoute>} />
                 <Route path="/admin/finance" element={<ProtectedRoute><AdminRoute><AdminFinance /></AdminRoute></ProtectedRoute>} />
                 <Route path="/admin/onboarding" element={<ProtectedRoute><AdminRoute><AdminOnboarding /></AdminRoute></ProtectedRoute>} />
+                <Route path="/admin/drivers/:userId" element={<ProtectedRoute><AdminRoute><DriverProfileDetail /></AdminRoute></ProtectedRoute>} />
                 <Route path="/admin/drivers/:userId/complete" element={<ProtectedRoute><AdminRoute><DriverOnboardingWizard /></AdminRoute></ProtectedRoute>} />
-                <Route path="/control/clients/:clientId/complete" element={<ProtectedRoute><AdminRoute><ClientOnboardingWizard /></AdminRoute></ProtectedRoute>} />
+                <Route path="/admin/clients/:clientId" element={<ProtectedRoute><AdminRoute><ClientProfileDetail /></AdminRoute></ProtectedRoute>} />
+                <Route path="/admin/clients/:clientId/complete" element={<ProtectedRoute><AdminRoute><ClientOnboardingWizard /></AdminRoute></ProtectedRoute>} />
+                <Route path="/super-admin/orgs/:orgId" element={<ProtectedRoute><SuperAdminRoute><OrganisationProfileDetail /></SuperAdminRoute></ProtectedRoute>} />
                 <Route path="/super-admin/orgs/:orgId/complete" element={<ProtectedRoute><SuperAdminRoute><OrganisationOnboardingWizard /></SuperAdminRoute></ProtectedRoute>} />
 
                 {/* ── Super-admin-only routes ── */}

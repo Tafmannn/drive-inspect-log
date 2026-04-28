@@ -130,7 +130,7 @@ export function SuperAdminOrgs() {
               </TableHeader>
               <TableBody>
                 {filtered.map(o => (
-                  <TableRow key={o.id}>
+                  <TableRow key={o.id} className="cursor-pointer hover:bg-muted/40" onClick={() => window.location.assign(`/super-admin/orgs/${o.id}`)}>
                     <TableCell className="text-sm font-medium">{o.name}</TableCell>
                     <TableCell className="text-xs text-muted-foreground font-mono">{o.id?.slice(0, 8)}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{new Date(o.created_at).toLocaleDateString()}</TableCell>

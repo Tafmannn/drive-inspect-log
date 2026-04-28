@@ -180,7 +180,7 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
 
       // After fresh creation, route to profile completion.
       if (!isEdit && savedClientId) {
-        navigate(`/control/clients/${savedClientId}/complete?created=1`);
+        navigate(`/admin/clients/${savedClientId}/complete?created=1`);
       }
     } catch (err: any) {
       toast({

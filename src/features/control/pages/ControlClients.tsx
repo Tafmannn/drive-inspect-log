@@ -3,6 +3,9 @@
  * Premium admin UI for managing billing client profiles.
  */
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { scoreClient } from "@/features/onboarding/lib/completion";
+import { CompletionBadge } from "@/features/onboarding/components/CompletionBadge";
 import { ControlShell, ControlHeader, ControlSection } from "../components/shared/ControlShell";
 import { KpiStrip, type KpiItem } from "../components/shared/KpiStrip";
 import { CompactTable, type CompactColumn } from "../components/shared/CompactTable";
@@ -42,6 +45,7 @@ export function ControlClients() {
   const [search, setSearch] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const navigate = useNavigate();
   const [editingClient, setEditingClient] = useState<Client | null>(null);
 
   const { data: clients, isLoading } = useClients({
@@ -111,6 +115,12 @@ export function ControlClients() {
           )}
         </div>
       ),
+    },
+    {
+      key: "completion",
+      header: "Profile",
+      className: "w-28",
+      render: (row) => <CompletionBadge result={scoreClient(row as any)} />,
     },
     {
       key: "contact",
@@ -233,7 +243,7 @@ export function ControlClients() {
           data={clients ?? []}
           loading={isLoading}
           emptyMessage="No clients found. Create your first client profile."
-          onRowClick={handleEdit}
+          onRowClick={(row) => navigate(`/admin/clients/${row.id}`)}
         />
       </ControlSection>
 
