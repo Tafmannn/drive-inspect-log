@@ -186,3 +186,46 @@ resolvable job/org.
 
 ### Rollback
 `git revert` the Stage 4 commit and redeploy the two functions.
+
+---
+
+## Stage 5 — Storage + residual-RLS hardening (H1, C5 partial)
+Migration: `20260628100200_phase1_storage_and_residual_rls_hardening.sql`
+Rollback:  `supabase/rollback/20260628100200_*.down.sql`
+
+Shipped (validated non-breaking):
+- **H1** expense-receipts bucket is now org-scoped (was readable by any
+  authenticated user). Existing stored signed URLs keep working (signed URLs
+  bypass RLS); new uploads pass the org check because the uploader owns the
+  expense.
+- **C5** `sheet_sync_config` / `sheet_sync_logs` locked to admins (no client
+  reads them; the service-role sync bypasses RLS).
+- `app_settings` writes restricted to admins; reads stay open.
+
+### Apply / Verify
+`supabase db push`. Then:
+```sql
+-- expense receipt cross-org read denied for a normal user (run as that user):
+-- SELECT ... from storage with a name '<otherOrgExpenseId>/x.jpg' must return nothing.
+```
+App: as an admin, open Expenses, upload a receipt, view it; confirm receipts of
+other orgs are not visible. Confirm the Sheets sync (if used) still runs (service
+role). Confirm feature flags still load.
+
+### ⚠️ Deferred from Phase 1 — REQUIRES APPROVAL + CLIENT WORK (reported, not shipped)
+- **C5 `qr_confirmations` (still `USING(true)`):** the anonymous customer
+  handover page (`QrConfirm.tsx`) reads a confirmation **by token** and a job
+  lookup as the anon role. Pure RLS cannot express "anon may read only the row
+  whose token it supplies." Safe fix = two `SECURITY DEFINER` RPCs
+  (`get_qr_confirmation(token)`, `confirm_qr(token, name, notes)`) + rework
+  `qrApi.ts`/`QrConfirm.tsx` to call them, then deny direct anon table access.
+  Needs testing of the live customer flow.
+- **C6 `vehicle-photos` bucket (`public = true`):** still referenced as the
+  non-GCS fallback bucket (`internalStorageService.ts`) and may hold legacy
+  public-URL data. Flipping to private + org-scoped policies must be paired with
+  confirming the active storage backend and migrating/erroring legacy public
+  URLs. **Action:** confirm whether this bucket still receives or serves data; if
+  legacy-only, plan a migration to GCS then privatise.
+
+### Rollback
+Apply `supabase/rollback/20260628100200_*.down.sql`.
