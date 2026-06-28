@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { authenticateCaller, callerCanAccessPath } from "../_shared/auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -45,51 +45,27 @@ serve(async (req) => {
       );
     }
 
-    // ─── Auth: Authorization header OR ?token= query param ───
-    let authHeader = req.headers.get("Authorization") ?? "";
+    // ─── Auth: Authorization header OR ?token= query param (for <img> loads) ───
+    // NOTE: token-in-URL is retained because <img>/streamed responses cannot send
+    // an Authorization header. It carries the caller's OWN JWT. Hardening this to
+    // a signed-cookie/signed-path scheme is a Phase 2 follow-up (needs a
+    // coordinated client change); the IDOR is closed by the org check below.
     const tokenParam = url.searchParams.get("token");
-    if (!authHeader && tokenParam) {
-      authHeader = `Bearer ${tokenParam}`;
-    }
+    const authResult = await authenticateCaller(req, { tokenParam });
+    if ("error" in authResult) return authResult.error;
+    const { caller, admin } = authResult;
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-    if (authError || !authData?.user) {
-      return new Response(JSON.stringify({ error: "UNAUTHENTICATED" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    if (caller.accountStatus === "suspended") {
+      return new Response(JSON.stringify({ error: "ACCOUNT_SUSPENDED" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Role-based superadmin check
-    const directRole = String(
-      authData.user.user_metadata?.role ?? authData.user.app_metadata?.role ?? ""
-    ).toLowerCase();
-    const roleSet = new Set(
-      [
-        ...((authData.user.user_metadata?.roles ?? []) as string[]),
-        ...((authData.user.app_metadata?.roles ?? []) as string[]),
-      ].map((r: string) => String(r).toUpperCase().replace(/-/g, "_"))
-    );
-    const isSuperAdmin =
-      directRole === "super_admin" ||
-      directRole === "superadmin" ||
-      roleSet.has("SUPERADMIN") ||
-      roleSet.has("SUPER_ADMIN");
-
-    if (!isSuperAdmin) {
-      const orgId =
-        authData.user.user_metadata?.org_id ??
-        authData.user.app_metadata?.org_id ??
-        null;
-      if (!orgId) {
-        return new Response(JSON.stringify({ error: "NO_ORG" }), {
-          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+    // ─── Authorize the requested object against the caller's org (C2 IDOR) ───
+    if (!(await callerCanAccessPath(admin, caller, objectPath))) {
+      return new Response(JSON.stringify({ error: "FORBIDDEN" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // ─── Generate GCS V4 signed URL ───

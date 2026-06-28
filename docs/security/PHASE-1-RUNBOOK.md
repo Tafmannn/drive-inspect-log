@@ -151,3 +151,38 @@ role from `user_metadata`. Suspended callers are rejected.
 
 ### Rollback
 `git revert` the Stage 3 commit and redeploy the four functions. (No DB change.)
+
+---
+
+## Stage 4 — Path→org authorization for storage IDOR (C1, C2)
+Code only. Files: `_shared/auth.ts` (adds `callerCanAccessPath`),
+`gcs-proxy/`, `resolve-signature-url/`.
+
+Both functions now resolve the owning org of the requested object from the DB
+(every object path is `jobs/<jobId>/...`, so org = `jobs.org_id`) and require it
+to match the caller's org (super-admins bypass). Fails closed when a path has no
+resolvable job/org.
+
+> **Deviation from the audit's wording:** the `?token=` query param on `gcs-proxy`
+> is **retained**, not removed — `<img>`/streamed responses cannot send an
+> Authorization header, so removing it would break all image/POD rendering. It
+> carries the caller's own JWT. Replacing it with a signed-cookie/signed-path
+> scheme is deferred to Phase 2 (needs a coordinated client change). The actual
+> IDOR is fully closed by the org check.
+
+### Deploy
+`supabase functions deploy gcs-proxy resolve-signature-url`
+
+### Verify
+1. **Cross-org read blocked:** as a driver in org A, call `gcs-proxy?path=jobs/<jobB>/...`
+   and `resolve-signature-url` with `{ rawUrl: 'jobs/<jobB>/signatures/.../driver.png' }`.
+   Both must return **403 FORBIDDEN**.
+2. **Own-org read works:** open a POD / job gallery / signature for a job in the
+   caller's own org — images and signatures render exactly as before.
+3. **Regression watch (legacy data):** test several historical jobs (especially
+   the oldest). Any object whose stored path does NOT start with `jobs/<uuid>/`
+   would 403 for non-super-admins — if you find such legacy paths, report before
+   proceeding so we can add a resolver for that shape.
+
+### Rollback
+`git revert` the Stage 4 commit and redeploy the two functions.

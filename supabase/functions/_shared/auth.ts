@@ -45,11 +45,18 @@ export interface AuthOk {
 /**
  * Authenticate the request and load the caller's authoritative profile.
  * Returns either { caller, admin } or a ready-to-return error Response.
+ *
+ * `opts.tokenParam` allows callers (e.g. gcs-proxy serving <img> requests that
+ * cannot set an Authorization header) to supply the bearer token explicitly.
  */
 export async function authenticateCaller(
   req: Request,
+  opts: { tokenParam?: string | null } = {},
 ): Promise<AuthOk | { error: Response }> {
-  const authHeader = req.headers.get("Authorization") ?? "";
+  let authHeader = req.headers.get("Authorization") ?? "";
+  if (!authHeader && opts.tokenParam) {
+    authHeader = `Bearer ${opts.tokenParam}`;
+  }
   if (!authHeader.startsWith("Bearer ")) {
     return { error: jsonRes({ error: "UNAUTHENTICATED" }, 401) };
   }
@@ -97,4 +104,34 @@ export function rolesArrayFor(role: AppRole): string[] {
   if (role === "super_admin") return ["SUPERADMIN", "ADMIN", "DRIVER"];
   if (role === "admin") return ["ADMIN", "DRIVER"];
   return ["DRIVER"];
+}
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Authorize access to a storage object by resolving its owning org from the DB.
+ * All GCS/signature object paths are of the form `jobs/<jobId>/...`, so the org
+ * is resolved via the jobs table and compared to the caller's org. Fails closed
+ * for non-super-admins when the path has no resolvable job/org.
+ */
+export async function callerCanAccessPath(
+  admin: SupabaseClient,
+  caller: Caller,
+  objectPath: string,
+): Promise<boolean> {
+  if (caller.isSuperAdmin) return true;
+  if (!caller.orgId) return false;
+
+  const match = objectPath.match(/(?:^|\/)jobs\/([^/]+)\//);
+  const jobId = match?.[1];
+  if (!jobId || !UUID_RE.test(jobId)) return false; // fail closed
+
+  const { data: job } = await admin
+    .from("jobs")
+    .select("org_id")
+    .eq("id", jobId)
+    .maybeSingle();
+
+  return !!job && job.org_id === caller.orgId;
 }
