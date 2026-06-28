@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { authenticateCaller, callerCanAccessPath } from "../_shared/auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -135,21 +135,14 @@ serve(async (req) => {
   }
 
   try {
-    // Auth check
-    const authHeader = req.headers.get('Authorization') ?? '';
-    if (!authHeader.startsWith('Bearer ')) {
+    // Auth: load caller from user_profiles (never JWT user_metadata).
+    const authResult = await authenticateCaller(req);
+    if ("error" in authResult) {
       return jsonResponse({ success: false, finalUrl: null, normalized: { format: 'none', backend: 'none', bucket: null, path: null }, error: 'UNAUTHENTICATED' }, 401);
     }
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-    if (authError || !authData?.user) {
-      return jsonResponse({ success: false, finalUrl: null, normalized: { format: 'none', backend: 'none', bucket: null, path: null }, error: 'UNAUTHENTICATED' }, 401);
+    const { caller, admin } = authResult;
+    if (caller.accountStatus === "suspended") {
+      return jsonResponse({ success: false, finalUrl: null, normalized: { format: 'none', backend: 'none', bucket: null, path: null }, error: 'ACCOUNT_SUSPENDED' }, 403);
     }
 
     // Parse input
@@ -165,11 +158,13 @@ serve(async (req) => {
       return jsonResponse({ success: false, finalUrl: null, normalized, error: `UNRECOGNIZED_FORMAT: ${normalized.format}` }, 400);
     }
 
-    // Use service role to create signed URL (bypasses RLS)
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+    // ─── Authorize the requested object against the caller's org (C1 IDOR) ───
+    if (!(await callerCanAccessPath(admin, caller, normalized.path))) {
+      return jsonResponse({ success: false, finalUrl: null, normalized, error: 'FORBIDDEN' }, 403);
+    }
 
-    const { data, error } = await adminClient.storage
+    // Use service role to create signed URL (bypasses RLS)
+    const { data, error } = await admin.storage
       .from(normalized.bucket)
       .createSignedUrl(normalized.path, SIGNED_URL_EXPIRY_SECONDS);
 

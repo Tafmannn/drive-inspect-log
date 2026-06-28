@@ -1,10 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-};
+import {
+  authenticateCaller,
+  corsHeaders,
+  jsonRes,
+  rolesArrayFor,
+} from "../_shared/auth.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -12,137 +12,78 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization") ?? "";
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    // Authorise from user_profiles (never JWT user_metadata).
+    const authResult = await authenticateCaller(req);
+    if ("error" in authResult) return authResult.error;
+    const { caller, admin } = authResult;
 
-    const anonClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    const { data: authData, error: authError } = await anonClient.auth.getUser();
-    if (authError || !authData?.user) {
-      return new Response(JSON.stringify({ error: "UNAUTHENTICATED" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (caller.accountStatus === "suspended") {
+      return jsonRes({ error: "ACCOUNT_SUSPENDED" }, 403);
     }
-
-    const caller = authData.user;
-    const callerOrgId =
-      caller.user_metadata?.org_id ?? caller.app_metadata?.org_id ?? null;
-    const directRole = String(
-      caller.user_metadata?.role ?? caller.app_metadata?.role ?? ""
-    ).toLowerCase();
-    const roleSet = new Set(
-      [
-        ...((caller.user_metadata?.roles ?? []) as string[]),
-        ...((caller.app_metadata?.roles ?? []) as string[]),
-      ].map((r) => String(r).toUpperCase().replace(/-/g, "_"))
-    );
-    const isSuperAdmin =
-      directRole === "super_admin" ||
-      directRole === "superadmin" ||
-      roleSet.has("SUPERADMIN") ||
-      roleSet.has("SUPER_ADMIN");
-    const isAdmin = isSuperAdmin || directRole === "admin" || roleSet.has("ADMIN");
-
-    // Only super_admin or admin can assign drivers
-    if (!isAdmin) {
-      return new Response(JSON.stringify({ error: "ADMIN_OR_SUPER_ADMIN_ONLY" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (!caller.isAdmin) {
+      return jsonRes({ error: "ADMIN_OR_SUPER_ADMIN_ONLY" }, 403);
     }
 
     const body = await req.json();
     const { email, org_id } = body;
-
     if (!email || typeof email !== "string") {
-      return new Response(JSON.stringify({ error: "EMAIL_REQUIRED" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonRes({ error: "EMAIL_REQUIRED" }, 400);
     }
 
-    // Resolve destination org
-    let targetOrgId: string | null;
-    if (isAdmin && !isSuperAdmin) {
-      // Admin can only assign into their own org
-      targetOrgId = callerOrgId;
-    } else {
-      // super_admin can specify or fallback
-      targetOrgId = org_id ?? callerOrgId;
-    }
+    // Admins can only assign into their own org; super-admins may target any org.
+    const targetOrgId = caller.isSuperAdmin ? (org_id ?? caller.orgId) : caller.orgId;
+    if (!targetOrgId) return jsonRes({ error: "NO_TARGET_ORG" }, 400);
 
-    if (!targetOrgId) {
-      return new Response(JSON.stringify({ error: "NO_TARGET_ORG" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const adminClient = createClient(supabaseUrl, serviceRoleKey);
-
-    const { data: listData, error: listError } = await adminClient.auth.admin.listUsers();
-    if (listError) {
-      return new Response(JSON.stringify({ error: "LIST_USERS_FAILED" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
+    // Locate the target auth user by email.
+    const { data: listData, error: listError } = await admin.auth.admin.listUsers();
+    if (listError) return jsonRes({ error: "LIST_USERS_FAILED" }, 500);
     const targetUser = listData.users.find(
-      (u) => u.email?.toLowerCase() === email.toLowerCase()
+      (u) => u.email?.toLowerCase() === email.toLowerCase(),
     );
+    if (!targetUser) return jsonRes({ error: "USER_NOT_FOUND" }, 404);
 
-    if (!targetUser) {
-      return new Response(JSON.stringify({ error: "USER_NOT_FOUND" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Admin cannot assign users from other orgs
-    if (isAdmin && !isSuperAdmin) {
-      const targetCurrentOrg = targetUser.user_metadata?.org_id ?? null;
-      if (targetCurrentOrg && targetCurrentOrg !== callerOrgId) {
-        return new Response(JSON.stringify({ error: "CROSS_ORG_FORBIDDEN" }), {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+    // Org admins cannot pull a user who already belongs to a different org.
+    if (!caller.isSuperAdmin) {
+      const { data: existingProfile } = await admin
+        .from("user_profiles")
+        .select("org_id")
+        .eq("auth_user_id", targetUser.id)
+        .maybeSingle();
+      if (existingProfile?.org_id && existingProfile.org_id !== caller.orgId) {
+        return jsonRes({ error: "CROSS_ORG_FORBIDDEN" }, 403);
       }
     }
 
-    const existingMeta = targetUser.user_metadata ?? {};
-    const { error: updateError } = await adminClient.auth.admin.updateUserById(
+    // Authoritative write: user_profiles is the source of truth.
+    const { error: profileErr } = await admin.from("user_profiles").upsert(
+      {
+        auth_user_id: targetUser.id,
+        email: (targetUser.email ?? email).toLowerCase(),
+        role: "driver",
+        org_id: targetOrgId,
+      },
+      { onConflict: "auth_user_id" },
+    );
+    if (profileErr) return jsonRes({ error: profileErr.message }, 500);
+
+    // Keep app_metadata (service-controlled) in sync for any JWT consumers.
+    // user_metadata is intentionally NOT used for role/org anymore.
+    const { error: updateError } = await admin.auth.admin.updateUserById(
       targetUser.id,
       {
-        user_metadata: {
-          ...existingMeta,
+        app_metadata: {
+          ...targetUser.app_metadata,
           role: "driver",
           org_id: targetOrgId,
+          roles: rolesArrayFor("driver"),
         },
-      }
+      },
     );
+    if (updateError) return jsonRes({ error: "UPDATE_FAILED" }, 500);
 
-    if (updateError) {
-      return new Response(JSON.stringify({ error: "UPDATE_FAILED" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonRes({ success: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
-    return new Response(JSON.stringify({ error: msg }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonRes({ error: msg }, 500);
   }
 });
