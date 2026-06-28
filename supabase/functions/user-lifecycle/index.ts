@@ -29,38 +29,11 @@ function roleLevel(role: string): number {
   return 1;
 }
 
-function isSuperAdminCheck(user: any): boolean {
-  const direct = String(user.app_metadata?.role ?? "")
-    .toLowerCase()
-    .replace(/_/g, "");
-  if (direct === "superadmin") return true;
-
-  const roles = [...((user.app_metadata?.roles ?? []) as string[])].map((r) =>
-    String(r).toUpperCase().replace(/-/g, "_")
-  );
-
-  return roles.includes("SUPERADMIN") || roles.includes("SUPER_ADMIN");
-}
-
-function isAdminCheck(user: any): boolean {
-  if (isSuperAdminCheck(user)) return true;
-
-  const direct = String(
-    user.app_metadata?.role ?? user.user_metadata?.role ?? ""
-  ).toLowerCase();
-
-  if (direct === "admin") return true;
-
-  const roles = [
-    ...((user.app_metadata?.roles ?? []) as string[]),
-    ...((user.user_metadata?.roles ?? []) as string[]),
-  ].map((r) => String(r).toUpperCase().replace(/-/g, "_"));
-
-  return roles.includes("ADMIN");
-}
-
+// Authoritative caller org. After the caller's profile is loaded in the handler,
+// caller.app_metadata.org_id is overwritten with the user_profiles value, so this
+// reads only trusted data.
 function callerOrgId(user: any): string | null {
-  return user.app_metadata?.org_id ?? user.user_metadata?.org_id ?? null;
+  return user.app_metadata?.org_id ?? null;
 }
 
 async function writeAudit(
@@ -142,9 +115,35 @@ serve(async (req) => {
     }
 
     const caller = adminUserData.user;
-    const callerIsSuper = isSuperAdminCheck(caller);
-    const callerIsAdmin = isAdminCheck(caller);
 
+    // AUTHORITATIVE authz (C3): role/org come ONLY from user_profiles, never
+    // from JWT metadata (user_metadata is self-writable). We load the caller's
+    // profile and overwrite caller.app_metadata/user_metadata from it so the
+    // existing callerOrgId()/role helpers below operate on trusted data.
+    const { data: callerProfile } = await admin
+      .from("user_profiles")
+      .select("role, org_id, account_status")
+      .eq("auth_user_id", caller.id)
+      .maybeSingle();
+
+    const callerRole = String(callerProfile?.role ?? "driver");
+    const callerIsSuper = callerRole === "super_admin";
+    const callerIsAdmin = callerRole === "admin" || callerIsSuper;
+
+    caller.app_metadata = {
+      role: callerRole,
+      org_id: callerProfile?.org_id ?? null,
+      roles: callerIsSuper
+        ? ["SUPERADMIN", "ADMIN", "DRIVER"]
+        : callerRole === "admin"
+        ? ["ADMIN", "DRIVER"]
+        : ["DRIVER"],
+    };
+    caller.user_metadata = {};
+
+    if (callerProfile?.account_status === "suspended") {
+      return json({ error: "ACCOUNT_SUSPENDED" }, 403);
+    }
     if (!callerIsAdmin) {
       return json({ error: "ADMIN_OR_SUPER_ADMIN_ONLY" }, 403);
     }
@@ -996,7 +995,12 @@ serve(async (req) => {
           last_name: u.user_metadata?.full_name?.split(" ").slice(1).join(" ") ?? null,
           display_name: u.user_metadata?.name ?? u.user_metadata?.full_name ?? null,
           org_id: u.app_metadata?.org_id ?? u.user_metadata?.org_id ?? null,
-          role: u.app_metadata?.role ?? u.user_metadata?.role ?? "driver",
+          // role from app_metadata ONLY (service-controlled). Never trust
+          // user_metadata.role here — it is self-writable and would launder a
+          // self-asserted privileged role into user_profiles.
+          role: ["admin", "super_admin"].includes(String(u.app_metadata?.role ?? ""))
+            ? u.app_metadata.role
+            : "driver",
           account_status: "active",
         }));
 

@@ -115,3 +115,39 @@ see other orgs' data. If anything 403s for a legit user, check their
 
 ### Rollback
 Apply `supabase/rollback/20260628100100_*.down.sql` (restores metadata fallback).
+
+---
+
+## Stage 3 — Edge-function authz from `user_profiles` (C3)
+Code only (no migration). Files:
+`supabase/functions/_shared/auth.ts` (new shared helper),
+`assign-driver/`, `get-org-users/`, `gcs-upload/`, `user-lifecycle/`.
+
+All caller authorization now derives role/org from `user_profiles` via the
+service role; `user_metadata` is never trusted. `assign-driver` now **upserts
+`user_profiles`** (previously it wrote only `user_metadata`, which after Stage 2
+would have left assigned drivers with no org). `sync_profiles` no longer derives
+role from `user_metadata`. Suspended callers are rejected.
+
+> `promote-admin` is intentionally unchanged: its super-admin gate already reads
+> only `app_metadata` (service-controlled, not self-writable).
+
+### Deploy
+`supabase functions deploy assign-driver get-org-users gcs-upload user-lifecycle`
+(the `_shared` module is bundled automatically).
+
+### Verify (negative + positive)
+1. **Driver cannot escalate:** as a driver, run in the browser console
+   `await supabase.auth.updateUser({ data: { role: 'admin', org_id: '<otherOrg>' } })`,
+   refresh the token, then call `assign-driver` / `get-org-users` / `user-lifecycle`.
+   All must return **403** (profile still says driver).
+2. **Admin still works:** as a real org admin, list org users, assign a driver,
+   set a role — all succeed and are scoped to the admin's org.
+3. **Assigned driver gets access:** assign a driver to your org, then sign in as
+   that driver and confirm they see the org's jobs (proves the user_profiles
+   upsert works end-to-end with the Stage 2 helpers).
+4. Cross-org: super-admin can target another org with `org_id`; an org admin
+   cannot (403 CROSS_ORG_FORBIDDEN / ORG_SCOPE_VIOLATION).
+
+### Rollback
+`git revert` the Stage 3 commit and redeploy the four functions. (No DB change.)
