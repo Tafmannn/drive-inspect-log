@@ -26,7 +26,7 @@ an ordinary logged-in driver with a **legitimate** token (no forgery required).
 | ID | Severity | Issue | Fix | Migration / file |
 |----|----------|-------|-----|------------------|
 | **C4** | Critical | RLS helpers (`is_super_admin`, `user_role`, `user_org_id`) fell back to **self-writable JWT `user_metadata`** when a `user_profiles` row was missing → a profile-less user could set `user_metadata.role=super_admin` and have RLS honour it (full-DB compromise). | Backfill `user_profiles` for all users + signup trigger; rewrite helpers to read role/org **only** from `user_profiles` (deny-by-default). | `20260628100000`, `20260628100100` |
-| **C3** | Critical | Edge functions (`assign-driver`, `get-org-users`, `user-lifecycle`, `gcs-upload`) authorized off `user_metadata.role/org_id` → a driver could `auth.updateUser({data:{role:'admin'}})` and self-promote to org admin. | New `_shared/auth.ts` loads role/org from `user_profiles`; `assign-driver` now upserts `user_profiles`; suspended callers rejected. | edge functions |
+| **C3** | Critical | Edge functions authorized off self-writable `user_metadata.role/org_id` → a driver could `auth.updateUser({data:{role:'admin'}})` and self-promote. Initially fixed: `assign-driver`, `get-org-users`, `user-lifecycle`, `gcs-upload`. **A reviewer pass then found two more:** `gcs-fix-acl` (self-escalate → set `allUsers:READER` on all media) and `vision-ocr` (org from `user_metadata`). | All eight derive role/org from `user_profiles` via `_shared/auth.ts`; `assign-driver` upserts `user_profiles`; `gcs-fix-acl` is super-admin-only **and its "make media public" capability is removed**; `vision-ocr` org from profile. | edge functions |
 | **C1** | Critical | `resolve-signature-url` authenticated but signed **any** path with the service role → any user could read any org's customer signatures. | Resolve the owning org from the path's `jobs/<jobId>/…` and require caller-org match. | `resolve-signature-url`, `_shared/pathAuth.ts` |
 | **C2** | Critical | `gcs-proxy` only checked the caller *had* an org, never that the requested object belonged to it → cross-org read of all photos/PODs in the shared bucket. | Same path→org authorization before streaming. | `gcs-proxy` |
 | **Stage 5b** | Critical | **(New finding)** Leftover `"Allow public … vehicle-signatures" USING(true)` policies were never dropped when the bucket went private → any authenticated (likely anon) user could read any org's signature **directly via the storage API**, bypassing the C1 fix. | Drop the permissive policies; org-scope signature insert/update/delete; keep org-scoped read. | `20260628100300` |
@@ -55,8 +55,12 @@ exploitable by a normal authenticated user; there is no evidence requirement of 
 
 **Highlights**
 - **Authorization is now sourced solely from the `user_profiles` table.** The database RLS helpers
-  and all privileged Edge Functions no longer trust the user-writable JWT `user_metadata`, closing
+  and the privileged Edge Functions no longer trust the user-writable JWT `user_metadata`, closing
   a privilege-escalation path (driver → admin/super-admin) and a cross-tenant data path.
+  > **C3 closure note:** C3 is only fully closed **with `gcs-fix-acl` and `vision-ocr` remediated**.
+  > A reviewer pass found those two still trusted `user_metadata`; this release fixes both
+  > (`gcs-fix-acl` is super-admin-only and its "make all media public" capability was removed;
+  > `vision-ocr` resolves org from `user_profiles`). Prior to that fix, C3 was only **partially** closed.
 - **Storage access is org-scoped.** `gcs-proxy` and `resolve-signature-url` now verify that the
   requested object belongs to the caller's organisation, closing cross-org read of photos, PODs,
   and signatures. Leftover permissive `vehicle-signatures` policies were removed.
@@ -70,7 +74,8 @@ RLS helpers) → `20260628100200` (storage/RLS hardening) → `20260628100300` (
 Each has a rollback script in `supabase/rollback/`.
 
 **Edge Functions redeployed:** `assign-driver`, `get-org-users`, `gcs-upload`, `user-lifecycle`,
-`gcs-proxy`, `resolve-signature-url` (`promote-admin` unchanged). New shared module
+`gcs-proxy`, `resolve-signature-url`, `gcs-fix-acl`, `vision-ocr` (`promote-admin` unchanged — its
+gate already uses only service-controlled `app_metadata`). New shared module
 `supabase/functions/_shared/`.
 
 **Operational notes**
@@ -267,9 +272,9 @@ an early Phase 2 item so the alerts above are actionable in real time.
 - **`gcs-proxy` token-in-URL** — retained for `<img>` compatibility; harden to signed-path/cookie.
 - **Inert `user_metadata.role` writes** in `user-lifecycle`/`promote-admin` — now unused; remove to
   prevent future footguns.
-- **External Edge Functions** (`vehicle-lookup`, `maps-directions`, `vision-ocr`, `postcode-lookup`,
+- **External Edge Functions** (`vehicle-lookup`, `maps-directions`, `postcode-lookup`,
   `business-search`, `place-details`) remain `verify_jwt = false` and unauthenticated — quota-abuse
-  risk only; add auth/rate-limits.
+  risk only; add auth/rate-limits. (`vision-ocr` and `gcs-fix-acl` are now `user_profiles`-authorized.)
 
 ### Phase 2 — data integrity & correctness (from the audit roadmap)
 - **C7** inspection-submit vs. photo-promotion race → transactional/compensating reconciliation +

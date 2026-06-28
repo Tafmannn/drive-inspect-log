@@ -12,6 +12,11 @@ import {
   type SupabaseClient,
 } from "https://esm.sh/@supabase/supabase-js@2";
 import { extractJobIdFromPath } from "./pathAuth.ts";
+import {
+  callerAuthzFromProfile,
+  rolesArrayFor,
+  type AppRole,
+} from "./profileAuthz.ts";
 
 export const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,7 +31,9 @@ export function jsonRes(body: unknown, status = 200): Response {
   });
 }
 
-export type AppRole = "driver" | "admin" | "super_admin";
+// Re-exported from the pure module so existing importers keep working.
+export type { AppRole };
+export { rolesArrayFor };
 
 export interface Caller {
   id: string;
@@ -82,29 +89,14 @@ export async function authenticateCaller(
     .eq("auth_user_id", authData.user.id)
     .maybeSingle();
 
-  const role: AppRole =
-    profile?.role === "super_admin" || profile?.role === "admin"
-      ? profile.role
-      : "driver";
-
+  // Authorization is derived ONLY from the profile row (never user_metadata).
   const caller: Caller = {
     id: authData.user.id,
     email: profile?.email ?? authData.user.email ?? "",
-    role,
-    orgId: profile?.org_id ?? null,
-    accountStatus: profile?.account_status ?? "active",
-    isAdmin: role === "admin" || role === "super_admin",
-    isSuperAdmin: role === "super_admin",
+    ...callerAuthzFromProfile(profile),
   };
 
   return { caller, admin };
-}
-
-/** Roles array for app_metadata, kept in sync with a profile role. */
-export function rolesArrayFor(role: AppRole): string[] {
-  if (role === "super_admin") return ["SUPERADMIN", "ADMIN", "DRIVER"];
-  if (role === "admin") return ["ADMIN", "DRIVER"];
-  return ["DRIVER"];
 }
 
 /**

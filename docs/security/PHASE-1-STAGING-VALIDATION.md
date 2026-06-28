@@ -114,6 +114,18 @@ sign in as them; (4) admin targets another org's `org_id`.
 **Gate G3:** PASS only if the escalation attempt is 403 on all three and admin/assignment flows work.
 Any 200 on (1) = FAIL → `git revert` Stage 3 commit, redeploy, report.
 
+### Stage 3c — `gcs-fix-acl` + `vision-ocr` authz (deploy `gcs-fix-acl vision-ocr`)
+These two trusted `user_metadata` before the reviewer fix. Verify the self-escalation cannot
+authorize either:
+1. As a driver, `supabase.auth.updateUser({ data:{ role:'super_admin', org_id:'<any>' }})`, re-auth.
+2. Call `gcs-fix-acl` → **403 `SUPER_ADMIN_ONLY`** (profile still says driver). As a real super-admin
+   it returns **410 `DISABLED`** (the make-media-public capability is intentionally removed — no
+   object is ever made public).
+3. Call `vision-ocr` with a valid image → it uses the **profile** org, not the forged
+   `user_metadata.org_id`; a driver with no profile org gets **403 `NO_ORG`** regardless of metadata.
+**Gate G3c:** PASS only if `gcs-fix-acl` never returns 200 (never makes media public) and neither
+function honours a forged `user_metadata` role/org. Unit proof: `src/test/edge-authz.test.ts`.
+
 ### Stage 4 — Storage IDOR functions (deploy `gcs-proxy resolve-signature-url`)
 Verify: (1) as a driver in org A, `GET gcs-proxy?path=jobs/<jobB>/...&token=<driverA_jwt>` and
 `POST resolve-signature-url {"rawUrl":"jobs/<jobB>/signatures/.../driver.png"}`; (2) open own-org POD/
@@ -192,6 +204,7 @@ npm run typecheck && npx vitest run && npm run build
 1. `psql "$PROD_DB_URL" -f .../20260628100000_*.sql` → Stage 1 verify
 2. `psql "$PROD_DB_URL" -f .../20260628100100_*.sql` → Stage 2 verify
 3. `supabase functions deploy assign-driver get-org-users gcs-upload user-lifecycle --project-ref "$PROD_REF"` → Stage 3
+3c. `supabase functions deploy gcs-fix-acl vision-ocr --project-ref "$PROD_REF"` → Stage 3c
 4. `supabase functions deploy gcs-proxy resolve-signature-url --project-ref "$PROD_REF"` → Stage 4
 5. `psql "$PROD_DB_URL" -f .../20260628100200_*.sql` → Stage 5
 6. `psql "$PROD_DB_URL" -f .../20260628100300_*.sql` → Stage 5b

@@ -280,8 +280,10 @@ empty, and id-smuggling). Locally validated: `typecheck` ✓, `vitest` 296/296 �
 
 ## Post-implementation security audit (fill in after staging validation)
 
-**Closed in Phase 1:** C1, C2 (storage IDOR), C3 (metadata privilege escalation),
-C4 (RLS metadata fallback), C5 (sheet-sync/app_settings), H1 (expense receipts),
+**Closed in Phase 1:** C1, C2 (storage IDOR), **C3 (metadata privilege escalation) — closed only
+because the reviewer fix also remediated `gcs-fix-acl` and `vision-ocr`** (both previously trusted
+`user_metadata`; `gcs-fix-acl`'s "make all media public" capability was removed and it is now
+super-admin-only). C4 (RLS metadata fallback), C5 (sheet-sync/app_settings), H1 (expense receipts),
 L1 (.env).
 
 **Remaining / deferred risks to track:**
@@ -292,7 +294,8 @@ L1 (.env).
 - **Residual target `user_metadata.role` writes** in `user-lifecycle`/`promote-admin`
   — now inert (nothing authorizes off them) but should be removed in Phase 4 to
   avoid future footguns.
-- **`external` edge functions** (`vehicle-lookup`, `maps-directions`, `vision-ocr`,
+- **`external` edge functions** (`vehicle-lookup`, `maps-directions`, `postcode-lookup`,
   etc.) remain `verify_jwt = false` and unauthenticated — quota-abuse risk only,
-  no data exposure; add auth/rate-limits in a later pass.
+  no data exposure; add auth/rate-limits in a later pass. (`vision-ocr`/`gcs-fix-acl`
+  are now `user_profiles`-authorized.)
 - Then proceed to **Phase 2** (data-integrity: C7 + H5/H6 + tests).

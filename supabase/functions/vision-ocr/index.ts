@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { authenticateCaller } from "../_shared/auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -52,20 +52,16 @@ serve(async (req) => {
   if (limited) return limited;
 
   try {
-    // ─── Auth ───
-    const authHeader = req.headers.get("Authorization") ?? "";
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-    if (authError || !authData?.user) {
-      return new Response(JSON.stringify({ error: "UNAUTHENTICATED" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    // ─── Auth: org comes from user_profiles, never user_metadata ───
+    const authResult = await authenticateCaller(req);
+    if ("error" in authResult) return authResult.error;
+    const { caller } = authResult;
+    if (caller.accountStatus === "suspended") {
+      return new Response(JSON.stringify({ error: "ACCOUNT_SUSPENDED" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const orgId = authData.user.user_metadata?.org_id ?? null;
+    const orgId = caller.orgId;
     if (!orgId) {
       return new Response(JSON.stringify({ error: "NO_ORG" }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
