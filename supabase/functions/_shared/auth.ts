@@ -11,6 +11,7 @@ import {
   createClient,
   type SupabaseClient,
 } from "https://esm.sh/@supabase/supabase-js@2";
+import { extractJobIdFromPath } from "./pathAuth.ts";
 
 export const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -106,9 +107,6 @@ export function rolesArrayFor(role: AppRole): string[] {
   return ["DRIVER"];
 }
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /**
  * Authorize access to a storage object by resolving its owning org from the DB.
  * All GCS/signature object paths are of the form `jobs/<jobId>/...`, so the org
@@ -123,9 +121,8 @@ export async function callerCanAccessPath(
   if (caller.isSuperAdmin) return true;
   if (!caller.orgId) return false;
 
-  const match = objectPath.match(/(?:^|\/)jobs\/([^/]+)\//);
-  const jobId = match?.[1];
-  if (!jobId || !UUID_RE.test(jobId)) return false; // fail closed
+  const jobId = extractJobIdFromPath(objectPath);
+  if (!jobId) return false; // fail closed
 
   const { data: job } = await admin
     .from("jobs")

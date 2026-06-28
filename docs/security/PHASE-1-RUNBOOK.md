@@ -229,3 +229,48 @@ role). Confirm feature flags still load.
 
 ### Rollback
 Apply `supabase/rollback/20260628100200_*.down.sql`.
+
+---
+
+## Stage 6 — Regression test + CI
+Code only. `supabase/functions/_shared/pathAuth.ts` (pure logic),
+`src/test/storage-path-auth.test.ts`.
+
+The IDOR org-resolution rule (`extractJobIdFromPath`) is extracted into a pure
+module and unit-tested (fail-closed on non-`jobs/<uuid>/` paths, traversal,
+empty, and id-smuggling). Locally validated: `typecheck` ✓, `vitest` 296/296 ✓,
+`build` ✓.
+
+> Note: full edge-function authz/IDOR and RLS behaviour can only be exercised
+> against a real Supabase instance — run the per-stage "Verify" checks above on
+> staging. Add them to CI as integration tests when a test project is available.
+
+---
+
+## Stage 7 — Rotate the anon key (LAST — only after all of the above is validated)
+1. Supabase dashboard → Project Settings → API → roll the `anon` key.
+2. Update the deploy secret / `.env` (`VITE_SUPABASE_PUBLISHABLE_KEY`) and
+   redeploy the frontend.
+3. Because the old `.env` was in git history, also consider purging history
+   (e.g. `git filter-repo`) if the repo is or was ever shared.
+
+---
+
+## Post-implementation security audit (fill in after staging validation)
+
+**Closed in Phase 1:** C1, C2 (storage IDOR), C3 (metadata privilege escalation),
+C4 (RLS metadata fallback), C5 (sheet-sync/app_settings), H1 (expense receipts),
+L1 (.env).
+
+**Remaining / deferred risks to track:**
+- **C5 (qr_confirmations)** and **C6 (vehicle-photos public bucket)** — deferred
+  with documented designs (need client work + live validation).
+- **Token-in-URL on gcs-proxy** — retained for `<img>` compatibility; harden to
+  signed-path/cookie in Phase 2.
+- **Residual target `user_metadata.role` writes** in `user-lifecycle`/`promote-admin`
+  — now inert (nothing authorizes off them) but should be removed in Phase 4 to
+  avoid future footguns.
+- **`external` edge functions** (`vehicle-lookup`, `maps-directions`, `vision-ocr`,
+  etc.) remain `verify_jwt = false` and unauthenticated — quota-abuse risk only,
+  no data exposure; add auth/rate-limits in a later pass.
+- Then proceed to **Phase 2** (data-integrity: C7 + H5/H6 + tests).
