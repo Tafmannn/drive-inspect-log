@@ -232,6 +232,28 @@ Apply `supabase/rollback/20260628100200_*.down.sql`.
 
 ---
 
+## Stage 5b — Close the `vehicle-signatures` storage-API IDOR (NEW finding)
+Migration: `20260628100300_phase1_close_signature_storage_idor.sql`
+Rollback:  `supabase/rollback/20260628100300_*.down.sql`
+
+Surfaced during the C5/C6 review: when `vehicle-signatures` was made private, the original
+`"Allow public … vehicle-signatures" USING(true)` policies were never dropped. Because RLS
+policies are OR'd, that permissive SELECT still let any authenticated (likely anon) user read
+**any** org's signature directly via the storage API — bypassing the Stage 4 `resolve-signature-url`
+check. **This migration drops those policies and replaces the write policies with org-scoped
+insert/update/delete** (UPDATE is required because signature upload uses `upsert`). Display is
+unaffected (service-role signed URLs bypass RLS).
+
+### Apply / Verify / Pass-fail
+See `PHASE-1-STAGING-VALIDATION.md` → "Stage 5b" (Gate G5b): no permissive signature policies
+remain; cross-org signature read = 0; **signature capture, re-capture (upsert overwrite), and POD
+display all still work**.
+
+### Rollback
+Apply `supabase/rollback/20260628100300_*.down.sql` (re-opens the hole — last resort only).
+
+---
+
 ## Stage 6 — Regression test + CI
 Code only. `supabase/functions/_shared/pathAuth.ts` (pure logic),
 `src/test/storage-path-auth.test.ts`.
