@@ -80,3 +80,38 @@ reads role from `user_profiles`, so this exercises the backfill end-to-end).
 
 ### Rollback
 Apply `supabase/rollback/20260628100000_*.down.sql` (drops trigger/function; leaves data).
+
+---
+
+## Stage 2 — Deny-by-default RLS helpers (C4)
+Migration: `20260628100100_phase1_deny_by_default_rls_helpers.sql`
+Rollback:  `supabase/rollback/20260628100100_*.down.sql`
+
+Removes the JWT metadata fallback from `is_super_admin()`, `user_role()`,
+`user_org_id()`. **Do not apply until Stage 1 verify (a) shows
+`missing_profiles = 0`** and the Stage 1 audit queries (b)/(c) are clean.
+
+### Apply
+`supabase db push` (this single migration).
+
+### Verify
+```sql
+-- Helpers now ignore JWT metadata. Confirm a known super-admin and admin still
+-- resolve correctly (run while impersonating, or check via the app):
+SELECT public.user_role(), public.user_org_id(), public.is_super_admin();
+
+-- Confirm NO authenticated user can be super-admin without a profile row:
+SELECT count(*) FROM auth.users au
+WHERE NOT EXISTS (SELECT 1 FROM public.user_profiles up WHERE up.auth_user_id = au.id);
+-- Expect 0 (already guaranteed by Stage 1 + the signup trigger).
+```
+
+### App validation (critical — exercises every RLS-gated read/write)
+Smoke test as **driver**, **org admin**, and **super-admin**:
+job list/download, inspection submit, photo upload, signature capture, POD
+generation, admin dashboards, Google Sheets sync, expenses. A driver must NOT
+see other orgs' data. If anything 403s for a legit user, check their
+`user_profiles` row first; only roll back if data is correct but access is wrong.
+
+### Rollback
+Apply `supabase/rollback/20260628100100_*.down.sql` (restores metadata fallback).
