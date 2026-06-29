@@ -44,15 +44,39 @@ export interface StorageFailure {
  * Never throws — always returns *something*, defaulting to "unknown".
  */
 export function classifyStorageError(err: unknown): StorageFailure {
-  const raw = errMessage(err);
-  const lower = raw.toLowerCase();
-  const name = (err as { name?: string } | null)?.name?.toLowerCase() ?? "";
+  // Pull every diagnostic signal we can off the error. iOS Safari often
+  // rejects IndexedDB writes with a DOMException that has an empty
+  // .message — the only signal is `.name` and `.code`. Without this,
+  // every Safari quota/abort failure used to log `raw: ""` and fall
+  // through to the generic "unknown" bucket.
+  const errObj = (err ?? null) as
+    | { name?: string; message?: string; code?: number; constructor?: { name?: string } }
+    | null;
+  const rawMessage = errMessage(err);
+  const name = errObj?.name ?? "";
+  const code = typeof errObj?.code === "number" ? errObj.code : null;
+  const ctor = errObj?.constructor?.name ?? "";
+  const lower = rawMessage.toLowerCase();
+  const nameLower = name.toLowerCase();
 
+  // Always produce a non-empty `raw` so logs are actionable even when
+  // the underlying DOMException had no message text.
+  const raw =
+    rawMessage ||
+    (name || code != null
+      ? `${name || ctor || "DOMException"}#${code ?? "?"}`
+      : "");
+
+  // ── quota_exceeded ────────────────────────────────────────────
+  // DOMException.QUOTA_EXCEEDED_ERR === 22 (legacy). Also covers
+  // Safari's "UnknownError" thrown during IDB writes near quota.
   if (
-    name === "quotaexceedederror" ||
+    nameLower === "quotaexceedederror" ||
+    code === 22 ||
     lower.includes("quota") ||
     lower.includes("ns_error_dom_quota_reached") ||
-    lower.includes("disk is full")
+    lower.includes("disk is full") ||
+    nameLower === "unknownerror"
   ) {
     return {
       kind: "quota_exceeded",
@@ -71,7 +95,7 @@ export function classifyStorageError(err: unknown): StorageFailure {
     lower.includes("private") ||
     lower.includes("a mutation operation was attempted on a database that did not allow mutations") ||
     lower.includes("the user denied permission") ||
-    name === "invalidstateerror"
+    nameLower === "invalidstateerror"
   ) {
     return {
       kind: "private_mode",
@@ -87,8 +111,8 @@ export function classifyStorageError(err: unknown): StorageFailure {
   }
 
   if (
+    nameLower === "securityerror" ||
     lower.includes("securityerror") ||
-    name === "securityerror" ||
     lower.includes("blocked") ||
     lower.includes("not allowed") ||
     lower.includes("cookies") ||
@@ -130,8 +154,8 @@ export function classifyStorageError(err: unknown): StorageFailure {
   if (
     lower.includes("timeout") ||
     lower.includes("aborted") ||
-    name === "aborterror" ||
-    lower.includes("transaction") && lower.includes("inactive")
+    nameLower === "aborterror" ||
+    (lower.includes("transaction") && lower.includes("inactive"))
   ) {
     return {
       kind: "transient",
@@ -162,10 +186,11 @@ export function classifyStorageError(err: unknown): StorageFailure {
 
 function errMessage(err: unknown): string {
   if (!err) return "";
-  if (err instanceof Error) return err.message || err.name || "Error";
+  if (err instanceof Error) return err.message || err.name || "";
   if (typeof err === "string") return err;
   try { return JSON.stringify(err); } catch { return String(err); }
 }
+
 
 // ─────────────────────────────────────────────────────────────────────
 // Pre-flight probe

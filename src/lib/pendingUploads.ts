@@ -51,9 +51,18 @@ import type {
 const QUEUE_KEY = "queue";
 const store = createStore("axentra-pending-uploads", "v2");
 
+// Per-item blob keys live alongside the index in the same store.
+// Splitting blobs out of the index array eliminates the O(N) rewrite
+// that happens on every stage and was causing iOS Safari to abort
+// (often with an empty-message DOMException) once the index grew past
+// ~8 photos. The index keeps only metadata; each blob is persisted
+// under its own key and hydrated on demand.
+const BLOB_KEY_PREFIX = "pu_blob_";
+
 // One-time migration flag from legacy localStorage queue.
 const LEGACY_LOCALSTORAGE_KEY = "axentra.pendingUploads.v1";
 const MIGRATION_FLAG_KEY = "_migrated_from_v1";
+
 
 /** Legacy status surface, derived from `state` for the Pending Uploads UI. */
 export type PendingUploadStatus = "pending" | "uploading" | "failed" | "done";
@@ -268,12 +277,55 @@ function normaliseRow(raw: any): PendingUpload {
   return { ...(raw as PendingUpload), state };
 }
 
+// ── Per-item blob storage helpers ────────────────────────────
+//
+// Blobs are persisted under `pu_blob_<id>` keys, separate from the
+// index. This keeps the index payload small and ensures each stage
+// writes only one new blob + a tiny index update, instead of
+// rewriting the entire array of blobs on every photo.
+
+async function writeBlobKey(id: string, blob: Blob): Promise<void> {
+  await set(BLOB_KEY_PREFIX + id, blob, store);
+}
+
+async function readBlobKey(id: string): Promise<Blob | null> {
+  try {
+    const b = await get<Blob>(BLOB_KEY_PREFIX + id, store);
+    return (b as Blob | undefined) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function deleteBlobKey(id: string): Promise<void> {
+  try {
+    await del(BLOB_KEY_PREFIX + id, store);
+  } catch {
+    /* best-effort */
+  }
+}
+
 async function loadAllRaw(): Promise<PendingUpload[]> {
   await migrateLegacyIfNeeded();
   try {
     const data = (await get<PendingUpload[]>(QUEUE_KEY, store)) ?? [];
     if (!Array.isArray(data)) return [];
-    return data.map(normaliseRow);
+    const rows = data.map(normaliseRow);
+
+    // Hydrate blobs from per-item keys for any item that still needs
+    // its blob (i.e. anything not already uploaded). Items written
+    // under the legacy single-key layout still carry fileBlob inline,
+    // so only hydrate when missing.
+    await Promise.all(
+      rows.map(async (row) => {
+        if (row.state === "uploaded") return;
+        if (row.fileBlob) return;
+        const blob = await readBlobKey(row.id);
+        if (blob) row.fileBlob = blob;
+      }),
+    );
+
+    return rows;
   } catch (e) {
     console.warn("[pendingUploads] Failed to read queue from IDB", e);
     return [];
@@ -302,6 +354,7 @@ async function loadAll(): Promise<PendingUpload[]> {
   if (stale.length > 0) {
     try {
       await saveAll(survivors);
+      await Promise.all(stale.map((u) => deleteBlobKey(u.id)));
     } catch {
       /* ignore */
     }
@@ -320,8 +373,16 @@ async function loadAll(): Promise<PendingUpload[]> {
   return survivors;
 }
 
+/**
+ * Persist the queue index. Blobs are NEVER serialised into the index
+ * — callers are responsible for writing the blob under its own key
+ * via `writeBlobKey` before (or as part of) the operation. saveAll
+ * strips any inline fileBlob from the persisted copy so we cannot
+ * accidentally regress to the legacy single-key big-array layout.
+ */
 async function saveAll(items: PendingUpload[]): Promise<void> {
-  await set(QUEUE_KEY, items, store);
+  const persisted = items.map((u) => ({ ...u, fileBlob: null as Blob | null }));
+  await set(QUEUE_KEY, persisted, store);
 }
 
 async function updateOne(
@@ -346,9 +407,11 @@ async function removeOne(id: string): Promise<void> {
   const next = all.filter((u) => u.id !== id);
   try {
     await saveAll(next);
+    await deleteBlobKey(id);
   } catch {
     // ignore
   }
+
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -546,13 +609,27 @@ export async function stagePendingUpload(
     clientDamageId: args.clientDamageId ?? null,
   };
 
+  // Write the blob FIRST under its own key. This is the only large
+  // write in the staging hot path — the subsequent index update is
+  // O(metadata) regardless of how many photos are already staged.
+  // If the blob write fails (quota / blocked / private mode), the
+  // error propagates and the caller (InspectionFlow) rolls back the
+  // whole session.
+  await writeBlobKey(id, blob);
+
   const all = await loadAll();
   all.push(item);
-  // Intentionally let the underlying IDB error propagate so the caller
-  // can detect quota/blocked/private-mode failures and roll back.
-  await saveAll(all);
+  try {
+    await saveAll(all);
+  } catch (e) {
+    // Index write failed AFTER blob write — clean up the orphan blob
+    // and rethrow so the caller's failPreflight path runs.
+    await deleteBlobKey(id);
+    throw e;
+  }
   return item;
 }
+
 
 /**
  * Atomically apply a linkage patch to every item in a submission
@@ -631,8 +708,12 @@ export async function discardSubmissionSession(
   );
   const discarded = all.length - survivors.length;
   if (discarded > 0) {
+    const discardedIds = all
+      .filter((u) => u.submissionSessionId === submissionSessionId)
+      .map((u) => u.id);
     try {
       await saveAll(survivors);
+      await Promise.all(discardedIds.map((id) => deleteBlobKey(id)));
     } catch {
       /* ignore */
     }
@@ -640,6 +721,7 @@ export async function discardSubmissionSession(
   }
   return { discarded };
 }
+
 
 // ─────────────────────────────────────────────────────────────
 // Legacy shim removed.
@@ -668,17 +750,22 @@ export async function deletePendingUpload(id: string): Promise<void> {
  */
 export async function pruneDone(): Promise<void> {
   const all = await loadAll();
+  const removedIds = all
+    .filter((u) => u.state === "uploaded" || u.status === "done")
+    .map((u) => u.id);
   const next = all.filter(
     (u) => u.state !== "uploaded" && u.status !== "done",
   );
   if (next.length === all.length) return;
   try {
     await saveAll(next);
+    await Promise.all(removedIds.map((id) => deleteBlobKey(id)));
   } catch {
     /* ignore */
   }
   notifyEvidenceQueueChanged();
 }
+
 
 /**
  * Remove queued uploads whose `runId` no longer matches the job's
@@ -730,8 +817,17 @@ export async function purgeStaleRunUploads(): Promise<number> {
   }
 
   if (purged > 0) {
+    const purgedIds = all
+      .filter(
+        (u) =>
+          u.runId &&
+          (!currentRunByJob.get(u.jobId) ||
+            currentRunByJob.get(u.jobId) !== u.runId),
+      )
+      .map((u) => u.id);
     try {
       await saveAll(survivors);
+      await Promise.all(purgedIds.map((id) => deleteBlobKey(id)));
     } catch {
       /* ignore */
     }
@@ -739,6 +835,7 @@ export async function purgeStaleRunUploads(): Promise<number> {
   }
   return purged;
 }
+
 
 /**
  * Worker entrypoint: upload a single queued item.
@@ -975,9 +1072,12 @@ export async function retryUpload(
       backend: stored.backend,
       backendRef: stored.backendRef ?? null,
     }));
+    // Reclaim quota: drop the per-item blob now that it's safely server-side.
+    await deleteBlobKey(id);
     notifyEvidenceQueueChanged();
 
     return true;
+
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Upload failed";
     const deterministic = isDeterministicFailure(msg);

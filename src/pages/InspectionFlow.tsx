@@ -603,7 +603,44 @@ export const InspectionFlow = () => {
           : `cid-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
       try {
+        // ── PRE-FLIGHT QUOTA ESTIMATE ───────────────────────────────
+        // If the device reports too little free storage to hold the
+        // photos we're about to stage, fail up-front with a clear
+        // "device full" card instead of failing partway through the
+        // loop. Budget ~3 MB per photo (post-compression headroom).
+        try {
+          const damageCount = formState.damages.filter((d) => d.photo).length;
+          const stdCount = PHOTO_TYPES_BY_INSPECTION[type].filter(
+            (pt) => !!formState.standardPhotos[pt.key],
+          ).length;
+          const totalPhotos = damageCount + stdCount;
+          if (
+            totalPhotos > 0 &&
+            typeof navigator !== "undefined" &&
+            navigator.storage &&
+            typeof navigator.storage.estimate === "function"
+          ) {
+            const est = await navigator.storage.estimate();
+            const free = (est.quota ?? 0) - (est.usage ?? 0);
+            const budget = totalPhotos * 3 * 1024 * 1024;
+            if (est.quota && free < budget) {
+              const err = new Error(
+                `Device storage is full (free ${Math.round(
+                  free / 1024 / 1024,
+                )} MB, need ~${Math.round(budget / 1024 / 1024)} MB)`,
+              );
+              (err as any).name = "QuotaExceededError";
+              failPreflight(err, 0);
+              return;
+            }
+          }
+        } catch {
+          // Estimate is best-effort. If it throws, fall through to the
+          // staging loop and let real errors surface there.
+        }
+
         const queueRunId: string | null = (job as any)?.current_run_id ?? null;
+
 
         // Damage photos
         for (let i = 0; i < formState.damages.length; i++) {
