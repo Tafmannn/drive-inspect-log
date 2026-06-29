@@ -102,7 +102,14 @@ serve(async (req) => {
     const bucket = "axentra_db";
     const fileBytes = Uint8Array.from(atob(fileBase64), (c) => c.charCodeAt(0));
 
-    // Validate file size
+    // Validate file size — reject empty (0-byte) payloads so corrupt/empty
+    // evidence never lands in storage with a matching photos row (V7).
+    if (fileBytes.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "File is empty" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     if (fileBytes.length > MAX_SIZE) {
       return new Response(
         JSON.stringify({ error: "File too large (max 10 MB)" }),

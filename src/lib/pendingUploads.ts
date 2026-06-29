@@ -108,6 +108,13 @@ export interface PendingUpload {
   lastErrorAt?: string | null;
 
   /**
+   * ISO timestamp set when the item transitions into "uploading". Used to
+   * detect and recover items stranded in "uploading" by a crash/reload
+   * mid-upload (see applyMaintenance). Absent on legacy rows.
+   */
+  uploadingSince?: string | null;
+
+  /**
    * Raw image blob, kept until the upload succeeds.
    * Cleared (set to null) after a successful upload to reclaim quota.
    */
@@ -280,75 +287,169 @@ async function loadAllRaw(): Promise<PendingUpload[]> {
   }
 }
 
+// ── Serialized queue access (V3) ──────────────────────────────────────
+// Every read-modify-write span runs through this single-flight lock so
+// concurrent promote / discard / drain / retry passes can't overwrite each
+// other's whole-array writes (lost-update race). Mutating helpers re-read a
+// FRESH snapshot inside the lock and persist before releasing it.
+let queueLock: Promise<unknown> = Promise.resolve();
+function withQueueLock<T>(fn: () => Promise<T>): Promise<T> {
+  const run = queueLock.then(fn, fn);
+  queueLock = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run as Promise<T>;
+}
+
 /**
- * Public load. Auto-purges stale "staged" items (TTL expired) on every
- * read so workers cannot inadvertently promote zombie sessions.
+ * An item left in "uploading" longer than this (and not currently in
+ * flight in THIS session) is assumed to have been stranded by a crash /
+ * reload mid-upload and is re-armed to "ready" so it becomes visible and
+ * retriable again instead of silently disappearing (V2).
  */
-async function loadAll(): Promise<PendingUpload[]> {
-  const all = await loadAllRaw();
-  const now = Date.now();
-  const stale: PendingUpload[] = [];
+const STALE_UPLOADING_MS = 2 * 60 * 1000;
+
+interface MaintenanceResult {
+  survivors: PendingUpload[];
+  purgedStale: PendingUpload[];
+  resetUploading: number;
+}
+
+/**
+ * In-memory maintenance applied on every load/mutation (pure — does not
+ * persist):
+ *   - purge "staged" items older than STAGED_TTL_MS (zombie sessions), and
+ *   - re-arm "uploading" items stranded by a crash mid-upload back to
+ *     "ready" (V2). Items still in flight in this session (inFlight) are
+ *     left untouched; the per-id inFlight guard prevents any duplicate
+ *     upload even if a re-arm races a late completion.
+ */
+function applyMaintenance(all: PendingUpload[], now: number): MaintenanceResult {
+  const purgedStale: PendingUpload[] = [];
   const survivors: PendingUpload[] = [];
+  let resetUploading = 0;
   for (const u of all) {
     if (u.state === "staged") {
       const age = now - new Date(u.createdAt).getTime();
       if (age > STAGED_TTL_MS) {
-        stale.push(u);
+        purgedStale.push(u);
+        continue;
+      }
+    }
+    if (u.state === "uploading" && !inFlight.has(u.id)) {
+      const ref = u.uploadingSince ?? u.createdAt;
+      const age = now - new Date(ref).getTime();
+      if (age > STALE_UPLOADING_MS) {
+        survivors.push({
+          ...u,
+          state: "ready",
+          status: "pending",
+          uploadingSince: null,
+        });
+        resetUploading++;
         continue;
       }
     }
     survivors.push(u);
   }
-  if (stale.length > 0) {
-    try {
-      await saveAll(survivors);
-    } catch {
-      /* ignore */
-    }
+  return { survivors, purgedStale, resetUploading };
+}
+
+function logMaintenance(res: MaintenanceResult): void {
+  if (res.purgedStale.length > 0) {
     void logClientEvent("pending_upload_staged_purged", "warn", {
       source: "storage",
       type: "upload",
       context: {
-        purgedCount: stale.length,
+        purgedCount: res.purgedStale.length,
         sessions: Array.from(
-          new Set(stale.map((u) => u.submissionSessionId ?? "(none)")),
+          new Set(res.purgedStale.map((u) => u.submissionSessionId ?? "(none)")),
         ),
         reason: "stale_staged_ttl_exceeded",
       },
     });
   }
-  return survivors;
+  if (res.resetUploading > 0) {
+    void logClientEvent("pending_upload_uploading_rearmed", "warn", {
+      source: "storage",
+      type: "upload",
+      context: {
+        count: res.resetUploading,
+        reason: "stale_uploading_recovered",
+      },
+    });
+  }
+}
+
+/**
+ * Public load. Runs maintenance (stale-staged purge + stranded-uploading
+ * recovery) under the queue lock and persists if anything changed.
+ */
+async function loadAll(): Promise<PendingUpload[]> {
+  return withQueueLock(async () => {
+    const all = await loadAllRaw();
+    const res = applyMaintenance(all, Date.now());
+    if (res.purgedStale.length > 0 || res.resetUploading > 0) {
+      try {
+        await saveAll(res.survivors);
+      } catch {
+        /* ignore */
+      }
+      logMaintenance(res);
+    }
+    return res.survivors;
+  });
 }
 
 async function saveAll(items: PendingUpload[]): Promise<void> {
   await set(QUEUE_KEY, items, store);
 }
 
+/**
+ * Atomic read-modify-write across the whole queue. The mutator receives a
+ * fresh, maintenance-applied snapshot and returns the next array (or null
+ * to abort the write). Runs under the queue lock so concurrent callers
+ * never clobber each other (V3).
+ */
+async function mutateQueue<T>(
+  fn: (all: PendingUpload[]) => { next: PendingUpload[] | null; result: T },
+): Promise<T> {
+  return withQueueLock(async () => {
+    const raw = await loadAllRaw();
+    const res = applyMaintenance(raw, Date.now());
+    if (res.purgedStale.length > 0 || res.resetUploading > 0) logMaintenance(res);
+    const { next, result } = fn(res.survivors);
+    if (next) {
+      try {
+        await saveAll(next);
+      } catch {
+        /* best-effort */
+      }
+    }
+    return result;
+  });
+}
+
 async function updateOne(
   id: string,
   updater: (item: PendingUpload) => PendingUpload,
 ): Promise<PendingUpload | null> {
-  const all = await loadAll();
-  const idx = all.findIndex((u) => u.id === id);
-  if (idx === -1) return null;
-  const updated = updater(all[idx]);
-  all[idx] = updated;
-  try {
-    await saveAll(all);
-  } catch {
-    // best-effort
-  }
-  return updated;
+  return mutateQueue((all) => {
+    const idx = all.findIndex((u) => u.id === id);
+    if (idx === -1) return { next: null, result: null };
+    const updated = updater(all[idx]);
+    const next = all.slice();
+    next[idx] = updated;
+    return { next, result: updated };
+  });
 }
 
 async function removeOne(id: string): Promise<void> {
-  const all = await loadAll();
-  const next = all.filter((u) => u.id !== id);
-  try {
-    await saveAll(next);
-  } catch {
-    // ignore
-  }
+  await mutateQueue((all) => ({
+    next: all.filter((u) => u.id !== id),
+    result: undefined,
+  }));
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -546,12 +647,17 @@ export async function stagePendingUpload(
     clientDamageId: args.clientDamageId ?? null,
   };
 
-  const all = await loadAll();
-  all.push(item);
-  // Intentionally let the underlying IDB error propagate so the caller
-  // can detect quota/blocked/private-mode failures and roll back.
-  await saveAll(all);
-  return item;
+  // Runs under the queue lock (V3). Intentionally lets the underlying IDB
+  // error propagate so the caller can detect quota/blocked/private-mode
+  // failures and roll back the staging attempt.
+  return withQueueLock(async () => {
+    const raw = await loadAllRaw();
+    const res = applyMaintenance(raw, Date.now());
+    if (res.purgedStale.length > 0 || res.resetUploading > 0) logMaintenance(res);
+    const next = [...res.survivors, item];
+    await saveAll(next);
+    return item;
+  });
 }
 
 /**
@@ -568,53 +674,58 @@ export async function promoteSubmissionSession(
     damageIdMap: Record<string, string>;
   },
 ): Promise<{ promoted: number }> {
-  const all = await loadAll();
-  const targets = all.filter(
-    (u) =>
-      u.submissionSessionId === submissionSessionId && u.state === "staged",
-  );
-  if (targets.length === 0) {
-    return { promoted: 0 };
-  }
+  // Runs atomically under the queue lock (V3) so a concurrent worker drain
+  // cannot clobber the promotion (which would strand items in "staged" →
+  // TTL purge → evidence loss). The validation throw aborts the write.
+  const result = await mutateQueue<{ promoted: number }>((all) => {
+    const targets = all.filter(
+      (u) =>
+        u.submissionSessionId === submissionSessionId && u.state === "staged",
+    );
+    if (targets.length === 0) {
+      return { next: null, result: { promoted: 0 } };
+    }
 
-  // Validation pass: every damage close-up MUST resolve to a server id.
-  // If even one cannot resolve, refuse to promote any of them. The
-  // caller is then expected to discard the session and trigger
-  // server-side rollback.
-  for (const t of targets) {
-    if (t.photoType === "damage_close_up" && t.clientDamageId) {
-      const serverId = patch.damageIdMap[t.clientDamageId];
-      if (!serverId) {
-        throw new Error(
-          `LINKAGE_PATCH_FAILED: no server damage id for clientDamageId=${t.clientDamageId}`,
-        );
+    // Validation pass: every damage close-up MUST resolve to a server id.
+    // If even one cannot resolve, refuse to promote any of them. The
+    // caller is then expected to discard the session and trigger
+    // server-side rollback.
+    for (const t of targets) {
+      if (t.photoType === "damage_close_up" && t.clientDamageId) {
+        const serverId = patch.damageIdMap[t.clientDamageId];
+        if (!serverId) {
+          throw new Error(
+            `LINKAGE_PATCH_FAILED: no server damage id for clientDamageId=${t.clientDamageId}`,
+          );
+        }
       }
     }
-  }
 
-  const next = all.map((u) => {
-    if (
-      u.submissionSessionId !== submissionSessionId ||
-      u.state !== "staged"
-    ) {
-      return u;
-    }
-    const damageItemId =
-      u.photoType === "damage_close_up" && u.clientDamageId
-        ? patch.damageIdMap[u.clientDamageId] ?? null
-        : null;
-    return {
-      ...u,
-      inspectionId: patch.inspectionId,
-      damageItemId,
-      state: "ready" as PendingUploadState,
-      status: "pending" as PendingUploadStatus,
-    };
+    const next = all.map((u) => {
+      if (
+        u.submissionSessionId !== submissionSessionId ||
+        u.state !== "staged"
+      ) {
+        return u;
+      }
+      const damageItemId =
+        u.photoType === "damage_close_up" && u.clientDamageId
+          ? patch.damageIdMap[u.clientDamageId] ?? null
+          : null;
+      return {
+        ...u,
+        inspectionId: patch.inspectionId,
+        damageItemId,
+        state: "ready" as PendingUploadState,
+        status: "pending" as PendingUploadStatus,
+      };
+    });
+
+    return { next, result: { promoted: targets.length } };
   });
 
-  await saveAll(next);
-  notifyEvidenceQueueChanged();
-  return { promoted: targets.length };
+  if (result.promoted > 0) notifyEvidenceQueueChanged();
+  return result;
 }
 
 /**
@@ -625,19 +736,14 @@ export async function promoteSubmissionSession(
 export async function discardSubmissionSession(
   submissionSessionId: string,
 ): Promise<{ discarded: number }> {
-  const all = await loadAll();
-  const survivors = all.filter(
-    (u) => u.submissionSessionId !== submissionSessionId,
-  );
-  const discarded = all.length - survivors.length;
-  if (discarded > 0) {
-    try {
-      await saveAll(survivors);
-    } catch {
-      /* ignore */
-    }
-    notifyEvidenceQueueChanged();
-  }
+  const discarded = await mutateQueue<number>((all) => {
+    const survivors = all.filter(
+      (u) => u.submissionSessionId !== submissionSessionId,
+    );
+    const n = all.length - survivors.length;
+    return { next: n > 0 ? survivors : null, result: n };
+  });
+  if (discarded > 0) notifyEvidenceQueueChanged();
   return { discarded };
 }
 
@@ -667,17 +773,14 @@ export async function deletePendingUpload(id: string): Promise<void> {
  * Remove all "uploaded" (legacy: "done") items to reclaim space.
  */
 export async function pruneDone(): Promise<void> {
-  const all = await loadAll();
-  const next = all.filter(
-    (u) => u.state !== "uploaded" && u.status !== "done",
-  );
-  if (next.length === all.length) return;
-  try {
-    await saveAll(next);
-  } catch {
-    /* ignore */
-  }
-  notifyEvidenceQueueChanged();
+  const changed = await mutateQueue<boolean>((all) => {
+    const next = all.filter(
+      (u) => u.state !== "uploaded" && u.status !== "done",
+    );
+    if (next.length === all.length) return { next: null, result: false };
+    return { next, result: true };
+  });
+  if (changed) notifyEvidenceQueueChanged();
 }
 
 /**
@@ -685,8 +788,8 @@ export async function pruneDone(): Promise<void> {
  * `current_run_id`. Returns count purged.
  */
 export async function purgeStaleRunUploads(): Promise<number> {
-  const all = await loadAll();
-  const itemsWithRun = all.filter((u) => u.runId);
+  const snapshot = await loadAll();
+  const itemsWithRun = snapshot.filter((u) => u.runId);
   if (itemsWithRun.length === 0) return 0;
 
   const jobIds = Array.from(new Set(itemsWithRun.map((u) => u.jobId)));
@@ -703,40 +806,43 @@ export async function purgeStaleRunUploads(): Promise<number> {
   for (const row of data ?? [])
     currentRunByJob.set(row.id, (row as any).current_run_id ?? null);
 
-  const survivors: PendingUpload[] = [];
-  let purged = 0;
-  for (const u of all) {
-    if (!u.runId) {
+  // Apply the purge atomically (V3). Only items whose job we actually
+  // queried are eligible — items added after the query (job not in the map)
+  // are left untouched rather than wrongly purged.
+  const purgedItems: PendingUpload[] = [];
+  const purged = await mutateQueue<number>((all) => {
+    const survivors: PendingUpload[] = [];
+    for (const u of all) {
+      if (!u.runId || !currentRunByJob.has(u.jobId)) {
+        survivors.push(u);
+        continue;
+      }
+      const current = currentRunByJob.get(u.jobId) ?? null;
+      if (!current || current !== u.runId) {
+        purgedItems.push(u);
+        continue;
+      }
       survivors.push(u);
-      continue;
     }
-    const current = currentRunByJob.get(u.jobId);
-    if (!current || current !== u.runId) {
-      void logClientEvent("photo_upload_failed", "warn", {
-        jobId: u.jobId,
-        source: "storage",
-        type: "upload",
-        context: {
-          reason: "stale_run_purged",
-          pendingId: u.id,
-          queuedRun: u.runId,
-          currentRun: current ?? null,
-        },
-      });
-      purged++;
-      continue;
-    }
-    survivors.push(u);
+    if (purgedItems.length === 0) return { next: null, result: 0 };
+    return { next: survivors, result: purgedItems.length };
+  });
+
+  for (const u of purgedItems) {
+    void logClientEvent("photo_upload_failed", "warn", {
+      jobId: u.jobId,
+      source: "storage",
+      type: "upload",
+      context: {
+        reason: "stale_run_purged",
+        pendingId: u.id,
+        queuedRun: u.runId,
+        currentRun: currentRunByJob.get(u.jobId) ?? null,
+      },
+    });
   }
 
-  if (purged > 0) {
-    try {
-      await saveAll(survivors);
-    } catch {
-      /* ignore */
-    }
-    notifyEvidenceQueueChanged();
-  }
+  if (purged > 0) notifyEvidenceQueueChanged();
   return purged;
 }
 
@@ -846,21 +952,36 @@ export async function retryUpload(
       ...u,
       state: "uploading",
       status: "uploading",
+      uploadingSince: new Date().toISOString(),
       errorMessage: null,
     }));
 
     if (!existing) return false;
 
-    if (!existing.fileBlob) {
+    // V4 + V7: a missing OR empty (0-byte) blob on a non-uploaded item is NOT
+    // a success. Previously a missing blob was marked "uploaded"/"done" with no
+    // storage object and no photos row — silently dropping evidence; a 0-byte
+    // blob would upload as an empty object. Treat both as a hard failure so the
+    // item surfaces in Pending Uploads for the user to discard/re-capture.
+    if (!existing.fileBlob || existing.fileBlob.size === 0) {
       await updateOne(id, (u) => ({
         ...u,
-        state: "uploaded",
-        status: "done",
-        completedAt: u.completedAt ?? new Date().toISOString(),
-        errorMessage: null,
+        state: "failed",
+        status: "failed",
+        uploadingSince: null,
+        needsAttention: true,
+        lastErrorAt: new Date().toISOString(),
+        errorMessage:
+          "Image data missing for this photo — cannot upload. Re-capture or discard.",
       }));
       notifyEvidenceQueueChanged();
-      return true;
+      void logClientEvent("photo_upload_failed", "error", {
+        jobId: existing.jobId,
+        source: "storage",
+        type: "upload",
+        context: { pendingId: id, error: "file_blob_missing", deterministic: true },
+      });
+      return false;
     }
 
     // ── Pre-flight referential checks ────────────────────────────────
@@ -970,6 +1091,7 @@ export async function retryUpload(
       state: "uploaded",
       status: "done",
       completedAt: new Date().toISOString(),
+      uploadingSince: null,
       errorMessage: null,
       fileBlob: null,
       backend: stored.backend,
@@ -988,6 +1110,7 @@ export async function retryUpload(
       ...u,
       state: "failed",
       status: "failed",
+      uploadingSince: null,
       errorMessage: msg,
       lastErrorAt: nowIso,
       attempts: (u.attempts ?? 0) + 1,
@@ -1192,7 +1315,9 @@ export async function retryJobUploads(
 export const __testing__ = {
   loadAll,
   saveAll,
+  updateOne,
   store,
   QUEUE_KEY,
   STAGED_TTL_MS,
+  STALE_UPLOADING_MS,
 };
