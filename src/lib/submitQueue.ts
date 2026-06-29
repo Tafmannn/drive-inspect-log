@@ -369,7 +369,7 @@ export async function drainSubmitQueue(): Promise<DrainResult> {
         succeeded++;
       } catch (e) {
         failed++;
-        const message = e instanceof Error ? e.message : String(e);
+        const message = formatErrorMessage(e);
         const isNet = isNetworkError(e);
         await updateOne(entry.id, (q) => ({
           ...q,
@@ -423,7 +423,7 @@ export async function retrySubmission(id: string): Promise<void> {
   try {
     await drainOne(reset);
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
+    const message = formatErrorMessage(e);
     const isNet = isNetworkError(e);
     await updateOne(id, (q) => ({
       ...q,

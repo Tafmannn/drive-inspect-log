@@ -126,7 +126,7 @@ export function QueuedSubmissionsSection() {
       await retrySubmission(id);
       toast({ title: "Submission sent." });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = formatErrorMessage(e);
       toast({
         title: "Retry failed.",
         description: msg,
@@ -148,7 +148,7 @@ export function QueuedSubmissionsSection() {
       await discardSubmission(id);
       toast({ title: "Queued submission deleted." });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = formatErrorMessage(e);
       toast({
         title: "Couldn't delete submission.",
         description: msg,
