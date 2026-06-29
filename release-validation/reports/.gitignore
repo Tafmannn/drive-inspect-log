@@ -1,0 +1,4 @@
+# Generated reports are build artifacts — never commit them (they would imply a
+# PASS/FAIL state that may not match the reviewer's environment).
+*
+!.gitignore
