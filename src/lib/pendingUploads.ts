@@ -609,13 +609,27 @@ export async function stagePendingUpload(
     clientDamageId: args.clientDamageId ?? null,
   };
 
+  // Write the blob FIRST under its own key. This is the only large
+  // write in the staging hot path — the subsequent index update is
+  // O(metadata) regardless of how many photos are already staged.
+  // If the blob write fails (quota / blocked / private mode), the
+  // error propagates and the caller (InspectionFlow) rolls back the
+  // whole session.
+  await writeBlobKey(id, blob);
+
   const all = await loadAll();
   all.push(item);
-  // Intentionally let the underlying IDB error propagate so the caller
-  // can detect quota/blocked/private-mode failures and roll back.
-  await saveAll(all);
+  try {
+    await saveAll(all);
+  } catch (e) {
+    // Index write failed AFTER blob write — clean up the orphan blob
+    // and rethrow so the caller's failPreflight path runs.
+    await deleteBlobKey(id);
+    throw e;
+  }
   return item;
 }
+
 
 /**
  * Atomically apply a linkage patch to every item in a submission
