@@ -1062,6 +1062,11 @@ export async function retryUpload(
     const photoPayload: any = {
       job_id: existing.jobId,
       inspection_id: existing.inspectionId ?? null,
+      // Durable damage link (V6): persisted on the photos row so a server-side
+      // trigger keeps damage_items.photo_url in sync atomically, instead of
+      // relying on the best-effort client update below.
+      damage_item_id:
+        existing.photoType === "damage_close_up" ? existing.damageItemId ?? null : null,
       type: existing.photoType,
       url: stored.url,
       thumbnail_url: stored.thumbnailUrl ?? null,

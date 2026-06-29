@@ -88,7 +88,16 @@ gate "Stage 5 (expense-receipts / sheet-sync / app_settings)"
 apply_sql "$MIG/20260628100300_phase1_close_signature_storage_idor.sql"
 gate "Stage 5b (vehicle-signatures policies; test signature capture + re-capture)"
 
+# --- Evidence-pipeline fixes (V1, V6, V9) — see EVIDENCE-PIPELINE-FIXES.md ------
+apply_sql "$MIG/20260629100000_fix_damage_items_replay_ordering.sql"
+gate "V1 (damage_items.submission_index; replay order matches input)"
+
+apply_sql "$MIG/20260629100100_photos_server_side_links_and_org.sql"
+deploy_fns gcs-upload
+gate "V6/V9/V5/V7 (photo org from job, durable damage link, deterministic naming, 0-byte guard)"
+
 echo
 echo "All staging stages applied and gated PASS. Run the production go/no-go"
-echo "checklist in PHASE-1-STAGING-VALIDATION.md before scheduling production."
+echo "checklist in PHASE-1-STAGING-VALIDATION.md (+ EVIDENCE-PIPELINE-FIXES.md)"
+echo "before scheduling production."
 echo "Stage 7 (anon-key rotation) is production-only and NOT part of this script."

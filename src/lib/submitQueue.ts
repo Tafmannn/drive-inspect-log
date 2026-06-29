@@ -294,6 +294,33 @@ export async function enqueueSubmission(
 }
 
 export async function discardSubmission(id: string): Promise<void> {
+  // V8: if signatures were already uploaded for this submission but the RPC
+  // never attached them (the entry is being discarded), the storage objects
+  // are now orphaned. We log them for a server-side GC sweep. (A direct
+  // delete would require a dedicated storage-delete edge function — tracked as
+  // a follow-up. V5's deterministic naming already prevents accumulation when
+  // a submission is RE-DRAINED rather than discarded.)
+  try {
+    const all = await loadAllRaw();
+    const entry = all.find((q) => q.id === id);
+    const orphans = [entry?.driverSignatureUrl, entry?.customerSignatureUrl].filter(
+      (u): u is string => !!u,
+    );
+    if (orphans.length > 0) {
+      void logClientEvent("submit_queue_signature_orphaned", "warn", {
+        jobId: entry?.jobId,
+        source: "storage",
+        type: "upload",
+        context: {
+          submissionSessionId: entry?.submissionSessionId,
+          orphanedSignatureUrls: orphans,
+          reason: "submission_discarded_after_signature_upload",
+        },
+      });
+    }
+  } catch {
+    /* best-effort */
+  }
   await removeOne(id);
 }
 
