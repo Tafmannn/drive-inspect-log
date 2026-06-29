@@ -102,7 +102,14 @@ serve(async (req) => {
     const bucket = "axentra_db";
     const fileBytes = Uint8Array.from(atob(fileBase64), (c) => c.charCodeAt(0));
 
-    // Validate file size
+    // Validate file size — reject empty (0-byte) payloads so corrupt/empty
+    // evidence never lands in storage with a matching photos row (V7).
+    if (fileBytes.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "File is empty" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     if (fileBytes.length > MAX_SIZE) {
       return new Response(
         JSON.stringify({ error: "File too large (max 10 MB)" }),
@@ -125,11 +132,19 @@ serve(async (req) => {
       }
     }
 
-    // Server-side file naming for security
-    const ext = fileName.split('.').pop() || 'jpg';
-    const safeName = `${crypto.randomUUID()}-${Date.now()}.${ext}`;
-    const pathPrefix = fileName.includes('/') ? fileName.substring(0, fileName.lastIndexOf('/') + 1) : '';
-    const finalName = pathPrefix ? `${pathPrefix}${safeName}` : safeName;
+    // Deterministic, sanitised object name (V5). The client supplies a unique,
+    // namespaced path (jobs/<job>/<type>/<photoType>/<itemId>.<ext> or
+    // jobs/<job>/signatures/<type>/<role>.<ext>), so retries OVERWRITE the same
+    // object instead of orphaning a new randomly-named one on every failed
+    // insert / re-capture. The name is used verbatim as the GCS object key, so
+    // reject path traversal / absolute paths defensively.
+    const finalName = String(fileName).replace(/^\/+/, "");
+    if (finalName.length === 0 || finalName.includes("..") || finalName.includes("//")) {
+      return new Response(
+        JSON.stringify({ error: "Invalid fileName" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const uploadUrl = `https://storage.googleapis.com/upload/storage/v1/b/${bucket}/o?uploadType=media&name=${encodeURIComponent(finalName)}`;
     const uploadRes = await fetch(uploadUrl, {
