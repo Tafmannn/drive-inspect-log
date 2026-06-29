@@ -369,7 +369,7 @@ export async function drainSubmitQueue(): Promise<DrainResult> {
         succeeded++;
       } catch (e) {
         failed++;
-        const message = e instanceof Error ? e.message : String(e);
+        const message = formatErrorMessage(e);
         const isNet = isNetworkError(e);
         await updateOne(entry.id, (q) => ({
           ...q,
@@ -423,7 +423,7 @@ export async function retrySubmission(id: string): Promise<void> {
   try {
     await drainOne(reset);
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
+    const message = formatErrorMessage(e);
     const isNet = isNetworkError(e);
     await updateOne(id, (q) => ({
       ...q,
@@ -542,6 +542,33 @@ function blobToFile(blob: Blob, filename: string): File {
 // Network classifier — exported so InspectionFlow can decide whether
 // to enqueue a failed submit vs surface a hard error.
 // ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Serialize an unknown thrown value to a human-readable string.
+ * Supabase RPC errors are plain objects ({ message, code, details, hint })
+ * — `String(obj)` returns "[object Object]", which is useless to a driver.
+ */
+export function formatErrorMessage(err: unknown): string {
+  if (err == null) return "Unknown error";
+  if (typeof err === "string") return err;
+  if (err instanceof Error) return err.message || err.name || "Error";
+  if (typeof err === "object") {
+    const o = err as Record<string, unknown>;
+    const parts: string[] = [];
+    if (typeof o.message === "string" && o.message) parts.push(o.message);
+    if (typeof o.details === "string" && o.details) parts.push(o.details);
+    if (typeof o.hint === "string" && o.hint) parts.push(`hint: ${o.hint}`);
+    if (typeof o.code === "string" && o.code) parts.push(`(${o.code})`);
+    if (parts.length) return parts.join(" — ");
+    try {
+      const j = JSON.stringify(err);
+      if (j && j !== "{}") return j;
+    } catch {
+      /* fall through */
+    }
+  }
+  return String(err);
+}
 
 export function isNetworkError(err: unknown): boolean {
   if (!err) return false;
