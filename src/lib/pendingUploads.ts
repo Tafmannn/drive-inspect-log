@@ -817,8 +817,17 @@ export async function purgeStaleRunUploads(): Promise<number> {
   }
 
   if (purged > 0) {
+    const purgedIds = all
+      .filter(
+        (u) =>
+          u.runId &&
+          (!currentRunByJob.get(u.jobId) ||
+            currentRunByJob.get(u.jobId) !== u.runId),
+      )
+      .map((u) => u.id);
     try {
       await saveAll(survivors);
+      await Promise.all(purgedIds.map((id) => deleteBlobKey(id)));
     } catch {
       /* ignore */
     }
@@ -826,6 +835,7 @@ export async function purgeStaleRunUploads(): Promise<number> {
   }
   return purged;
 }
+
 
 /**
  * Worker entrypoint: upload a single queued item.
