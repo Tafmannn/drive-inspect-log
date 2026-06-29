@@ -750,17 +750,22 @@ export async function deletePendingUpload(id: string): Promise<void> {
  */
 export async function pruneDone(): Promise<void> {
   const all = await loadAll();
+  const removedIds = all
+    .filter((u) => u.state === "uploaded" || u.status === "done")
+    .map((u) => u.id);
   const next = all.filter(
     (u) => u.state !== "uploaded" && u.status !== "done",
   );
   if (next.length === all.length) return;
   try {
     await saveAll(next);
+    await Promise.all(removedIds.map((id) => deleteBlobKey(id)));
   } catch {
     /* ignore */
   }
   notifyEvidenceQueueChanged();
 }
+
 
 /**
  * Remove queued uploads whose `runId` no longer matches the job's
