@@ -277,12 +277,55 @@ function normaliseRow(raw: any): PendingUpload {
   return { ...(raw as PendingUpload), state };
 }
 
+// ── Per-item blob storage helpers ────────────────────────────
+//
+// Blobs are persisted under `pu_blob_<id>` keys, separate from the
+// index. This keeps the index payload small and ensures each stage
+// writes only one new blob + a tiny index update, instead of
+// rewriting the entire array of blobs on every photo.
+
+async function writeBlobKey(id: string, blob: Blob): Promise<void> {
+  await set(BLOB_KEY_PREFIX + id, blob, store);
+}
+
+async function readBlobKey(id: string): Promise<Blob | null> {
+  try {
+    const b = await get<Blob>(BLOB_KEY_PREFIX + id, store);
+    return (b as Blob | undefined) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function deleteBlobKey(id: string): Promise<void> {
+  try {
+    await del(BLOB_KEY_PREFIX + id, store);
+  } catch {
+    /* best-effort */
+  }
+}
+
 async function loadAllRaw(): Promise<PendingUpload[]> {
   await migrateLegacyIfNeeded();
   try {
     const data = (await get<PendingUpload[]>(QUEUE_KEY, store)) ?? [];
     if (!Array.isArray(data)) return [];
-    return data.map(normaliseRow);
+    const rows = data.map(normaliseRow);
+
+    // Hydrate blobs from per-item keys for any item that still needs
+    // its blob (i.e. anything not already uploaded). Items written
+    // under the legacy single-key layout still carry fileBlob inline,
+    // so only hydrate when missing.
+    await Promise.all(
+      rows.map(async (row) => {
+        if (row.state === "uploaded") return;
+        if (row.fileBlob) return;
+        const blob = await readBlobKey(row.id);
+        if (blob) row.fileBlob = blob;
+      }),
+    );
+
+    return rows;
   } catch (e) {
     console.warn("[pendingUploads] Failed to read queue from IDB", e);
     return [];
@@ -311,6 +354,7 @@ async function loadAll(): Promise<PendingUpload[]> {
   if (stale.length > 0) {
     try {
       await saveAll(survivors);
+      await Promise.all(stale.map((u) => deleteBlobKey(u.id)));
     } catch {
       /* ignore */
     }
@@ -329,8 +373,16 @@ async function loadAll(): Promise<PendingUpload[]> {
   return survivors;
 }
 
+/**
+ * Persist the queue index. Blobs are NEVER serialised into the index
+ * — callers are responsible for writing the blob under its own key
+ * via `writeBlobKey` before (or as part of) the operation. saveAll
+ * strips any inline fileBlob from the persisted copy so we cannot
+ * accidentally regress to the legacy single-key big-array layout.
+ */
 async function saveAll(items: PendingUpload[]): Promise<void> {
-  await set(QUEUE_KEY, items, store);
+  const persisted = items.map((u) => ({ ...u, fileBlob: null as Blob | null }));
+  await set(QUEUE_KEY, persisted, store);
 }
 
 async function updateOne(
@@ -355,9 +407,11 @@ async function removeOne(id: string): Promise<void> {
   const next = all.filter((u) => u.id !== id);
   try {
     await saveAll(next);
+    await deleteBlobKey(id);
   } catch {
     // ignore
   }
+
 }
 
 // ─────────────────────────────────────────────────────────────
