@@ -708,8 +708,12 @@ export async function discardSubmissionSession(
   );
   const discarded = all.length - survivors.length;
   if (discarded > 0) {
+    const discardedIds = all
+      .filter((u) => u.submissionSessionId === submissionSessionId)
+      .map((u) => u.id);
     try {
       await saveAll(survivors);
+      await Promise.all(discardedIds.map((id) => deleteBlobKey(id)));
     } catch {
       /* ignore */
     }
@@ -717,6 +721,7 @@ export async function discardSubmissionSession(
   }
   return { discarded };
 }
+
 
 // ─────────────────────────────────────────────────────────────
 // Legacy shim removed.
