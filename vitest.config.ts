@@ -9,6 +9,16 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    // Dummy Supabase env so `src/integrations/supabase/client.ts` constructs
+    // without throwing during module load. Tests that exercise Supabase mock
+    // the client; these values never reach the network. Without them, any test
+    // that transitively imports the client fails to collect from a clean
+    // checkout (no live network calls are made — see evidence-pipeline-fixes
+    // and pending-uploads specs which mock `@/integrations/supabase/client`).
+    env: {
+      VITE_SUPABASE_URL: "http://localhost:54321",
+      VITE_SUPABASE_PUBLISHABLE_KEY: "test-anon-key",
+    },
   },
   resolve: {
     alias: { "@": path.resolve(__dirname, "./src") },
