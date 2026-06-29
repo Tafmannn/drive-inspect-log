@@ -421,8 +421,8 @@ async function removeOne(id: string): Promise<void> {
 const MAX_PHOTO_DIMENSION = 1920;
 const JPEG_QUALITY = 0.75;
 
-async function compressToBlob(file: File): Promise<Blob> {
-  return await new Promise<Blob>((resolve, reject) => {
+async function compressOnce(file: File): Promise<Blob | null> {
+  return await new Promise<Blob | null>((resolve) => {
     const img = new Image();
     const objectUrl = URL.createObjectURL(file);
 
@@ -442,30 +442,56 @@ async function compressToBlob(file: File): Promise<Blob> {
         canvas.height = h;
         const ctx = canvas.getContext("2d");
         if (!ctx) {
-          reject(new Error("Canvas context unavailable"));
+          resolve(null);
           return;
         }
         ctx.drawImage(img, 0, 0, w, h);
 
         canvas.toBlob(
           (blob) => {
-            if (blob) resolve(blob);
-            else reject(new Error("Canvas toBlob returned null"));
+            // iOS Safari can return a non-null but 0-byte Blob under
+            // GPU/canvas memory pressure. Treat that as failure so the
+            // caller can retry or fall back.
+            if (blob && blob.size > 0) resolve(blob);
+            else resolve(null);
           },
           "image/jpeg",
           JPEG_QUALITY,
         );
-      } catch (e) {
-        reject(e);
+      } catch {
+        resolve(null);
       }
     };
     img.onerror = () => {
       URL.revokeObjectURL(objectUrl);
-      // Fall back to the raw file if it can't be decoded for compression
-      resolve(file);
+      resolve(null);
     };
     img.src = objectUrl;
   });
+}
+
+async function compressToBlob(file: File): Promise<Blob> {
+  // Retry up to 3 times — iOS Safari's canvas.toBlob sporadically returns
+  // empty Blobs under memory pressure during long photo-staging batches.
+  // A small delay between attempts lets WebKit reclaim canvas buffers.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const blob = await compressOnce(file);
+    if (blob && blob.size > 0) return blob;
+    if (attempt < 2) {
+      await new Promise((r) => setTimeout(r, 50 * (attempt + 1)));
+    }
+  }
+  // Fall back to the original file — we know it has real bytes
+  // (the camera/library handed it to us). Better to upload a larger
+  // photo than a 0-byte one.
+  if (file.size > 0) {
+    console.warn(
+      "[pendingUploads] compressToBlob exhausted retries — falling back to original file",
+      { name: file.name, size: file.size },
+    );
+    return file;
+  }
+  throw new Error("compressToBlob: empty input file and compression failed");
 }
 
 // ─────────────────────────────────────────────────────────────

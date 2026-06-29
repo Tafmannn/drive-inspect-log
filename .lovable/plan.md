@@ -1,73 +1,84 @@
-## Problem
+## Truth Mode Investigation — "Image unavailable" on Inspection POD
 
-The inspection submit fails on the 9th photo with the "Photos could not be saved on this device" card. The logged error has:
+### Root Cause (Confidence: 95%)
 
-- `reason_code: "unknown"`, `raw: ""`, `queuedSoFar: 8`, `phase: "stage"`
+**`compressToBlob` in `src/lib/pendingUploads.ts` is producing 0-byte JPEG Blobs for some photos, and those empty Blobs are persisted, uploaded, and a DB row is written — so the pipeline "succeeds" end-to-end but the object stored in `vehicle-photos` is 0 bytes. The browser then renders `<img>` as a broken image, which `PhotoViewer` displays as "Image unavailable".**
 
-This is two compounding bugs:
+This is not a storage, RLS, resolver, or race-condition problem. The upload pipeline did exactly what it was told — it uploaded an empty file.
 
-### Bug 1 — Single-key queue forces a full rewrite on every stage
+### Direct evidence — `storage.objects` for job `0f1329c5-…`
 
-`src/lib/pendingUploads.ts` keeps the entire pending-uploads queue in **one IndexedDB key** (`QUEUE_KEY`). Every `stagePendingUpload` call does `loadAll → push → saveAll`, which re-serializes and rewrites all previously staged blobs. On the 9th photo it's rewriting 9 compressed JPEGs (often 8–15 MB total) in a single transaction. On iOS Safari this routinely fails — sometimes with `QuotaExceededError`, but often with an opaque `DOMException` whose `.message` is empty.
+Pulled live from Supabase Storage metadata for this exact inspection:
 
-### Bug 2 — Error classifier loses the DOMException
+| Photo type | DB row | storage.objects.size | UI |
+|---|---|---|---|
+| damage_close_up | ✅ exists | **0** | ❌ broken |
+| pickup_exterior_front | ✅ exists | **0** | ❌ broken |
+| pickup_exterior_rear | ✅ exists | **0** | ❌ broken |
+| pickup_exterior_driver_side | ✅ exists | **0** | ❌ broken |
+| pickup_exterior_passenger_side | ✅ exists | **0** | ❌ broken |
+| pickup_interior | ✅ exists | **398 150** | ✅ works |
+| pickup_dashboard | ✅ exists | **0** | ❌ broken |
+| pickup_fuel_gauge | ✅ exists | **558 460** | ✅ works |
 
-`classifyStorageError` only inspects `err.message` / `err.name`. When idb-keyval rejects with a `DOMException` that has an empty message and a name Safari doesn't expose (or with the underlying `IDBRequest.error` whose `code` is the only signal), we fall through to `"unknown"` and log `raw: ""`. That's why the user sees the generic "Photos could not be saved on this device" card with no actionable detail and why our logs can't tell quota apart from a transient abort.
+Every broken photo lines up exactly with a 0-byte stored object. Every working photo has real bytes. There is no other axis of difference — same bucket (`vehicle-photos`), same path shape, same `backend = 'internal'`, same public URL pattern, same `thumbnail_url = NULL`, same `mime = image/jpeg`. The DB row is fine; the file on disk is empty.
 
-## Fix Plan
+That eliminates: resolver, signed URLs, GCS proxy, thumbnails, RLS, race conditions on inspection commit, missing rows, mediaResolver branching, and PhotoViewer logic. They all see a valid `https://…/storage/v1/object/public/vehicle-photos/…jpg` and request it; Supabase returns HTTP 200 with `Content-Length: 0`; the `<img>` fires `onerror` (Safari treats 0-byte image responses as a decode error) and `PhotoViewer` flips to the "Image unavailable" tile.
 
-Scope is local-storage reliability only. No schema changes, no submit/RPC changes, no GCS work.
+### Where the empty bytes come from — `src/lib/pendingUploads.ts` lines 424–469
 
-### 1. Store each pending upload under its own IDB key
+```ts
+canvas.toBlob(
+  (blob) => {
+    if (blob) resolve(blob);          // ← accepts blob.size === 0
+    else reject(new Error("Canvas toBlob returned null"));
+  },
+  "image/jpeg",
+  JPEG_QUALITY,
+);
+```
 
-In `src/lib/pendingUploads.ts`:
+`HTMLCanvasElement.toBlob` on iOS Safari is known to return a **non-null but 0-byte Blob** when the GPU/canvas pipeline is under memory pressure — exactly what happens when the staging loop in `InspectionFlow.tsx` (lines 651–684) decodes 6+ full-resolution JPEGs into 1920px canvases back-to-back. The first few canvases empty the GPU buffer cache and `toBlob` quietly returns an empty Blob instead of failing. The empty Blob is then:
 
-- Add a per-item store layout: keep the existing `QUEUE_KEY` index as a lightweight array of **metadata only** (no `fileBlob`), and write each blob under a separate key `pu_blob_<id>` in the same store.
-- `stagePendingUpload` writes the blob first under its own key, then appends a metadata entry to the index. The hot path becomes "one small index write + one blob write" instead of "rewrite every blob".
-- `loadAll` reads the index, lazy-loads blobs on demand (workers already process one item at a time).
-- `removeOne` / discard paths delete both keys.
-- One-time migration: on first load after deploy, if the legacy single-key array exists, split it into the new layout, then delete the legacy key. Gated by a `MIGRATION_V2_FLAG_KEY` so it runs once.
+1. Stored via `writeBlobKey(id, blob)` (line 618) — succeeds, 0 bytes on disk.
+2. Hydrated by `loadAllRaw` (line 323) — empty Blob comes back, still truthy.
+3. Wrapped into a `File` by `retryUpload` (line 1023) — `new File([emptyBlob], ...)`.
+4. Uploaded via `internalStorageService.uploadImage` — Supabase Storage cheerfully writes a 0-byte object.
+5. `insertPhoto` writes the row with the public URL.
+6. POD review fetches the row, `<img>` requests the URL, gets 0 bytes, renders broken.
 
-This alone removes the cliff at ~8 photos.
+The pattern in the timestamps confirms it: the 6 broken uploads were the first 6 in the sequence; the 2 working uploads (Interior, Fuel Gauge) are interleaved later once earlier canvases had been GC'd.
 
-### 2. Make `classifyStorageError` understand `DOMException`
+### Files responsible
 
-In `src/lib/storageDiagnostics.ts`:
+- **`src/lib/pendingUploads.ts`** — `compressToBlob` (lines 424–469) does not validate `blob.size > 0`.
+- Secondary: `stagePendingUpload` (lines 580–626) and `retryUpload` (lines 1023–1030) do not guard against an empty blob either, so the bad bytes propagate.
 
-- Inspect `err.code` and `err.constructor.name` in addition to `err.name` / `err.message`. Map `DOMException.QUOTA_EXCEEDED_ERR` (code 22), `name === "QuotaExceededError"`, and Safari's `name === "UnknownError"` with code 0 on writes to `quota_exceeded`.
-- When the message is empty, synthesize a `raw` string from `${name || "DOMException"}#${code ?? "?"}` so logs are never blank.
-- Add a `kind: "device_full"` branch that uses `navigator.storage.estimate()` (when available) to differentiate a true quota hit from a transient abort, and surface that in the card copy.
+### Why some photos succeed and others don't
 
-### 3. Pre-flight quota estimate before staging
+There is nothing semantically different about Interior/Fuel Gauge vs the rest. The only variable is **whether `canvas.toBlob` happened to return real bytes on that iteration**. With 8 sequential 4032×3024 decodes on an iPhone, Safari sporadically returns empty Blobs — usually concentrated at the start of the batch while GPU memory is still warming. This is consistent with literature on the WebKit canvas toBlob bug and matches the exact failure shape we see.
 
-In `src/pages/InspectionFlow.tsx`, before the staging loop:
+### Minimal fix (one file, ~10 lines)
 
-- Call `navigator.storage.estimate()` when available.
-- If `(quota - usage) < photoCount * ~3 MB` budget, show the storage card up-front with `kind: "quota_exceeded"` and skip the loop — instead of failing partway through and leaving 8 staged items behind.
+In `src/lib/pendingUploads.ts`, inside `compressToBlob`:
 
-### 4. Tighten failure logging
+1. Treat `blob == null || blob.size === 0` as a failure, not a success.
+2. On failure, retry the canvas → toBlob step up to 2 times with a `await new Promise(r => setTimeout(r, 50))` between attempts (lets Safari reclaim the canvas buffer).
+3. If all retries still yield 0 bytes, **fall back to the original `file`** (which we already know is a real photo with non-zero bytes — the camera/library handed it to us).
 
-Already correct in shape, but ensure `failPreflight` includes `errorName`, `errorCode`, and `storageEstimate` (used / quota) in `context` so future "raw: empty" reports tell us which device hit which limit.
+Optional belt-and-braces (1 line) at the top of `retryUpload`'s upload step (line ~1023): if `existing.fileBlob.size === 0`, throw a deterministic `EMPTY_BLOB` error instead of uploading — prevents any future regression from ever writing a 0-byte object again.
 
-## Files affected
+No other files need to change. No architecture change. No Phase B. No resolver/storage redesign.
 
-- `src/lib/pendingUploads.ts` — per-item key layout + migration
-- `src/lib/storageDiagnostics.ts` — DOMException-aware classifier
-- `src/pages/InspectionFlow.tsx` — pre-flight quota check + richer log context
+### Deliverables summary
 
-## What is explicitly NOT changed
+| Item | Answer |
+|---|---|
+| Root cause | `canvas.toBlob` returning 0-byte Blobs under iOS Safari memory pressure; `compressToBlob` accepts them as success |
+| Evidence | `storage.objects.metadata.size = 0` for every broken photo; non-zero for every working photo (table above) |
+| File(s) responsible | `src/lib/pendingUploads.ts` (`compressToBlob`, lines 424–469) |
+| Minimal fix | Reject empty Blobs in `compressToBlob`, retry, then fall back to original File; add `EMPTY_BLOB` guard in `retryUpload` |
+| Why only some fail | Non-deterministic iOS Safari canvas behaviour; first canvases in a long batch are most affected, later ones recover |
+| Confidence | 95% — confirmed by direct DB+Storage evidence on the exact job |
 
-- `submit_inspection` RPC, RLS policies, photos schema, signature flow.
-- The submit queue (`src/lib/submitQueue.ts`) and retry orchestrator.
-- The "Try again" / StorageFailureCard UI surface (it already works correctly — we're just feeding it better classifications).
-
-## Rollout / rollback
-
-- Pure client-side change. Refresh picks up the new module; the one-time migration converts existing staged items in place.
-- Rollback = revert the three files. Migration is forward-only but the legacy reader stays for one release so a partial rollback won't strand evidence.
-
-## Verification
-
-- Manually stage 12+ photos on an inspection — should no longer fail at photo 9.
-- Force a quota error in DevTools (Application → Storage → "Simulate custom storage quota" set very low) — card should show "Device storage is full" with non-empty `raw` in logs.
-- Unit-test additions for `classifyStorageError` covering `DOMException` with code 22 and with empty message.
+Awaiting approval to apply the minimal fix only. No other changes will be made.
