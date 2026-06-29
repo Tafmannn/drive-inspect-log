@@ -5,6 +5,7 @@ import {
   discardSubmission,
   drainSubmitQueue,
   useSubmitQueueVersion,
+  formatErrorMessage,
   type QueuedSubmission,
 } from "@/lib/submitQueue";
 import { Button } from "@/components/ui/button";
