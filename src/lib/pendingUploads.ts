@@ -1072,9 +1072,12 @@ export async function retryUpload(
       backend: stored.backend,
       backendRef: stored.backendRef ?? null,
     }));
+    // Reclaim quota: drop the per-item blob now that it's safely server-side.
+    await deleteBlobKey(id);
     notifyEvidenceQueueChanged();
 
     return true;
+
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Upload failed";
     const deterministic = isDeterministicFailure(msg);
