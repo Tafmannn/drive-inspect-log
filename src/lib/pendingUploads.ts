@@ -51,9 +51,18 @@ import type {
 const QUEUE_KEY = "queue";
 const store = createStore("axentra-pending-uploads", "v2");
 
+// Per-item blob keys live alongside the index in the same store.
+// Splitting blobs out of the index array eliminates the O(N) rewrite
+// that happens on every stage and was causing iOS Safari to abort
+// (often with an empty-message DOMException) once the index grew past
+// ~8 photos. The index keeps only metadata; each blob is persisted
+// under its own key and hydrated on demand.
+const BLOB_KEY_PREFIX = "pu_blob_";
+
 // One-time migration flag from legacy localStorage queue.
 const LEGACY_LOCALSTORAGE_KEY = "axentra.pendingUploads.v1";
 const MIGRATION_FLAG_KEY = "_migrated_from_v1";
+
 
 /** Legacy status surface, derived from `state` for the Pending Uploads UI. */
 export type PendingUploadStatus = "pending" | "uploading" | "failed" | "done";
