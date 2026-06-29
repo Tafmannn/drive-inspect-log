@@ -1046,6 +1046,12 @@ export async function retryUpload(
       throw preflightErr;
     }
 
+    if (!existing.fileBlob || existing.fileBlob.size === 0) {
+      throw new Error(
+        "EMPTY_BLOB: photo data is empty (0 bytes) — cannot upload. Recapture this photo.",
+      );
+    }
+
     const file = new File([existing.fileBlob], existing.fileName, {
       type: existing.fileBlob.type || "image/jpeg",
     });
