@@ -40,6 +40,11 @@ jobs:
       - name: Install dependencies
         run: npm ci || npm install
 
+      # Live DB suites (12/13) shell out to `psql`. Cheap and harmless for
+      # static-only runs; required when STAGING_DB_URL is configured.
+      - name: Install PostgreSQL client (for live DB suites)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+
       - name: Run release validation
         env:
           # Live suites stay gated unless these repo/environment secrets exist.
