@@ -55,6 +55,7 @@ Static suites run anywhere (laptop, CI, container). Live suites require a
 | 09 | Unit / regression tests | static | 🔒 | `vitest run` green (incl. storage path authz, 0-byte guard) |
 | 10 | Committed-secret scan | static | 🔒 | No PEM keys / service-role keys / SA JSON committed; `.env` untracked |
 | 11 | Dependency vulnerability audit | static | | `npm audit` summary (advisory) |
+| 16 | ESLint (lint backlog ratchet) | static | | `npm run lint`; WARNING while a backlog exists, PASS when clean. Promote to 🔒 once errors reach 0 |
 | 12 | RLS helpers — runtime proof | **live** | 🔒 | Forged-metadata super-admin returns false on the real DB |
 | 13 | Cross-tenant isolation | **live** | 🔒 | A driver sees zero cross-org jobs / receipts under RLS |
 | 14 | Storage IDOR path→org | **live** | 🔒 | `gcs-proxy` / `resolve-signature-url` return 403 cross-org |

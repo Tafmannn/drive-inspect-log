@@ -264,7 +264,13 @@ serve(async (req) => {
           return json({ error: inviteErr.message }, 500);
         }
       } else {
-        authUserId = inviteData?.user?.id!;
+        // Defensive: inviteUserByEmail can resolve without an error yet without
+        // a user object. A non-null assertion (`!`) only silences the compiler
+        // and would let `undefined` flow into updateUserById below, so guard.
+        if (!inviteData?.user?.id) {
+          return json({ error: "Invite succeeded but returned no user" }, 500);
+        }
+        authUserId = inviteData.user.id;
       }
 
       await admin.auth.admin.updateUserById(authUserId, {
