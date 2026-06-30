@@ -12,7 +12,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "ci": "npm run test && npm run typecheck && npm run build"
+    "ci": "npm run test && npm run typecheck && npm run build",
+    "release:validate": "node release-validation/run.mjs",
+    "release:validate:fast": "node release-validation/run.mjs --fast"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

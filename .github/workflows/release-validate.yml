@@ -1,0 +1,73 @@
+name: Release Validation
+
+# Runs the production release-validation framework. The STATIC suites
+# (environment, migration order/idempotency/rollback, RLS & edge-function static
+# analysis, typecheck, build, vitest, secret scan) run on every PR and on demand.
+# The LIVE suites (DB/HTTP/realtime) only execute when staging secrets are
+# present; otherwise they self-report NOT_EXECUTED and do not fail the build.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_live:
+        description: "Attempt live (staging) suites using configured secrets"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      # Live DB suites (12/13) shell out to `psql`. Cheap and harmless for
+      # static-only runs; required when STAGING_DB_URL is configured.
+      - name: Install PostgreSQL client (for live DB suites)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Run release validation
+        env:
+          # Live suites stay gated unless these repo/environment secrets exist.
+          # They self-detect absence and emit NOT_EXECUTED — never a false PASS.
+          STAGING_DB_URL: ${{ secrets.STAGING_DB_URL }}
+          STAGING_REF: ${{ secrets.STAGING_REF }}
+          STAGING_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          STAGING_ANON_KEY: ${{ secrets.STAGING_ANON_KEY }}
+          STAGING_SERVICE_ROLE_KEY: ${{ secrets.STAGING_SERVICE_ROLE_KEY }}
+          STAGING_DRIVER_A_JWT: ${{ secrets.STAGING_DRIVER_A_JWT }}
+          STAGING_CROSS_ORG_PATH: ${{ secrets.STAGING_CROSS_ORG_PATH }}
+          STAGING_DRIVER_SUB: ${{ secrets.STAGING_DRIVER_SUB }}
+          STAGING_ORG_A: ${{ secrets.STAGING_ORG_A }}
+        run: npm run release:validate
+
+      - name: Upload validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-validation-report
+          path: release-validation/reports/release-validation.*
+          if-no-files-found: warn
+
+      - name: Publish report to job summary
+        if: always()
+        run: cat release-validation/reports/release-validation.md >> "$GITHUB_STEP_SUMMARY" || true
