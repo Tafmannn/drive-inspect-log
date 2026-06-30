@@ -3,6 +3,11 @@ import type { StorageService, StoredFileInfo } from './types';
 
 class InternalStorageService implements StorageService {
   async uploadImage(file: File, pathHint: string): Promise<StoredFileInfo> {
+    // Reject empty (0-byte) payloads so corrupt/empty evidence never lands in
+    // storage with a matching DB row (V7).
+    if (!file || file.size === 0) {
+      throw new Error('File is empty');
+    }
     const isSignature = pathHint.includes('signature');
     const bucket = isSignature ? 'vehicle-signatures' : 'vehicle-photos';
     const ext = file.name.split('.').pop() || 'jpg';
