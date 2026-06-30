@@ -392,34 +392,49 @@ export const InspectionFlow = () => {
     }));
   };
 
-  const handlePhotoCapture = (photoKey: string, file: File) => {
-    const url = URL.createObjectURL(file);
+  const handlePhotoCapture = async (photoKey: string, file: File) => {
+    // Detach from the OS-backed File reference immediately. On mobile Safari a
+    // captured/picked File can be neutered after backgrounding — `.size` stays
+    // cached (non-zero) while the bytes read as empty, surfacing later as a
+    // "File is empty" upload failure. Copying into an ArrayBuffer-backed File
+    // now (while the bytes are still readable) pins them in memory.
+    const buf = await file.arrayBuffer();
+    const safe = new File([buf], file.name || "photo.jpg", {
+      type: file.type || "image/jpeg",
+    });
+    const url = URL.createObjectURL(safe);
     setFormState((prev) => ({
       ...prev,
-      standardPhotos: { ...prev.standardPhotos, [photoKey]: file },
+      standardPhotos: { ...prev.standardPhotos, [photoKey]: safe },
       standardPhotoUrls: { ...prev.standardPhotoUrls, [photoKey]: url },
     }));
     // Persist the File blob so the photo survives an exit/reopen of the
     // app. Best-effort — the in-memory File is still authoritative for
     // the current session.
     if (jobId) {
-      void savePhotoDraftStandard(type, jobId, photoKey, file);
+      void savePhotoDraftStandard(type, jobId, photoKey, safe);
     }
   };
 
-  const addAdditionalPhoto = (file: File, label: string) => {
+  const addAdditionalPhoto = async (file: File, label: string) => {
+    // Detach from the OS-backed File reference immediately (see
+    // handlePhotoCapture) so the bytes can't be neutered before upload.
+    const buf = await file.arrayBuffer();
+    const safe = new File([buf], file.name || "photo.jpg", {
+      type: file.type || "image/jpeg",
+    });
     const draft: AdditionalPhotoDraft = {
       tempId: Date.now().toString(),
-      file,
+      file: safe,
       label,
-      previewUrl: URL.createObjectURL(file),
+      previewUrl: URL.createObjectURL(safe),
     };
     setFormState((prev) => ({
       ...prev,
       additionalPhotos: [...prev.additionalPhotos, draft],
     }));
     if (jobId) {
-      void savePhotoDraftAdditional(type, jobId, draft.tempId, file, label);
+      void savePhotoDraftAdditional(type, jobId, draft.tempId, safe, label);
     }
   };
 
