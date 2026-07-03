@@ -71,21 +71,34 @@ USING (
 
 -- ---------------------------------------------------------------------
 -- C5) sheet_sync_config / sheet_sync_logs: admin-only (was USING(true)).
+--
+-- These Google-Sheets-sync tables do not exist in every environment (the sync
+-- was retired before they were created in some databases). `DROP POLICY IF
+-- EXISTS ... ON <table>` still errors when the TABLE is absent (IF EXISTS only
+-- guards the policy, not the relation), so guard the whole block on the table
+-- actually existing. No-op where the tables were never created.
 -- ---------------------------------------------------------------------
-DROP POLICY IF EXISTS "Admins can manage sheet sync config" ON public.sheet_sync_config;
-CREATE POLICY "sheet_sync_config_admin_all"
-ON public.sheet_sync_config FOR ALL TO authenticated
-USING (public.is_admin_or_super_admin())
-WITH CHECK (public.is_admin_or_super_admin());
+DO $$
+BEGIN
+  IF to_regclass('public.sheet_sync_config') IS NOT NULL THEN
+    DROP POLICY IF EXISTS "Admins can manage sheet sync config" ON public.sheet_sync_config;
+    CREATE POLICY "sheet_sync_config_admin_all"
+    ON public.sheet_sync_config FOR ALL TO authenticated
+    USING (public.is_admin_or_super_admin())
+    WITH CHECK (public.is_admin_or_super_admin());
+  END IF;
 
-DROP POLICY IF EXISTS "Admins can view sync logs" ON public.sheet_sync_logs;
-DROP POLICY IF EXISTS "System can insert sync logs" ON public.sheet_sync_logs;
-CREATE POLICY "sheet_sync_logs_admin_select"
-ON public.sheet_sync_logs FOR SELECT TO authenticated
-USING (public.is_admin_or_super_admin());
-CREATE POLICY "sheet_sync_logs_admin_insert"
-ON public.sheet_sync_logs FOR INSERT TO authenticated
-WITH CHECK (public.is_admin_or_super_admin());
+  IF to_regclass('public.sheet_sync_logs') IS NOT NULL THEN
+    DROP POLICY IF EXISTS "Admins can view sync logs" ON public.sheet_sync_logs;
+    DROP POLICY IF EXISTS "System can insert sync logs" ON public.sheet_sync_logs;
+    CREATE POLICY "sheet_sync_logs_admin_select"
+    ON public.sheet_sync_logs FOR SELECT TO authenticated
+    USING (public.is_admin_or_super_admin());
+    CREATE POLICY "sheet_sync_logs_admin_insert"
+    ON public.sheet_sync_logs FOR INSERT TO authenticated
+    WITH CHECK (public.is_admin_or_super_admin());
+  END IF;
+END $$;
 
 -- ---------------------------------------------------------------------
 -- app_settings: reads stay open (feature flags); writes admin-only.

@@ -20,8 +20,16 @@
 -- live-DB-drift case where "Allow all for anon on qr_confirmations" was re-added
 -- via the dashboard). Direct table access by anon/authenticated is denied; the
 -- RPCs below (SECURITY DEFINER) are the sole entry point.
-ALTER TABLE public.qr_confirmations ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Allow all for anon on qr_confirmations" ON public.qr_confirmations;
+-- Guarded for schema drift: skip table-level hardening if qr_confirmations is
+-- absent in this environment (the RPCs below still create — plpgsql resolves
+-- table names at call time — and simply return no data until the table exists).
+DO $$
+BEGIN
+  IF to_regclass('public.qr_confirmations') IS NOT NULL THEN
+    ALTER TABLE public.qr_confirmations ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS "Allow all for anon on qr_confirmations" ON public.qr_confirmations;
+  END IF;
+END $$;
 
 -- ── qr_lookup(token): fetch display data for a pending handover ──────────
 -- Returns { status: 'ready'|'done'|'expired'|'not_found', ... }. On 'ready'
