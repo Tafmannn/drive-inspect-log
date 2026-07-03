@@ -1055,26 +1055,43 @@ export async function emailPodPdf(
       data: { session },
     } = await supabase.auth.getSession();
 
-    const orgId = session?.user?.user_metadata?.org_id ?? "shared";
-    const path = `${orgId}/${fileName}`;
+    // Org MUST come from user_profiles (authoritative), never user_metadata
+    // (self-writable and no longer populated). If it can't be resolved we skip
+    // the upload rather than write to a shared cross-tenant prefix — the email
+    // still goes out, just without a download link.
+    let orgId: string | null = null;
+    if (session?.user?.id) {
+      const { data: profile } = await supabase
+        .from("user_profiles")
+        .select("org_id")
+        .eq("auth_user_id", session.user.id)
+        .maybeSingle();
+      orgId = (profile as { org_id?: string | null } | null)?.org_id ?? null;
+    }
 
-    const { error: uploadError } = await supabase.storage
-      .from("pod-pdfs")
-      .upload(path, blob, {
-        contentType: "application/pdf",
-        upsert: true,
-      });
-
-    if (!uploadError) {
-      const { data: signed } = await supabase.storage
-        .from("pod-pdfs")
-        .createSignedUrl(path, 60 * 60 * 24 * 30);
-
-      if (signed?.signedUrl) {
-        downloadLink = signed.signedUrl;
-      }
+    if (!orgId) {
+      debugLog("POD email: no authoritative org_id — skipping upload");
     } else {
-      debugLog("Supabase upload failed", uploadError);
+      const path = `${orgId}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("pod-pdfs")
+        .upload(path, blob, {
+          contentType: "application/pdf",
+          upsert: true,
+        });
+
+      if (!uploadError) {
+        const { data: signed } = await supabase.storage
+          .from("pod-pdfs")
+          .createSignedUrl(path, 60 * 60 * 24 * 30);
+
+        if (signed?.signedUrl) {
+          downloadLink = signed.signedUrl;
+        }
+      } else {
+        debugLog("Supabase upload failed", uploadError);
+      }
     }
   } catch (error) {
     debugLog("Supabase upload exception", error);
