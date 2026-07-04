@@ -284,14 +284,42 @@ function normaliseRow(raw: any): PendingUpload {
 // writes only one new blob + a tiny index update, instead of
 // rewriting the entire array of blobs on every photo.
 
+// iOS WebKit stores a Blob put into IndexedDB as a reference to a temporary
+// file. When WebKit reclaims that file (app backgrounding / memory pressure),
+// the Blob reads back as 0 bytes — a staged photo "succeeds" then fails upload
+// with "File is empty". Persisting the raw bytes as an ArrayBuffer instead makes
+// structured clone copy them inline, so they survive. We rebuild the Blob on read.
+interface StoredBlobBytes {
+  __axBytes: ArrayBuffer;
+  type: string;
+}
+
+// Duck-typed (not `instanceof ArrayBuffer`): a structured-clone round-trip can
+// hand back an ArrayBuffer from a different realm, where instanceof would fail.
+function isStoredBlobBytes(v: unknown): v is StoredBlobBytes {
+  if (typeof v !== "object" || v === null || !("__axBytes" in v)) return false;
+  const bytes = (v as { __axBytes?: unknown }).__axBytes;
+  return bytes != null && typeof (bytes as ArrayBuffer).byteLength === "number";
+}
+
 async function writeBlobKey(id: string, blob: Blob): Promise<void> {
-  await set(BLOB_KEY_PREFIX + id, blob, store);
+  const bytes = await blob.arrayBuffer();
+  const payload: StoredBlobBytes = { __axBytes: bytes, type: blob.type || "image/jpeg" };
+  await set(BLOB_KEY_PREFIX + id, payload, store);
 }
 
 async function readBlobKey(id: string): Promise<Blob | null> {
   try {
-    const b = await get<Blob>(BLOB_KEY_PREFIX + id, store);
-    return (b as Blob | undefined) ?? null;
+    const v = await get<unknown>(BLOB_KEY_PREFIX + id, store);
+    if (!v) return null;
+    // New format: ArrayBuffer-backed bytes (survives WebKit temp-file reclaim).
+    if (isStoredBlobBytes(v)) {
+      return new Blob([v.__axBytes], { type: v.type || "image/jpeg" });
+    }
+    // Legacy format: a raw Blob/File persisted directly. Return as-is; if WebKit
+    // already zeroed it, the 0-byte guard in retryUpload catches it downstream.
+    if (v instanceof Blob) return v;
+    return null;
   } catch {
     return null;
   }
@@ -1326,5 +1354,6 @@ export const __testing__ = {
   saveAll,
   store,
   QUEUE_KEY,
+  BLOB_KEY_PREFIX,
   STAGED_TTL_MS,
 };

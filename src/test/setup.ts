@@ -1,6 +1,22 @@
 import "@testing-library/jest-dom";
 import "fake-indexeddb/auto";
 
+// jsdom's Blob/File do not implement arrayBuffer(); real browsers (and iOS
+// Safari) do. pendingUploads/photoDraftStore persist bytes via blob.arrayBuffer()
+// so they survive the WebKit IndexedDB 0-byte bug — the tests must exercise that
+// path, so polyfill it here via FileReader.
+if (typeof Blob !== "undefined" && typeof Blob.prototype.arrayBuffer !== "function") {
+  // eslint-disable-next-line no-extend-native
+  Blob.prototype.arrayBuffer = function (this: Blob): Promise<ArrayBuffer> {
+    return new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(fr.result as ArrayBuffer);
+      fr.onerror = () => reject(fr.error);
+      fr.readAsArrayBuffer(this);
+    });
+  };
+}
+
 // jsdom does not implement URL.createObjectURL / revokeObjectURL.
 // pendingUploads.compressToBlob uses these to load images into <img>;
 // we stub them so the call doesn't throw. Image decoding will then fail in
