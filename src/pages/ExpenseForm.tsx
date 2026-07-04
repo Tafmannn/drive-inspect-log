@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { PhotoViewer } from "@/components/PhotoViewer";
+import { resolveMediaUrlAsync } from "@/lib/mediaResolver";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -165,7 +166,17 @@ export const ExpenseForm = () => {
         console.error("Failed to load receipts", rErr);
       }
 
-      setExistingReceipts((receipts ?? []) as ExistingReceipt[]);
+      // Resolve each receipt URL for display. New receipts carry a signed
+      // expense-receipts URL (passed through unchanged); legacy receipts stored
+      // a now-private vehicle-photos URL and are re-signed here.
+      const rawReceipts = (receipts ?? []) as ExistingReceipt[];
+      const resolvedReceipts = await Promise.all(
+        rawReceipts.map(async (r) => ({
+          ...r,
+          url: (await resolveMediaUrlAsync(r.url)) ?? r.url,
+        })),
+      );
+      setExistingReceipts(resolvedReceipts);
       setLoadingExpense(false);
     };
 

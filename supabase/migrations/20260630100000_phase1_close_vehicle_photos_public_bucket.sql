@@ -39,6 +39,10 @@ DROP POLICY IF EXISTS "Allow public update vehicle-photos" ON storage.objects;
 DROP POLICY IF EXISTS "Allow public delete vehicle-photos" ON storage.objects;
 
 -- 3) Org/job-scoped SELECT (read/display + createSignedUrl).
+--    The second EXISTS covers LEGACY expense receipts that an older code path
+--    wrote into THIS bucket under `expense-receipts/<expenseId>/...` (current
+--    uploads correctly use the dedicated expense-receipts bucket). They stay
+--    readable by the owning expense's org so no receipt evidence is orphaned.
 CREATE POLICY "vehicle_photos_select_org"
 ON storage.objects FOR SELECT TO authenticated
 USING (
@@ -49,6 +53,11 @@ USING (
       SELECT 1 FROM public.jobs j
       WHERE j.org_id = public.user_org_id()
         AND storage.objects.name LIKE 'jobs/' || j.id::text || '/%'
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.expenses e
+      WHERE e.org_id = public.user_org_id()
+        AND storage.objects.name LIKE 'expense-receipts/' || e.id::text || '/%'
     )
   )
 );
