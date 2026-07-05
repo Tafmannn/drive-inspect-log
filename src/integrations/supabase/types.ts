@@ -348,6 +348,7 @@ export type Database = {
           org_id: string
           photo_url: string | null
           run_id: string | null
+          submission_index: number | null
           submission_session_id: string | null
           x: number | null
           y: number | null
@@ -365,6 +366,7 @@ export type Database = {
           org_id: string
           photo_url?: string | null
           run_id?: string | null
+          submission_index?: number | null
           submission_session_id?: string | null
           x?: number | null
           y?: number | null
@@ -382,6 +384,7 @@ export type Database = {
           org_id?: string
           photo_url?: string | null
           run_id?: string | null
+          submission_index?: number | null
           submission_session_id?: string | null
           x?: number | null
           y?: number | null
@@ -1658,6 +1661,7 @@ export type Database = {
           backend: string
           backend_ref: string | null
           created_at: string
+          damage_item_id: string | null
           id: string
           inspection_id: string | null
           job_id: string
@@ -1674,6 +1678,7 @@ export type Database = {
           backend?: string
           backend_ref?: string | null
           created_at?: string
+          damage_item_id?: string | null
           id?: string
           inspection_id?: string | null
           job_id: string
@@ -1690,6 +1695,7 @@ export type Database = {
           backend?: string
           backend_ref?: string | null
           created_at?: string
+          damage_item_id?: string | null
           id?: string
           inspection_id?: string | null
           job_id?: string
@@ -1702,6 +1708,13 @@ export type Database = {
           url?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "photos_damage_item_id_fkey"
+            columns: ["damage_item_id"]
+            isOneToOne: false
+            referencedRelation: "damage_items"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "photos_inspection_id_fkey"
             columns: ["inspection_id"]
@@ -2447,6 +2460,11 @@ export type Database = {
       }
       next_job_number: { Args: never; Returns: string }
       normalize_client_name: { Args: { input: string }; Returns: string }
+      qr_confirm: {
+        Args: { p_customer_name: string; p_notes?: string; p_token: string }
+        Returns: Json
+      }
+      qr_lookup: { Args: { p_token: string }; Returns: Json }
       reopen_job: {
         Args: { p_job_id: string; p_notes?: string }
         Returns: Json
