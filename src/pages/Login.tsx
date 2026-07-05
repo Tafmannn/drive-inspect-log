@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,9 @@ import { TEST_CREDENTIALS, hasTestCredentials } from "@/dev/testCredentials";
 
 export const Login = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const nextRaw = searchParams.get("next");
+  const next = nextRaw && nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : null;
   const { authEnabled, user } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
