@@ -27,7 +27,17 @@ DO $$
 BEGIN
   IF to_regclass('public.qr_confirmations') IS NOT NULL THEN
     ALTER TABLE public.qr_confirmations ENABLE ROW LEVEL SECURITY;
+    -- Remove ALL permissive anon policies. Besides the original USING(true) one,
+    -- the live DB carries dashboard-created anon policies that are NOT token-
+    -- scoped in RLS: "read by token" allows SELECT of EVERY unconfirmed row
+    -- (all tokens/job ids, cross-org) and "confirm" allows anon UPDATE of any
+    -- unconfirmed row. Both are replaced by the token-keyed SECURITY DEFINER
+    -- RPCs below; the anonymous customer no longer needs direct table access.
     DROP POLICY IF EXISTS "Allow all for anon on qr_confirmations" ON public.qr_confirmations;
+    DROP POLICY IF EXISTS "Anon can read qr_confirmation by token" ON public.qr_confirmations;
+    DROP POLICY IF EXISTS "Anon can confirm qr_confirmation" ON public.qr_confirmations;
+    -- NOTE: "Org members can manage qr_confirmations" (authenticated, org-scoped)
+    -- is intentionally LEFT IN PLACE — admins still manage handovers directly.
   END IF;
 END $$;
 
