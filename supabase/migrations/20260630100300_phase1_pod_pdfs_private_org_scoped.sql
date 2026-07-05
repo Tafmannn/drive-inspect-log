@@ -19,12 +19,24 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('pod-pdfs', 'pod-pdfs', false)
 ON CONFLICT (id) DO UPDATE SET public = false;
 
--- Drop any pre-existing permissive/dashboard policies for this bucket so the
--- org-scoped ones below are authoritative (names unknown; these are the likely
--- defaults — safe no-ops if absent).
+-- Drop pre-existing permissive/dashboard policies for this bucket so the
+-- org-scoped ones below are authoritative. RLS policies are OR'd, so any
+-- bucket-only policy left behind would keep POD PDFs cross-org readable.
+-- The live DB (drift-confirmed) carries these dashboard policies with NO org
+-- check (USING/ WITH CHECK bucket_id='pod-pdfs') — they MUST be dropped:
+DROP POLICY IF EXISTS "Authenticated users can read pod pdfs"   ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated users can update pod pdfs" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated users can upload pod pdfs" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated users can delete pod pdfs" ON storage.objects;
+-- Legacy/guessed names (safe no-ops if absent):
 DROP POLICY IF EXISTS "Allow public read pod-pdfs"   ON storage.objects;
 DROP POLICY IF EXISTS "Allow public upload pod-pdfs" ON storage.objects;
 DROP POLICY IF EXISTS "pod_pdfs_all" ON storage.objects;
+-- Idempotent: drop the org-scoped names too, in case of a partial re-run.
+DROP POLICY IF EXISTS "pod_pdfs_select_org" ON storage.objects;
+DROP POLICY IF EXISTS "pod_pdfs_insert_org" ON storage.objects;
+DROP POLICY IF EXISTS "pod_pdfs_update_org" ON storage.objects;
+DROP POLICY IF EXISTS "pod_pdfs_delete_org" ON storage.objects;
 
 -- Helper predicate inlined: first path segment must be the caller's org uuid.
 CREATE POLICY "pod_pdfs_select_org"
