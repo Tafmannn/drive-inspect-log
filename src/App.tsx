@@ -35,6 +35,7 @@ import { InvoiceGenerator } from "./pages/InvoiceGenerator";
 import { Profile } from "./pages/Profile";
 import { QrConfirm } from "./pages/QrConfirm";
 import { Login } from "./pages/Login";
+import OAuthConsent from "./pages/OAuthConsent";
 import { ForgotPassword } from "./pages/ForgotPassword";
 import { ResetPassword } from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
@@ -201,6 +202,9 @@ const App = () => {
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/confirm" element={<QrConfirm />} />
+                <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
+
+
 
                 {/* ── Protected routes (flat) ── */}
                 <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
