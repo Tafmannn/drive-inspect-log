@@ -24,12 +24,6 @@ verify_jwt = false
 [functions.vehicle-lookup]
 verify_jwt = false
 
-[functions.gcs-fix-acl]
-verify_jwt = false
-
-[functions.promote-admin]
-verify_jwt = false
-
 [functions.assign-driver]
 verify_jwt = false
 

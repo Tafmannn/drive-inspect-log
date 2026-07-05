@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { resolveSignatureUrlSimple } from "@/lib/resolveSignatureUrlSimple";
+import { isVehiclePhotoRef, resolveVehiclePhotoUrl } from "@/lib/vehiclePhotoUrl";
 
 const GCS_PUBLIC_PREFIX = "https://storage.googleapis.com/axentra_db/";
 const GCS_PROXY_ENDPOINT = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gcs-proxy`;
@@ -79,6 +80,18 @@ export async function resolveMediaUrlAsync(
     const resolved = await resolveSignatureUrlSimple(normalizedUrl);
     if (resolved) return resolved;
     console.error("[MediaResolver] Signature resolution failed", {
+      raw: normalizedUrl.slice(0, 180),
+    });
+    return null;
+  }
+
+  // ─── PHOTOS in the private vehicle-photos bucket → Supabase signed URL ───
+  // Legacy internal-backend photos are stored as /object/public/vehicle-photos/
+  // URLs; the bucket is now private, so re-sign (RLS gates cross-org access).
+  if (isVehiclePhotoRef(normalizedUrl)) {
+    const signed = await resolveVehiclePhotoUrl(normalizedUrl);
+    if (signed) return signed;
+    console.error("[MediaResolver] vehicle-photos resolution failed", {
       raw: normalizedUrl.slice(0, 180),
     });
     return null;

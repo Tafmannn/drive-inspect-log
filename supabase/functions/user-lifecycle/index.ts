@@ -979,6 +979,31 @@ serve(async (req) => {
       return json({ success: true });
     }
 
+    // ── CREATE ORG (super-admin only) ──
+    // Authoritative org creation for the Super Admin dashboard. Lives here (not
+    // in the legacy promote-admin function) so ALL super-admin user/org actions
+    // authorize from user_profiles, never JWT metadata.
+    if (action === "create_org") {
+      if (!callerIsSuper) return json({ error: "SUPER_ADMIN_ONLY" }, 403);
+      const { name } = body;
+      if (!name || typeof name !== "string" || !name.trim()) {
+        return json({ error: "NAME_REQUIRED" }, 400);
+      }
+      const { data, error } = await admin
+        .from("organisations")
+        .insert({ name: name.trim() })
+        .select()
+        .single();
+      if (error) return json({ error: error.message }, 500);
+
+      await writeAudit(admin, caller, "create_org", {
+        target_org_id: data.id,
+        after_state: { name: name.trim() },
+      });
+
+      return json({ success: true, org: data });
+    }
+
     // ── SYNC PROFILE ──
     if (action === "sync_profiles") {
       if (!callerIsSuper) return json({ error: "SUPER_ADMIN_ONLY" }, 403);

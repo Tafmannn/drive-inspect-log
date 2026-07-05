@@ -220,7 +220,7 @@ export function SuperAdminUsers() {
       else { await reactivateUser(userId); toast({ title: "User reactivated" }); }
       load();
     } catch (e: any) {
-      const msg = e.message?.includes("CANNOT_MODIFY_SELF") ? "You cannot deactivate your own account." : e.message;
+      const msg = /CANNOT_(MODIFY|SUSPEND)_SELF/.test(e.message ?? "") ? "You cannot deactivate your own account." : e.message;
       toast({ title: "Failed", description: msg, variant: "destructive" });
     } finally { setActionLoading(null); }
   };

@@ -12,6 +12,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { isVehiclePhotoRef, resolveVehiclePhotoUrl } from '@/lib/vehiclePhotoUrl';
 
 const GCS_PUBLIC_PREFIX = 'https://storage.googleapis.com/axentra_db/';
 const SUPABASE_FUNCTIONS_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gcs-proxy`;
@@ -103,6 +104,12 @@ export async function resolveImageUrlAsync(url: string | null | undefined): Prom
 
   if (isBareObjectPath(url)) {
     return buildProxyUrl(url, token);
+  }
+
+  // Legacy internal-backend photos in the now-private vehicle-photos bucket:
+  // re-sign the stored /object/public/ URL (RLS gates cross-org access).
+  if (isVehiclePhotoRef(url)) {
+    return (await resolveVehiclePhotoUrl(url)) ?? null;
   }
 
   return url;

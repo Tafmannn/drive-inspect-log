@@ -23,10 +23,16 @@ const DB_NAME = "axentra.photoDrafts.v1";
 const STORE = "photos";
 const DB_VERSION = 1;
 
+// Bytes are stored as an ArrayBuffer, not a Blob: iOS WebKit can zero out a Blob
+// held in IndexedDB when it reclaims the backing temp file (backgrounding /
+// memory pressure). An ArrayBuffer is copied inline by structured clone and
+// survives. `blob` is retained as optional for reading legacy draft records.
 export interface StoredStandardPhoto {
   /** photoKey, e.g. `pickup_exterior_front` */
   key: string;
-  blob: Blob;
+  bytes?: ArrayBuffer;
+  /** @deprecated legacy records only */
+  blob?: Blob;
   type: string;
   name: string;
 }
@@ -34,7 +40,9 @@ export interface StoredStandardPhoto {
 export interface StoredAdditionalPhoto {
   /** Stable tempId assigned at capture time. */
   tempId: string;
-  blob: Blob;
+  bytes?: ArrayBuffer;
+  /** @deprecated legacy records only */
+  blob?: Blob;
   label: string;
   type: string;
   name: string;
@@ -98,6 +106,7 @@ export async function saveStandardPhoto(
   file: File,
 ): Promise<void> {
   try {
+    const bytes = await file.arrayBuffer();
     const db = await openDb();
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(STORE, "readwrite");
@@ -117,7 +126,7 @@ export async function saveStandardPhoto(
           ...existing,
           standardPhotos: [
             ...existing.standardPhotos.filter((p) => p.key !== photoKey),
-            { key: photoKey, blob: file, type: file.type, name: file.name },
+            { key: photoKey, bytes, type: file.type, name: file.name },
           ],
           updatedAt: Date.now(),
         };
@@ -171,6 +180,7 @@ export async function saveAdditionalPhoto(
   label: string,
 ): Promise<void> {
   try {
+    const bytes = await file.arrayBuffer();
     const db = await openDb();
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(STORE, "readwrite");
@@ -190,7 +200,7 @@ export async function saveAdditionalPhoto(
           ...existing,
           additionalPhotos: [
             ...existing.additionalPhotos.filter((p) => p.tempId !== tempId),
-            { tempId, blob: file, label, type: file.type, name: file.name },
+            { tempId, bytes, label, type: file.type, name: file.name },
           ],
           updatedAt: Date.now(),
         };
@@ -253,7 +263,17 @@ export async function clearPhotoDraft(
   }
 }
 
-/** Helper to convert a stored photo blob back into a File. */
-export function storedToFile(stored: { blob: Blob; type: string; name: string }): File {
-  return new File([stored.blob], stored.name, { type: stored.type });
+/** Helper to convert a stored photo (ArrayBuffer bytes, or legacy Blob) into a File. */
+export function storedToFile(stored: {
+  bytes?: ArrayBuffer;
+  blob?: Blob;
+  type: string;
+  name: string;
+}): File {
+  const parts: BlobPart[] = stored.bytes
+    ? [stored.bytes]
+    : stored.blob
+      ? [stored.blob]
+      : [];
+  return new File(parts, stored.name, { type: stored.type });
 }

@@ -16,11 +16,9 @@ const PRIVILEGED = new Set([
   "assign-driver",
   "get-org-users",
   "user-lifecycle",
-  "promote-admin",
   "gcs-upload",
   "gcs-proxy",
   "resolve-signature-url",
-  "gcs-fix-acl",
   "vision-ocr",
 ]);
 

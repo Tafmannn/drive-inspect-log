@@ -17,38 +17,31 @@ export const QrConfirm = () => {
   const [jobRef, setJobRef] = useState("");
   const [vehicleReg, setVehicleReg] = useState("");
   const [eventType, setEventType] = useState("");
-  const [confirmationId, setConfirmationId] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
     if (!token) { setStatus("error"); return; }
     const load = async () => {
-      const { data, error } = await supabase
-        .from("qr_confirmations")
-        .select("id, event_type, confirmed_at, expires_at, job_id")
-        .eq("token", token)
-        .maybeSingle();
+      // Handover data is served exclusively via a token-keyed SECURITY DEFINER
+      // RPC — the customer is anonymous and has no direct table access.
+      const { data, error } = await supabase.rpc("qr_lookup", { p_token: token });
+      const result = (data ?? {}) as {
+        status?: string; event_type?: string; job_ref?: string; vehicle_reg?: string;
+      };
+      if (error) { setStatus("error"); return; }
 
-      if (error || !data) { setStatus("error"); return; }
-      if (data.confirmed_at) { setStatus("done"); return; }
-      if (new Date(data.expires_at) < new Date()) { setStatus("expired"); return; }
-
-      setConfirmationId(data.id);
-      setEventType(data.event_type);
-
-      // Get job info
-      const { data: job } = await supabase
-        .from("jobs")
-        .select("external_job_number, vehicle_reg")
-        .eq("id", data.job_id)
-        .single();
-
-      if (job) {
-        setJobRef(job.external_job_number || data.job_id.slice(0, 8));
-        setVehicleReg(job.vehicle_reg);
+      switch (result.status) {
+        case "ready":
+          setEventType(result.event_type ?? "");
+          setJobRef(result.job_ref ?? "");
+          setVehicleReg(result.vehicle_reg ?? "");
+          setStatus("ready");
+          break;
+        case "done": setStatus("done"); break;
+        case "expired": setStatus("expired"); break;
+        default: setStatus("error");
       }
-      setStatus("ready");
     };
     load();
   }, [token]);
@@ -56,16 +49,13 @@ export const QrConfirm = () => {
   const handleConfirm = async () => {
     if (!customerName.trim()) return;
     setStatus("confirming");
-    const { error } = await supabase
-      .from("qr_confirmations")
-      .update({
-        confirmed_at: new Date().toISOString(),
-        customer_name: customerName.trim(),
-        notes: notes.trim() || null,
-      })
-      .eq("id", confirmationId);
-
-    setStatus(error ? "error" : "done");
+    const { data, error } = await supabase.rpc("qr_confirm", {
+      p_token: token,
+      p_customer_name: customerName.trim(),
+      p_notes: notes.trim() || null,
+    });
+    const result = (data ?? {}) as { status?: string };
+    setStatus(!error && result.status === "done" ? "done" : "error");
   };
 
   return (
