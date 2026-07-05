@@ -43,8 +43,9 @@ export default function OAuthConsent() {
       const { data, error: err } = await oauth.getAuthorizationDetails(authorizationId);
       if (!active) return;
       if (err) return setError(err.message ?? String(err));
-      const immediate = data?.redirect_url ?? data?.redirect_to;
-      if (immediate && !data?.client) {
+      const d: any = data;
+      const immediate = d?.redirect_url ?? d?.redirect_to;
+      if (immediate && !d?.client) {
         window.location.href = immediate;
         return;
       }
@@ -72,7 +73,7 @@ export default function OAuthConsent() {
       setError(err.message ?? String(err));
       return;
     }
-    const target = data?.redirect_url ?? data?.redirect_to;
+    const target = (data as any)?.redirect_url ?? (data as any)?.redirect_to;
     if (!target) {
       setBusy(false);
       setError("No redirect returned by the authorization server.");
