@@ -24,7 +24,7 @@ export const Login = () => {
   // Redirect if already logged in
   useEffect(() => {
     if (authEnabled && user) {
-      navigate("/", { replace: true });
+      navigate(next ?? "/", { replace: true });
     }
   }, [authEnabled, user, navigate]);
 
@@ -39,7 +39,7 @@ export const Login = () => {
         password,
       });
       if (err) throw err;
-      navigate("/", { replace: true });
+      navigate(next ?? "/", { replace: true });
     } catch (err: unknown) {
       setError(
         err instanceof Error ? err.message : "Something went wrong. Please try again."
