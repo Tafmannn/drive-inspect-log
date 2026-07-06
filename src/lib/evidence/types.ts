@@ -180,6 +180,8 @@ export interface CaptureInput {
   capturedBy?: string | null;
   /** Optional: caller-fixed localId (e.g. to correlate with existing flow). */
   localId?: string;
+  /** Optional extension-point data (e.g. { label } for additional photos). */
+  metadata?: Record<string, unknown>;
 }
 
 /**

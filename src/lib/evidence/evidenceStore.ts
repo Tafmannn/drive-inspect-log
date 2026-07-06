@@ -96,7 +96,7 @@ export async function saveCapture(input: CaptureInput): Promise<EvidenceItem> {
     storagePath: null,
     thumbnailPath: null,
     reviewStatus: "pending",
-    metadata: {},
+    metadata: input.metadata ?? {},
     createdAt: ts,
     updatedAt: ts,
   };

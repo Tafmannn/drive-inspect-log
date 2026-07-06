@@ -60,6 +60,9 @@ import {
 } from "@/lib/storageDiagnostics";
 
 import { JOB_STATUS } from "@/lib/statusConfig";
+import { useEvidenceCapture } from "@/hooks/useEvidenceCapture";
+import { parseLegacyType } from "@/lib/evidence/legacyAdapter";
+import { isFeatureEnabled } from "@/lib/featureFlags";
 import {
   type InspectionFormState,
   INITIAL_INSPECTION_FORM,
@@ -78,7 +81,7 @@ import {
 
 export const InspectionFlow = () => {
   const navigate = useNavigate();
-  const { canUseGallery } = useAuth();
+  const { canUseGallery, user } = useAuth();
   const { jobId, inspectionType } = useParams<{
     jobId: string;
     inspectionType: string;
@@ -94,6 +97,19 @@ export const InspectionFlow = () => {
 
   const { data: job, isLoading: jobLoading } = useJob(jobId ?? "");
   const submitMutation = useSubmitInspection();
+
+  // ── Evidence v2 (flag-gated capture-time save + background upload) ──
+  // When ON, standard/additional photos are durably saved + queued the moment
+  // the driver accepts them; the legacy stage-at-submit pipeline is skipped
+  // for exactly those photos (and remains the fallback if a capture-time save
+  // fails). Damage close-ups always use the legacy path — their linkage to
+  // damage_items is only known at submit. Flag OFF (default) = zero change.
+  const { enabled: evidenceV2, capture: captureEvidence, removeIfNotUploaded } =
+    useEvidenceCapture();
+  /** Standard photo keys owned by the v2 pipeline this session. */
+  const v2StandardKeys = useRef<Set<string>>(new Set());
+  /** Additional photos owned by v2: tempId → evidence localId. */
+  const v2AdditionalIds = useRef<Map<string, string>>(new Map());
 
   const [currentStep, setCurrentStep] = useState(1);
   const [showDamageModal, setShowDamageModal] = useState(false);
@@ -297,10 +313,45 @@ export const InspectionFlow = () => {
           additionalPhotos: [...prev.additionalPhotos, ...restoredAdditional],
         };
       });
+
+      // Evidence v2: after a refresh/reopen the in-memory ownership sets are
+      // gone, so re-register every restored draft with the evidence store.
+      // saveCapture dedupes by content hash — if a photo was already captured
+      // (or even uploaded) this is a no-op; if not, it becomes durably queued.
+      // Rebuilding the sets here keeps the submit-time skip logic correct so
+      // a v2 photo is never double-staged through the legacy queue.
+      if (await isFeatureEnabled("EVIDENCE_V2_ENABLED")) {
+        if (cancelled) return;
+        for (const stored of draft.standardPhotos) {
+          try {
+            const { stage, category } = parseLegacyType(stored.key);
+            await captureEvidence(storedToFile(stored), {
+              jobId,
+              stage: stage ?? type,
+              category: category ?? "additional",
+              capturedBy: user?.id ?? null,
+            });
+            v2StandardKeys.current.add(stored.key);
+          } catch { /* legacy stage-at-submit covers this key */ }
+        }
+        for (const p of draft.additionalPhotos) {
+          try {
+            const item = await captureEvidence(storedToFile(p), {
+              jobId,
+              stage: type,
+              category: "additional",
+              capturedBy: user?.id ?? null,
+              metadata: p.label ? { label: p.label } : {},
+            });
+            v2AdditionalIds.current.set(p.tempId, item.localId);
+          } catch { /* legacy stage-at-submit covers this photo */ }
+        }
+      }
     })();
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot hydrate per (jobId, type); capture deps are stable
   }, [jobId, type]);
 
   // ─── AUTO-POPULATE: prefill driver/customer names ───
@@ -414,6 +465,27 @@ export const InspectionFlow = () => {
     if (jobId) {
       void savePhotoDraftStandard(type, jobId, photoKey, safe);
     }
+    // Evidence v2: durable save + background upload at capture time.
+    // replaceCategory gives retake semantics (supersedes a prior non-uploaded
+    // shot of the same category). On failure we fall back to the legacy
+    // stage-at-submit pipeline for this key — evidence is never lost.
+    if (evidenceV2 && jobId) {
+      try {
+        const { stage, category } = parseLegacyType(photoKey);
+        await captureEvidence(safe, {
+          jobId,
+          stage: stage ?? type,
+          category: category ?? "additional",
+          externalJobNumber: job?.external_job_number ?? null,
+          runId: ((job as { current_run_id?: string | null } | undefined)?.current_run_id ?? null),
+          capturedBy: user?.id ?? null,
+          replaceCategory: true,
+        });
+        v2StandardKeys.current.add(photoKey);
+      } catch {
+        v2StandardKeys.current.delete(photoKey);
+      }
+    }
   };
 
   const addAdditionalPhoto = async (file: File, label: string) => {
@@ -436,6 +508,24 @@ export const InspectionFlow = () => {
     if (jobId) {
       void savePhotoDraftAdditional(type, jobId, draft.tempId, safe, label);
     }
+    // Evidence v2: durable save + background upload at capture time. Label
+    // rides in metadata (extension point) and onto the bridge photos row.
+    if (evidenceV2 && jobId) {
+      try {
+        const item = await captureEvidence(safe, {
+          jobId,
+          stage: type,
+          category: "additional",
+          externalJobNumber: job?.external_job_number ?? null,
+          runId: ((job as { current_run_id?: string | null } | undefined)?.current_run_id ?? null),
+          capturedBy: user?.id ?? null,
+          metadata: label ? { label } : {},
+        });
+        v2AdditionalIds.current.set(draft.tempId, item.localId);
+      } catch {
+        /* legacy stage-at-submit covers this photo */
+      }
+    }
   };
 
   const removeAdditionalPhoto = (tempId: string) => {
@@ -447,6 +537,13 @@ export const InspectionFlow = () => {
     }));
     if (jobId) {
       void removePhotoDraftAdditional(type, jobId, tempId);
+    }
+    // Evidence v2: drop the queued item too (only if it never reached the
+    // server — uploaded evidence is append-only and is never deleted here).
+    const localId = v2AdditionalIds.current.get(tempId);
+    if (localId) {
+      v2AdditionalIds.current.delete(tempId);
+      void removeIfNotUploaded(localId);
     }
   };
 
@@ -679,6 +776,9 @@ export const InspectionFlow = () => {
         for (const pt of photoTypes) {
           const file = formState.standardPhotos[pt.key];
           if (!file) continue;
+          // Evidence v2 owns this photo (durably saved + uploading since
+          // capture time) — never double-stage it through the legacy queue.
+          if (v2StandardKeys.current.has(pt.key)) continue;
           const clientPhotoId = newClientId();
           const item = await stagePendingUpload(file, {
             submissionSessionId,
@@ -694,6 +794,8 @@ export const InspectionFlow = () => {
         // Additional photos
         for (let i = 0; i < formState.additionalPhotos.length; i++) {
           const ap = formState.additionalPhotos[i];
+          // Evidence v2 owns this photo — skip legacy staging (see above).
+          if (v2AdditionalIds.current.has(ap.tempId)) continue;
           const photoKey = type === "pickup" ? "pickup_other" : "delivery_other";
           const clientPhotoId = newClientId();
           const item = await stagePendingUpload(ap.file, {

@@ -48,6 +48,7 @@ import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { useEffect } from "react";
 import { installRetryTriggers, triggerRetry } from "@/lib/retryOrchestrator";
 import { installSubmitQueueDrainer, drainSubmitQueue } from "@/lib/submitQueue";
+import { installEvidenceDrainTriggers, drainEvidenceQueue } from "@/lib/evidence/queueRuntime";
 import { Loader2 } from "lucide-react";
 
 /* ── Command Center imports ── */
@@ -84,6 +85,10 @@ function BackgroundUploader() {
     if (authLoading || !user) return;
     void drainSubmitQueue().finally(() => {
       void triggerRetry("auth_ready");
+      // Evidence v2 uploads (capture-time queue) — independent of the legacy
+      // photo worker; drains regardless of the capture feature flag so a flag
+      // flip never strands queued evidence.
+      void drainEvidenceQueue();
     });
   }, [authLoading, user]);
 
@@ -92,9 +97,11 @@ function BackgroundUploader() {
   useEffect(() => {
     const cleanupRetry = installRetryTriggers();
     const cleanupSubmit = installSubmitQueueDrainer();
+    const cleanupEvidence = installEvidenceDrainTriggers();
     return () => {
       cleanupRetry();
       cleanupSubmit();
+      cleanupEvidence();
     };
   }, []);
 
