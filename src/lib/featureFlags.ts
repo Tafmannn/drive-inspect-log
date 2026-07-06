@@ -5,6 +5,10 @@ const KNOWN_FLAGS = [
   "MAPS_ENABLED",
   "CLOUD_STORAGE_ENABLED",
   "VISION_AI_ENABLED",
+  // Evidence v2 capture path (capture-time save + background upload).
+  // Default OFF; an absent row reads as false. Gates CAPTURE only — the
+  // evidence upload queue always drains, so a flag flip never strands items.
+  "EVIDENCE_V2_ENABLED",
 ] as const;
 
 type FeatureFlagKey = (typeof KNOWN_FLAGS)[number];
