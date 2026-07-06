@@ -14,6 +14,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { EvidenceStatusBadges } from "@/components/EvidenceStatusBadges";
+import { PhotoUploadsStatusGroup } from "@/components/PhotoUploadsStatusGroup";
 import { useNavigate } from "react-router-dom";
 import {
   getPendingUploadsByJob,
@@ -167,6 +168,7 @@ export const PendingUploads = () => {
 
         {jobs.length > 0 && (
           <div className="space-y-2">
+            <PhotoUploadsStatusGroup jobs={jobs} />
             <Button
               onClick={handleRetryAll}
               disabled={retryingAll}
