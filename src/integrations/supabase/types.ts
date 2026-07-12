@@ -650,6 +650,119 @@ export type Database = {
           },
         ]
       }
+      evidence_items: {
+        Row: {
+          archived_at: string | null
+          captured_at: string
+          captured_by: string | null
+          category: string
+          created_at: string
+          damage_item_id: string | null
+          evidence_type: string
+          file_size: number | null
+          hash: string | null
+          height: number | null
+          id: string
+          inspection_id: string | null
+          job_id: string
+          metadata: Json
+          mime_type: string | null
+          org_id: string
+          original_filename: string | null
+          review_status: string
+          run_id: string | null
+          stage: string
+          storage_bucket: string
+          storage_path: string
+          thumbnail_path: string | null
+          updated_at: string
+          width: number | null
+        }
+        Insert: {
+          archived_at?: string | null
+          captured_at: string
+          captured_by?: string | null
+          category: string
+          created_at?: string
+          damage_item_id?: string | null
+          evidence_type?: string
+          file_size?: number | null
+          hash?: string | null
+          height?: number | null
+          id?: string
+          inspection_id?: string | null
+          job_id: string
+          metadata?: Json
+          mime_type?: string | null
+          org_id: string
+          original_filename?: string | null
+          review_status?: string
+          run_id?: string | null
+          stage: string
+          storage_bucket?: string
+          storage_path: string
+          thumbnail_path?: string | null
+          updated_at?: string
+          width?: number | null
+        }
+        Update: {
+          archived_at?: string | null
+          captured_at?: string
+          captured_by?: string | null
+          category?: string
+          created_at?: string
+          damage_item_id?: string | null
+          evidence_type?: string
+          file_size?: number | null
+          hash?: string | null
+          height?: number | null
+          id?: string
+          inspection_id?: string | null
+          job_id?: string
+          metadata?: Json
+          mime_type?: string | null
+          org_id?: string
+          original_filename?: string | null
+          review_status?: string
+          run_id?: string | null
+          stage?: string
+          storage_bucket?: string
+          storage_path?: string
+          thumbnail_path?: string | null
+          updated_at?: string
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evidence_items_damage_item_id_fkey"
+            columns: ["damage_item_id"]
+            isOneToOne: false
+            referencedRelation: "damage_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evidence_items_inspection_id_fkey"
+            columns: ["inspection_id"]
+            isOneToOne: false
+            referencedRelation: "inspections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evidence_items_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evidence_items_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expense_receipts: {
         Row: {
           backend: string
@@ -2460,6 +2573,11 @@ export type Database = {
       }
       next_job_number: { Args: never; Returns: string }
       normalize_client_name: { Args: { input: string }; Returns: string }
+      qr_confirm: {
+        Args: { p_customer_name: string; p_notes?: string; p_token: string }
+        Returns: Json
+      }
+      qr_lookup: { Args: { p_token: string }; Returns: Json }
       reopen_job: {
         Args: { p_job_id: string; p_notes?: string }
         Returns: Json
