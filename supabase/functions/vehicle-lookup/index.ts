@@ -1,10 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
+import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-};
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -15,9 +18,7 @@ serve(async (req) => {
     // ─── Auth ───
     const authHeader = req.headers.get("Authorization") ?? "";
     if (!authHeader.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "UNAUTHENTICATED" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ success: false, error: "UNAUTHENTICATED" }, 401);
     }
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -27,36 +28,26 @@ serve(async (req) => {
     const token = authHeader.replace("Bearer ", "");
     const { data: claimsData, error: authError } = await supabase.auth.getClaims(token);
     if (authError || !claimsData?.claims?.sub) {
-      return new Response(JSON.stringify({ error: "UNAUTHENTICATED" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      console.warn("vehicle-lookup auth failed", authError?.message ?? "missing sub claim");
+      return jsonResponse({ success: false, error: "UNAUTHENTICATED" }, 401);
     }
     // authenticated user is sufficient for DVLA lookup
 
     // ─── Input validation ───
     const body = await req.json();
     if (!body?.registration || typeof body.registration !== "string") {
-      return new Response(
-        JSON.stringify({ error: "BAD_REG" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ success: false, error: "BAD_REG" }, 400);
     }
 
     const DVLA_KEY = Deno.env.get("DVLA_VES_API_KEY");
     if (!DVLA_KEY) {
-      return new Response(
-        JSON.stringify({ success: false, error: "DVLA_VES_API_KEY not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ success: false, error: "DVLA_VES_API_KEY not configured" }, 500);
     }
 
     const registration = body.registration.replace(/\s+/g, "").toUpperCase();
 
     if (registration.length < 2 || registration.length > 8) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Invalid registration" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ success: false, error: "Invalid registration" }, 400);
     }
 
     // Call DVLA VES API
@@ -74,16 +65,10 @@ serve(async (req) => {
       console.error("DVLA lookup failed:", dvlaRes.status, errText);
 
       if (dvlaRes.status === 404) {
-        return new Response(
-          JSON.stringify({ success: false, error: "Vehicle not found" }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return jsonResponse({ success: false, error: "Vehicle not found" });
       }
 
-      return new Response(
-        JSON.stringify({ success: false, error: "DVLA_ERROR" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ success: false, error: "DVLA_ERROR" });
     }
 
     const vehicle = await dvlaRes.json();
@@ -95,8 +80,8 @@ serve(async (req) => {
       year = vehicle.monthOfFirstRegistration.split("-")[0];
     }
 
-    return new Response(
-      JSON.stringify({
+    return jsonResponse(
+      {
         success: true,
         registration: vehicle.registrationNumber || registration,
         make: (vehicle.make || "").toUpperCase(),
@@ -106,14 +91,10 @@ serve(async (req) => {
         engineCapacity: vehicle.engineCapacity || null,
         taxStatus: vehicle.taxStatus || null,
         motStatus: vehicle.motStatus || null,
-      }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      }
     );
   } catch (e: unknown) {
     console.error("vehicle-lookup error:", e);
-    return new Response(
-      JSON.stringify({ success: false, error: e instanceof Error ? e.message : String(e) }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ success: false, error: e instanceof Error ? e.message : String(e) }, 500);
   }
 });
