@@ -8,6 +8,42 @@ const corsHeaders = {
 
 const UK_POSTCODE_RE = /^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i;
 
+function parseNominatimAddress(item: any, fallbackPostcode: string, index: number) {
+  const address = item?.address || {};
+  const house = address.house_number || address.house_name || address.building || "";
+  const street = address.road || address.pedestrian || address.footway || address.suburb || "";
+  const line1 = [house, street].filter(Boolean).join(" ") || item?.display_name?.split(",")?.[0]?.trim() || fallbackPostcode;
+  const town = address.city || address.town || address.village || address.hamlet || address.county || "";
+  const postcode = address.postcode || fallbackPostcode;
+  return {
+    id: item.place_id ? `nominatim:${item.place_id}:${index}` : `nominatim-${index}`,
+    label: item.display_name || [line1, town, postcode].filter(Boolean).join(", "),
+    line1,
+    town,
+    postcode,
+  };
+}
+
+async function lookupPostcodeWithNominatim(postcode: string) {
+  const url = new URL("https://nominatim.openstreetmap.org/search");
+  url.searchParams.set("format", "jsonv2");
+  url.searchParams.set("addressdetails", "1");
+  url.searchParams.set("countrycodes", "gb");
+  url.searchParams.set("limit", "10");
+  url.searchParams.set("postalcode", postcode);
+
+  const resp = await fetch(url.toString(), {
+    headers: {
+      "Accept": "application/json",
+      "User-Agent": "AxentraVehicleLogistics/1.0 (postcode-lookup)",
+    },
+  });
+  if (!resp.ok) return [];
+  const data = await resp.json();
+  if (!Array.isArray(data)) return [];
+  return data.map((item: any, i: number) => parseNominatimAddress(item, postcode, i));
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -90,6 +126,13 @@ serve(async (req) => {
       const geoData = await geoResp.json();
 
       if (geoData.status !== "OK" || !geoData.results?.length) {
+        const fallbackResults = await lookupPostcodeWithNominatim(normalised);
+        if (fallbackResults.length) {
+          return new Response(
+            JSON.stringify({ results: fallbackResults }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
         return new Response(
           JSON.stringify({ results: [], error: "No addresses found" }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }

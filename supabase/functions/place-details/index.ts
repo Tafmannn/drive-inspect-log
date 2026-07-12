@@ -29,6 +29,21 @@ function parsedDetailsFromGeocodeResult(result: any) {
   };
 }
 
+function parsedDetailsFromNominatim(item: any) {
+  const address = item?.address || {};
+  const house = [address.house_name, address.house_number].filter(Boolean).join(" ");
+  const street = address.road || address.pedestrian || address.footway || "";
+  const line1 = [house, street].filter(Boolean).join(" ") || item?.display_name?.split(",")?.[0]?.trim() || "";
+  const city = address.city || address.town || address.village || address.hamlet || address.county || "";
+  const postcode = address.postcode || "";
+  return {
+    name: item?.name || line1,
+    types: [item?.type, item?.class].filter(Boolean),
+    parsedAddress: { house, street, line1, city, postcode },
+    phone: null,
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -77,6 +92,27 @@ serve(async (req) => {
     }
 
     const geocodePlaceId = placeId.startsWith("geocode:") ? placeId.replace("geocode:", "") : "";
+    const nominatimPlaceId = placeId.startsWith("nominatim:") ? placeId.split(":")[1] : "";
+    if (nominatimPlaceId) {
+      const nominatimUrl = new URL("https://nominatim.openstreetmap.org/lookup");
+      nominatimUrl.searchParams.set("format", "jsonv2");
+      nominatimUrl.searchParams.set("addressdetails", "1");
+      nominatimUrl.searchParams.set("osm_ids", `N${nominatimPlaceId}`);
+      const nominatimResp = await fetch(nominatimUrl.toString(), {
+        headers: {
+          "Accept": "application/json",
+          "User-Agent": "AxentraVehicleLogistics/1.0 (place-details)",
+        },
+      });
+      const nominatimData = await nominatimResp.json();
+      if (Array.isArray(nominatimData) && nominatimData[0]) {
+        return new Response(
+          JSON.stringify(parsedDetailsFromNominatim(nominatimData[0])),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     if (geocodePlaceId) {
       const geoUrl = new URL("https://maps.googleapis.com/maps/api/geocode/json");
       geoUrl.searchParams.set("place_id", geocodePlaceId);

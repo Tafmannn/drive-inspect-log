@@ -24,6 +24,47 @@ function parseGeocodeAddress(result: any, fallbackPostcode = "") {
   return { line1, city: postalTown, postcode };
 }
 
+function parseNominatimAddress(item: any, fallbackPostcode = "") {
+  const address = item?.address || {};
+  const house = address.house_number || address.house_name || address.building || "";
+  const street = address.road || address.pedestrian || address.footway || address.suburb || "";
+  const line1 = [house, street].filter(Boolean).join(" ") || item?.name || item?.display_name?.split(",")?.[0]?.trim() || "";
+  const city = address.city || address.town || address.village || address.hamlet || address.county || "";
+  const postcode = address.postcode || item?.display_name?.match(UK_POSTCODE_RE)?.[0]?.toUpperCase() || fallbackPostcode.toUpperCase();
+  return { line1, city, postcode };
+}
+
+async function searchNominatim(query: string, postcode?: string) {
+  const url = new URL("https://nominatim.openstreetmap.org/search");
+  url.searchParams.set("format", "jsonv2");
+  url.searchParams.set("addressdetails", "1");
+  url.searchParams.set("countrycodes", "gb");
+  url.searchParams.set("limit", "8");
+  url.searchParams.set("q", [query.trim(), postcode?.trim()].filter(Boolean).join(" "));
+
+  const resp = await fetch(url.toString(), {
+    headers: {
+      "Accept": "application/json",
+      "User-Agent": "AxentraVehicleLogistics/1.0 (business-search)",
+    },
+  });
+  if (!resp.ok) return [];
+  const data = await resp.json();
+  if (!Array.isArray(data)) return [];
+  return data.map((item: any, i: number) => {
+    const parsed = parseNominatimAddress(item, postcode || "");
+    return {
+      placeId: item.place_id ? `nominatim:${item.place_id}:${i}` : `nominatim-${i}`,
+      name: item.name || query.trim(),
+      address: item.display_name || "",
+      types: [item.type, item.class].filter(Boolean),
+      line1: parsed.line1,
+      city: parsed.city,
+      postcode: parsed.postcode,
+    };
+  });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -164,6 +205,13 @@ serve(async (req) => {
           const geoData = await geoResp.json();
           if (geoData.status !== "OK" || !geoData.results?.length) {
             console.log("business-search geocode fallback empty. status:", geoData.status, "err:", geoData.error_message);
+            const nominatimResults = await searchNominatim(query, postcode);
+            if (nominatimResults.length) {
+              return new Response(
+                JSON.stringify({ results: nominatimResults }),
+                { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+              );
+            }
             return new Response(
               JSON.stringify({ results: [] }),
               { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
