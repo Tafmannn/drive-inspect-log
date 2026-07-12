@@ -396,9 +396,14 @@ export const PodReport = () => {
         amount: Number(e.amount),
         billable_on_pod: (e as any).billable_on_pod ?? true,
       }));
-      await emailPodPdf(job, billable);
+      const result = await emailPodPdf(job, billable);
 
-      if (!navigator.share) {
+      if (result.method === "resend") {
+        toast({
+          title: "POD emailed",
+          description: `Sent directly to ${result.recipient}.`,
+        });
+      } else if (!navigator.share) {
         toast({
           title: "PDF downloaded — attach it to your email",
           description:

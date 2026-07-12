@@ -1033,10 +1033,15 @@ export async function sharePodPdf(
   }
 }
 
+export type EmailPodResult =
+  | { method: "resend"; recipient: string }
+  | { method: "share" }
+  | { method: "mailto" };
+
 export async function emailPodPdf(
   job: JobWithRelations,
   expenses?: PodExpense[]
-): Promise<void> {
+): Promise<EmailPodResult> {
   const blob = await generatePodPdf(job, expenses);
   const ref = job.external_job_number || job.id.slice(0, 8).toUpperCase();
   const sanitizedReg = clean(job.vehicle_reg, "UNKNOWN").replace(/\s+/g, "");
@@ -1093,6 +1098,35 @@ export async function emailPodPdf(
         debugLog("Supabase upload failed", uploadError);
       }
     }
+
+    // Prefer sending a real HTML email with a clean "Download POD" link
+    // directly via the send-pod-email edge function (Resend) when we have
+    // both a recipient on file and a download link. Falls through to the
+    // navigator.share/mailto flow below on any failure — missing recipient,
+    // RESEND_API_KEY not configured yet, network error, etc. — so the
+    // feature never appears broken while that setup is pending.
+    const recipient = job.delivery_contact_email || job.pickup_contact_email;
+    if (recipient && downloadLink) {
+      try {
+        const { data, error } = await supabase.functions.invoke("send-pod-email", {
+          body: {
+            to: recipient,
+            jobRef: ref,
+            vehicleReg: job.vehicle_reg,
+            pickupCity: job.pickup_city,
+            deliveryCity: job.delivery_city,
+            dateStr,
+            downloadUrl: downloadLink,
+          },
+        });
+        if (!error && data?.sent) {
+          return { method: "resend", recipient };
+        }
+        debugLog("send-pod-email did not confirm sent — falling back", error || data);
+      } catch (error) {
+        debugLog("send-pod-email invoke failed — falling back", error);
+      }
+    }
   } catch (error) {
     debugLog("Supabase upload exception", error);
   }
@@ -1119,13 +1153,14 @@ export async function emailPodPdf(
   if (navigator.share) {
     try {
       await navigator.share({ title: subject, text: body });
-      return;
+      return { method: "share" };
     } catch (error: unknown) {
-      if (error instanceof Error && error.name === "AbortError") return;
+      if (error instanceof Error && error.name === "AbortError") return { method: "share" };
       debugLog("navigator.share failed", error);
     }
   }
 
   const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   window.open(mailto, "_blank");
+  return { method: "mailto" };
 }
