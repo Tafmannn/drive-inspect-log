@@ -7,6 +7,10 @@ export interface BusinessResult {
   name: string;
   address: string;
   types: string[];
+  line1?: string;
+  city?: string;
+  postcode?: string;
+  phone?: string | null;
 }
 
 export interface PlaceDetails {

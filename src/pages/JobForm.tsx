@@ -342,8 +342,35 @@ export const JobForm = () => {
       }
     };
 
+    const applyAddressFallback = () => {
+      const parts = (result.address || "").split(",").map((p) => p.trim()).filter(Boolean);
+      const postcodeMatch = result.address?.match(/\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/i);
+      const fallbackLine1 = result.line1 || parts[0] || "";
+      const fallbackCity = result.city || parts.find((p) => !postcodeMatch?.[0] || !p.includes(postcodeMatch[0])) || "";
+      const fallbackPostcode = result.postcode || postcodeMatch?.[0]?.toUpperCase() || "";
+
+      if (fallbackLine1) setVal(`${side}_address_line1`, fallbackLine1);
+      if (fallbackCity) setVal(`${side}_city`, fallbackCity);
+      if (fallbackPostcode) setVal(`${side}_postcode`, fallbackPostcode);
+      if (result.phone) {
+        const phoneEl = fields.namedItem(`${side}_contact_phone`) as HTMLInputElement | null;
+        if (phoneEl && !phoneEl.value.trim()) setVal(`${side}_contact_phone`, result.phone);
+      }
+
+      if (fallbackPostcode) {
+        const fd = new FormData(formRef.current!);
+        const pickupPC = side === "pickup" ? fallbackPostcode : (fd.get("pickup_postcode") as string || "");
+        const deliveryPC = side === "delivery" ? fallbackPostcode : (fd.get("delivery_postcode") as string || "");
+        if (pickupPC && deliveryPC) triggerRouteCalc(pickupPC, deliveryPC);
+      }
+    };
+
     const details = await getPlaceDetails(result.placeId);
-    if (!details) return;
+    if (!details) {
+      applyAddressFallback();
+      saveDraftFromForm();
+      return;
+    }
 
     const addr = details.parsedAddress;
 

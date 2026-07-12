@@ -6,26 +6,58 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
+function parsedDetailsFromGeocodeResult(result: any) {
+  const components = result?.address_components || [];
+  const getComp = (type: string): string =>
+    components.find((c: any) => c.types?.includes(type))?.long_name || "";
+
+  const subpremise = getComp("subpremise");
+  const premise = getComp("premise");
+  const streetNumber = getComp("street_number");
+  const route = getComp("route");
+  const city = getComp("postal_town") || getComp("locality") || getComp("administrative_area_level_2") || "";
+  const postcode = getComp("postal_code") || "";
+  const house = [subpremise, premise, streetNumber].filter(Boolean).join(" ");
+  const street = route || "";
+  const line1 = [house, street].filter(Boolean).join(" ") || result?.formatted_address?.split(",")?.[0]?.trim() || "";
+
+  return {
+    name: result?.formatted_address?.split(",")?.[0]?.trim() || "",
+    types: result?.types || [],
+    parsedAddress: { house, street, line1, city, postcode },
+    phone: null,
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // ─── Auth ───
+    // ─── Optional auth ───
     const authHeader = req.headers.get("Authorization") ?? "";
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-    if (authError || !authData?.user) {
-      return new Response(JSON.stringify({ error: "UNAUTHENTICATED" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    const isPublicCall = !authHeader || authHeader === `Bearer ${supabaseAnonKey}`;
+    if (!isPublicCall) {
+      if (!authHeader.startsWith("Bearer ")) {
+        return new Response(JSON.stringify({ error: "UNAUTHENTICATED" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } },
       });
+      const token = authHeader.replace("Bearer ", "");
+      const { data: claimsData, error: authError } = await supabase.auth.getClaims(token);
+      if (authError || !claimsData?.claims?.sub) {
+        return new Response(JSON.stringify({ error: "UNAUTHENTICATED" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
-    // authenticated user is sufficient for place details lookup
+    // Public and authenticated sessions can both use place details lookup.
 
     // ─── Original logic ───
     const MAPS_KEY = Deno.env.get("GOOGLE_MAPS_API_KEY");
@@ -44,6 +76,21 @@ serve(async (req) => {
       );
     }
 
+    const geocodePlaceId = placeId.startsWith("geocode:") ? placeId.replace("geocode:", "") : "";
+    if (geocodePlaceId) {
+      const geoUrl = new URL("https://maps.googleapis.com/maps/api/geocode/json");
+      geoUrl.searchParams.set("place_id", geocodePlaceId);
+      geoUrl.searchParams.set("key", MAPS_KEY);
+      const geoResp = await fetch(geoUrl.toString());
+      const geoData = await geoResp.json();
+      if (geoData.status === "OK" && geoData.results?.[0]) {
+        return new Response(
+          JSON.stringify(parsedDetailsFromGeocodeResult(geoData.results[0])),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     const resp = await fetch(
       `https://places.googleapis.com/v1/places/${placeId}`,
       {
@@ -58,6 +105,17 @@ serve(async (req) => {
     const place = await resp.json();
 
     if (!place.displayName) {
+      const geoUrl = new URL("https://maps.googleapis.com/maps/api/geocode/json");
+      geoUrl.searchParams.set("place_id", placeId);
+      geoUrl.searchParams.set("key", MAPS_KEY);
+      const geoResp = await fetch(geoUrl.toString());
+      const geoData = await geoResp.json();
+      if (geoData.status === "OK" && geoData.results?.[0]) {
+        return new Response(
+          JSON.stringify(parsedDetailsFromGeocodeResult(geoData.results[0])),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       return new Response(
         JSON.stringify({ error: "Place not found" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }

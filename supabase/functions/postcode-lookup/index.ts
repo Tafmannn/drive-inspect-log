@@ -14,26 +14,29 @@ serve(async (req) => {
   }
 
   try {
-    // ─── Auth ───
+    // ─── Optional auth ───
     const authHeader = req.headers.get("Authorization") ?? "";
-    if (!authHeader.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "UNAUTHENTICATED" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: authError } = await supabase.auth.getClaims(token);
-    if (authError || !claimsData?.claims?.sub) {
-      return new Response(JSON.stringify({ error: "UNAUTHENTICATED" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    const isPublicCall = !authHeader || authHeader === `Bearer ${supabaseAnonKey}`;
+    if (!isPublicCall) {
+      if (!authHeader.startsWith("Bearer ")) {
+        return new Response(JSON.stringify({ error: "UNAUTHENTICATED" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } },
       });
+      const token = authHeader.replace("Bearer ", "");
+      const { data: claimsData, error: authError } = await supabase.auth.getClaims(token);
+      if (authError || !claimsData?.claims?.sub) {
+        return new Response(JSON.stringify({ error: "UNAUTHENTICATED" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
-    // authenticated user is sufficient for postcode lookup
+    // Public and authenticated sessions can both use postcode lookup.
 
     // ─── Original logic ───
     const MAPS_KEY = Deno.env.get("GOOGLE_MAPS_API_KEY");

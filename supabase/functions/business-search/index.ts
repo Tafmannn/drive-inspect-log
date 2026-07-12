@@ -6,32 +6,53 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
+const UK_POSTCODE_RE = /\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/i;
+
+function parseGeocodeAddress(result: any, fallbackPostcode = "") {
+  const components = result?.address_components || [];
+  const getComp = (type: string) =>
+    components.find((c: any) => c.types?.includes(type))?.long_name || "";
+  const streetNum = getComp("street_number");
+  const route = getComp("route");
+  const premise = getComp("premise");
+  const subpremise = getComp("subpremise");
+  const postalTown = getComp("postal_town") || getComp("locality") || getComp("administrative_area_level_2") || "";
+  const formatted = result?.formatted_address || "";
+  const postcode = getComp("postal_code") || formatted.match(UK_POSTCODE_RE)?.[0]?.toUpperCase() || fallbackPostcode.toUpperCase();
+  const firstLine = formatted.split(",")[0]?.trim() || "";
+  const line1 = [subpremise, premise, streetNum, route].filter(Boolean).join(" ") || firstLine;
+  return { line1, city: postalTown, postcode };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // ─── Auth ───
+    // ─── Optional auth ───
     const authHeader = req.headers.get("Authorization") ?? "";
-    if (!authHeader.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "UNAUTHENTICATED" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error } = await supabase.auth.getClaims(token);
-    if (error || !claimsData?.claims?.sub) {
-      return new Response(JSON.stringify({ error: "UNAUTHENTICATED" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    const isPublicCall = !authHeader || authHeader === `Bearer ${supabaseAnonKey}`;
+    if (!isPublicCall) {
+      if (!authHeader.startsWith("Bearer ")) {
+        return new Response(JSON.stringify({ error: "UNAUTHENTICATED" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } },
       });
+      const token = authHeader.replace("Bearer ", "");
+      const { data: claimsData, error } = await supabase.auth.getClaims(token);
+      if (error || !claimsData?.claims?.sub) {
+        return new Response(JSON.stringify({ error: "UNAUTHENTICATED" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
-    // authenticated user is sufficient for company search
+    // Public and authenticated sessions can both use company search.
 
     // ─── Original logic ───
     const MAPS_KEY = Deno.env.get("GOOGLE_MAPS_API_KEY");
@@ -128,24 +149,55 @@ serve(async (req) => {
       if (!data2.places?.length) {
         // Legacy Places Text Search fallback (in case Places API New is not enabled)
         const legacyUrl = new URL("https://maps.googleapis.com/maps/api/place/textsearch/json");
-        legacyUrl.searchParams.set("query", query.trim());
+        legacyUrl.searchParams.set("query", [query.trim(), postcode?.trim()].filter(Boolean).join(" "));
         legacyUrl.searchParams.set("region", "gb");
         legacyUrl.searchParams.set("key", MAPS_KEY);
         const legacyResp = await fetch(legacyUrl.toString());
         const legacyData = await legacyResp.json();
         if (legacyData.status !== "OK" || !legacyData.results?.length) {
           console.log("business-search legacy fallback empty. status:", legacyData.status, "err:", legacyData.error_message);
+          const geoUrl = new URL("https://maps.googleapis.com/maps/api/geocode/json");
+          geoUrl.searchParams.set("address", [query.trim(), postcode?.trim(), "UK"].filter(Boolean).join(" "));
+          geoUrl.searchParams.set("components", "country:GB");
+          geoUrl.searchParams.set("key", MAPS_KEY);
+          const geoResp = await fetch(geoUrl.toString());
+          const geoData = await geoResp.json();
+          if (geoData.status !== "OK" || !geoData.results?.length) {
+            console.log("business-search geocode fallback empty. status:", geoData.status, "err:", geoData.error_message);
+            return new Response(
+              JSON.stringify({ results: [] }),
+              { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+          const geocodeResults = geoData.results.slice(0, 8).map((r: any, i: number) => {
+            const parsed = parseGeocodeAddress(r, postcode || "");
+            return {
+              placeId: r.place_id ? `geocode:${r.place_id}` : `geocode-${i}`,
+              name: query.trim(),
+              address: r.formatted_address || "",
+              types: r.types || [],
+              line1: parsed.line1,
+              city: parsed.city,
+              postcode: parsed.postcode,
+            };
+          });
           return new Response(
-            JSON.stringify({ results: [] }),
+            JSON.stringify({ results: geocodeResults }),
             { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
-        const legacyResults = legacyData.results.slice(0, 8).map((p: any) => ({
-          placeId: p.place_id,
-          name: p.name || "",
-          address: p.formatted_address || "",
-          types: p.types || [],
-        }));
+        const legacyResults = legacyData.results.slice(0, 8).map((p: any) => {
+          const parsed = parseGeocodeAddress({ formatted_address: p.formatted_address, address_components: [] }, postcode || "");
+          return {
+            placeId: p.place_id,
+            name: p.name || "",
+            address: p.formatted_address || "",
+            types: p.types || [],
+            line1: parsed.line1,
+            city: parsed.city,
+            postcode: parsed.postcode,
+          };
+        });
         return new Response(
           JSON.stringify({ results: legacyResults }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
