@@ -181,6 +181,8 @@ export interface Photo {
   run_id?: string | null;
   /** Soft-archive marker set when an admin reopens a job. */
   archived_at?: string | null;
+  /** Durable link to the damage_items row this close-up photo belongs to. */
+  damage_item_id?: string | null;
 }
 
 export interface JobActivityLog {
