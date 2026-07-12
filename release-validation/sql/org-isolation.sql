@@ -13,7 +13,12 @@
 \set ON_ERROR_STOP on
 
 -- Resolve the test driver into a temp table so both statements agree.
-CREATE TEMP TABLE _vd ON COMMIT DROP AS
+-- No ON COMMIT DROP: psql runs in autocommit mode (each statement is its
+-- own implicit transaction), so ON COMMIT DROP would drop this table the
+-- instant the CREATE statement commits, before any later statement could
+-- see it. A plain TEMP TABLE lives for the psql session and is cleaned up
+-- automatically when the connection closes at the end of this script.
+CREATE TEMP TABLE _vd AS
 SELECT auth_user_id, org_id
 FROM public.user_profiles
 WHERE role = 'driver' AND org_id IS NOT NULL
