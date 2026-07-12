@@ -1,10 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-};
+import { authenticateCaller, corsHeaders } from "../_shared/auth.ts";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -16,15 +11,28 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
+// Only http(s) links belong in the "Download POD" button. Reject anything else
+// (javascript:, data:, etc.) so a malformed/hostile downloadUrl can never become
+// a live link, and attribute-escape the value like every other interpolation.
+function safeHref(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    return escapeHtml(url);
+  } catch {
+    return null;
+  }
+}
+
 function renderHtml(opts: {
   jobRef: string;
   vehicleReg: string;
   pickupCity: string;
   deliveryCity: string;
   dateStr: string;
-  downloadUrl: string;
+  downloadHref: string;
 }): string {
-  const { jobRef, vehicleReg, pickupCity, deliveryCity, dateStr, downloadUrl } = opts;
+  const { jobRef, vehicleReg, pickupCity, deliveryCity, dateStr, downloadHref } = opts;
   return `<!doctype html>
 <html>
   <body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
@@ -47,7 +55,7 @@ function renderHtml(opts: {
                 <p style="margin:0 0 4px;"><strong>Route:</strong> ${escapeHtml(pickupCity)} &rarr; ${escapeHtml(deliveryCity)}</p>
                 <p style="margin:0 0 24px;"><strong>Date:</strong> ${escapeHtml(dateStr)}</p>
                 <p style="margin:0 0 24px;text-align:center;">
-                  <a href="${downloadUrl}"
+                  <a href="${downloadHref}"
                      style="background:#111827;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:bold;display:inline-block;">
                     Download POD
                   </a>
@@ -71,27 +79,13 @@ serve(async (req) => {
   }
 
   try {
-    // ─── Auth: requires a real signed-in user (this sends email on the
-    // org's behalf, never a public/anon action). Uses getClaims — getUser()
-    // stopped validating correctly under the newer signing-keys JWT setup.
-    const authHeader = req.headers.get("Authorization") ?? "";
-    if (!authHeader.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "UNAUTHENTICATED" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: authError } = await supabase.auth.getClaims(token);
-    if (authError || !claimsData?.claims?.sub) {
-      return new Response(JSON.stringify({ error: "UNAUTHENTICATED" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // ─── Auth: requires a real signed-in user with a resolvable org (this
+    // sends email — and reads job contact details — on the org's behalf,
+    // never a public/anon action). Same authoritative caller/org resolution
+    // as every other edge function, via _shared/auth.ts.
+    const authResult = await authenticateCaller(req);
+    if ("error" in authResult) return authResult.error;
+    const { caller, admin } = authResult;
 
     const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
     if (!RESEND_API_KEY) {
@@ -103,7 +97,7 @@ serve(async (req) => {
     const fromAddress = Deno.env.get("POD_EMAIL_FROM") || "Axentra Vehicle Logistics <onboarding@resend.dev>";
 
     const body = await req.json();
-    const { to, jobRef, vehicleReg, pickupCity, deliveryCity, dateStr, downloadUrl } = body ?? {};
+    const { to, jobId, jobRef, vehicleReg, pickupCity, deliveryCity, dateStr, downloadUrl } = body ?? {};
 
     if (!to || typeof to !== "string" || !EMAIL_RE.test(to)) {
       return new Response(
@@ -111,10 +105,44 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    if (!downloadUrl || typeof downloadUrl !== "string") {
+    if (!jobId || typeof jobId !== "string") {
       return new Response(
-        JSON.stringify({ error: "downloadUrl is required" }),
+        JSON.stringify({ error: "jobId is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    const downloadHref = typeof downloadUrl === "string" ? safeHref(downloadUrl) : null;
+    if (!downloadHref) {
+      return new Response(
+        JSON.stringify({ error: "A valid http(s) downloadUrl is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ─── Authorization: this sends on the org's behalf via a shared sending
+    // identity/reputation, so a caller must not be able to reach jobs outside
+    // their own org, or redirect delivery to an address that isn't actually
+    // on file for the job (an open relay via the org's Resend account).
+    const { data: job } = await admin
+      .from("jobs")
+      .select("org_id, pickup_contact_email, delivery_contact_email")
+      .eq("id", jobId)
+      .maybeSingle();
+
+    if (!job || (!caller.isSuperAdmin && job.org_id !== caller.orgId)) {
+      return new Response(
+        JSON.stringify({ error: "FORBIDDEN" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const onFileEmails = [job.pickup_contact_email, job.delivery_contact_email]
+      .filter((e): e is string => typeof e === "string" && e.length > 0)
+      .map((e) => e.toLowerCase());
+    if (!onFileEmails.includes(to.toLowerCase())) {
+      return new Response(
+        JSON.stringify({ error: "Recipient must be a contact email on file for this job" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -125,7 +153,7 @@ serve(async (req) => {
       pickupCity: String(pickupCity ?? "Unknown"),
       deliveryCity: String(deliveryCity ?? "Unknown"),
       dateStr: String(dateStr ?? ""),
-      downloadUrl: String(downloadUrl),
+      downloadHref,
     });
 
     const resendResp = await fetch("https://api.resend.com/emails", {

@@ -1111,6 +1111,7 @@ export async function emailPodPdf(
         const { data, error } = await supabase.functions.invoke("send-pod-email", {
           body: {
             to: recipient,
+            jobId: job.id,
             jobRef: ref,
             vehicleReg: job.vehicle_reg,
             pickupCity: job.pickup_city,
