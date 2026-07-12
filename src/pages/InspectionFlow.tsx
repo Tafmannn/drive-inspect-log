@@ -616,7 +616,7 @@ export const InspectionFlow = () => {
           try { sessionStorage.removeItem(sessionKey); } catch { /* ignore */ }
           setSubmitting(false);
           submitInFlight.current = false;
-          navigate(`/jobs/${jobId}`);
+          navigate(`/jobs/${jobId}${window.location.search}`);
           return;
         }
       } catch {
@@ -868,7 +868,7 @@ export const InspectionFlow = () => {
         if (dk) clearDraft(dk);
         if (jobId) void clearPhotoDraft(type, jobId);
         try { sessionStorage.removeItem(sessionKey); } catch { /* ignore */ }
-        navigate(`/jobs/${jobId}`);
+        navigate(`/jobs/${jobId}${window.location.search}`);
       };
 
       // ── 4a) OFFLINE / NETWORK-DROP SHORT-CIRCUIT ──
@@ -982,7 +982,7 @@ export const InspectionFlow = () => {
         if (dk) clearDraft(dk);
         if (jobId) void clearPhotoDraft(type, jobId);
         try { sessionStorage.removeItem(sessionKey); } catch { /* ignore */ }
-        navigate(`/jobs/${jobId}`);
+        navigate(`/jobs/${jobId}${window.location.search}`);
         return;
       }
 
@@ -1099,7 +1099,7 @@ export const InspectionFlow = () => {
       if (dk) clearDraft(dk);
       if (jobId) void clearPhotoDraft(type, jobId);
       try { sessionStorage.removeItem(sessionKey); } catch { /* ignore */ }
-      navigate(`/jobs/${jobId}`);
+      navigate(`/jobs/${jobId}${window.location.search}`);
     } catch {
       toast({ title: "Submission failed. Please try again.", variant: "destructive" });
     } finally {

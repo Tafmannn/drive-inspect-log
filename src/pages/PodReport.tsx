@@ -12,7 +12,6 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useSafeBack } from "@/hooks/useSafeBack";
 import { useQueryClient } from "@tanstack/react-query";
 import { invalidateForEvent } from "@/lib/mutationEvents";
-// resolveBackTarget removed — using navigate(-1) for natural back behavior
 import {
   Loader2,
   Mail,
@@ -123,8 +122,8 @@ const SignatureCard = ({
 export const PodReport = () => {
   const navigate = useNavigate();
   const { jobId } = useParams<{ jobId: string }>();
-  const goBack = useSafeBack(jobId ? `/jobs/${jobId}` : "/jobs");
   const [searchParams] = useSearchParams();
+  const goBack = useSafeBack(jobId ? `/jobs/${jobId}` : "/jobs", searchParams);
   const { data: job, isLoading } = useJob(jobId ?? "");
   const { data: jobExpenses } = useJobExpenses(jobId ?? "");
   const { isAdmin, isSuperAdmin } = useAuth();

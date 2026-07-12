@@ -243,7 +243,7 @@ export function ControlClients() {
           data={clients ?? []}
           loading={isLoading}
           emptyMessage="No clients found. Create your first client profile."
-          onRowClick={(row) => navigate(`/admin/clients/${row.id}`)}
+          onRowClick={(row) => navigate(`/control/clients/${row.id}`)}
         />
       </ControlSection>
 

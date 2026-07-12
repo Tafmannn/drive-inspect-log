@@ -152,7 +152,7 @@ export default function ClientProfileDetail() {
 
       <div className="fixed bottom-16 inset-x-0 px-4 py-3 bg-background/95 backdrop-blur border-t border-border z-30 lg:bottom-0">
         <div className="max-w-lg mx-auto">
-          <Button className="w-full min-h-[48px]" onClick={() => navigate(`/admin/clients/${clientId}/complete`)}>
+          <Button className="w-full min-h-[48px]" onClick={() => navigate(`/control/clients/${clientId}/complete`)}>
             <Pencil className="w-4 h-4 mr-2" />
             {completion.pct >= 100 ? "Edit profile" : "Resume onboarding"}
           </Button>
