@@ -5,6 +5,13 @@ import { FUEL_PERCENT_TO_LABEL } from "./types";
 import { CHECKLIST_FIELDS } from "./inspectionFields";
 import { resolveImageUrlAsync } from "./gcsProxyUrl";
 import { canonicalisePhotos } from "./photoDedupe";
+import { PHOTO_TYPES_BY_INSPECTION } from "@/features/inspection/inspectionFormConfig";
+
+const PHOTO_TYPE_LABELS: Record<string, string> = Object.fromEntries(
+  [...PHOTO_TYPES_BY_INSPECTION.pickup, ...PHOTO_TYPES_BY_INSPECTION.delivery].map(
+    (p) => [p.key, p.label]
+  )
+);
 
 const MARGIN = 20;
 const HEADER_HEIGHT = 30;
@@ -583,12 +590,8 @@ function renderPhotosGrid(
   const photoWidth = (contentWidth - 6) / 3;
   const photoHeight = photoWidth * 0.75;
 
-  y = addSectionTitle(doc, title, y);
-  y = ensureSpace(doc, y, 14);
-
-  setTextStyle(doc, { size: 9, style: "bold", color: PDF_THEME.dark });
-  doc.text(`${title} (${photos.length})`, MARGIN, y);
-  y += 6;
+  y = addSectionTitle(doc, `${title} (${photos.length})`, y);
+  y = ensureSpace(doc, y, photoHeight + 10);
 
   let col = 0;
 
@@ -598,7 +601,7 @@ function renderPhotosGrid(
     }
 
     const x = MARGIN + col * (photoWidth + 3);
-    const label = clean(photo.label || photo.type);
+    const label = clean(photo.label || PHOTO_TYPE_LABELS[photo.type] || photo.type);
     const image = imageCache.get(photo.url) ?? null;
 
     if (image) {
@@ -842,10 +845,10 @@ export async function generatePodPdf(
     ["Colour", clean(job.vehicle_colour)],
     ...(job.vehicle_year ? [["Year", String(job.vehicle_year)] as [string, string]] : []),
     ["Job ID", `Job ${ref}`],
-    ["Route", `${clean(job.pickup_city)} → ${clean(job.delivery_city)}`],
+    ["Route", `${clean(job.pickup_city)} to ${clean(job.delivery_city)}`],
     ["Assigned Driver", clean(job.resolvedDriverName ?? job.driver_name)],
-    ["Collection Status", pickup ? "✓ Collected" : "Not collected"],
-    ["Delivery Status", delivery ? "✓ Delivered" : "Not delivered"],
+    ["Collection Status", pickup ? "Collected" : "Not collected"],
+    ["Delivery Status", delivery ? "Delivered" : "Not delivered"],
   ]);
 
   const billableExpenses = (expenses ?? []).filter((e) => e.billable_on_pod !== false);
@@ -928,6 +931,8 @@ export async function generatePodPdf(
     );
     y += 5;
 
+    // Muted, non-link styling: this text is not clickable in a PDF viewer, so it
+    // shouldn't be colored like a hyperlink (misleading affordance).
     y = addWrappedText(
       doc,
       "To download individual images, view this job in the Axentra app and use the Collection / Delivery download buttons on the POD page.",
@@ -936,8 +941,8 @@ export async function generatePodPdf(
       contentWidth,
       {
         fontSize: 7.5,
-        fontStyle: "normal",
-        textColor: PDF_THEME.link,
+        fontStyle: "italic",
+        textColor: PDF_THEME.muted,
         lineHeight: 4,
       }
     );
