@@ -141,6 +141,15 @@ async function main() {
       for (const c of b.checks.filter((c) => c.status === STATUS.FAIL))
         console.log(`    ❌ [${b.id}] ${c.name}: ${c.detail.split("\n")[0]}`);
   }
+  const nonBlockingFails = results.filter(
+    (r) => !r.critical && r.checks.some((c) => c.status === STATUS.FAIL),
+  );
+  if (nonBlockingFails.length) {
+    console.log(`\n  Non-blocking failures (informational — suite is not critical):`);
+    for (const b of nonBlockingFails)
+      for (const c of b.checks.filter((c) => c.status === STATUS.FAIL))
+        console.log(`    ⚠️ [${b.id}] ${c.name}: ${c.detail.split("\n")[0]}`);
+  }
   console.log("");
 
   process.exit(blocking.length ? 1 : 0);
