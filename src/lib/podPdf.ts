@@ -747,7 +747,10 @@ async function buildSignatureImageCache(
 function getCanonicalPhotoGroups(
   job: JobWithRelations
 ): { pickupPhotos: PhotoLike[]; deliveryPhotos: PhotoLike[] } {
-  const canonicalPhotos = canonicalisePhotos(job.photos, (job as any).current_run_id ?? null);
+  // current_run_id exists on the DB row but isn't declared on JobWithRelations
+  // (pre-existing gap, also worked around the same way in PodReport.tsx).
+  const currentRunId = (job as JobWithRelations & { current_run_id?: string | null }).current_run_id ?? null;
+  const canonicalPhotos = canonicalisePhotos(job.photos, currentRunId);
   return {
     pickupPhotos: canonicalPhotos.filter((p) => p.type.startsWith("pickup_")),
     deliveryPhotos: canonicalPhotos.filter((p) => p.type.startsWith("delivery_")),
