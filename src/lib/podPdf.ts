@@ -6,6 +6,9 @@ import { CHECKLIST_FIELDS } from "./inspectionFields";
 import { resolveImageUrlAsync } from "./gcsProxyUrl";
 import { canonicalisePhotos } from "./photoDedupe";
 import { PHOTO_TYPES_BY_INSPECTION } from "@/features/inspection/inspectionFormConfig";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/integrations/supabase/types";
+import type JSZip from "jszip";
 
 const PHOTO_TYPE_LABELS: Record<string, string> = Object.fromEntries(
   [...PHOTO_TYPES_BY_INSPECTION.pickup, ...PHOTO_TYPES_BY_INSPECTION.delivery].map(
@@ -555,77 +558,58 @@ function renderChecklistSection(
   return y + 2;
 }
 
-function renderPlaceholderBox(
-  doc: jsPDF,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  centerText: string,
-  label?: string
-): void {
-  doc.setDrawColor(...PDF_THEME.lightBorder);
-  doc.setFillColor(...PDF_THEME.lightFill);
-  doc.rect(x, y, width, height, "FD");
-
-  setTextStyle(doc, { size: 7, style: "normal", color: [160, 160, 160] });
-  doc.text(centerText, x + width / 2, y + height / 2, { align: "center" });
-
-  if (label) {
-    setTextStyle(doc, { size: 6, style: "normal", color: [100, 100, 100] });
-    doc.text(label, x, y + height + 3);
-  }
-}
-
-function renderPhotosGrid(
+/**
+ * Lists a photo group's friendly captions as plain wrapped text — no
+ * embedded image bytes. Photos live in the optional download zip instead
+ * (see renderPhotosDownloadLink), so the PDF stays small and fast to
+ * generate regardless of how many photos a job has.
+ */
+function renderPhotoCaptionList(
   doc: jsPDF,
   y: number,
   title: string,
   photos: PhotoLike[],
-  imageCache: Map<string, CachedImage | null>
+  contentWidth: number
 ): number {
   if (!photos.length) return y;
 
-  const contentWidth = getContentWidth(doc);
-  const photoWidth = (contentWidth - 6) / 3;
-  const photoHeight = photoWidth * 0.75;
+  y = ensureSpace(doc, y, 12);
+  setTextStyle(doc, { size: 8.5, style: "bold", color: PDF_THEME.dark });
+  doc.text(`${title} (${photos.length})`, MARGIN, y);
+  y += 5;
 
-  y = addSectionTitle(doc, `${title} (${photos.length})`, y);
-  y = ensureSpace(doc, y, photoHeight + 10);
+  const captions = photos
+    .map((p) => clean(p.label || PHOTO_TYPE_LABELS[p.type] || p.type))
+    .join("   ·   ");
 
-  let col = 0;
+  y = addWrappedText(doc, captions, MARGIN, y, contentWidth, {
+    fontSize: 7.5,
+    fontStyle: "normal",
+    textColor: PDF_THEME.text,
+    lineHeight: 4,
+  });
 
-  for (const photo of photos) {
-    if (col === 0) {
-      y = ensureSpace(doc, y, photoHeight + 10);
-    }
+  return y + 5;
+}
 
-    const x = MARGIN + col * (photoWidth + 3);
-    const label = clean(photo.label || PHOTO_TYPE_LABELS[photo.type] || photo.type);
-    const image = imageCache.get(photo.url) ?? null;
+/** Real clickable link (not just link-colored text) to the photos zip. */
+function renderPhotosDownloadLink(doc: jsPDF, y: number, url: string): number {
+  y = ensureSpace(doc, y, 16);
 
-    if (image) {
-      const ok = drawImageContain(doc, image, x, y, photoWidth, photoHeight);
-      if (ok) {
-        setTextStyle(doc, { size: 6, style: "normal", color: [100, 100, 100] });
-        doc.text(label, x, y + photoHeight + 3);
-      } else {
-        renderPlaceholderBox(doc, x, y, photoWidth, photoHeight, "Photo unavailable", label);
-      }
-    } else {
-      renderPlaceholderBox(doc, x, y, photoWidth, photoHeight, "Photo unavailable", label);
-    }
+  const label = "Download all photos (ZIP)";
+  const paddingX = 4;
+  const boxHeight = 8;
 
-    col += 1;
-    if (col >= 3) {
-      col = 0;
-      y += photoHeight + 8;
-    }
-  }
+  setTextStyle(doc, { size: 9, style: "bold", color: PDF_THEME.white });
+  const textWidth = doc.getTextWidth(label);
+  const boxWidth = textWidth + paddingX * 2;
 
-  if (col > 0) y += photoHeight + 8;
+  doc.setFillColor(...PDF_THEME.dark);
+  doc.roundedRect(MARGIN, y, boxWidth, boxHeight, 1, 1, "F");
+  doc.text(label, MARGIN + paddingX, y + boxHeight / 2 + 1.2);
+  doc.link(MARGIN, y, boxWidth, boxHeight, { url });
 
-  return y;
+  return y + boxHeight + 6;
 }
 
 function renderSignatures(
@@ -704,24 +688,19 @@ async function resolveSignatureForPdf(
   }
 }
 
-async function buildImageCache(
-  pickupPhotos: PhotoLike[],
-  deliveryPhotos: PhotoLike[],
+async function buildSignatureImageCache(
   pickup: JobWithRelations["inspections"][number] | undefined,
   delivery: JobWithRelations["inspections"][number] | undefined,
   meta?: { jobId?: string; orgId?: string }
 ): Promise<Map<string, CachedImage | null>> {
   const imageCache = new Map<string, CachedImage | null>();
 
-  const photoUrls = [...pickupPhotos, ...deliveryPhotos].map((p) => p.url);
   const rawSignatureUrls = [
     pickup?.driver_signature_url,
     pickup?.customer_signature_url,
     delivery?.driver_signature_url,
     delivery?.customer_signature_url,
   ].filter(Boolean) as string[];
-
-  const uniquePhotoUrls = [...new Set(photoUrls)];
 
   // Re-sign signature URLs so they aren't expired
   const sigUrlMap = new Map<string, string>(); // original → resolved
@@ -732,83 +711,176 @@ async function buildImageCache(
     })
   );
 
-  await Promise.allSettled([
-    ...uniquePhotoUrls.map(async (url) => {
-      const image = await loadImage(url, { isSignature: false });
-      imageCache.set(url, image);
-    }),
-    ...Array.from(sigUrlMap.entries()).map(async ([origUrl, resolvedUrl]) => {
+  await Promise.allSettled(
+    Array.from(sigUrlMap.entries()).map(async ([origUrl, resolvedUrl]) => {
       const image = await loadImage(resolvedUrl, { isSignature: true });
       imageCache.set(origUrl, image); // cache under original URL for lookup
-    }),
-  ]);
+    })
+  );
 
   // Retry pass: a transient network blip during the burst above can silently
-  // drop photos from the POD (rendered as "Photo unavailable"). Mirror the
-  // JobDetail gallery behaviour and try failed images again, with one short
-  // pause and one final attempt. This is bounded to the URLs we already
-  // failed, so cost is proportional to the failure rate, not the photo count.
-  const failedPhotoUrls = uniquePhotoUrls.filter((u) => !imageCache.get(u));
+  // drop a signature from the POD (rendered as "Image unavailable"). One
+  // short pause and one final attempt, bounded to the URLs that failed.
   const failedSigEntries = Array.from(sigUrlMap.entries()).filter(
     ([origUrl]) => !imageCache.get(origUrl),
   );
 
-  if (failedPhotoUrls.length > 0 || failedSigEntries.length > 0) {
-    debugLog("Retrying failed POD images", {
-      photos: failedPhotoUrls.length,
-      signatures: failedSigEntries.length,
-    });
+  if (failedSigEntries.length > 0) {
+    debugLog("Retrying failed POD signatures", { signatures: failedSigEntries.length });
     await new Promise((r) => setTimeout(r, 800));
-    await Promise.allSettled([
-      ...failedPhotoUrls.map(async (url) => {
-        const image = await loadImage(url, { isSignature: false });
-        if (image) imageCache.set(url, image);
-      }),
-      ...failedSigEntries.map(async ([origUrl, resolvedUrl]) => {
+    await Promise.allSettled(
+      failedSigEntries.map(async ([origUrl, resolvedUrl]) => {
         const image = await loadImage(resolvedUrl, { isSignature: true });
         if (image) imageCache.set(origUrl, image);
-      }),
-    ]);
-
-    // Final attempt for anything still missing — re-resolve the URL in case
-    // the original signed URL has expired between attempts.
-    const stillFailed = uniquePhotoUrls.filter((u) => !imageCache.get(u));
-    if (stillFailed.length > 0) {
-      await new Promise((r) => setTimeout(r, 1500));
-      await Promise.allSettled(
-        stillFailed.map(async (url) => {
-          const image = await loadImage(url, { isSignature: false });
-          if (image) imageCache.set(url, image);
-        }),
-      );
-      const finalMissing = uniquePhotoUrls.filter((u) => !imageCache.get(u));
-      if (finalMissing.length > 0) {
-        try {
-          const { logClientEvent } = await import("./logger");
-          void logClientEvent("pod_pdf_photo_missing", "warn", {
-            jobId: meta?.jobId,
-            message: `${finalMissing.length}/${uniquePhotoUrls.length} POD photos failed to load after retries`,
-            source: "storage",
-            type: "upload",
-            context: {
-              orgId: meta?.orgId,
-              missingCount: finalMissing.length,
-              totalCount: uniquePhotoUrls.length,
-            },
-          });
-        } catch {
-          // best-effort logging
-        }
-      }
-    }
+      })
+    );
   }
 
   return imageCache;
 }
 
+/**
+ * Canonicalise once: drop archived, isolate to current_run_id, dedupe by
+ * strongest identity. Shared by generatePodPdf and the photos-zip builder so
+ * both agree on exactly which photos count for a job.
+ */
+function getCanonicalPhotoGroups(
+  job: JobWithRelations
+): { pickupPhotos: PhotoLike[]; deliveryPhotos: PhotoLike[] } {
+  const canonicalPhotos = canonicalisePhotos(job.photos, (job as any).current_run_id ?? null);
+  return {
+    pickupPhotos: canonicalPhotos.filter((p) => p.type.startsWith("pickup_")),
+    deliveryPhotos: canonicalPhotos.filter((p) => p.type.startsWith("delivery_")),
+  };
+}
+
+function extensionForMime(mime: string): string {
+  if (mime.includes("png")) return "png";
+  if (mime.includes("webp")) return "webp";
+  if (mime.includes("heic")) return "heic";
+  return "jpg";
+}
+
+/** Fetches a photo group's original (uncompressed) bytes into a zip folder. */
+async function addPhotosToZip(
+  zip: JSZip,
+  folderName: string,
+  photos: PhotoLike[]
+): Promise<number> {
+  const folder = zip.folder(folderName);
+  if (!folder) return 0;
+
+  let added = 0;
+  await Promise.allSettled(
+    photos.map(async (photo, index) => {
+      try {
+        const resolvedUrl = (await resolveImageUrlAsync(photo.url)) ?? photo.url;
+        const response = await fetch(resolvedUrl, { mode: "cors" });
+        if (!response.ok) return;
+        const blob = await response.blob();
+        if (blob.size === 0) return;
+
+        const label = clean(photo.label || PHOTO_TYPE_LABELS[photo.type] || photo.type, "photo");
+        const ext = extensionForMime(blob.type);
+        folder.file(`${String(index + 1).padStart(2, "0")} ${label}.${ext}`, blob);
+        added += 1;
+      } catch (error) {
+        debugLog("Photo zip fetch failed", { url: photo.url, error });
+      }
+    })
+  );
+  return added;
+}
+
+/**
+ * Zips a job's collection/delivery photos at original quality (no
+ * recompression — this is a "download the originals" bundle, unlike the
+ * downscaled copies previously embedded in the PDF itself). Returns null
+ * when there are no photos, or every fetch failed.
+ */
+async function buildPhotosZipBlob(
+  pickupPhotos: PhotoLike[],
+  deliveryPhotos: PhotoLike[]
+): Promise<Blob | null> {
+  if (pickupPhotos.length === 0 && deliveryPhotos.length === 0) return null;
+
+  const JSZip = (await import("jszip")).default;
+  const zip = new JSZip();
+
+  const [pickupAdded, deliveryAdded] = await Promise.all([
+    addPhotosToZip(zip, "Collection Photos", pickupPhotos),
+    addPhotosToZip(zip, "Delivery Photos", deliveryPhotos),
+  ]);
+
+  if (pickupAdded + deliveryAdded === 0) return null;
+
+  return zip.generateAsync({ type: "blob" });
+}
+
+/** Authoritative org — from user_profiles ONLY, never self-writable user_metadata. */
+async function resolveAuthoritativeOrgId(
+  supabase: SupabaseClient<Database>
+): Promise<string | null> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.user?.id) return null;
+
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("org_id")
+    .eq("auth_user_id", session.user.id)
+    .maybeSingle();
+  return (profile as { org_id?: string | null } | null)?.org_id ?? null;
+}
+
+/**
+ * Best-effort: builds the photos zip and uploads it next to the POD PDF
+ * (same private, org-scoped, signed-URL pattern). Never throws — a failure
+ * here should never block generating or sending the POD itself, it just
+ * means the optional photos link is omitted.
+ */
+async function tryBuildAndUploadPhotosZip(job: JobWithRelations): Promise<string | null> {
+  try {
+    const { pickupPhotos, deliveryPhotos } = getCanonicalPhotoGroups(job);
+    const zipBlob = await buildPhotosZipBlob(pickupPhotos, deliveryPhotos);
+    if (!zipBlob) return null;
+
+    const { supabase } = await import("@/integrations/supabase/client");
+    const orgId = await resolveAuthoritativeOrgId(supabase);
+    if (!orgId) {
+      debugLog("POD photos zip: no authoritative org_id — skipping upload");
+      return null;
+    }
+
+    const ref = job.external_job_number || job.id.slice(0, 8).toUpperCase();
+    const sanitizedReg = clean(job.vehicle_reg, "UNKNOWN").replace(/\s+/g, "");
+    const path = `${orgId}/AXENTRA_POD_${ref}_${sanitizedReg}_photos.zip`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("pod-photos")
+      .upload(path, zipBlob, { contentType: "application/zip", upsert: true });
+
+    if (uploadError) {
+      debugLog("POD photos zip upload failed", uploadError);
+      return null;
+    }
+
+    const { data: signed } = await supabase.storage
+      .from("pod-photos")
+      .createSignedUrl(path, 60 * 60 * 24 * 30);
+
+    return signed?.signedUrl ?? null;
+  } catch (error) {
+    debugLog("POD photos zip exception", error);
+    return null;
+  }
+}
+
 export async function generatePodPdf(
   job: JobWithRelations,
-  expenses?: PodExpense[]
+  expenses?: PodExpense[],
+  photosZipUrl?: string | null
 ): Promise<Blob> {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const contentWidth = getContentWidth(doc);
@@ -820,18 +892,9 @@ export async function generatePodPdf(
   const pickupDamages = job.damage_items.filter((d) => pickup && d.inspection_id === pickup.id);
   const deliveryDamages = job.damage_items.filter((d) => delivery && d.inspection_id === delivery.id);
 
-  // Canonicalise once: drop archived, isolate to current_run_id, dedupe by
-  // strongest identity. This stops the PDF from rendering repeated
-  // "Photo unavailable" placeholders for the same physical asset and
-  // prevents stale-run leakage on reopened jobs.
-  const canonicalPhotos = canonicalisePhotos(
-    job.photos,
-    (job as any).current_run_id ?? null,
-  );
-  const pickupPhotos = canonicalPhotos.filter((p) => p.type.startsWith("pickup_"));
-  const deliveryPhotos = canonicalPhotos.filter((p) => p.type.startsWith("delivery_"));
+  const { pickupPhotos, deliveryPhotos } = getCanonicalPhotoGroups(job);
 
-  const imageCache = await buildImageCache(pickupPhotos, deliveryPhotos, pickup, delivery, { jobId: job.id });
+  const imageCache = await buildSignatureImageCache(pickup, delivery, { jobId: job.id });
   const logo = await loadLogo();
 
   renderHeader(doc, job, ref, logo);
@@ -923,33 +986,30 @@ export async function generatePodPdf(
     y = addSectionTitle(doc, "Photos", y);
     y = ensureSpace(doc, y, 16);
 
-    setTextStyle(doc, { size: 8, style: "normal", color: PDF_THEME.text });
-    doc.text(
-      `${pickupPhotos.length} collection photo(s) · ${deliveryPhotos.length} delivery photo(s) embedded below.`,
-      MARGIN,
-      y
-    );
-    y += 5;
+    // Photos are no longer embedded inline — that bloated the PDF (multi-MB
+    // for a handful of images) and slowed generation. Captions are listed
+    // for the record, with an optional link to download the originals.
+    y = renderPhotoCaptionList(doc, y, "Collection Photos", pickupPhotos, contentWidth);
+    y = renderPhotoCaptionList(doc, y, "Delivery Photos", deliveryPhotos, contentWidth);
 
-    // Muted, non-link styling: this text is not clickable in a PDF viewer, so it
-    // shouldn't be colored like a hyperlink (misleading affordance).
-    y = addWrappedText(
-      doc,
-      "To download individual images, view this job in the Axentra app and use the Collection / Delivery download buttons on the POD page.",
-      MARGIN,
-      y,
-      contentWidth,
-      {
-        fontSize: 7.5,
-        fontStyle: "italic",
-        textColor: PDF_THEME.muted,
-        lineHeight: 4,
-      }
-    );
-    y += 4;
-
-    y = renderPhotosGrid(doc, y, "Collection Photos", pickupPhotos, imageCache);
-    y = renderPhotosGrid(doc, y, "Delivery Photos", deliveryPhotos, imageCache);
+    if (photosZipUrl) {
+      y = renderPhotosDownloadLink(doc, y, photosZipUrl);
+    } else {
+      y = addWrappedText(
+        doc,
+        "To download the photos, view this job in the Axentra app and use the Collection / Delivery download buttons on the POD page.",
+        MARGIN,
+        y,
+        contentWidth,
+        {
+          fontSize: 7.5,
+          fontStyle: "italic",
+          textColor: PDF_THEME.muted,
+          lineHeight: 4,
+        }
+      );
+      y += 4;
+    }
   }
 
   y = renderSignatures(
@@ -1009,7 +1069,8 @@ export async function sharePodPdf(
   job: JobWithRelations,
   expenses?: PodExpense[]
 ): Promise<void> {
-  const blob = await generatePodPdf(job, expenses);
+  const photosZipUrl = await tryBuildAndUploadPhotosZip(job);
+  const blob = await generatePodPdf(job, expenses, photosZipUrl);
   const ref = job.external_job_number || job.id.slice(0, 8).toUpperCase();
   const sanitizedReg = clean(job.vehicle_reg, "UNKNOWN").replace(/\s+/g, "");
   const dateStr = job.completed_at
@@ -1047,7 +1108,8 @@ export async function emailPodPdf(
   job: JobWithRelations,
   expenses?: PodExpense[]
 ): Promise<EmailPodResult> {
-  const blob = await generatePodPdf(job, expenses);
+  const photosZipUrl = await tryBuildAndUploadPhotosZip(job);
+  const blob = await generatePodPdf(job, expenses, photosZipUrl);
   const ref = job.external_job_number || job.id.slice(0, 8).toUpperCase();
   const sanitizedReg = clean(job.vehicle_reg, "UNKNOWN").replace(/\s+/g, "");
   const dateStr = job.completed_at
@@ -1061,23 +1123,12 @@ export async function emailPodPdf(
 
   try {
     const { supabase } = await import("@/integrations/supabase/client");
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
 
     // Org MUST come from user_profiles (authoritative), never user_metadata
     // (self-writable and no longer populated). If it can't be resolved we skip
     // the upload rather than write to a shared cross-tenant prefix — the email
     // still goes out, just without a download link.
-    let orgId: string | null = null;
-    if (session?.user?.id) {
-      const { data: profile } = await supabase
-        .from("user_profiles")
-        .select("org_id")
-        .eq("auth_user_id", session.user.id)
-        .maybeSingle();
-      orgId = (profile as { org_id?: string | null } | null)?.org_id ?? null;
-    }
+    const orgId = await resolveAuthoritativeOrgId(supabase);
 
     if (!orgId) {
       debugLog("POD email: no authoritative org_id — skipping upload");
@@ -1123,6 +1174,7 @@ export async function emailPodPdf(
             deliveryCity: job.delivery_city,
             dateStr,
             downloadUrl: downloadLink,
+            photosZipUrl: photosZipUrl ?? undefined,
           },
         });
         if (!error && data?.sent) {
@@ -1146,6 +1198,7 @@ export async function emailPodPdf(
     `Date: ${dateStr}`,
     "",
     downloadLink ? `Download POD: ${downloadLink}` : "(PDF link unavailable - attach manually if required)",
+    ...(photosZipUrl ? ["", `Download photos (optional): ${photosZipUrl}`] : []),
     "",
     "Link expires in 30 days.",
     "",
