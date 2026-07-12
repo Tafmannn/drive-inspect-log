@@ -59,7 +59,7 @@ Static suites run anywhere (laptop, CI, container). Live suites require a
 | 12 | RLS helpers — runtime proof | **live** | 🔒 | Forged-metadata super-admin returns false on the real DB |
 | 13 | Cross-tenant isolation | **live** | 🔒 | A driver sees zero cross-org jobs / receipts under RLS |
 | 14 | Storage IDOR path→org | **live** | 🔒 | `gcs-proxy` / `resolve-signature-url` return 403 cross-org |
-| 15 | Realtime reachability | **live** | | Realtime websocket upgrade accepted; e2e delivery flagged manual |
+| 15 | Realtime reachability | **live** | | Realtime websocket upgrade accepted; e2e delivery flagged manual. Non-critical: known to fail from GitHub Actions runners even against a healthy, correctly-keyed project — see note below |
 
 ## Enabling the live suites (staging only)
 
@@ -86,6 +86,20 @@ npm run release:validate
 Requirements for the DB suites: `psql` on `PATH`. For the realtime suite: a Node
 runtime with a global `WebSocket` (Node 22+). When a prerequisite is missing the
 suite reports exactly what was absent and stays `NOT_EXECUTED`.
+
+**Known CI limitation — suite 15 (Realtime reachability):** this suite can fail
+with `websocket error: Received network error or non-101 status code.` when run
+from GitHub Actions, even against a healthy staging project with a correct
+`STAGING_ANON_KEY`. Supabase's Realtime endpoint sits behind Cloudflare, whose
+bot/WAF protection commonly blocks or challenges the websocket upgrade from
+known datacenter IP ranges (including GitHub Actions runners) before a 101
+response can be returned. This is not a project misconfiguration — ruled out by
+confirming the project is `ACTIVE_HEALTHY`, the `supabase_realtime` publication
+is live, and the failure persists across an anon-key rotation. Suite 15 is
+`critical: false` for exactly this reason: a FAIL here never blocks the build.
+To verify Realtime end-to-end, open the same
+`wss://<ref>.supabase.co/realtime/v1/websocket?apikey=...&vsn=1.0.0` URL from a
+browser or a non-datacenter network instead of relying on the CI run.
 
 ## CI
 
