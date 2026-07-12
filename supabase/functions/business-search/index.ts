@@ -99,6 +99,9 @@ serve(async (req) => {
     });
 
     const placesData = await resp.json();
+    if (!placesData.places?.length) {
+      console.log("business-search primary empty. status:", resp.status, "body:", JSON.stringify(placesData).slice(0, 500));
+    }
 
     if (!placesData.places?.length) {
       // Retry without includedType restriction
@@ -118,10 +121,33 @@ serve(async (req) => {
         }),
       });
       const data2 = await resp2.json();
+      if (!data2.places?.length) {
+        console.log("business-search retry empty. status:", resp2.status, "body:", JSON.stringify(data2).slice(0, 500));
+      }
 
       if (!data2.places?.length) {
+        // Legacy Places Text Search fallback (in case Places API New is not enabled)
+        const legacyUrl = new URL("https://maps.googleapis.com/maps/api/place/textsearch/json");
+        legacyUrl.searchParams.set("query", query.trim());
+        legacyUrl.searchParams.set("region", "gb");
+        legacyUrl.searchParams.set("key", MAPS_KEY);
+        const legacyResp = await fetch(legacyUrl.toString());
+        const legacyData = await legacyResp.json();
+        if (legacyData.status !== "OK" || !legacyData.results?.length) {
+          console.log("business-search legacy fallback empty. status:", legacyData.status, "err:", legacyData.error_message);
+          return new Response(
+            JSON.stringify({ results: [] }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        const legacyResults = legacyData.results.slice(0, 8).map((p: any) => ({
+          placeId: p.place_id,
+          name: p.name || "",
+          address: p.formatted_address || "",
+          types: p.types || [],
+        }));
         return new Response(
-          JSON.stringify({ results: [] }),
+          JSON.stringify({ results: legacyResults }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
