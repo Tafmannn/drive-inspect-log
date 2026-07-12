@@ -65,6 +65,7 @@ export interface Job {
   vehicle_fuel_type: string | null;
   pickup_contact_name: string;
   pickup_contact_phone: string;
+  pickup_contact_email: string | null;
   pickup_company: string | null;
   pickup_address_line1: string;
   pickup_address_line2: string | null;
@@ -76,6 +77,7 @@ export interface Job {
   pickup_access_notes: string | null;
   delivery_contact_name: string;
   delivery_contact_phone: string;
+  delivery_contact_email: string | null;
   delivery_company: string | null;
   delivery_address_line1: string;
   delivery_address_line2: string | null;

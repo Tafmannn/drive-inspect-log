@@ -514,6 +514,7 @@ export const JobForm = () => {
 
       pickup_contact_name: getStr(data, "pickup_contact_name"),
       pickup_contact_phone: getStr(data, "pickup_contact_phone"),
+      pickup_contact_email: getStr(data, "pickup_contact_email") || null,
       pickup_company: getStr(data, "pickup_company") || null,
       pickup_address_line1: getStr(data, "pickup_address_line1"),
       pickup_address_line2: getStr(data, "pickup_address_line2") || null,
@@ -523,6 +524,7 @@ export const JobForm = () => {
 
       delivery_contact_name: getStr(data, "delivery_contact_name"),
       delivery_contact_phone: getStr(data, "delivery_contact_phone"),
+      delivery_contact_email: getStr(data, "delivery_contact_email") || null,
       delivery_company: getStr(data, "delivery_company") || null,
       delivery_address_line1: getStr(data, "delivery_address_line1"),
       delivery_address_line2: getStr(data, "delivery_address_line2") || null,
@@ -1020,6 +1022,20 @@ export const JobForm = () => {
             </div>
             <div>
               <Label className="text-sm font-medium">
+                Email
+              </Label>
+              <Input
+                type="email"
+                name="pickup_contact_email"
+                defaultValue={
+                  existingJob?.pickup_contact_email ?? ""
+                }
+                className="mt-1"
+              />
+              <ErrorText field="pickup_contact_email" />
+            </div>
+            <div>
+              <Label className="text-sm font-medium">
                 Company
               </Label>
               <BusinessSearchInput
@@ -1165,6 +1181,20 @@ export const JobForm = () => {
                 className="mt-1"
               />
               <ErrorText field="delivery_contact_phone" />
+            </div>
+            <div>
+              <Label className="text-sm font-medium">
+                Email
+              </Label>
+              <Input
+                type="email"
+                name="delivery_contact_email"
+                defaultValue={
+                  existingJob?.delivery_contact_email ?? ""
+                }
+                className="mt-1"
+              />
+              <ErrorText field="delivery_contact_email" />
             </div>
             <div>
               <Label className="text-sm font-medium">
