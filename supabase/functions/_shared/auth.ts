@@ -73,26 +73,33 @@ export async function authenticateCaller(
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-  // Token signature is verified server-side by GoTrue here.
+  // getUser() stopped validating correctly under the newer signing-keys JWT
+  // setup (confirmed live on business-search/postcode-lookup/maps-directions,
+  // all fixed by switching to getClaims()) — verifies the token locally
+  // against the current signing keys instead of round-tripping through the
+  // old endpoint.
   const anon = createClient(supabaseUrl, anonKey, {
     global: { headers: { Authorization: authHeader } },
   });
-  const { data: authData, error: authError } = await anon.auth.getUser();
-  if (authError || !authData?.user) {
+  const token = authHeader.replace("Bearer ", "");
+  const { data: claimsData, error: authError } = await anon.auth.getClaims(token);
+  if (authError || !claimsData?.claims?.sub) {
     return { error: jsonRes({ error: "UNAUTHENTICATED" }, 401) };
   }
+  const userId = claimsData.claims.sub;
+  const userEmail = (claimsData.claims as { email?: string }).email ?? "";
 
   const admin = createClient(supabaseUrl, serviceKey);
   const { data: profile } = await admin
     .from("user_profiles")
     .select("role, org_id, account_status, email")
-    .eq("auth_user_id", authData.user.id)
+    .eq("auth_user_id", userId)
     .maybeSingle();
 
   // Authorization is derived ONLY from the profile row (never user_metadata).
   const caller: Caller = {
-    id: authData.user.id,
-    email: profile?.email ?? authData.user.email ?? "",
+    id: userId,
+    email: profile?.email ?? userEmail,
     ...callerAuthzFromProfile(profile),
   };
 
