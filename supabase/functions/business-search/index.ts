@@ -99,6 +99,9 @@ serve(async (req) => {
     });
 
     const placesData = await resp.json();
+    if (!placesData.places?.length) {
+      console.log("business-search primary empty. status:", resp.status, "body:", JSON.stringify(placesData).slice(0, 500));
+    }
 
     if (!placesData.places?.length) {
       // Retry without includedType restriction
@@ -118,6 +121,9 @@ serve(async (req) => {
         }),
       });
       const data2 = await resp2.json();
+      if (!data2.places?.length) {
+        console.log("business-search retry empty. status:", resp2.status, "body:", JSON.stringify(data2).slice(0, 500));
+      }
 
       if (!data2.places?.length) {
         return new Response(
