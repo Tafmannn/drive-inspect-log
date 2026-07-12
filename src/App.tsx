@@ -205,6 +205,7 @@ const App = () => {
               <Routes>
                 {/* ── Public routes ── */}
                 <Route path="/login" element={<Login />} />
+                <Route path="/index" element={<Navigate to="/" replace />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/confirm" element={<QrConfirm />} />
