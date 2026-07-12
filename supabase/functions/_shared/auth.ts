@@ -4,8 +4,9 @@
 //   The ONLY authoritative source for a caller's role and org is the
 //   public.user_profiles table (server-controlled). JWT `user_metadata` is
 //   user-writable via auth.updateUser() and must NEVER be trusted for authz.
-//   These helpers verify the bearer token (signature-checked by GoTrue via
-//   getUser) and then load role/org from user_profiles using the service role.
+//   These helpers verify the bearer token (validated locally against the
+//   project's signing keys via getClaims) and then load role/org from
+//   user_profiles using the service role.
 
 import {
   createClient,

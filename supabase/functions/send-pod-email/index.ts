@@ -16,15 +16,28 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
+// Only http(s) links belong in the "Download POD" button. Reject anything else
+// (javascript:, data:, etc.) so a malformed/hostile downloadUrl can never become
+// a live link, and attribute-escape the value like every other interpolation.
+function safeHref(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    return escapeHtml(url);
+  } catch {
+    return null;
+  }
+}
+
 function renderHtml(opts: {
   jobRef: string;
   vehicleReg: string;
   pickupCity: string;
   deliveryCity: string;
   dateStr: string;
-  downloadUrl: string;
+  downloadHref: string;
 }): string {
-  const { jobRef, vehicleReg, pickupCity, deliveryCity, dateStr, downloadUrl } = opts;
+  const { jobRef, vehicleReg, pickupCity, deliveryCity, dateStr, downloadHref } = opts;
   return `<!doctype html>
 <html>
   <body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
@@ -47,7 +60,7 @@ function renderHtml(opts: {
                 <p style="margin:0 0 4px;"><strong>Route:</strong> ${escapeHtml(pickupCity)} &rarr; ${escapeHtml(deliveryCity)}</p>
                 <p style="margin:0 0 24px;"><strong>Date:</strong> ${escapeHtml(dateStr)}</p>
                 <p style="margin:0 0 24px;text-align:center;">
-                  <a href="${downloadUrl}"
+                  <a href="${downloadHref}"
                      style="background:#111827;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:bold;display:inline-block;">
                     Download POD
                   </a>
@@ -111,9 +124,10 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    if (!downloadUrl || typeof downloadUrl !== "string") {
+    const downloadHref = typeof downloadUrl === "string" ? safeHref(downloadUrl) : null;
+    if (!downloadHref) {
       return new Response(
-        JSON.stringify({ error: "downloadUrl is required" }),
+        JSON.stringify({ error: "A valid http(s) downloadUrl is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -125,7 +139,7 @@ serve(async (req) => {
       pickupCity: String(pickupCity ?? "Unknown"),
       deliveryCity: String(deliveryCity ?? "Unknown"),
       dateStr: String(dateStr ?? ""),
-      downloadUrl: String(downloadUrl),
+      downloadHref,
     });
 
     const resendResp = await fetch("https://api.resend.com/emails", {
