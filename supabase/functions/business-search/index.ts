@@ -35,12 +35,39 @@ function parseNominatimAddress(item: any, fallbackPostcode = "") {
 }
 
 async function searchNominatim(query: string, postcode?: string) {
+  let postcodeCoords: { lat: number; lon: number } | null = null;
+  if (postcode?.trim()) {
+    const pcUrl = new URL("https://nominatim.openstreetmap.org/search");
+    pcUrl.searchParams.set("format", "jsonv2");
+    pcUrl.searchParams.set("addressdetails", "0");
+    pcUrl.searchParams.set("countrycodes", "gb");
+    pcUrl.searchParams.set("limit", "1");
+    pcUrl.searchParams.set("postalcode", postcode.trim());
+    const pcResp = await fetch(pcUrl.toString(), {
+      headers: {
+        "Accept": "application/json",
+        "User-Agent": "AxentraVehicleLogistics/1.0 (business-search)",
+      },
+    });
+    if (pcResp.ok) {
+      const pcData = await pcResp.json();
+      if (Array.isArray(pcData) && pcData[0]?.lat && pcData[0]?.lon) {
+        postcodeCoords = { lat: Number(pcData[0].lat), lon: Number(pcData[0].lon) };
+      }
+    }
+  }
+
   const url = new URL("https://nominatim.openstreetmap.org/search");
   url.searchParams.set("format", "jsonv2");
   url.searchParams.set("addressdetails", "1");
   url.searchParams.set("countrycodes", "gb");
   url.searchParams.set("limit", "8");
-  url.searchParams.set("q", [query.trim(), postcode?.trim()].filter(Boolean).join(" "));
+  url.searchParams.set("q", query.trim());
+  if (postcodeCoords) {
+    const latPad = 0.6;
+    const lonPad = 0.9;
+    url.searchParams.set("viewbox", `${postcodeCoords.lon - lonPad},${postcodeCoords.lat + latPad},${postcodeCoords.lon + lonPad},${postcodeCoords.lat - latPad}`);
+  }
 
   const resp = await fetch(url.toString(), {
     headers: {
@@ -51,7 +78,14 @@ async function searchNominatim(query: string, postcode?: string) {
   if (!resp.ok) return [];
   const data = await resp.json();
   if (!Array.isArray(data)) return [];
-  return data.map((item: any, i: number) => {
+  const sorted = postcodeCoords
+    ? [...data].sort((a: any, b: any) => {
+        const da = Math.hypot(Number(a.lat) - postcodeCoords.lat, Number(a.lon) - postcodeCoords.lon);
+        const db = Math.hypot(Number(b.lat) - postcodeCoords.lat, Number(b.lon) - postcodeCoords.lon);
+        return da - db;
+      })
+    : data;
+  return sorted.map((item: any, i: number) => {
     const parsed = parseNominatimAddress(item, postcode || "");
     const osmType = item.osm_type === "way" ? "W" : item.osm_type === "relation" ? "R" : "N";
     return {
