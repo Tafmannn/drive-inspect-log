@@ -1104,23 +1104,18 @@ export async function retryUpload(
       backend: stored.backend,
       backend_ref: stored.backendRef ?? null,
       label: existing.label,
+      // Durable damage-photo link (V6, migration 20260629100100): the
+      // photos AFTER INSERT trigger syncs damage_items.photo_url from this
+      // column atomically with the insert, server-side. Always pass it
+      // (null unless this is a damage close-up) — the trigger no-ops when
+      // it's null, so this is safe for every photo type.
+      damage_item_id:
+        existing.photoType === "damage_close_up" ? existing.damageItemId ?? null : null,
     };
     if (verifiedRunId) {
       photoPayload.run_id = verifiedRunId;
     }
     await insertPhoto(photoPayload);
-
-    if (existing.photoType === "damage_close_up" && existing.damageItemId) {
-      try {
-        const { supabase } = await import("@/integrations/supabase/client");
-        await supabase
-          .from("damage_items")
-          .update({ photo_url: stored.url })
-          .eq("id", existing.damageItemId);
-      } catch {
-        // best-effort
-      }
-    }
 
     await updateOne(id, (u) => ({
       ...u,

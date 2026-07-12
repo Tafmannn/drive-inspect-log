@@ -278,10 +278,40 @@ describe("pendingUploads — promotion & discard lifecycle", () => {
     expect(ok).toBe(true);
     expect(mockUpload).toHaveBeenCalledTimes(1);
     expect(mockInsertPhoto).toHaveBeenCalledTimes(1);
+    expect(mockInsertPhoto.mock.calls[0][0].damage_item_id).toBeNull();
 
     const [after] = await getAllPendingUploads();
     expect(after.state).toBe("uploaded");
     expect(after.fileBlob).toBeNull();
+  });
+
+  it("retryUpload passes the resolved damage_item_id through to insertPhoto for damage close-ups (durable server-side link, V6)", async () => {
+    mockUpload.mockResolvedValue({
+      url: "https://x/damage.jpg",
+      thumbnailUrl: null,
+      backend: "gcs",
+      backendRef: "ref-2",
+    });
+    mockInsertPhoto.mockResolvedValue({ id: "p2" });
+
+    const item = await stagePendingUpload(makeFile(), {
+      submissionSessionId: SESSION_A,
+      clientPhotoId: "cpid-1",
+      clientDamageId: "dmg-1",
+      jobId: "j1",
+      inspectionType: "pickup",
+      photoType: "damage_close_up",
+      label: null,
+    });
+    await promoteSubmissionSession(SESSION_A, {
+      inspectionId: "insp-1",
+      damageIdMap: { "dmg-1": "di-server-1" },
+    });
+
+    const ok = await retryUpload(item.id);
+    expect(ok).toBe(true);
+    expect(mockInsertPhoto).toHaveBeenCalledTimes(1);
+    expect(mockInsertPhoto.mock.calls[0][0].damage_item_id).toBe("di-server-1");
   });
 });
 
