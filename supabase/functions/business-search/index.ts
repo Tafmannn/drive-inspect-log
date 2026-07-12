@@ -126,8 +126,28 @@ serve(async (req) => {
       }
 
       if (!data2.places?.length) {
+        // Legacy Places Text Search fallback (in case Places API New is not enabled)
+        const legacyUrl = new URL("https://maps.googleapis.com/maps/api/place/textsearch/json");
+        legacyUrl.searchParams.set("query", query.trim());
+        legacyUrl.searchParams.set("region", "gb");
+        legacyUrl.searchParams.set("key", MAPS_KEY);
+        const legacyResp = await fetch(legacyUrl.toString());
+        const legacyData = await legacyResp.json();
+        if (legacyData.status !== "OK" || !legacyData.results?.length) {
+          console.log("business-search legacy fallback empty. status:", legacyData.status, "err:", legacyData.error_message);
+          return new Response(
+            JSON.stringify({ results: [] }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        const legacyResults = legacyData.results.slice(0, 8).map((p: any) => ({
+          placeId: p.place_id,
+          name: p.name || "",
+          address: p.formatted_address || "",
+          types: p.types || [],
+        }));
         return new Response(
-          JSON.stringify({ results: [] }),
+          JSON.stringify({ results: legacyResults }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
