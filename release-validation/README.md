@@ -68,7 +68,11 @@ every code path — like the gated staging rollout script, it cannot be pointed 
 prod. To execute the live suites against a seeded staging clone, export:
 
 ```bash
-export STAGING_DB_URL="postgresql://postgres:***@db.<staging-ref>.supabase.co:5432/postgres"
+# Use the Session pooler string (Dashboard → Connect → Session pooler), not the
+# direct db.<ref>.supabase.co host: the direct host is IPv6-only, and GitHub
+# Actions runners have no outbound IPv6 route to it — suites 12/13 will fail
+# with "Network is unreachable" if STAGING_DB_URL points at the direct host.
+export STAGING_DB_URL="postgresql://postgres.<staging-ref>:***@aws-<region>.pooler.supabase.com:5432/postgres"
 export STAGING_SUPABASE_URL="https://<staging-ref>.supabase.co"
 export STAGING_ANON_KEY="<staging anon key>"
 # Optional, sharpen suites 13/14 with explicit identities instead of auto-select:
