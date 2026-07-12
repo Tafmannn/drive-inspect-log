@@ -53,8 +53,9 @@ async function searchNominatim(query: string, postcode?: string) {
   if (!Array.isArray(data)) return [];
   return data.map((item: any, i: number) => {
     const parsed = parseNominatimAddress(item, postcode || "");
+    const osmType = item.osm_type === "way" ? "W" : item.osm_type === "relation" ? "R" : "N";
     return {
-      placeId: item.place_id ? `nominatim:${item.place_id}:${i}` : `nominatim-${i}`,
+      placeId: item.osm_id ? `nominatim:${osmType}:${item.osm_id}:${i}` : `nominatim-${i}`,
       name: item.name || query.trim(),
       address: item.display_name || "",
       types: [item.type, item.class].filter(Boolean),

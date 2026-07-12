@@ -92,12 +92,12 @@ serve(async (req) => {
     }
 
     const geocodePlaceId = placeId.startsWith("geocode:") ? placeId.replace("geocode:", "") : "";
-    const nominatimPlaceId = placeId.startsWith("nominatim:") ? placeId.split(":")[1] : "";
-    if (nominatimPlaceId) {
+    const nominatimParts = placeId.startsWith("nominatim:") ? placeId.split(":") : [];
+    if (nominatimParts.length >= 3) {
       const nominatimUrl = new URL("https://nominatim.openstreetmap.org/lookup");
       nominatimUrl.searchParams.set("format", "jsonv2");
       nominatimUrl.searchParams.set("addressdetails", "1");
-      nominatimUrl.searchParams.set("osm_ids", `N${nominatimPlaceId}`);
+      nominatimUrl.searchParams.set("osm_ids", `${nominatimParts[1]}${nominatimParts[2]}`);
       const nominatimResp = await fetch(nominatimUrl.toString(), {
         headers: {
           "Accept": "application/json",
