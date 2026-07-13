@@ -25,7 +25,7 @@ import { cn } from "@/lib/utils";
 
 /* ─── KPI Pill (all tappable, all route) ───────────────────────── */
 
-function KpiPill({
+export function KpiPill({
   label, value, icon: Icon, variant = "default", loading, onClick,
 }: {
   label: string;
@@ -56,8 +56,9 @@ function KpiPill({
       ) : (
         <span className="text-lg font-semibold tabular-nums leading-tight">{value}</span>
       )}
-      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground truncate w-full text-center flex items-center justify-center gap-0.5">
-        {label} <ChevronRight className="h-2.5 w-2.5" />
+      <span className="w-full flex items-center justify-center gap-0.5 min-w-0">
+        <span className="min-w-0 truncate text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{label}</span>
+        <ChevronRight className="h-2.5 w-2.5 shrink-0" />
       </span>
     </button>
   );

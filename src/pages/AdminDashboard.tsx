@@ -57,7 +57,7 @@ interface NeedsActionItem {
 
 // ── Tier 1: Intervention KPI Strip ───────────────────────────────────
 
-function KpiPill({
+export function KpiPill({
   label, value, icon: Icon, variant = "default", loading, onClick,
 }: {
   label: string;
@@ -87,8 +87,9 @@ function KpiPill({
       ) : (
         <span className="text-base font-bold tabular-nums leading-tight">{value}</span>
       )}
-      <span className="text-[9px] font-semibold uppercase tracking-wider truncate w-full text-center flex items-center justify-center gap-0.5">
-        {label} <ChevronRight className="h-2 w-2" />
+      <span className="w-full flex items-center justify-center gap-0.5 min-w-0">
+        <span className="min-w-0 truncate text-[9px] font-semibold uppercase tracking-wider">{label}</span>
+        <ChevronRight className="h-2 w-2 shrink-0" />
       </span>
     </button>
   );
