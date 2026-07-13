@@ -65,9 +65,7 @@ export function useUploadReceipt() {
   return useMutation({
     mutationFn: ({ expenseId, file }: { expenseId: string; file: File }) =>
       expApi.uploadReceipt(expenseId, file),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['expenses'] });
-    },
+    onSuccess: () => invalidateForEvent(qc, 'expense_changed'),
   });
 }
 
@@ -75,8 +73,6 @@ export function useDeleteReceipt() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: expApi.deleteReceipt,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['expenses'] });
-    },
+    onSuccess: () => invalidateForEvent(qc, 'expense_changed'),
   });
 }

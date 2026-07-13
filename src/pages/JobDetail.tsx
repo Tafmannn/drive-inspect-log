@@ -402,6 +402,7 @@ export const JobDetail = () => {
             onAction={() => navigate(withFrom(`/inspection/${job.id}/pickup`, searchParams))}
             actionIcon={ClipboardCheck}
             warning={isBlocked ? execEval.reason : undefined}
+            blocked={isBlocked}
           />
           <InspectionRow
             label="Delivery Inspection"
@@ -409,6 +410,7 @@ export const JobDetail = () => {
             onAction={() => navigate(withFrom(`/inspection/${job.id}/delivery`, searchParams))}
             actionIcon={Truck}
             warning={isBlocked || isReviewOnly ? (execEval.reason || "Awaiting review") : undefined}
+            blocked={isBlocked}
           />
         </Section>
 
@@ -663,12 +665,20 @@ function InspectionRow({
   onAction,
   actionIcon: ActionIcon,
   warning,
+  blocked = false,
 }: {
   label: string;
   done: boolean;
   onAction?: () => void;
   actionIcon: React.ComponentType<{ className?: string }>;
   warning?: string;
+  /**
+   * Hard block (e.g. driver has another job in progress, or the job's own
+   * status disallows action) — never overridable via double-tap. Distinct
+   * from a soft `warning` (e.g. "Awaiting review"), which the driver can
+   * still tap through twice to proceed anyway.
+   */
+  blocked?: boolean;
 }) {
   const [dismissed, setDismissed] = useState(false);
 
@@ -702,8 +712,14 @@ function InspectionRow({
           Complete
         </span>
       ) : onAction ? (
-        <Button size="sm" onClick={handleAction} variant={warning && !dismissed ? "outline" : "default"} className="min-h-[44px] rounded-lg">
-          <ActionIcon className="w-4 h-4 mr-1" /> {warning && !dismissed ? "Override" : "Start"}
+        <Button
+          size="sm"
+          onClick={handleAction}
+          disabled={blocked}
+          variant={warning && !dismissed ? "outline" : "default"}
+          className="min-h-[44px] rounded-lg"
+        >
+          <ActionIcon className="w-4 h-4 mr-1" /> {blocked ? "Blocked" : warning && !dismissed ? "Override" : "Start"}
         </Button>
       ) : null}
     </div>

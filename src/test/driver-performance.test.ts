@@ -73,10 +73,13 @@ describe("driverPerformance — counts and aggregates", () => {
 });
 
 describe("driverPerformance — late events", () => {
+  // pickup_time_to / delivery_time_to are plain "HH:MM" text columns in the
+  // real schema (not ISO timestamps) — these fixtures match that shape so
+  // the test actually exercises the real parsing path (see isLate()).
   it("flags late pickup when actual > planned", () => {
     const p = calculateDriverPerformance("d1", [
       baseJob({
-        pickup_time_to: "2026-01-01T10:00:00Z",
+        pickup_time_to: "10:00",
         pickup_inspected_at: "2026-01-01T11:00:00Z",
       }),
     ]);
@@ -86,7 +89,7 @@ describe("driverPerformance — late events", () => {
   it("does not flag on-time pickup", () => {
     const p = calculateDriverPerformance("d1", [
       baseJob({
-        pickup_time_to: "2026-01-01T10:00:00Z",
+        pickup_time_to: "10:00",
         pickup_inspected_at: "2026-01-01T09:30:00Z",
       }),
     ]);
@@ -175,6 +178,16 @@ describe("driverPerformance — risk model", () => {
       baseJob({ status: "completed", evidenceHealth: ev("red") }),
     ]);
     expect(p.riskLevel).toBe("medium");
+  });
+
+  it("flags 3+ late events as a risk reason (regression: isLate() used to always return false)", () => {
+    const p = calculateDriverPerformance("d1", [
+      baseJob({ pickup_time_to: "10:00", pickup_inspected_at: "2026-01-01T11:00:00Z" }),
+      baseJob({ pickup_time_to: "10:00", pickup_inspected_at: "2026-01-01T11:00:00Z" }),
+      baseJob({ delivery_time_to: "14:00", delivery_inspected_at: "2026-01-01T15:00:00Z" }),
+    ]);
+    expect(p.latePickupCount + p.lateDeliveryCount).toBe(3);
+    expect(p.riskReasons.join(" ")).toMatch(/late events/);
   });
 });
 
