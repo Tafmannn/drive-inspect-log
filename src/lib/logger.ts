@@ -3,6 +3,7 @@
 // Best-effort only — never crashes the app.
 
 import { supabase } from "@/integrations/supabase/client";
+import { E2E_TEST_MODE } from "@/lib/runtimeMode";
 
 export type LogSeverity = "info" | "warn" | "error";
 
@@ -18,10 +19,6 @@ interface LogOptions {
   source?: LogSource;
   type?: LogType;
 }
-
-const E2E_TEST_MODE =
-  typeof import.meta !== "undefined" &&
-  (import.meta.env.VITE_E2E_TEST_MODE as string | undefined) === "true";
 
 /**
  * Log a client event. In E2E_TEST_MODE, also persists to client_logs.
@@ -100,9 +97,4 @@ export function installGlobalErrorHandlers(): void {
       context: { filename: e.filename, lineno: e.lineno, colno: e.colno },
     });
   });
-}
-
-/** Check if E2E test mode is active */
-export function isE2ETestMode(): boolean {
-  return E2E_TEST_MODE;
 }
