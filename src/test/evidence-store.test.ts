@@ -168,3 +168,70 @@ describe("evidenceUploadQueue — drain", () => {
     expect(up).not.toHaveBeenCalled();
   });
 });
+
+// ─── WORKFLOW-005: stranded "uploading" items must self-heal ──────────
+//
+// Same defect as the legacy pendingUploads pipeline: an app crash/reload
+// mid-upload leaves an item's uploadStatus frozen at "uploading". Neither
+// listPendingWork (queued/failed only) nor the upload queue's isEligible()
+// guard (queued/failed only) would ever pick it up again — the only way out
+// was deleting it and permanently losing that evidence.
+describe("evidenceStore — stranded uploading recovery", () => {
+  it("re-arms an uploading item to failed once it exceeds UPLOAD_STUCK_TIMEOUT_MS", async () => {
+    const item = await saveCapture({ ...CAP, file: makeFile() });
+    const { getMeta, putMeta } = await import("@/lib/evidence/indexedDb");
+    const { EVIDENCE_BUDGETS } = await import("@/lib/evidence/types");
+    const meta = await getMeta(item.localId);
+    await putMeta({
+      ...meta!,
+      uploadStatus: "uploading",
+      updatedAt: new Date(Date.now() - (EVIDENCE_BUDGETS.UPLOAD_STUCK_TIMEOUT_MS + 60_000)).toISOString(),
+    });
+
+    const pending = await listPendingWork();
+    expect(pending).toHaveLength(1);
+    expect(pending[0].uploadStatus).toBe("failed");
+    expect(pending[0].lastError).toMatch(/interrupted/i);
+
+    // Persisted, not just returned in-memory.
+    const reread = await getMeta(item.localId);
+    expect(reread?.uploadStatus).toBe("failed");
+  });
+
+  it("leaves a genuinely recent uploading item alone (does not race a live upload)", async () => {
+    const item = await saveCapture({ ...CAP, file: makeFile() });
+    const { getMeta, putMeta } = await import("@/lib/evidence/indexedDb");
+    const meta = await getMeta(item.localId);
+    await putMeta({ ...meta!, uploadStatus: "uploading", updatedAt: new Date().toISOString() });
+
+    expect(await listPendingWork()).toHaveLength(0);
+    const reread = await getMeta(item.localId);
+    expect(reread?.uploadStatus).toBe("uploading");
+  });
+
+  it("re-armed item is picked up and successfully uploaded by the queue", async () => {
+    const item = await saveCapture({ ...CAP, file: makeFile() });
+    const { getMeta, putMeta } = await import("@/lib/evidence/indexedDb");
+    const { EVIDENCE_BUDGETS } = await import("@/lib/evidence/types");
+    const meta = await getMeta(item.localId);
+    await putMeta({
+      ...meta!,
+      uploadStatus: "uploading",
+      updatedAt: new Date(Date.now() - (EVIDENCE_BUDGETS.UPLOAD_STUCK_TIMEOUT_MS + 60_000)).toISOString(),
+    });
+
+    const q = new EvidenceUploadQueue({
+      upload: vi.fn(async (i) => ({
+        serverId: i.localId,
+        storageBucket: "vehicle-photos",
+        storagePath: `jobs/${i.jobId}/pickup/front/${i.localId}.jpg`,
+        thumbnailPath: null,
+      })),
+    });
+    const res = await q.drain();
+    expect(res.attempted).toBe(1);
+    expect(res.uploaded).toBe(1);
+    const reread = await getMeta(item.localId);
+    expect(reread?.uploadStatus).toBe("uploaded");
+  });
+});

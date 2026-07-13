@@ -342,6 +342,127 @@ describe("pendingUploads — stale staged TTL", () => {
   });
 });
 
+// ─── WORKFLOW-005: stranded "uploading" items must self-heal on load ────
+//
+// An app crash, force-quit, tab close, or unexpected reload while a photo
+// is genuinely mid-upload leaves that item's persisted state frozen at
+// "uploading". Before this fix, NOTHING recovered it: retryUpload,
+// retryAllPending, and every focus/online/visibility auto-retry trigger all
+// unconditionally refuse "uploading" items (by design — see
+// lifecycle-integrity.test.ts's "REFUSES uploading items" contract, which
+// guards against racing a *genuinely* in-flight upload). That guard cannot
+// tell "in flight right now" apart from "abandoned by a dead session", so
+// the only way out was Discard — permanently losing that evidence.
+describe("pendingUploads — stranded uploading recovery", () => {
+  it("re-arms an uploading item to failed once it exceeds UPLOAD_STUCK_TIMEOUT_MS", async () => {
+    const item = await stagePendingUpload(makeFile(), {
+      submissionSessionId: SESSION_A,
+      clientPhotoId: "cpid-stuck",
+      jobId: "j1",
+      inspectionType: "pickup",
+      photoType: "x",
+      label: null,
+    });
+    await promoteSubmissionSession(SESSION_A, "insp-1");
+
+    // Simulate a crash mid-upload: state="uploading", started long ago.
+    const all = await __testing__.loadAll();
+    const idx = all.findIndex((u) => u.id === item.id);
+    all[idx] = {
+      ...all[idx],
+      state: "uploading",
+      status: "uploading",
+      uploadingStartedAt: new Date(
+        Date.now() - (__testing__.UPLOAD_STUCK_TIMEOUT_MS + 60_000),
+      ).toISOString(),
+    };
+    await __testing__.saveAll(all);
+
+    const reloaded = await getAllPendingUploads();
+    const found = reloaded.find((u) => u.id === item.id);
+    expect(found?.state).toBe("failed");
+    expect(found?.status).toBe("failed");
+    expect(found?.errorMessage).toMatch(/interrupted/i);
+  });
+
+  it("re-arms an uploading item with no uploadingStartedAt at all (predates the fix)", async () => {
+    const item = await stagePendingUpload(makeFile(), {
+      submissionSessionId: SESSION_A,
+      clientPhotoId: "cpid-legacy-stuck",
+      jobId: "j1",
+      inspectionType: "pickup",
+      photoType: "x",
+      label: null,
+    });
+    await promoteSubmissionSession(SESSION_A, "insp-1");
+
+    const all = await __testing__.loadAll();
+    const idx = all.findIndex((u) => u.id === item.id);
+    all[idx] = { ...all[idx], state: "uploading", status: "uploading", uploadingStartedAt: undefined };
+    await __testing__.saveAll(all);
+
+    const reloaded = await getAllPendingUploads();
+    expect(reloaded.find((u) => u.id === item.id)?.state).toBe("failed");
+  });
+
+  it("leaves a genuinely recent uploading item alone (does not race a live upload)", async () => {
+    const item = await stagePendingUpload(makeFile(), {
+      submissionSessionId: SESSION_A,
+      clientPhotoId: "cpid-live",
+      jobId: "j1",
+      inspectionType: "pickup",
+      photoType: "x",
+      label: null,
+    });
+    await promoteSubmissionSession(SESSION_A, "insp-1");
+
+    const all = await __testing__.loadAll();
+    const idx = all.findIndex((u) => u.id === item.id);
+    all[idx] = {
+      ...all[idx],
+      state: "uploading",
+      status: "uploading",
+      uploadingStartedAt: new Date(Date.now() - 5_000).toISOString(),
+    };
+    await __testing__.saveAll(all);
+
+    const reloaded = await getAllPendingUploads();
+    expect(reloaded.find((u) => u.id === item.id)?.state).toBe("uploading");
+  });
+
+  it("re-armed item becomes retryable again (not stuck via Discard-only)", async () => {
+    const item = await stagePendingUpload(makeFile(), {
+      submissionSessionId: SESSION_A,
+      clientPhotoId: "cpid-recover",
+      jobId: "j1",
+      inspectionType: "pickup",
+      photoType: "x",
+      label: null,
+    });
+    await promoteSubmissionSession(SESSION_A, "insp-1");
+
+    const all = await __testing__.loadAll();
+    const idx = all.findIndex((u) => u.id === item.id);
+    all[idx] = {
+      ...all[idx],
+      state: "uploading",
+      status: "uploading",
+      uploadingStartedAt: new Date(
+        Date.now() - (__testing__.UPLOAD_STUCK_TIMEOUT_MS + 60_000),
+      ).toISOString(),
+    };
+    await __testing__.saveAll(all);
+
+    mockUpload.mockResolvedValue({ url: "https://example.test/photo.jpg", backend: "gcs" });
+    mockInsertPhoto.mockResolvedValue({ id: "photo-1" });
+
+    const ok = await retryUpload(item.id);
+    expect(ok).toBe(true);
+    const final = (await getAllPendingUploads()).find((u) => u.id === item.id);
+    expect(final?.state).toBe("uploaded");
+  });
+});
+
 // ─── Misc preserved coverage ─────────────────────────────────────────
 
 describe("pendingUploads — misc operations", () => {
