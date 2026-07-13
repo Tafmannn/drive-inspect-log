@@ -200,6 +200,36 @@ export default {
       "USING(true) SELECT policy still active — every org's client_logs rows are readable by anyone, including anon",
     );
 
+    // 8) invoices writes — SECURITY-005. Same shape as SECURITY-001/003,
+    //    but unlike those, the invoices table's original permissive policy
+    //    was never captured by any tracked migration (no CREATE TABLE or
+    //    policy migration exists for it in history — confirmed live via
+    //    direct database inspection: production names it "Org admins can
+    //    manage invoices", staging names the identical-shaped policy "Org
+    //    members can manage invoices"). checkAdminOnlyWritesClosed's
+    //    CREATE/DROP lifecycle replay can't detect an exposure whose CREATE
+    //    was never tracked, so instead directly confirm the closure
+    //    migration drops both known names and creates the 3 admin-only
+    //    replacement policies.
+    const invoicesClose = files.find((f) => /invoices_admin_only_writes/.test(f));
+    if (invoicesClose) {
+      const sql = readFileSync(join(dir, invoicesClose), "utf8");
+      const dropsBothNames =
+        /DROP\s+POLICY\s+IF\s+EXISTS\s+"Org admins can manage invoices"/i.test(sql) &&
+        /DROP\s+POLICY\s+IF\s+EXISTS\s+"Org members can manage invoices"/i.test(sql);
+      const createsAdminOnly =
+        /CREATE\s+POLICY\s+"invoices_insert_admin"/i.test(sql) &&
+        /CREATE\s+POLICY\s+"invoices_update_admin"/i.test(sql) &&
+        /CREATE\s+POLICY\s+"invoices_delete_admin"/i.test(sql);
+      checks.push(
+        dropsBothNames && createsAdminOnly
+          ? pass("invoices writes admin-scoped", `both known permissive policy names dropped in ${invoicesClose}, admin-only policies created`)
+          : fail("invoices writes admin-scoped", `expected both DROP POLICY statements and 3 admin-only CREATE POLICY statements in ${invoicesClose}`),
+      );
+    } else {
+      checks.push(fail("invoices writes admin-scoped", "closure migration not found"));
+    }
+
     return { checks };
   },
 };
