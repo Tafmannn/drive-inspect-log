@@ -394,6 +394,7 @@ Full root causes, fixes, and test evidence for every defect are in Section 3 (De
 | `npm run release:validate` (full, 16 suites) | ⚠️ WARNING overall, **zero FAIL** — 8 PASS, 4 non-blocking WARNING (all pre-existing: migration-idempotency release-set note, edge-function-authorization static notes, one pre-existing high dependency advisory, 316-error ESLint backlog — down from the 317 documented baseline, confirming zero new lint errors), 4 NOT_EXECUTED (live-DB/HTTP suites — no staging credentials available in this environment) |
 | `npx eslint <touched files>` (per batch) | ✅ 0 new errors in every batch — every pre-existing error confirmed via diff to sit on an untouched line |
 | `@axe-core/cli` (attempted) | ❌ Blocked by the environment's safety classifier (unpinned npm package, no explicit user authorization) — see Batch 13 |
+| SonarCloud Code Analysis (PR check) | ❌ FAIL — 29.6% new-code duplication (required ≤3%); root-caused to an Automatic Analysis CI-configuration limitation, not real duplication — see Remaining Risk #6 |
 
 ### Remaining risks
 
@@ -402,6 +403,7 @@ Full root causes, fixes, and test evidence for every defect are in Section 3 (De
 3. **No automated accessibility scan was run** (axe-core install was blocked by the sandbox). Color contrast, ARIA-attribute validity, and screen-reader behaviour were not systematically checked. ~9 icon-only buttons and many `cursor-pointer` clickable elements outside the two components fixed in A11Y-001/002 still lack keyboard/screen-reader support.
 4. **Live-browser testing covered only 2 of 56 routes**, at 3 of the mandated viewports, with synthetic (not real) data. The full 320×568–1440×900 responsive matrix across all pages remains unverified visually.
 5. **The pre-existing 316-error ESLint backlog** (mostly `no-explicit-any`) is explicitly out of scope for this audit (a large, unrelated refactor) but remains a known code-quality debt.
+6. **SonarCloud Quality Gate fails on `new_duplicated_lines_density`** (~29.6%, required ≤3%) — investigated and understood to be a CI-configuration limitation, not a real regression. The duplication is concentrated in paired `supabase/migrations/**`/`supabase/rollback/**` SQL files (a `.down.sql` rollback restoring a prior `CREATE OR REPLACE FUNCTION` body is inherently near-identical to an earlier migration), which `sonar-project.properties` already excludes from analysis for `migrations/**` and was extended to `rollback/**` in this branch (commit `90d1d84`). However this repo's SonarCloud project runs in **Automatic Analysis** mode (no CI workflow invokes a scanner), which does not read `sonar-project.properties` at all — confirmed because the reported duplication percentage was byte-for-byte identical before and after the exclusion fix. Resolving this requires SonarCloud dashboard access (add the exclusion server-side, or switch the project to CI-based analysis with a `SONAR_TOKEN`), which isn't available in this session. Left for a human reviewer/admin; does not indicate an actual increase in duplicated application code.
 
 ### Manual QA instructions (for human review before merge)
 
