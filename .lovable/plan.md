@@ -1,21 +1,12 @@
-## Fix postcode-lookup & business-search 401 errors
+**Current diagnosis (no code changes made):**
+- Browser/runtime tools report **no recorded console errors** and **no runtime errors** for the preview snapshot.
+- `VITE_SUPABASE_URL` is **set**.
+- `VITE_SUPABASE_PUBLISHABLE_KEY` is **set**.
+- Recent Vite logs show the dev server is running and only restarted after `.env` changed; no current build/runtime error is visible.
 
-Both edge functions use `supabase.auth.getUser()` for auth, which fails on the new Supabase JWT signing-keys system with `missing sub claim` → returns 401 → search dropdown appears broken.
-
-### Changes
-
-**`supabase/functions/postcode-lookup/index.ts`** (auth block, ~lines 19-32)
-- Strip `Bearer ` prefix from `Authorization` header.
-- Replace `supabase.auth.getUser()` with `supabase.auth.getClaims(token)`.
-- Validate `claims?.sub` instead of `data.user`.
-- Keep same 401 response shape on failure.
-
-**`supabase/functions/business-search/index.ts`** (auth block, ~lines 16-29)
-- Same swap: `getUser()` → `getClaims(token)` with `sub` check.
-
-No client-side changes. CORS headers, query params, response shapes, and Places API logic remain untouched.
-
-### Verification
-- Deploy both functions.
-- Curl each with the preview session token: expect 200 with `results`.
-- Confirm in preview: postcode search returns addresses; business search returns companies.
+**Plan to resolve the white screen:**
+1. Reproduce the blank screen directly against the running app route, including `/index`, `/login`, and `/`, and capture the actual rendered DOM/screenshot state.
+2. If React is not mounting, trace the import chain from `src/main.tsx` and report/fix the first thrown module error.
+3. If React mounts locally but the Lovable iframe remains white, treat it as a preview-cache/service-worker or route-shell issue and add a minimal safe recovery path without hardcoding secrets.
+4. Verify after the fix by loading the same route in a mobile-sized viewport and confirming a visible login/app screen rather than a white page.
+5. Report the exact root cause and any changed files after implementation.
