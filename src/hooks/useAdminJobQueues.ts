@@ -25,6 +25,14 @@ export interface AdminJobQueues {
   review: AdminJobRow[];
   completed: AdminJobRow[];
   missingEvidence: AdminJobRow[];
+  /**
+   * True when the underlying fetch (ordered most-recently-updated first,
+   * capped at 300) hit its limit. Older, longer-untouched jobs sort last and
+   * are the first to be dropped — exactly the stale/unassigned/review jobs
+   * these queues exist to surface — so this signals every bucket below may
+   * be missing rows even though the KPI tiles above stay accurate.
+   */
+  truncated: boolean;
 }
 
 export function useAdminJobQueues() {
@@ -79,7 +87,10 @@ export function useAdminJobQueues() {
       // Cap completed to recent
       queues.completed = queues.completed.slice(0, 20);
 
-      return queues as AdminJobQueues;
+      return {
+        ...queues,
+        truncated: (data ?? []).length >= 300,
+      } as AdminJobQueues;
     },
     staleTime: 20_000,
   });

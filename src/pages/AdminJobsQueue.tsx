@@ -176,6 +176,16 @@ export function AdminJobsQueue() {
         {/* ── QUEUE SECTIONS ── */}
         {queues && !isLoading && (
           <>
+            {queues.truncated && (
+              <div className="p-3 rounded-xl bg-warning/5 border border-warning/20 flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
+                <p className="text-xs text-warning">
+                  Showing the most recently updated 300 jobs — older jobs may be missing from the
+                  queues below. KPI counts above remain accurate.
+                </p>
+              </div>
+            )}
+
             {(filter === "all" || filter === "attention") && (
               <QueueSection
                 title="Needs Attention"
