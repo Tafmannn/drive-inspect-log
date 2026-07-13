@@ -94,6 +94,10 @@ const EVENT_INVALIDATIONS: Record<EventClass, QueryKey[]> = {
     ["dashboard-counts"],
     ["jobs", "admin", "queues"],
     ["control-finance"],
+    // Separate from ["control-finance", filter] (the list query) — the KPI
+    // tiles (spend/receipt-coverage) register under their own key and were
+    // silently never invalidated by this event.
+    ["control-finance-kpis"],
   ],
 
   onboarding_review_changed: [
