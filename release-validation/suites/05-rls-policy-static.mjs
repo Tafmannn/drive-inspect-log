@@ -160,6 +160,37 @@ export default {
       checks.push(fail("onboarding-docs storage org-scoped", "closure migration not found"));
     }
 
+    // 6) clients / invoice_items writes — SECURITY-003. Same shape as
+    //    SECURITY-001: both were single FOR ALL policies scoped only by
+    //    org, letting any org member (not just admins) write client billing
+    //    profiles and invoice line items, even though every real call path
+    //    is admin-only (ControlClients/ClientFormModal, createInvoice.ts).
+    const clientsWritesExposure = policyExposureStillActive(dir, files, {
+      createPattern: /CREATE\s+POLICY\s+"Org members can manage clients"/i,
+      dropPattern: /DROP\s+POLICY\s+IF\s+EXISTS\s+"Org members can manage clients"/i,
+    });
+    checks.push(
+      clientsWritesExposure.active
+        ? fail(
+            "clients writes admin-scoped",
+            "permissive FOR ALL policy still active — any org member can insert/update/delete client records",
+          )
+        : pass("clients writes admin-scoped", `closed by ${clientsWritesExposure.closedBy}`),
+    );
+
+    const invoiceItemsWritesExposure = policyExposureStillActive(dir, files, {
+      createPattern: /CREATE\s+POLICY\s+"Org members can manage invoice_items"/i,
+      dropPattern: /DROP\s+POLICY\s+IF\s+EXISTS\s+"Org members can manage invoice_items"/i,
+    });
+    checks.push(
+      invoiceItemsWritesExposure.active
+        ? fail(
+            "invoice_items writes admin-scoped",
+            "permissive FOR ALL policy still active — any org member can insert/update/delete invoice line items",
+          )
+        : pass("invoice_items writes admin-scoped", `closed by ${invoiceItemsWritesExposure.closedBy}`),
+    );
+
     return { checks };
   },
 };

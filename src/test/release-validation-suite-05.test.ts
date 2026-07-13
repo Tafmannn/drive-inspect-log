@@ -142,3 +142,65 @@ describe("policyExposureStillActive — driver_onboarding writes (SECURITY-001)"
     expect(result.closedBy).toBe("20260713190000_close.sql");
   });
 });
+
+// SECURITY-003: clients/invoice_items had the same "Org members can manage
+// X" FOR ALL shape as driver_onboarding, even though every real write path
+// is admin-only in practice.
+const CLIENTS_WRITES_OPTS = {
+  createPattern: /CREATE\s+POLICY\s+"Org members can manage clients"/i,
+  dropPattern: /DROP\s+POLICY\s+IF\s+EXISTS\s+"Org members can manage clients"/i,
+};
+const INVOICE_ITEMS_WRITES_OPTS = {
+  createPattern: /CREATE\s+POLICY\s+"Org members can manage invoice_items"/i,
+  dropPattern: /DROP\s+POLICY\s+IF\s+EXISTS\s+"Org members can manage invoice_items"/i,
+};
+
+describe("policyExposureStillActive — clients/invoice_items writes (SECURITY-003)", () => {
+  it("flags the original permissive clients FOR ALL policy as active before the fix", () => {
+    write(
+      "20260323222553_init.sql",
+      `CREATE POLICY "Org members can manage clients" ON public.clients FOR ALL USING (is_super_admin() OR org_id = user_org_id());`,
+    );
+    const result = policyExposureStillActive(dir, ["20260323222553_init.sql"], CLIENTS_WRITES_OPTS);
+    expect(result.active).toBe(true);
+  });
+
+  it("resolves clients to closed once the admin-only migration drops it (the real-repo case)", () => {
+    write(
+      "20260323222553_init.sql",
+      `CREATE POLICY "Org members can manage clients" ON public.clients FOR ALL USING (is_super_admin() OR org_id = user_org_id());`,
+    );
+    write(
+      "20260713200000_close.sql",
+      `DROP POLICY IF EXISTS "Org members can manage clients" ON public.clients;`,
+    );
+    const files = ["20260323222553_init.sql", "20260713200000_close.sql"];
+    const result = policyExposureStillActive(dir, files, CLIENTS_WRITES_OPTS);
+    expect(result.active).toBe(false);
+    expect(result.closedBy).toBe("20260713200000_close.sql");
+  });
+
+  it("flags the original permissive invoice_items FOR ALL policy as active before the fix", () => {
+    write(
+      "20260323222553_init.sql",
+      `CREATE POLICY "Org members can manage invoice_items" ON public.invoice_items FOR ALL USING (true);`,
+    );
+    const result = policyExposureStillActive(dir, ["20260323222553_init.sql"], INVOICE_ITEMS_WRITES_OPTS);
+    expect(result.active).toBe(true);
+  });
+
+  it("resolves invoice_items to closed once the admin-only migration drops it (the real-repo case)", () => {
+    write(
+      "20260323222553_init.sql",
+      `CREATE POLICY "Org members can manage invoice_items" ON public.invoice_items FOR ALL USING (true);`,
+    );
+    write(
+      "20260713200000_close.sql",
+      `DROP POLICY IF EXISTS "Org members can manage invoice_items" ON public.invoice_items;`,
+    );
+    const files = ["20260323222553_init.sql", "20260713200000_close.sql"];
+    const result = policyExposureStillActive(dir, files, INVOICE_ITEMS_WRITES_OPTS);
+    expect(result.active).toBe(false);
+    expect(result.closedBy).toBe("20260713200000_close.sql");
+  });
+});
