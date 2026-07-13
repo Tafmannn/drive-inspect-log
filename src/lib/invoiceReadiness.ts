@@ -51,6 +51,7 @@ export type InvoiceBlockerCode =
   | "missing_price"
   | "missing_client"
   | "missing_billing_contact"
+  | "missing_receipts"
   | "evidence_red_or_critical"
   | "already_invoiced";
 
@@ -221,7 +222,7 @@ export function evaluateInvoiceReadiness(
     if (requireReceipts) {
       // Promote to a blocker only when the caller opts in.
       blockers.push({
-        code: "missing_billing_contact",
+        code: "missing_receipts",
         message: "Blocked: receipts required for this client",
       });
     }
