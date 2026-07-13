@@ -26,9 +26,23 @@ function hashText(value: string): string {
   return Math.abs(hash).toString(36);
 }
 
-/** Stable ID so acknowledgements survive refetches/navigation. */
-function stableExcId(partial: Omit<AttentionException, "id">): string {
+/**
+ * Stable ID so acknowledgements survive refetches/navigation.
+ *
+ * IMPORTANT: several exceptions embed a *live* value in their title/detail
+ * (elapsed minutes for timing, "expires in Nd" for compliance, a running
+ * failure count). Hashing those strings would make the ID change every
+ * minute/day, so an acknowledgement keyed on it would never stick. Callers
+ * that carry such volatile display text MUST pass an explicit `stableKey`
+ * (a value that identifies the exception, not its current wording); the
+ * title/detail fallback is only for exceptions whose text is already stable.
+ */
+function stableExcId(
+  partial: Omit<AttentionException, "id">,
+  stableKey?: string,
+): string {
   const jobPart = partial.jobId ?? "global";
+  if (stableKey) return `${partial.category}:${jobPart}:${stableKey}`;
   const titlePart = stablePart(partial.title, "exception");
   const detailPart = hashText(partial.detail ?? "");
   return `${partial.category}:${jobPart}:${titlePart}:${detailPart}`;
@@ -40,8 +54,9 @@ function minutesAgo(iso: string): number {
 
 function exc(
   partial: Omit<AttentionException, "id">,
+  stableKey?: string,
 ): AttentionException {
-  return { ...partial, id: stableExcId(partial) };
+  return { ...partial, id: stableExcId(partial, stableKey) };
 }
 
 /* ── Timing exceptions ─────────────────────────────────────────── */
@@ -70,7 +85,7 @@ export function deriveTimingExceptions(
         detail: `${Math.round(minutesAgo(ts))}m since ready — threshold ${T.readyForPickupNoStartMinutes}m`,
         createdAt: ts,
         actionLabel: "View job", actionRoute: `/jobs/${j.id}`,
-      }));
+      }, "no-pickup-started"));
     }
 
     if (j.status === "pickup_in_progress" && minutesAgo(ts) > T.pickupInProgressMinutes) {
@@ -80,7 +95,7 @@ export function deriveTimingExceptions(
         detail: `${Math.round(minutesAgo(ts))}m in pickup — threshold ${T.pickupInProgressMinutes}m`,
         createdAt: ts,
         actionLabel: "View job", actionRoute: `/jobs/${j.id}`,
-      }));
+      }, "pickup-too-long"));
     }
 
     if (j.status === "delivery_in_progress" && minutesAgo(ts) > T.deliveryInProgressMinutes) {
@@ -90,7 +105,7 @@ export function deriveTimingExceptions(
         detail: `${Math.round(minutesAgo(ts))}m in delivery — threshold ${T.deliveryInProgressMinutes}m`,
         createdAt: ts,
         actionLabel: "View job", actionRoute: `/jobs/${j.id}`,
-      }));
+      }, "delivery-too-long"));
     }
 
     if (j.status === "pod_ready" && minutesAgo(ts) > T.podReadyDelayMinutes) {
@@ -100,7 +115,7 @@ export function deriveTimingExceptions(
         detail: `${Math.round(minutesAgo(ts))}m since POD_READY — threshold ${T.podReadyDelayMinutes}m`,
         createdAt: ts,
         actionLabel: "View job", actionRoute: `/jobs/${j.id}`,
-      }));
+      }, "pod-delayed"));
     }
   }
   return out;
@@ -151,7 +166,7 @@ export function deriveEvidenceExceptions(
         detail: `All ${insps.length} inspection(s) lack driver signature`,
         createdAt: j.completed_at ?? j.updated_at,
         actionLabel: "Review inspection", actionRoute: `/jobs/${j.id}`,
-      }));
+      }, "missing-driver-signature"));
     }
     if (allMissingCustomer) {
       out.push(exc({
@@ -160,7 +175,7 @@ export function deriveEvidenceExceptions(
         detail: `All ${insps.length} inspection(s) lack customer signature`,
         createdAt: j.completed_at ?? j.updated_at,
         actionLabel: "Review inspection", actionRoute: `/jobs/${j.id}`,
-      }));
+      }, "missing-customer-signature"));
     }
   }
 
@@ -207,7 +222,7 @@ export function deriveEvidenceExceptions(
         detail: `${count} upload failures in last 24h`,
         createdAt: latestAt,
         actionLabel: "View job", actionRoute: `/jobs/${jobId}`,
-      }));
+      }, "repeated-upload-failures"));
     }
   }
 
@@ -353,7 +368,7 @@ export function deriveComplianceExceptions(
       createdAt: now,
       actionLabel,
       actionRoute: route,
-    }));
+    }, `doc-expiry:${d.id}`));
   }
 
   // Driver-level compliance gaps (active drivers only)
@@ -375,7 +390,7 @@ export function deriveComplianceExceptions(
         ...base, severity: "medium", category: "compliance",
         title: "Missing licence expiry",
         detail: `${name} — no licence expiry on file`,
-      }));
+      }, `licence-missing:${drv.user_id}`));
     } else {
       const days = daysUntil(drv.licence_expiry);
       if (days <= warnDays) {
@@ -385,7 +400,7 @@ export function deriveComplianceExceptions(
           category: "compliance",
           title: days < 0 ? "Driving licence expired" : `Licence expires in ${days}d`,
           detail: `${name} — licence ${days < 0 ? "overdue" : "renewal due"}`,
-        }));
+        }, `licence-expiry:${drv.user_id}`));
       }
     }
 
@@ -394,14 +409,14 @@ export function deriveComplianceExceptions(
         ...base, severity: "medium", category: "compliance",
         title: "Right to work not captured",
         detail: `${name} — RTW status missing`,
-      }));
+      }, `rtw-missing:${drv.user_id}`));
     }
     if (!drv.bank_captured) {
       out.push(exc({
         ...base, severity: "low", category: "compliance",
         title: "Bank details not captured",
         detail: `${name} — payout details missing`,
-      }));
+      }, `bank-missing:${drv.user_id}`));
     }
   }
 
