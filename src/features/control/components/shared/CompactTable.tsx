@@ -68,6 +68,18 @@ export function CompactTable<T extends { id?: string }>({
               key={row.id ?? i}
               className={cn(onRowClick && "cursor-pointer hover:bg-muted/50")}
               onClick={() => onRowClick?.(row)}
+              tabIndex={onRowClick ? 0 : undefined}
+              role={onRowClick ? "button" : undefined}
+              onKeyDown={
+                onRowClick
+                  ? (e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onRowClick(row);
+                      }
+                    }
+                  : undefined
+              }
             >
               {columns.map(col => (
                 <TableCell key={col.key} className={cn("py-2", col.className)}>

@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { pass, fail } from "../lib/types.mjs";
+import { isInReleaseSet } from "../lib/releaseSet.mjs";
 
 // Suite 04 — Rollback coverage for the release set (STATIC).
 // Every migration shipped in this release must have a matching, non-trivial
@@ -17,7 +18,7 @@ export default {
     const checks = [];
 
     const releaseSet = readdirSync(migDir)
-      .filter((f) => /^2026062[89].*\.sql$/.test(f))
+      .filter((f) => f.endsWith(".sql") && isInReleaseSet(f))
       .sort();
 
     for (const f of releaseSet) {

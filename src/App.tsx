@@ -46,6 +46,9 @@ import DriverProfileDetail from "./features/onboarding/pages/DriverProfileDetail
 import ClientProfileDetail from "./features/onboarding/pages/ClientProfileDetail";
 import OrganisationProfileDetail from "./features/onboarding/pages/OrganisationProfileDetail";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
+import { AccountStatusGate } from "./components/AccountStatusGate";
+import { DriverGateScreen } from "./components/DriverGateScreen";
+import { useDriverGate } from "@/hooks/useDriverGate";
 import { useEffect } from "react";
 import { installRetryTriggers, triggerRetry } from "@/lib/retryOrchestrator";
 import { installSubmitQueueDrainer, drainSubmitQueue } from "@/lib/submitQueue";
@@ -111,7 +114,7 @@ function BackgroundUploader() {
 
 /* ── Protected route wrapper ── */
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { authEnabled, authLoading, user } = useAuth();
 
   if (!authEnabled) return <>{children}</>;
@@ -127,26 +130,37 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!user) return <Navigate to="/login" replace />;
 
   // Block suspended or pending_activation users
-  if (user.accountStatus === "suspended") {
+  if (user.accountStatus === "suspended" || user.accountStatus === "pending_activation") {
+    return <AccountStatusGate user={user} />;
+  }
+
+  return <DriverOnboardingGate>{children}</DriverOnboardingGate>;
+}
+
+/**
+ * WORKFLOW-002: useDriverGate() (blocks drivers whose onboarding is
+ * no_profile/onboarding/rejected) was previously enforced only by Dashboard
+ * rendering <DriverGateScreen> at "/" — every other protected route
+ * (JobDetail, InspectionFlow, PodReport, PendingUploads, ExpenseForm, ...)
+ * never checked it, so a not-yet-approved or rejected driver could still
+ * reach a job directly (e.g. via browser history) and complete a real
+ * inspection. Centralising the check in ProtectedRoute closes every route at
+ * once. This is a no-op for admins/superadmins: useDriverGate()'s query is
+ * gated on `isDriverOnly`, so it never even fires for non-driver roles.
+ */
+function DriverOnboardingGate({ children }: { children: React.ReactNode }) {
+  const gate = useDriverGate();
+
+  if (gate.isDriverOnly && gate.status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-6">
-        <div className="text-center space-y-2 max-w-sm">
-          <h1 className="text-lg font-semibold text-destructive">Account Suspended</h1>
-          <p className="text-sm text-muted-foreground">Your account has been suspended. Contact your administrator for assistance.</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
 
-  if (user.accountStatus === "pending_activation") {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-6">
-        <div className="text-center space-y-2 max-w-sm">
-          <h1 className="text-lg font-semibold text-foreground">Account Pending</h1>
-          <p className="text-sm text-muted-foreground">Your account is pending activation. You'll be notified when access is granted.</p>
-        </div>
-      </div>
-    );
+  if (gate.isDriverOnly && gate.status !== "active") {
+    return <DriverGateScreen gateStatus={gate.status as Exclude<typeof gate.status, "loading" | "active" | "ungated">} />;
   }
 
   return <>{children}</>;

@@ -19,6 +19,11 @@ export default defineConfig({
       VITE_SUPABASE_URL: "http://localhost:54321",
       VITE_SUPABASE_PUBLISHABLE_KEY: "test-anon-key",
     },
+    coverage: {
+      provider: "v8",
+      reporter: ["lcov", "text"],
+      reportsDirectory: "./coverage",
+    },
   },
   resolve: {
     alias: { "@": path.resolve(__dirname, "./src") },

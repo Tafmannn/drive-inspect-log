@@ -215,17 +215,26 @@ export async function linkJobToClient(
   jobId: string,
   clientId: string | null
 ): Promise<void> {
-  const { error } = await supabase
+  // Best-effort: also point any existing invoice for this job at the new
+  // client. PGRST116 ("no rows") is expected when the job has no invoice
+  // yet — anything else is a real failure and must propagate so the caller
+  // knows the link didn't fully take (previously silently discarded here).
+  const { error: invoiceError } = await supabase
     .from("invoices")
     .update({ client_id: clientId } as any)
     .eq("job_id", jobId);
-  if (error && error.code !== "PGRST116") {
-    // ignore "0 rows" errors
+  if (invoiceError && invoiceError.code !== "PGRST116") {
+    throw invoiceError;
   }
 
   if (clientId) {
     const client = await getClient(clientId);
-    await supabase
+    // Authoritative write: these are the exact fields
+    // useInvoicePrepData.ts's eligibility matcher keys off of. A failure
+    // here must throw — silently resolving would leave the job
+    // permanently unmatched to this client for invoicing with no error
+    // ever surfaced (previously unchecked here entirely).
+    const { error: jobError } = await supabase
       .from("jobs")
       .update({
         client_company: client.company || client.name,
@@ -233,6 +242,7 @@ export async function linkJobToClient(
         client_email: client.email,
       } as any)
       .eq("id", jobId);
+    if (jobError) throw jobError;
   }
 }
 

@@ -95,6 +95,6 @@ GRANT EXECUTE ON FUNCTION public.allocate_invoice_number(uuid) TO authenticated;
 ALTER TABLE public.invoices
   ADD CONSTRAINT invoices_org_number_unique UNIQUE (org_id, invoice_number);
 
-CREATE UNIQUE INDEX invoice_items_job_id_unique
+CREATE UNIQUE INDEX IF NOT EXISTS invoice_items_job_id_unique
   ON public.invoice_items (job_id)
   WHERE job_id IS NOT NULL;

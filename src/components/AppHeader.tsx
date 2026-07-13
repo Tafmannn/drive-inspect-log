@@ -1,6 +1,7 @@
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { useAuth } from "@/context/AuthContext";
 
 interface AppHeaderProps {
   title?: string;
@@ -16,6 +17,8 @@ export const AppHeader = ({
   children,
 }: AppHeaderProps) => {
   const navigate = useNavigate();
+  const { isSuperAdmin, isAdmin } = useAuth();
+  const roleLabel = isSuperAdmin ? "Super Admin" : isAdmin ? "Admin" : "Driver App";
 
   const handleBack = () => {
     if (onBack) onBack();
@@ -35,7 +38,7 @@ export const AppHeader = ({
           <img src="/axentra-logo.png" alt="Axentra" className="h-5 w-auto brightness-0 invert" />
           <span className="text-[14px] font-semibold text-white tracking-tight">Axentra Vehicles</span>
         </button>
-        <span className="text-[11px] text-white/60 font-medium">Driver App</span>
+        <span className="text-[11px] text-white/60 font-medium">{roleLabel}</span>
       </div>
       {/* Breadcrumb trail */}
       <div className="px-4 py-1.5 border-b border-border bg-muted/50">

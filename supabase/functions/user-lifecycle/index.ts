@@ -9,6 +9,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { findAuthUserByEmail, listAllAuthUsers } from "../_shared/adminUsers.ts";
+import { isSensitivePermissionBlockedForNonSuperAdmin } from "../_shared/permissionEscalation.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -523,8 +524,11 @@ serve(async (req) => {
         if (targetProfile.role === "super_admin") {
           return json({ error: "CANNOT_MANAGE_SUPER_ADMIN" }, 403);
         }
-        // Admin can't manage sensitive permissions they don't have authority over
-        if (permDef.is_sensitive && ["users.manage_permissions", "users.manage_admins", "platform.super_admin"].includes(permission_key)) {
+        // Admin can't manage sensitive permissions they don't have authority
+        // over (SECURITY-002: previously hardcoded to 3 specific keys,
+        // which let an admin manage any OTHER is_sensitive permission via
+        // direct API call even though the UI hides all of them).
+        if (isSensitivePermissionBlockedForNonSuperAdmin(permDef)) {
           return json({ error: "CANNOT_MANAGE_SENSITIVE_PERMISSION" }, 403);
         }
       }

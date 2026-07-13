@@ -222,6 +222,14 @@ export const EVIDENCE_BUDGETS = {
   BACKOFF_BASE_MS: 2000,
   BACKOFF_FACTOR: 2,
   BACKOFF_CAP_MS: 5 * 60 * 1000,
+  /**
+   * WORKFLOW-005: an item stuck in "uploading" (app crash/reload mid-upload)
+   * is invisible to listPendingWork (queued/failed only) with nothing to ever
+   * move it back — same defect as the legacy pendingUploads pipeline. A real
+   * single-item upload completes in seconds; this is deliberately generous so
+   * it never races a genuinely slow-but-active upload within a live session.
+   */
+  UPLOAD_STUCK_TIMEOUT_MS: 5 * 60 * 1000,
 } as const;
 
 /** IndexedDB database + store names (versioned; never rename in place). */

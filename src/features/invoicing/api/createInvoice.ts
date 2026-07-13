@@ -49,13 +49,24 @@ async function getNextInvoiceNumber(orgId: string): Promise<string> {
   return data as string;
 }
 
-/** Check which job IDs are already linked to invoice_items */
-async function findAlreadyInvoicedJobs(jobIds: string[]): Promise<Set<string>> {
-  const { data } = await supabase
-    .from("invoice_items")
-    .select("job_id")
-    .in("job_id", jobIds);
-  return new Set((data ?? []).map((r: any) => r.job_id).filter(Boolean));
+/**
+ * Check which job IDs are already invoiced, via EITHER invoicing path:
+ * the multi-job flow (a row in invoice_items) or the legacy single-job
+ * flow (InvoiceGenerator.tsx writes invoices.job_id directly and never
+ * creates an invoice_items row). WORKFLOW-008: checking invoice_items
+ * alone let a job invoiced through one path silently be invoiced again
+ * through the other, since neither flow knew about the other's storage.
+ */
+export async function findAlreadyInvoicedJobs(jobIds: string[]): Promise<Set<string>> {
+  if (jobIds.length === 0) return new Set();
+  const [itemsResult, legacyResult] = await Promise.all([
+    supabase.from("invoice_items").select("job_id").in("job_id", jobIds),
+    supabase.from("invoices").select("job_id").in("job_id", jobIds),
+  ]);
+  const ids = new Set<string>();
+  for (const r of itemsResult.data ?? []) if (r.job_id) ids.add(r.job_id);
+  for (const r of legacyResult.data ?? []) if (r.job_id) ids.add(r.job_id);
+  return ids;
 }
 
 export async function createMultiJobInvoice(

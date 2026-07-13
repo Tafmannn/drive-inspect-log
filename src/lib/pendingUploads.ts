@@ -98,6 +98,23 @@ export type PendingUploadState =
  */
 export const STAGED_TTL_MS = 30 * 60 * 1000;
 
+/**
+ * WORKFLOW-005: an item stuck in "uploading" (app crash, force-quit, tab
+ * close, or unexpected reload mid-upload) was never recovered by anything —
+ * retryUpload, retryAllPending, and every focus/online/visibility auto-retry
+ * trigger all unconditionally refuse "uploading" items (by design, to avoid
+ * racing a genuinely in-flight upload — see lifecycle-integrity.test.ts).
+ * That guard has no way to distinguish "genuinely in flight right now" from
+ * "abandoned by a session that no longer exists", so once marked uploading,
+ * an item was retryable by NOTHING, forever — the only user-facing action
+ * left was Discard, which permanently loses that evidence.
+ *
+ * A real single-photo upload completes in seconds even on a poor connection;
+ * this threshold is deliberately generous so it can never misfire against a
+ * genuinely slow-but-active upload within the same live session.
+ */
+export const UPLOAD_STUCK_TIMEOUT_MS = 5 * 60 * 1000;
+
 export interface PendingUpload {
   id: string;
   jobId: string;
@@ -115,6 +132,12 @@ export interface PendingUpload {
   state: PendingUploadState;
   errorMessage?: string | null;
   lastErrorAt?: string | null;
+  /**
+   * Set when state transitions to "uploading". Lets loadAll() distinguish a
+   * genuinely in-flight upload from one stranded by a crash/reload/force-quit
+   * mid-upload — see UPLOAD_STUCK_TIMEOUT_MS.
+   */
+  uploadingStartedAt?: string | null;
 
   /**
    * Raw image blob, kept until the upload succeeds.
@@ -361,8 +384,11 @@ async function loadAllRaw(): Promise<PendingUpload[]> {
 }
 
 /**
- * Public load. Auto-purges stale "staged" items (TTL expired) on every
- * read so workers cannot inadvertently promote zombie sessions.
+ * Public load. Auto-purges stale "staged" items (TTL expired) and re-arms
+ * "uploading" items stranded past UPLOAD_STUCK_TIMEOUT_MS (crash/reload
+ * mid-upload — see WORKFLOW-005 above) on every read, so workers cannot
+ * inadvertently promote zombie sessions and stranded evidence is never
+ * permanently unretriable.
  */
 async function loadAll(): Promise<PendingUpload[]> {
   const all = await loadAllRaw();
@@ -398,7 +424,48 @@ async function loadAll(): Promise<PendingUpload[]> {
       },
     });
   }
-  return survivors;
+
+  const stranded: PendingUpload[] = [];
+  const result = survivors.map((u) => {
+    if (u.state !== "uploading") return u;
+    const startedAt = u.uploadingStartedAt ? new Date(u.uploadingStartedAt).getTime() : 0;
+    const age = now - startedAt;
+    // Missing uploadingStartedAt means this row predates the field (or was
+    // otherwise never stamped) — treat as stranded rather than trusting an
+    // unknown-age "uploading" row forever.
+    if (!u.uploadingStartedAt || age > UPLOAD_STUCK_TIMEOUT_MS) {
+      stranded.push(u);
+      return {
+        ...u,
+        state: "failed" as PendingUploadState,
+        status: "failed" as PendingUploadStatus,
+        errorMessage: "Upload was interrupted (app closed or crashed mid-upload). Retry to resume.",
+        lastErrorAt: new Date().toISOString(),
+        uploadingStartedAt: null,
+      };
+    }
+    return u;
+  });
+
+  if (stranded.length > 0) {
+    try {
+      await saveAll(result);
+    } catch {
+      /* ignore — next load retries the re-arm */
+    }
+    void logClientEvent("pending_upload_uploading_rearmed", "warn", {
+      source: "storage",
+      type: "upload",
+      context: {
+        rearmedCount: stranded.length,
+        ids: stranded.map((u) => u.id),
+        reason: "stale_uploading_state",
+      },
+    });
+    notifyEvidenceQueueChanged();
+  }
+
+  return result;
 }
 
 /**
@@ -998,6 +1065,7 @@ export async function retryUpload(
       state: "uploading",
       status: "uploading",
       errorMessage: null,
+      uploadingStartedAt: new Date().toISOString(),
     }));
 
     if (!existing) return false;
@@ -1351,4 +1419,5 @@ export const __testing__ = {
   QUEUE_KEY,
   BLOB_KEY_PREFIX,
   STAGED_TTL_MS,
+  UPLOAD_STUCK_TIMEOUT_MS,
 };

@@ -437,6 +437,9 @@ export async function completeJobRpc(jobId: string, notes?: string): Promise<Job
     if (error.message?.includes('INVALID_COMPLETION_TRANSITION')) {
       throw new Error('This job cannot be completed from its current status.');
     }
+    if (error.message?.includes('ADMIN_OR_SUPER_ADMIN_ONLY')) {
+      throw new Error('Only an admin or super-admin can complete this job.');
+    }
     throw error;
   }
   return data as Job;

@@ -142,9 +142,44 @@ export async function listByJobStageCategory(
   return (await listByJobStage(jobId, stage)).filter((e) => e.category === category);
 }
 
-/** Every item still needing work (queued or failed) across all jobs — queue boot. */
+/**
+ * Every item still needing work (queued or failed) across all jobs — queue
+ * boot. Also re-arms any item stranded in "uploading" past
+ * UPLOAD_STUCK_TIMEOUT_MS (app crash/reload/force-quit mid-upload) back to
+ * "failed" first — otherwise nothing (this function, the upload queue's
+ * isEligible() guard, and every retry trigger) would ever pick it up again,
+ * and the only way out would be deleting it and permanently losing that
+ * evidence. Mirrors the same fix in the legacy pendingUploads pipeline.
+ */
 export async function listPendingWork(): Promise<EvidenceItem[]> {
   const all = await listAllMeta();
+  const now = Date.now();
+
+  const stranded = all.filter(
+    (e) =>
+      e.uploadStatus === "uploading" &&
+      now - Date.parse(e.updatedAt) > EVIDENCE_BUDGETS.UPLOAD_STUCK_TIMEOUT_MS,
+  );
+  if (stranded.length > 0) {
+    const strandedMessage = "Upload was interrupted (app closed or crashed mid-upload). Retry to resume.";
+    await Promise.all(
+      stranded.map((e) =>
+        patch(e.localId, (item) => ({
+          ...item,
+          uploadStatus: "failed",
+          lastError: strandedMessage,
+        })),
+      ),
+    );
+    // Keep `all` (and therefore this function's return value) consistent
+    // with what was just persisted, instead of returning stale in-memory
+    // copies for the very items we just re-armed.
+    for (const e of stranded) {
+      e.uploadStatus = "failed";
+      e.lastError = strandedMessage;
+    }
+  }
+
   return all.filter((e) => e.uploadStatus === "queued" || e.uploadStatus === "failed");
 }
 

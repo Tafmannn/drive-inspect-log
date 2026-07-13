@@ -201,8 +201,16 @@ export const Expenses = () => {
               return (
                 <div
                   key={e.id}
+                  role="button"
+                  tabIndex={0}
                   className="p-3 rounded-xl bg-card border border-border shadow-sm space-y-1.5 cursor-pointer active:bg-muted/50 transition-colors"
                   onClick={() => navigate(`/expenses/${e.id}/edit${isScoped ? `?jobId=${scopedJobId}` : ""}`)}
+                  onKeyDown={(ev) => {
+                    if (ev.key === "Enter" || ev.key === " ") {
+                      ev.preventDefault();
+                      navigate(`/expenses/${e.id}/edit${isScoped ? `?jobId=${scopedJobId}` : ""}`);
+                    }
+                  }}
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-[16px] font-semibold text-foreground tabular-nums">{fmt(Number(e.amount))}</span>

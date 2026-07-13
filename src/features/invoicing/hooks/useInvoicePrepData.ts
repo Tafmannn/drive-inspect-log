@@ -19,6 +19,7 @@ import {
   INVOICEABLE_STATUSES,
   type InvoiceReadinessResult,
 } from "@/lib/invoiceReadiness";
+import { findAlreadyInvoicedJobs } from "../api/createInvoice";
 
 export interface EligibleJob {
   id: string;
@@ -101,16 +102,14 @@ export function useEligibleJobs(
 
       if (!clientJobs.length) return [];
 
-      // 3. Look up which jobs are already in invoice_items (do NOT drop —
-      //    we surface them in the UI with an "Already invoiced" badge so
-      //    admins can see the history rather than silently filtering).
+      // 3. Look up which jobs are already invoiced — via EITHER the
+      //    multi-job flow (invoice_items) or the legacy single-job flow
+      //    (invoices.job_id directly, e.g. from PodReport's "Create
+      //    Invoice" button) — WORKFLOW-008. Do NOT drop matches: we
+      //    surface them in the UI with an "Already invoiced" badge so
+      //    admins can see the history rather than silently filtering.
       const jobIds = clientJobs.map((j) => j.id);
-      const { data: invoiced } = await supabase
-        .from("invoice_items")
-        .select("job_id")
-        .in("job_id", jobIds);
-
-      const invoicedIds = new Set((invoiced ?? []).map((r: any) => r.job_id));
+      const invoicedIds = await findAlreadyInvoicedJobs(jobIds);
 
       // 4. Receipt counts from expenses (used by readiness warnings + UI)
       const countMap = new Map<string, number>();
