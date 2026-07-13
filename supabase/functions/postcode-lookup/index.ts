@@ -7,9 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-// This endpoint deliberately accepts unauthenticated (anon-key) calls, so
-// without a limiter it's an open door to unlimited billed Google Maps/Places
-// API usage.
+// Public + billed third-party API — see rateLimit.ts.
 const rateLimiter = createIpRateLimiter(corsHeaders);
 
 const UK_POSTCODE_RE = /^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i;

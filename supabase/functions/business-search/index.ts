@@ -7,9 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-// This endpoint deliberately accepts unauthenticated (anon-key) calls, and
-// each request can fan out into several chained Google Places/Geocode calls,
-// so without a limiter it's an open door to unlimited billed API usage.
+// Public + billed third-party API (multiple chained calls per request) — see rateLimit.ts.
 const rateLimiter = createIpRateLimiter(corsHeaders);
 
 const UK_POSTCODE_RE = /\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/i;
