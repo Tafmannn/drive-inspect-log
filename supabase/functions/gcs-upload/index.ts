@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { authenticateCaller } from "../_shared/auth.ts";
+import { authenticateCaller, callerCanAccessPath } from "../_shared/auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -30,7 +30,6 @@ interface UploadRequest {
   fileName: string;
   contentType: string;
   fileBase64: string;
-  jobId?: string;
 }
 
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
@@ -117,21 +116,6 @@ serve(async (req) => {
       );
     }
 
-    // ─── Job ownership check ───
-    if (body.jobId) {
-      const { data: job } = await admin
-        .from("jobs")
-        .select("id, org_id")
-        .eq("id", body.jobId)
-        .single();
-
-      if (!job || job.org_id !== userOrgId) {
-        return new Response(JSON.stringify({ error: "FORBIDDEN" }), {
-          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-    }
-
     // Deterministic, sanitised object name (V5). The client supplies a unique,
     // namespaced path (jobs/<job>/<type>/<photoType>/<itemId>.<ext> or
     // jobs/<job>/signatures/<type>/<role>.<ext>), so retries OVERWRITE the same
@@ -144,6 +128,20 @@ serve(async (req) => {
         JSON.stringify({ error: "Invalid fileName" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // ─── Authorize the write against the caller's org (cross-org write guard) ───
+    // The jobId is derived from the object path itself — not from a separate
+    // client-supplied field — because no real caller ever sends one (the
+    // upload wrapper only ever sends fileName/contentType/fileBase64), which
+    // previously left every upload unauthorized: any authenticated user could
+    // overwrite any job's photos/signatures in any org by naming the object
+    // `jobs/<other-job-id>/...`. callerCanAccessPath extracts the jobId from
+    // the path itself and fails closed if it can't.
+    if (!(await callerCanAccessPath(admin, caller, finalName))) {
+      return new Response(JSON.stringify({ error: "FORBIDDEN" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const uploadUrl = `https://storage.googleapis.com/upload/storage/v1/b/${bucket}/o?uploadType=media&name=${encodeURIComponent(finalName)}`;
