@@ -1,5 +1,6 @@
 import { Navigate } from "react-router-dom";
 import { useAuth, type AppRole } from "@/context/AuthContext";
+import { AccountStatusGate } from "@/components/AccountStatusGate";
 import { Loader2 } from "lucide-react";
 
 /**
@@ -27,6 +28,15 @@ export function ControlRoute({
   }
 
   if (!user) return <Navigate to="/login" replace />;
+
+  // Block suspended or pending_activation users — this guard is the sole
+  // gate for /control/* (it is not nested inside ProtectedRoute), so it must
+  // enforce the same account-status check or a suspended admin retains full
+  // Command Center access (dispatch, POD review, finance, driver management,
+  // and the super-admin panel) despite being locked out everywhere else.
+  if (user.accountStatus === "suspended" || user.accountStatus === "pending_activation") {
+    return <AccountStatusGate user={user} />;
+  }
 
   // Check specific role requirement
   if (requiredRole === "SUPERADMIN" && !isSuperAdmin) {
