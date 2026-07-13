@@ -174,7 +174,7 @@ export default function ClientOnboardingWizard() {
       setStep(step + 1);
     } else {
       toast({ title: "Client onboarding saved" });
-      navigate(`/admin/clients/${clientId}`);
+      navigate(`/control/clients/${clientId}`);
     }
   };
 
@@ -210,7 +210,7 @@ export default function ClientOnboardingWizard() {
       saving={saving}
       isFirst={step === 1}
       isLast={step === STEPS.length}
-      exitTo={`/admin/clients/${clientId}`}
+      exitTo={`/control/clients/${clientId}`}
       banner={banner}
     >
       {step === 1 && (

@@ -239,8 +239,10 @@ const App = () => {
                 <Route path="/admin/onboarding" element={<ProtectedRoute><AdminRoute><AdminOnboarding /></AdminRoute></ProtectedRoute>} />
                 <Route path="/admin/drivers/:userId" element={<ProtectedRoute><AdminRoute><DriverProfileDetail /></AdminRoute></ProtectedRoute>} />
                 <Route path="/admin/drivers/:userId/complete" element={<ProtectedRoute><AdminRoute><DriverOnboardingWizard /></AdminRoute></ProtectedRoute>} />
-                <Route path="/admin/clients/:clientId" element={<ProtectedRoute><AdminRoute><ClientProfileDetail /></AdminRoute></ProtectedRoute>} />
-                <Route path="/admin/clients/:clientId/complete" element={<ProtectedRoute><AdminRoute><ClientOnboardingWizard /></AdminRoute></ProtectedRoute>} />
+                {/* Lives under /control (not /admin) — clients are only ever listed at
+                    /control/clients, and ClientProfileDetail's back button points there. */}
+                <Route path="/control/clients/:clientId" element={<ProtectedRoute><AdminRoute><ClientProfileDetail /></AdminRoute></ProtectedRoute>} />
+                <Route path="/control/clients/:clientId/complete" element={<ProtectedRoute><AdminRoute><ClientOnboardingWizard /></AdminRoute></ProtectedRoute>} />
                 <Route path="/super-admin/orgs/:orgId" element={<ProtectedRoute><SuperAdminRoute><OrganisationProfileDetail /></SuperAdminRoute></ProtectedRoute>} />
                 <Route path="/super-admin/orgs/:orgId/complete" element={<ProtectedRoute><SuperAdminRoute><OrganisationOnboardingWizard /></SuperAdminRoute></ProtectedRoute>} />
 

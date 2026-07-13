@@ -118,9 +118,9 @@ function isStepComplete(step: WorkflowStep, status: string): boolean {
 
 export const JobDetail = () => {
   const navigate = useNavigate();
-  const goBack = useSafeBack("/jobs");
   const { jobId } = useParams<{ jobId: string }>();
   const [searchParams] = useSearchParams();
+  const goBack = useSafeBack("/jobs", searchParams);
   const { data: job, isLoading } = useJob(jobId ?? "");
   const { data: allActiveJobs } = useActiveJobs();
   const { data: jobExpenses } = useJobExpenses(jobId ?? "");
@@ -471,7 +471,7 @@ export const JobDetail = () => {
               onClick={() => navigate(
                 isReviewOnly
                   ? withFrom(`/jobs/${job.id}/pod`, searchParams)
-                  : primaryCta.route(job.id)
+                  : withFrom(primaryCta.route(job.id), searchParams)
               )}
             >
               {isReviewOnly ? "View POD" : primaryCta.label}

@@ -332,7 +332,7 @@ export function deriveComplianceExceptions(
       route = userId ? `/admin/drivers/${userId}` : "/admin/drivers";
       actionLabel = "Open driver";
     } else if (d.related_type === "client") {
-      route = `/admin/clients/${d.related_id}`;
+      route = `/control/clients/${d.related_id}`;
       actionLabel = "Open client";
       subjectName = "Client";
     } else if (d.related_type === "organisation" || d.related_type === "org") {

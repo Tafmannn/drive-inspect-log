@@ -31,8 +31,16 @@ function renderHtml(opts: {
   deliveryCity: string;
   dateStr: string;
   downloadHref: string;
+  photosHref: string | null;
 }): string {
-  const { jobRef, vehicleReg, pickupCity, deliveryCity, dateStr, downloadHref } = opts;
+  const { jobRef, vehicleReg, pickupCity, deliveryCity, dateStr, downloadHref, photosHref } = opts;
+  const photosLink = photosHref
+    ? `<p style="margin:0 0 16px;text-align:center;">
+                  <a href="${photosHref}" style="color:#6b7280;font-size:13px;text-decoration:underline;">
+                    Download original photos (optional)
+                  </a>
+                </p>`
+    : "";
   return `<!doctype html>
 <html>
   <body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
@@ -60,7 +68,8 @@ function renderHtml(opts: {
                     Download POD
                   </a>
                 </p>
-                <p style="margin:0 0 16px;color:#6b7280;font-size:13px;">This link expires in 30 days.</p>
+                ${photosLink}
+                <p style="margin:0 0 16px;color:#6b7280;font-size:13px;">Link(s) expire in 30 days.</p>
                 <p style="margin:0 0 16px;">If you have any queries, please do not hesitate to contact us.</p>
                 <p style="margin:24px 0 0;">Kind regards,<br/>Axentra Vehicle Logistics<br/>info@axentravehicles.com</p>
               </td>
@@ -97,7 +106,7 @@ serve(async (req) => {
     const fromAddress = Deno.env.get("POD_EMAIL_FROM") || "Axentra Vehicle Logistics <onboarding@resend.dev>";
 
     const body = await req.json();
-    const { to, jobId, jobRef, vehicleReg, pickupCity, deliveryCity, dateStr, downloadUrl } = body ?? {};
+    const { to, jobId, jobRef, vehicleReg, pickupCity, deliveryCity, dateStr, downloadUrl, photosZipUrl } = body ?? {};
 
     if (!to || typeof to !== "string" || !EMAIL_RE.test(to)) {
       return new Response(
@@ -118,6 +127,8 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+    // Optional — omit the link rather than fail the whole send if it's missing/invalid.
+    const photosHref = typeof photosZipUrl === "string" ? safeHref(photosZipUrl) : null;
 
     // ─── Authorization: this sends on the org's behalf via a shared sending
     // identity/reputation, so a caller must not be able to reach jobs outside
@@ -154,6 +165,7 @@ serve(async (req) => {
       deliveryCity: String(deliveryCity ?? "Unknown"),
       dateStr: String(dateStr ?? ""),
       downloadHref,
+      photosHref,
     });
 
     const resendResp = await fetch("https://api.resend.com/emails", {
