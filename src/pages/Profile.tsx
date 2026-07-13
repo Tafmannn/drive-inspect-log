@@ -7,6 +7,7 @@ import { DriverProfileForm } from "@/components/DriverProfileForm";
 import { useAuth } from "@/context/AuthContext";
 import { useDriverGate } from "@/hooks/useDriverGate";
 import { supabase } from "@/integrations/supabase/client";
+import { getOrgId } from "@/lib/orgHelper";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -35,8 +36,9 @@ export const Profile = () => {
   useEffect(() => {
     const loadOrgId = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const id = session?.user?.user_metadata?.org_id ?? session?.user?.app_metadata?.org_id;
+        // Authoritative source (app_metadata / user_profiles), not the
+        // self-writable user_metadata this previously read first.
+        const id = await getOrgId();
         if (id) setOrgId(id);
       } catch { /* keep fallback */ }
     };

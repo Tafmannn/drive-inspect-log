@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { getOrgId } from "@/lib/orgHelper";
 import { downloadInvoicePdf, type InvoiceLineItem, type InvoiceData } from "@/lib/invoicePdf";
 import {
   Loader2, Plus, Trash2, FileDown, Receipt,
@@ -31,21 +32,17 @@ function addDays(date: Date, days: number): Date {
   return d;
 }
 
+// Allocates the next invoice number atomically via the DB RPC (per-org
+// counter under a row lock), replacing the old read-max-then-add-one
+// approach that raced under concurrency and produced duplicate numbers.
 async function getNextInvoiceNumber(orgId: string): Promise<string> {
-  const { data } = await supabase
-    .from("invoices")
-    .select("invoice_number")
-    .eq("org_id", orgId)
-    .order("created_at", { ascending: false })
-    .limit(1);
-  const last = data?.[0]?.invoice_number;
-  let next = 1001;
-  if (last) {
-    const match = last.match(/(\d+)$/);
-    if (match) next = parseInt(match[1]) + 1;
+  const { data, error } = await (supabase as any).rpc("allocate_invoice_number", {
+    p_org_id: orgId,
+  });
+  if (error || !data) {
+    throw new Error(error?.message ?? "Failed to allocate an invoice number");
   }
-  const year = new Date().getFullYear().toString().slice(-2);
-  return `AX${year}-${String(next).padStart(4, "0")}`;
+  return data as string;
 }
 
 interface LineItemRowProps {
@@ -153,8 +150,7 @@ export function InvoiceGenerator() {
     (async () => {
       setLoading(true);
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const orgId = session?.user?.user_metadata?.org_id ?? "a0000000-0000-0000-0000-000000000001";
+        const orgId = await getOrgId();
         const num = await getNextInvoiceNumber(orgId);
         setInvoiceNumber(num);
 
@@ -246,8 +242,7 @@ export function InvoiceGenerator() {
     }
     setSaving(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const orgId = session?.user?.user_metadata?.org_id ?? "a0000000-0000-0000-0000-000000000001";
+      const orgId = await getOrgId();
       const inv = buildInvoiceData();
       const subtotal = inv.lineItems.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
       const vat = subtotal * (vatRate / 100);
