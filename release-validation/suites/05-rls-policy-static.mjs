@@ -191,6 +191,26 @@ export default {
         : pass("invoice_items writes admin-scoped", `closed by ${invoiceItemsWritesExposure.closedBy}`),
     );
 
+    // 7) client_logs anon-readable exposure — SECURITY-004. The original
+    //    USING(true) SELECT policy (no role restriction at all) was never
+    //    dropped when a later, narrower org-scoped policy was added
+    //    alongside it — RLS OR's permissive policies together, so the
+    //    blanket exposure stayed fully active regardless. Every org's
+    //    internal error/diagnostic logs were readable by anyone,
+    //    including unauthenticated requests.
+    const clientLogsExposure = policyExposureStillActive(dir, files, {
+      createPattern: /CREATE\s+POLICY\s+"Allow select for anon on client_logs"/i,
+      dropPattern: /DROP\s+POLICY\s+IF\s+EXISTS\s+"Allow select for anon on client_logs"/i,
+    });
+    checks.push(
+      clientLogsExposure.active
+        ? fail(
+            "client_logs anon-read closed",
+            "USING(true) SELECT policy still active — every org's client_logs rows are readable by anyone, including anon",
+          )
+        : pass("client_logs anon-read closed", `closed by ${clientLogsExposure.closedBy}`),
+    );
+
     return { checks };
   },
 };

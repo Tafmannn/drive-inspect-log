@@ -204,3 +204,53 @@ describe("policyExposureStillActive — clients/invoice_items writes (SECURITY-0
     expect(result.closedBy).toBe("20260713200000_close.sql");
   });
 });
+
+// SECURITY-004: client_logs' original USING(true) SELECT policy (no role
+// restriction at all) was never dropped when a narrower org-scoped policy
+// was added alongside it — RLS OR's permissive policies together, so the
+// anon-readable exposure stayed fully active regardless of the later,
+// narrower policy layered on top.
+const CLIENT_LOGS_ANON_READ_OPTS = {
+  createPattern: /CREATE\s+POLICY\s+"Allow select for anon on client_logs"/i,
+  dropPattern: /DROP\s+POLICY\s+IF\s+EXISTS\s+"Allow select for anon on client_logs"/i,
+};
+
+describe("policyExposureStillActive — client_logs anon-read (SECURITY-004)", () => {
+  it("flags the original anon-readable USING(true) policy as active before the fix", () => {
+    write(
+      "20260301095617_init.sql",
+      `CREATE POLICY "Allow select for anon on client_logs" ON public.client_logs FOR SELECT USING (true);`,
+    );
+    const result = policyExposureStillActive(dir, ["20260301095617_init.sql"], CLIENT_LOGS_ANON_READ_OPTS);
+    expect(result.active).toBe(true);
+  });
+
+  it("stays active even after a later, narrower policy is added alongside it (RLS ORs policies together)", () => {
+    write(
+      "20260301095617_init.sql",
+      `CREATE POLICY "Allow select for anon on client_logs" ON public.client_logs FOR SELECT USING (true);`,
+    );
+    write(
+      "20260316204833_narrower.sql",
+      `CREATE POLICY "Org admins can read own org client_logs" ON public.client_logs FOR SELECT TO authenticated USING ((context->>'org_id')::uuid = user_org_id());`,
+    );
+    const files = ["20260301095617_init.sql", "20260316204833_narrower.sql"];
+    const result = policyExposureStillActive(dir, files, CLIENT_LOGS_ANON_READ_OPTS);
+    expect(result.active).toBe(true);
+  });
+
+  it("resolves to closed once the anon-read policy is actually dropped (the real-repo fix)", () => {
+    write(
+      "20260301095617_init.sql",
+      `CREATE POLICY "Allow select for anon on client_logs" ON public.client_logs FOR SELECT USING (true);`,
+    );
+    write(
+      "20260713210000_close.sql",
+      `DROP POLICY IF EXISTS "Allow select for anon on client_logs" ON public.client_logs;`,
+    );
+    const files = ["20260301095617_init.sql", "20260713210000_close.sql"];
+    const result = policyExposureStillActive(dir, files, CLIENT_LOGS_ANON_READ_OPTS);
+    expect(result.active).toBe(false);
+    expect(result.closedBy).toBe("20260713210000_close.sql");
+  });
+});
