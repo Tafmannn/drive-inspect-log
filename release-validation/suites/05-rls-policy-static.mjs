@@ -127,6 +127,24 @@ export default {
           ),
     );
 
+    // 5-7) Admin-only-writes exposures (SECURITY-001/003/004): each of these
+    //    was a single permissive policy (FOR ALL or FOR SELECT USING(true))
+    //    that let any org member — or, for client_logs, literally anyone
+    //    including anon — do something every real call path in the app
+    //    treats as admin-only. Same defect shape, different table; one
+    //    helper checks the CREATE/DROP lifecycle for all of them.
+    const checkAdminOnlyWritesClosed = (policyName, label, activeMessage) => {
+      const exposure = policyExposureStillActive(dir, files, {
+        createPattern: new RegExp(`CREATE\\s+POLICY\\s+"${policyName}"`, "i"),
+        dropPattern: new RegExp(`DROP\\s+POLICY\\s+IF\\s+EXISTS\\s+"${policyName}"`, "i"),
+      });
+      checks.push(
+        exposure.active
+          ? fail(label, activeMessage)
+          : pass(label, `closed by ${exposure.closedBy}`),
+      );
+    };
+
     // 5) driver_onboarding writes / onboarding-docs storage — SECURITY-001.
     //    The original "Org members can manage onboarding" FOR ALL policy let
     //    any org member (not just admins) INSERT/UPDATE/DELETE onboarding
@@ -134,17 +152,10 @@ export default {
     //    onboarding-docs storage policies had no org scoping at all
     //    (auth.role() = 'authenticated' only), exposing every org's licence
     //    scans/right-to-work documents to every authenticated user.
-    const onboardingWritesExposure = policyExposureStillActive(dir, files, {
-      createPattern: /CREATE\s+POLICY\s+"Org members can manage onboarding"/i,
-      dropPattern: /DROP\s+POLICY\s+IF\s+EXISTS\s+"Org members can manage onboarding"/i,
-    });
-    checks.push(
-      onboardingWritesExposure.active
-        ? fail(
-            "driver_onboarding writes admin-scoped",
-            "permissive FOR ALL policy still active — any org member can insert/update/delete onboarding records",
-          )
-        : pass("driver_onboarding writes admin-scoped", `closed by ${onboardingWritesExposure.closedBy}`),
+    checkAdminOnlyWritesClosed(
+      "Org members can manage onboarding",
+      "driver_onboarding writes admin-scoped",
+      "permissive FOR ALL policy still active — any org member can insert/update/delete onboarding records",
     );
 
     const onboardingDocsClose = files.find((f) => /driver_onboarding_admin_only_writes/.test(f));
@@ -165,30 +176,15 @@ export default {
     //    org, letting any org member (not just admins) write client billing
     //    profiles and invoice line items, even though every real call path
     //    is admin-only (ControlClients/ClientFormModal, createInvoice.ts).
-    const clientsWritesExposure = policyExposureStillActive(dir, files, {
-      createPattern: /CREATE\s+POLICY\s+"Org members can manage clients"/i,
-      dropPattern: /DROP\s+POLICY\s+IF\s+EXISTS\s+"Org members can manage clients"/i,
-    });
-    checks.push(
-      clientsWritesExposure.active
-        ? fail(
-            "clients writes admin-scoped",
-            "permissive FOR ALL policy still active — any org member can insert/update/delete client records",
-          )
-        : pass("clients writes admin-scoped", `closed by ${clientsWritesExposure.closedBy}`),
+    checkAdminOnlyWritesClosed(
+      "Org members can manage clients",
+      "clients writes admin-scoped",
+      "permissive FOR ALL policy still active — any org member can insert/update/delete client records",
     );
-
-    const invoiceItemsWritesExposure = policyExposureStillActive(dir, files, {
-      createPattern: /CREATE\s+POLICY\s+"Org members can manage invoice_items"/i,
-      dropPattern: /DROP\s+POLICY\s+IF\s+EXISTS\s+"Org members can manage invoice_items"/i,
-    });
-    checks.push(
-      invoiceItemsWritesExposure.active
-        ? fail(
-            "invoice_items writes admin-scoped",
-            "permissive FOR ALL policy still active — any org member can insert/update/delete invoice line items",
-          )
-        : pass("invoice_items writes admin-scoped", `closed by ${invoiceItemsWritesExposure.closedBy}`),
+    checkAdminOnlyWritesClosed(
+      "Org members can manage invoice_items",
+      "invoice_items writes admin-scoped",
+      "permissive FOR ALL policy still active — any org member can insert/update/delete invoice line items",
     );
 
     // 7) client_logs anon-readable exposure — SECURITY-004. The original
@@ -198,17 +194,10 @@ export default {
     //    blanket exposure stayed fully active regardless. Every org's
     //    internal error/diagnostic logs were readable by anyone,
     //    including unauthenticated requests.
-    const clientLogsExposure = policyExposureStillActive(dir, files, {
-      createPattern: /CREATE\s+POLICY\s+"Allow select for anon on client_logs"/i,
-      dropPattern: /DROP\s+POLICY\s+IF\s+EXISTS\s+"Allow select for anon on client_logs"/i,
-    });
-    checks.push(
-      clientLogsExposure.active
-        ? fail(
-            "client_logs anon-read closed",
-            "USING(true) SELECT policy still active — every org's client_logs rows are readable by anyone, including anon",
-          )
-        : pass("client_logs anon-read closed", `closed by ${clientLogsExposure.closedBy}`),
+    checkAdminOnlyWritesClosed(
+      "Allow select for anon on client_logs",
+      "client_logs anon-read closed",
+      "USING(true) SELECT policy still active — every org's client_logs rows are readable by anyone, including anon",
     );
 
     return { checks };

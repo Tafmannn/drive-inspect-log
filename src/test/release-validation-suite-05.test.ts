@@ -106,102 +106,74 @@ describe("policyExposureStillActive", () => {
   });
 });
 
-// SECURITY-001: driver_onboarding's "Org members can manage onboarding" FOR
-// ALL policy let any org member (not just admins) write onboarding review
-// decisions. Guards the exact string this repo's migrations use, so a future
-// typo in the DROP statement's policy name can't silently leave the check
-// permanently green while the real exposure stays open.
-const ONBOARDING_WRITES_OPTS = {
-  createPattern: /CREATE\s+POLICY\s+"Org members can manage onboarding"/i,
-  dropPattern: /DROP\s+POLICY\s+IF\s+EXISTS\s+"Org members can manage onboarding"/i,
-};
+/**
+ * Shared "flags as active, then resolves once dropped" pair, parameterized
+ * per policy — SECURITY-001/003/004 all fixed the identical mistake (a
+ * permissive policy created and never dropped) on a different table, so
+ * the four security batches this batch covers exercised it with four
+ * hand-written, near-duplicate test blocks. This shared helper generates
+ * that pair once; call sites below supply only what differs per policy.
+ */
+function testAdminOnlyWritesExposureLifecycle(opts: {
+  table: string;
+  policyName: string;
+  initSql: string;
+  initFile?: string;
+  closeFile?: string;
+}) {
+  const initFile = opts.initFile ?? "20260101000000_init.sql";
+  const closeFile = opts.closeFile ?? "20260713000000_close.sql";
+  const patternOpts = {
+    createPattern: new RegExp(`CREATE\\s+POLICY\\s+"${opts.policyName}"`, "i"),
+    dropPattern: new RegExp(`DROP\\s+POLICY\\s+IF\\s+EXISTS\\s+"${opts.policyName}"`, "i"),
+  };
 
-describe("policyExposureStillActive — driver_onboarding writes (SECURITY-001)", () => {
-  it("flags the original permissive FOR ALL policy as active before the fix", () => {
-    write(
-      "20260317100818_init.sql",
-      `CREATE POLICY "Org members can manage onboarding" ON public.driver_onboarding FOR ALL USING (is_super_admin() OR org_id = user_org_id());`,
-    );
-    const files = ["20260317100818_init.sql"];
-    const result = policyExposureStillActive(dir, files, ONBOARDING_WRITES_OPTS);
+  it(`flags the original permissive ${opts.table} policy as active before the fix`, () => {
+    write(initFile, opts.initSql);
+    const result = policyExposureStillActive(dir, [initFile], patternOpts);
     expect(result.active).toBe(true);
   });
 
-  it("resolves to closed once the admin-only migration drops it (the real-repo case)", () => {
-    write(
-      "20260317100818_init.sql",
-      `CREATE POLICY "Org members can manage onboarding" ON public.driver_onboarding FOR ALL USING (is_super_admin() OR org_id = user_org_id());`,
-    );
-    write(
-      "20260713190000_close.sql",
-      `DROP POLICY IF EXISTS "Org members can manage onboarding" ON public.driver_onboarding;`,
-    );
-    const files = ["20260317100818_init.sql", "20260713190000_close.sql"];
-    const result = policyExposureStillActive(dir, files, ONBOARDING_WRITES_OPTS);
+  it(`resolves ${opts.table} to closed once the admin-only migration drops it (the real-repo case)`, () => {
+    write(initFile, opts.initSql);
+    write(closeFile, `DROP POLICY IF EXISTS "${opts.policyName}" ON public.${opts.table};`);
+    const result = policyExposureStillActive(dir, [initFile, closeFile], patternOpts);
     expect(result.active).toBe(false);
-    expect(result.closedBy).toBe("20260713190000_close.sql");
+    expect(result.closedBy).toBe(closeFile);
+  });
+}
+
+// SECURITY-001: driver_onboarding's "Org members can manage onboarding" FOR
+// ALL policy let any org member (not just admins) write onboarding review
+// decisions.
+describe("policyExposureStillActive — driver_onboarding writes (SECURITY-001)", () => {
+  testAdminOnlyWritesExposureLifecycle({
+    table: "driver_onboarding",
+    policyName: "Org members can manage onboarding",
+    initSql: `CREATE POLICY "Org members can manage onboarding" ON public.driver_onboarding FOR ALL USING (is_super_admin() OR org_id = user_org_id());`,
+    initFile: "20260317100818_init.sql",
+    closeFile: "20260713190000_close.sql",
   });
 });
 
 // SECURITY-003: clients/invoice_items had the same "Org members can manage
 // X" FOR ALL shape as driver_onboarding, even though every real write path
 // is admin-only in practice.
-const CLIENTS_WRITES_OPTS = {
-  createPattern: /CREATE\s+POLICY\s+"Org members can manage clients"/i,
-  dropPattern: /DROP\s+POLICY\s+IF\s+EXISTS\s+"Org members can manage clients"/i,
-};
-const INVOICE_ITEMS_WRITES_OPTS = {
-  createPattern: /CREATE\s+POLICY\s+"Org members can manage invoice_items"/i,
-  dropPattern: /DROP\s+POLICY\s+IF\s+EXISTS\s+"Org members can manage invoice_items"/i,
-};
-
 describe("policyExposureStillActive — clients/invoice_items writes (SECURITY-003)", () => {
-  it("flags the original permissive clients FOR ALL policy as active before the fix", () => {
-    write(
-      "20260323222553_init.sql",
-      `CREATE POLICY "Org members can manage clients" ON public.clients FOR ALL USING (is_super_admin() OR org_id = user_org_id());`,
-    );
-    const result = policyExposureStillActive(dir, ["20260323222553_init.sql"], CLIENTS_WRITES_OPTS);
-    expect(result.active).toBe(true);
+  testAdminOnlyWritesExposureLifecycle({
+    table: "clients",
+    policyName: "Org members can manage clients",
+    initSql: `CREATE POLICY "Org members can manage clients" ON public.clients FOR ALL USING (is_super_admin() OR org_id = user_org_id());`,
+    initFile: "20260323222553_init.sql",
+    closeFile: "20260713200000_close.sql",
   });
 
-  it("resolves clients to closed once the admin-only migration drops it (the real-repo case)", () => {
-    write(
-      "20260323222553_init.sql",
-      `CREATE POLICY "Org members can manage clients" ON public.clients FOR ALL USING (is_super_admin() OR org_id = user_org_id());`,
-    );
-    write(
-      "20260713200000_close.sql",
-      `DROP POLICY IF EXISTS "Org members can manage clients" ON public.clients;`,
-    );
-    const files = ["20260323222553_init.sql", "20260713200000_close.sql"];
-    const result = policyExposureStillActive(dir, files, CLIENTS_WRITES_OPTS);
-    expect(result.active).toBe(false);
-    expect(result.closedBy).toBe("20260713200000_close.sql");
-  });
-
-  it("flags the original permissive invoice_items FOR ALL policy as active before the fix", () => {
-    write(
-      "20260323222553_init.sql",
-      `CREATE POLICY "Org members can manage invoice_items" ON public.invoice_items FOR ALL USING (true);`,
-    );
-    const result = policyExposureStillActive(dir, ["20260323222553_init.sql"], INVOICE_ITEMS_WRITES_OPTS);
-    expect(result.active).toBe(true);
-  });
-
-  it("resolves invoice_items to closed once the admin-only migration drops it (the real-repo case)", () => {
-    write(
-      "20260323222553_init.sql",
-      `CREATE POLICY "Org members can manage invoice_items" ON public.invoice_items FOR ALL USING (true);`,
-    );
-    write(
-      "20260713200000_close.sql",
-      `DROP POLICY IF EXISTS "Org members can manage invoice_items" ON public.invoice_items;`,
-    );
-    const files = ["20260323222553_init.sql", "20260713200000_close.sql"];
-    const result = policyExposureStillActive(dir, files, INVOICE_ITEMS_WRITES_OPTS);
-    expect(result.active).toBe(false);
-    expect(result.closedBy).toBe("20260713200000_close.sql");
+  testAdminOnlyWritesExposureLifecycle({
+    table: "invoice_items",
+    policyName: "Org members can manage invoice_items",
+    initSql: `CREATE POLICY "Org members can manage invoice_items" ON public.invoice_items FOR ALL USING (true);`,
+    initFile: "20260323222553_init.sql",
+    closeFile: "20260713200000_close.sql",
   });
 });
 
@@ -210,22 +182,20 @@ describe("policyExposureStillActive — clients/invoice_items writes (SECURITY-0
 // was added alongside it — RLS OR's permissive policies together, so the
 // anon-readable exposure stayed fully active regardless of the later,
 // narrower policy layered on top.
-const CLIENT_LOGS_ANON_READ_OPTS = {
-  createPattern: /CREATE\s+POLICY\s+"Allow select for anon on client_logs"/i,
-  dropPattern: /DROP\s+POLICY\s+IF\s+EXISTS\s+"Allow select for anon on client_logs"/i,
-};
-
 describe("policyExposureStillActive — client_logs anon-read (SECURITY-004)", () => {
-  it("flags the original anon-readable USING(true) policy as active before the fix", () => {
-    write(
-      "20260301095617_init.sql",
-      `CREATE POLICY "Allow select for anon on client_logs" ON public.client_logs FOR SELECT USING (true);`,
-    );
-    const result = policyExposureStillActive(dir, ["20260301095617_init.sql"], CLIENT_LOGS_ANON_READ_OPTS);
-    expect(result.active).toBe(true);
+  testAdminOnlyWritesExposureLifecycle({
+    table: "client_logs",
+    policyName: "Allow select for anon on client_logs",
+    initSql: `CREATE POLICY "Allow select for anon on client_logs" ON public.client_logs FOR SELECT USING (true);`,
+    initFile: "20260301095617_init.sql",
+    closeFile: "20260713210000_close.sql",
   });
 
   it("stays active even after a later, narrower policy is added alongside it (RLS ORs policies together)", () => {
+    const opts = {
+      createPattern: /CREATE\s+POLICY\s+"Allow select for anon on client_logs"/i,
+      dropPattern: /DROP\s+POLICY\s+IF\s+EXISTS\s+"Allow select for anon on client_logs"/i,
+    };
     write(
       "20260301095617_init.sql",
       `CREATE POLICY "Allow select for anon on client_logs" ON public.client_logs FOR SELECT USING (true);`,
@@ -235,22 +205,7 @@ describe("policyExposureStillActive — client_logs anon-read (SECURITY-004)", (
       `CREATE POLICY "Org admins can read own org client_logs" ON public.client_logs FOR SELECT TO authenticated USING ((context->>'org_id')::uuid = user_org_id());`,
     );
     const files = ["20260301095617_init.sql", "20260316204833_narrower.sql"];
-    const result = policyExposureStillActive(dir, files, CLIENT_LOGS_ANON_READ_OPTS);
+    const result = policyExposureStillActive(dir, files, opts);
     expect(result.active).toBe(true);
-  });
-
-  it("resolves to closed once the anon-read policy is actually dropped (the real-repo fix)", () => {
-    write(
-      "20260301095617_init.sql",
-      `CREATE POLICY "Allow select for anon on client_logs" ON public.client_logs FOR SELECT USING (true);`,
-    );
-    write(
-      "20260713210000_close.sql",
-      `DROP POLICY IF EXISTS "Allow select for anon on client_logs" ON public.client_logs;`,
-    );
-    const files = ["20260301095617_init.sql", "20260713210000_close.sql"];
-    const result = policyExposureStillActive(dir, files, CLIENT_LOGS_ANON_READ_OPTS);
-    expect(result.active).toBe(false);
-    expect(result.closedBy).toBe("20260713210000_close.sql");
   });
 });
