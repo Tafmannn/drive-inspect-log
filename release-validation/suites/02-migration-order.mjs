@@ -1,6 +1,7 @@
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { pass, fail, warn } from "../lib/types.mjs";
+import { isInReleaseSet, RELEASE_SET_SINCE } from "../lib/releaseSet.mjs";
 
 // Suite 02 — Migration ordering & naming (STATIC).
 // Supabase applies migrations in lexical filename order, which must equal
@@ -45,16 +46,16 @@ export default {
         : fail("Lexical order == chronological order", "a timestamp is out of order"),
     );
 
-    // The release set (Phase 1 + evidence pipeline) must be the newest files so
-    // they apply after the historical baseline, never interleaved.
-    const releaseSet = files.filter((f) => /^2026062[89]/.test(f));
+    // The release set (everything since RELEASE_SET_SINCE) must be the newest
+    // files so they apply after the historical baseline, never interleaved.
+    const releaseSet = files.filter(isInReleaseSet);
     checks.push(
       releaseSet.length
         ? pass(
             "Release-set migrations are newest",
-            releaseSet.join(", "),
+            `${releaseSet.length} files since ${RELEASE_SET_SINCE}: ${releaseSet.join(", ")}`,
           )
-        : warn("Release-set migrations are newest", "no 2026-06-28/29 migrations found on this branch"),
+        : warn("Release-set migrations are newest", `no migrations since ${RELEASE_SET_SINCE} found on this branch`),
     );
 
     return { checks };

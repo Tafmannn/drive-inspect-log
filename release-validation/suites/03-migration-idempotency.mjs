@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pass, fail, warn } from "../lib/types.mjs";
+import { isInReleaseSet, RELEASE_SET_SINCE } from "../lib/releaseSet.mjs";
 
 // Suite 03 — Migration re-apply safety / idempotency (STATIC).
 // A migration may be re-run (CLI repair, partial failure, replay onto a fresh
@@ -18,12 +19,12 @@ export default {
   async run({ root }) {
     const dir = join(root, "supabase", "migrations");
     const files = readdirSync(dir)
-      .filter((f) => /^2026062[89].*\.sql$/.test(f))
+      .filter((f) => f.endsWith(".sql") && isInReleaseSet(f))
       .sort();
     const checks = [];
 
     if (!files.length) {
-      checks.push(warn("Release-set present", "no 2026-06-28/29 migrations on this branch"));
+      checks.push(warn("Release-set present", `no migrations since ${RELEASE_SET_SINCE} on this branch`));
       return { checks };
     }
 
