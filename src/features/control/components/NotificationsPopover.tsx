@@ -38,7 +38,12 @@ export function NotificationsPopover() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8 relative">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 relative"
+          aria-label={count > 0 ? `Notifications (${count} unread)` : "Notifications"}
+        >
           <Bell className="h-4 w-4 text-muted-foreground" />
           {count > 0 && (
             <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground px-1">

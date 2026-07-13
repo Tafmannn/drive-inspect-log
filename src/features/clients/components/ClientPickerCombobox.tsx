@@ -108,6 +108,7 @@ export function ClientPickerCombobox({ value, onSelect, className, disabled }: P
           size="icon"
           className="h-8 w-8 shrink-0"
           onClick={() => onSelect(null)}
+          aria-label="Clear client selection"
         >
           <X className="h-3.5 w-3.5" />
         </Button>
