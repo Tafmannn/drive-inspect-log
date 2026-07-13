@@ -1,5 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
-import { isE2ETestMode } from "@/lib/logger";
+import { isE2ETestMode } from "@/lib/runtimeMode";
 
 export function DevRoleBanner() {
   const { authEnabled } = useAuth();
