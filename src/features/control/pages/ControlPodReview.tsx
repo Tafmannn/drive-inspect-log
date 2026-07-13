@@ -22,7 +22,9 @@ import { FilterBar } from "../components/shared/FilterBar";
 import {
   useClosureReviewQueue,
   useClosureKpis,
+  selectClosureRows,
   type ClosureReviewRow,
+  type ClosureStatusFilter,
 } from "../hooks/useClosureReview";
 import { UKPlate } from "@/components/UKPlate";
 import { Button } from "@/components/ui/button";
@@ -37,9 +39,7 @@ import {
   Eye, FileText, ClipboardList, Receipt, Clock, CheckCircle, Loader2,
 } from "lucide-react";
 
-type StatusFilterValue = "all" | "pod_ready" | "delivery_complete" | "recently_completed";
-
-const STATUS_OPTIONS: { label: string; value: StatusFilterValue }[] = [
+const STATUS_OPTIONS: { label: string; value: ClosureStatusFilter }[] = [
   { label: "Review Queue", value: "all" },
   { label: "POD Ready", value: "pod_ready" },
   { label: "Delivery Complete", value: "delivery_complete" },
@@ -59,7 +59,7 @@ export function ControlPodReview() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilterValue>("all");
+  const [statusFilter, setStatusFilter] = useState<ClosureStatusFilter>("all");
   const [confirming, setConfirming] = useState<string | null>(null);
 
   const handleConfirmReview = async (jobId: string) => {
@@ -79,38 +79,12 @@ export function ControlPodReview() {
   const { data, isLoading } = useClosureReviewQueue();
   const { data: kpis, isLoading: kpisLoading } = useClosureKpis();
 
-  // Merge + filter
-  const rows = useMemo(() => {
-    if (!data) return [];
-
-    let merged: ClosureReviewRow[];
-    if (statusFilter === "recently_completed") {
-      merged = data.recentlyCompleted;
-    } else if (statusFilter === "pod_ready") {
-      merged = data.queue.filter(r => r.status === "pod_ready");
-    } else if (statusFilter === "delivery_complete") {
-      merged = data.queue.filter(r => r.status === "delivery_complete");
-    } else {
-      // "all" = active queue first, then recently completed
-      merged = [...data.queue, ...data.recentlyCompleted];
-    }
-
-    if (search.trim()) {
-      const s = search.toLowerCase();
-      merged = merged.filter(
-        r =>
-          r.vehicle_reg?.toLowerCase().includes(s) ||
-          r.external_job_number?.toLowerCase().includes(s) ||
-          r.client_company?.toLowerCase().includes(s) ||
-          r.client_name?.toLowerCase().includes(s) ||
-          r.resolvedDriverName?.toLowerCase().includes(s) ||
-          r.delivery_postcode?.toLowerCase().includes(s) ||
-          r.delivery_city?.toLowerCase().includes(s)
-      );
-    }
-
-    return merged;
-  }, [data, statusFilter, search]);
+  // Row selection lives in a pure, tested helper so the "Review Queue" view
+  // stays in lock-step with the Review Queue KPI (see selectClosureRows).
+  const rows = useMemo(
+    () => selectClosureRows(data, statusFilter, search),
+    [data, statusFilter, search],
+  );
 
   // ── KPI Strip ──
   const kpiItems = [
@@ -275,9 +249,6 @@ export function ControlPodReview() {
       ),
     },
   ];
-
-  const queueCount = data ? data.queue.length : 0;
-  const recentCount = data ? data.recentlyCompleted.length : 0;
 
   return (
     <ControlShell>

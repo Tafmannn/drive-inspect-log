@@ -93,6 +93,63 @@ export interface ClosureKpis {
   missingDeliveryInspection: number;
 }
 
+export type ClosureStatusFilter =
+  | "all"
+  | "pod_ready"
+  | "delivery_complete"
+  | "recently_completed";
+
+export interface ClosureReviewData {
+  queue: ClosureReviewRow[];
+  recentlyCompleted: ClosureReviewRow[];
+}
+
+/**
+ * Pure row-selection for the POD Review surface.
+ *
+ * The default "all" view is the *Review Queue* — jobs actively requiring
+ * review (pod_ready / delivery_complete) only. Recently-completed jobs are
+ * already actioned and are surfaced exclusively under the "recently_completed"
+ * filter; they must never leak into the "all" view, otherwise the queue reads
+ * as populated (and mislabelled "requiring review") even after everything has
+ * been closed out — the exact mismatch where the Review Queue KPI shows 0 but
+ * the list still renders rows.
+ */
+export function selectClosureRows(
+  data: ClosureReviewData | undefined | null,
+  statusFilter: ClosureStatusFilter,
+  search = "",
+): ClosureReviewRow[] {
+  if (!data) return [];
+
+  let rows: ClosureReviewRow[];
+  if (statusFilter === "recently_completed") {
+    rows = data.recentlyCompleted;
+  } else if (statusFilter === "pod_ready") {
+    rows = data.queue.filter(r => r.status === "pod_ready");
+  } else if (statusFilter === "delivery_complete") {
+    rows = data.queue.filter(r => r.status === "delivery_complete");
+  } else {
+    rows = data.queue;
+  }
+
+  const s = search.trim().toLowerCase();
+  if (s) {
+    rows = rows.filter(
+      r =>
+        r.vehicle_reg?.toLowerCase().includes(s) ||
+        r.external_job_number?.toLowerCase().includes(s) ||
+        r.client_company?.toLowerCase().includes(s) ||
+        r.client_name?.toLowerCase().includes(s) ||
+        r.resolvedDriverName?.toLowerCase().includes(s) ||
+        r.delivery_postcode?.toLowerCase().includes(s) ||
+        r.delivery_city?.toLowerCase().includes(s),
+    );
+  }
+
+  return rows;
+}
+
 const SELECT_FIELDS = [
   "id", "external_job_number", "vehicle_reg", "vehicle_make", "vehicle_model",
   "status", "driver_id", "driver_name", "delivery_city", "delivery_postcode",
