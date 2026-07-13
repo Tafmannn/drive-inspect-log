@@ -16,6 +16,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { getOrgId } from "@/lib/orgHelper";
 import { downloadInvoicePdf, type InvoiceLineItem, type InvoiceData } from "@/lib/invoicePdf";
+import { findAlreadyInvoicedJobs } from "@/features/invoicing/api/createInvoice";
 import {
   Loader2, Plus, Trash2, FileDown, Receipt,
   Building2, User, Calendar, CreditCard
@@ -242,6 +243,23 @@ export function InvoiceGenerator() {
     }
     setSaving(true);
     try {
+      // WORKFLOW-008: this single-job flow writes invoices.job_id directly
+      // and never creates an invoice_items row, so the multi-job prep
+      // screen's own duplicate check couldn't see it (and vice versa).
+      // Re-check both storage locations right before saving.
+      if (jobId) {
+        const alreadyInvoiced = await findAlreadyInvoicedJobs([jobId]);
+        if (alreadyInvoiced.has(jobId)) {
+          toast({
+            title: "Already invoiced",
+            description: "This job already has an invoice. Check the client's invoice history before creating another.",
+            variant: "destructive",
+          });
+          setSaving(false);
+          return;
+        }
+      }
+
       const orgId = await getOrgId();
       const inv = buildInvoiceData();
       const subtotal = inv.lineItems.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
