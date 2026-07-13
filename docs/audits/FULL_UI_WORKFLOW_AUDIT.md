@@ -192,7 +192,19 @@ not started until the previous one has no known unresolved critical breakage.
    - Commands run: `tsc --noEmit` ✅, `eslint` (changed files) — 0 new errors (20 pre-existing `no-explicit-any` errors in `JobDetail.tsx`, all on lines untouched by this batch's diff, confirmed by `git diff`), `vitest run` ✅ 49 files/389 tests, `vite build` ✅.
    - Not executed (declared honestly): no live backend, so the actual `getJobWithRelations` RLS-deny path (a real cross-driver/cross-org job id) was traced statically, not exercised against a live database; the "invalid job id" and "in-flight" states were exercised via mocked query results, not a real network round-trip.
    - Commit: (recorded after this batch's commit below).
-3. Job creation, assignment and editing — pending
+3. Job creation, assignment and editing — **done, no code fix required**
+   - Files statically reviewed: `src/pages/JobForm.tsx` (full: validation, submit, draft-save), `src/lib/api.ts` (`createJob`/`updateJob`/`adminChangeStatus`/`deleteJob`), `src/features/control/components/AssignDriverModal.tsx`, `supabase/functions/assign-driver/index.ts`, `supabase/migrations/20260630100100_phase1_jobs_write_scope_admin_only.sql`.
+   - Verified findings (no fix needed — already correct):
+     - Required-field validation rejects whitespace-only input (`.trim()` before falsy check on all 14 required fields); errors surface per-field via `<ErrorText>`.
+     - Double-submission: both create and edit paths gate the submit button on `createMutation.isPending || updateMutation.isPending`.
+     - Org-scoping on create/update/delete is enforced at the RLS layer (`jobs_insert_admin`, `jobs_update_org` with `WITH CHECK`, `jobs_delete_admin` — `supabase/migrations/20260630100100...sql`), not just client-side `<AdminRoute>`. Confirmed `WITH CHECK` on `jobs_update_org` prevents a driver from reassigning a job's `org_id` to a foreign org even via direct PostgREST calls.
+     - `adminChangeStatus` validates the status transition against `ADMIN_ALLOWED_TRANSITIONS` before writing (defence in depth, matching the DB-side enforcement).
+   - Observations (informational, not defects — see "Do not classify design preferences as defects"):
+     - `AssignDriverModal`'s eligibility check (licence expiry, onboarding status) is a client-side nudge only — the actual write is a direct `supabase.from("jobs").update(...)` with no server-side re-validation of eligibility. Not classified as a defect: only an already-authenticated admin can reach this modal, so bypassing their own UI's guardrail is a self-directed judgment call (e.g. a deliberate emergency override), not a privilege escalation from a lower-trust actor.
+     - The `jobs_update_org` RLS policy scopes by `org_id` only, not by column — a driver's own session can technically update any column (price, addresses, driver reassignment) on any job in their org via a raw API call, not just `status`. This is a **pre-existing, already-documented, deliberately-deferred** limitation (see the migration's own header comment: "Column-level protection... NOT attempted here"), not a new finding — noted for traceability, not re-litigated or fixed here (would require a trigger-based redesign out of this audit's scope).
+   - **Carried forward to Batch 4**: grepped `InspectionFlow.tsx` for any check that the current driver is the job's *assigned* driver before allowing inspection actions — found **zero matches**. Any active driver in the same org can seemingly navigate to `/inspection/:jobId/:type` for a job assigned to a different driver and submit a full inspection. This needs full investigation (is this intentional "any driver can pick up any org job" behaviour, or a genuine accountability/data-integrity gap?) in Batch 4, where `InspectionFlow.tsx` is the primary subject.
+   - Commands run: no code changed this batch, so no new verification run beyond Batch 2's already-green state; static review only.
+   - Commit: none (no code change).
 4. Pickup inspection — pending
 5. Delivery inspection — pending
 6. Evidence capture and uploads — pending
