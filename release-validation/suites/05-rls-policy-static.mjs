@@ -127,6 +127,39 @@ export default {
           ),
     );
 
+    // 5) driver_onboarding writes / onboarding-docs storage — SECURITY-001.
+    //    The original "Org members can manage onboarding" FOR ALL policy let
+    //    any org member (not just admins) INSERT/UPDATE/DELETE onboarding
+    //    records — a driver could self-approve their own compliance record.
+    //    onboarding-docs storage policies had no org scoping at all
+    //    (auth.role() = 'authenticated' only), exposing every org's licence
+    //    scans/right-to-work documents to every authenticated user.
+    const onboardingWritesExposure = policyExposureStillActive(dir, files, {
+      createPattern: /CREATE\s+POLICY\s+"Org members can manage onboarding"/i,
+      dropPattern: /DROP\s+POLICY\s+IF\s+EXISTS\s+"Org members can manage onboarding"/i,
+    });
+    checks.push(
+      onboardingWritesExposure.active
+        ? fail(
+            "driver_onboarding writes admin-scoped",
+            "permissive FOR ALL policy still active — any org member can insert/update/delete onboarding records",
+          )
+        : pass("driver_onboarding writes admin-scoped", `closed by ${onboardingWritesExposure.closedBy}`),
+    );
+
+    const onboardingDocsClose = files.find((f) => /driver_onboarding_admin_only_writes/.test(f));
+    if (onboardingDocsClose) {
+      const sql = readFileSync(join(dir, onboardingDocsClose), "utf8");
+      const drops = (sql.match(/DROP\s+POLICY\s+IF\s+EXISTS\s+"Org members can (view|upload|update|delete) onboarding docs"/gi) || []).length;
+      checks.push(
+        drops >= 4
+          ? pass("onboarding-docs storage org-scoped", `${drops} DROP statements in ${onboardingDocsClose}`)
+          : fail("onboarding-docs storage org-scoped", `expected >=4 DROPs, found ${drops}`),
+      );
+    } else {
+      checks.push(fail("onboarding-docs storage org-scoped", "closure migration not found"));
+    }
+
     return { checks };
   },
 };
