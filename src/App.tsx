@@ -47,6 +47,8 @@ import ClientProfileDetail from "./features/onboarding/pages/ClientProfileDetail
 import OrganisationProfileDetail from "./features/onboarding/pages/OrganisationProfileDetail";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { AccountStatusGate } from "./components/AccountStatusGate";
+import { DriverGateScreen } from "./components/DriverGateScreen";
+import { useDriverGate } from "@/hooks/useDriverGate";
 import { useEffect } from "react";
 import { installRetryTriggers, triggerRetry } from "@/lib/retryOrchestrator";
 import { installSubmitQueueDrainer, drainSubmitQueue } from "@/lib/submitQueue";
@@ -112,7 +114,7 @@ function BackgroundUploader() {
 
 /* ── Protected route wrapper ── */
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { authEnabled, authLoading, user } = useAuth();
 
   if (!authEnabled) return <>{children}</>;
@@ -130,6 +132,35 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   // Block suspended or pending_activation users
   if (user.accountStatus === "suspended" || user.accountStatus === "pending_activation") {
     return <AccountStatusGate user={user} />;
+  }
+
+  return <DriverOnboardingGate>{children}</DriverOnboardingGate>;
+}
+
+/**
+ * WORKFLOW-002: useDriverGate() (blocks drivers whose onboarding is
+ * no_profile/onboarding/rejected) was previously enforced only by Dashboard
+ * rendering <DriverGateScreen> at "/" — every other protected route
+ * (JobDetail, InspectionFlow, PodReport, PendingUploads, ExpenseForm, ...)
+ * never checked it, so a not-yet-approved or rejected driver could still
+ * reach a job directly (e.g. via browser history) and complete a real
+ * inspection. Centralising the check in ProtectedRoute closes every route at
+ * once. This is a no-op for admins/superadmins: useDriverGate()'s query is
+ * gated on `isDriverOnly`, so it never even fires for non-driver roles.
+ */
+function DriverOnboardingGate({ children }: { children: React.ReactNode }) {
+  const gate = useDriverGate();
+
+  if (gate.isDriverOnly && gate.status === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (gate.isDriverOnly && gate.status !== "active") {
+    return <DriverGateScreen gateStatus={gate.status as Exclude<typeof gate.status, "loading" | "active" | "ungated">} />;
   }
 
   return <>{children}</>;

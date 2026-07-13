@@ -121,7 +121,7 @@ export const JobDetail = () => {
   const { jobId } = useParams<{ jobId: string }>();
   const [searchParams] = useSearchParams();
   const goBack = useSafeBack("/jobs", searchParams);
-  const { data: job, isLoading } = useJob(jobId ?? "");
+  const { data: job, isLoading, isError } = useJob(jobId ?? "");
   const { data: allActiveJobs } = useActiveJobs();
   const { data: jobExpenses } = useJobExpenses(jobId ?? "");
   const { isAdmin, isSuperAdmin } = useAuth();
@@ -238,12 +238,40 @@ export const JobDetail = () => {
   // Must be called before any early return to keep hook order stable.
   const evidenceOverrides = useEvidenceOverrides(jobId ?? "");
 
-  // ── Loading / Error ──
-  if (isLoading || !job) {
+  // ── Loading ──
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-background pb-20">
         <AppHeader title="Job Detail" showBack onBack={goBack} />
         <div className="p-4"><DashboardSkeleton /></div>
+        <BottomNav />
+      </div>
+    );
+  }
+
+  // ── Not found / inaccessible ──
+  // useJob's query throws (Supabase .single() with 0 matching rows — either
+  // a genuinely invalid id or one RLS denies) rather than resolving to null,
+  // so `!job` here means "isLoading is done and there is still no job": a
+  // real terminal state, not a slow fetch. Previously this fell through to
+  // the loading skeleton, which then displayed forever with no indication
+  // anything had gone wrong.
+  if (isError || !job) {
+    return (
+      <div className="min-h-screen bg-background pb-20">
+        <AppHeader title="Job Detail" showBack onBack={goBack} />
+        <div className="p-4 flex flex-col items-center text-center gap-3 py-16">
+          <AlertTriangle className="w-10 h-10 text-muted-foreground" />
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-foreground">Job not found</p>
+            <p className="text-[13px] text-muted-foreground max-w-xs">
+              This job doesn't exist or you don't have access to it.
+            </p>
+          </div>
+          <Button variant="outline" className="min-h-[44px] rounded-lg mt-2" onClick={goBack}>
+            Back to Jobs
+          </Button>
+        </div>
         <BottomNav />
       </div>
     );
