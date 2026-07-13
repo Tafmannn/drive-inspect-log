@@ -55,11 +55,11 @@ function job(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function renderFlow() {
+function renderFlow(type: "pickup" | "delivery" = "pickup") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={["/inspection/job-1/pickup"]}>
+      <MemoryRouter initialEntries={[`/inspection/job-1/${type}`]}>
         <Routes>
           <Route path="/inspection/:jobId/:inspectionType" element={<InspectionFlow />} />
         </Routes>
@@ -118,5 +118,45 @@ describe("InspectionFlow guards", () => {
     });
     renderFlow();
     expect(screen.queryByText("Not your job")).not.toBeInTheDocument();
+  });
+
+  it('blocks a driver from starting delivery before pickup is complete ("Pickup not complete")', () => {
+    mockUseJob.mockReturnValue({
+      data: job({ driver_id: "driver-profile-assigned", has_pickup_inspection: false, status: "ready_for_pickup" }),
+      isLoading: false,
+      isError: false,
+    });
+    mockUseDriverGate.mockReturnValue({
+      status: "active", driverProfileId: "driver-profile-assigned", onboardingStatus: null, isDriverOnly: true,
+    });
+    renderFlow("delivery");
+    expect(screen.getByText("Pickup not complete")).toBeInTheDocument();
+    expect(screen.getByText("Start Pickup")).toBeInTheDocument();
+  });
+
+  it("allows delivery once pickup is complete", () => {
+    mockUseJob.mockReturnValue({
+      data: job({ driver_id: "driver-profile-assigned", has_pickup_inspection: true, status: "pickup_complete" }),
+      isLoading: false,
+      isError: false,
+    });
+    mockUseDriverGate.mockReturnValue({
+      status: "active", driverProfileId: "driver-profile-assigned", onboardingStatus: null, isDriverOnly: true,
+    });
+    renderFlow("delivery");
+    expect(screen.queryByText("Pickup not complete")).not.toBeInTheDocument();
+  });
+
+  it("never blocks an admin from a delivery-only completion even without pickup", () => {
+    mockUseJob.mockReturnValue({
+      data: job({ driver_id: "someone-elses-profile-id", has_pickup_inspection: false, status: "ready_for_pickup" }),
+      isLoading: false,
+      isError: false,
+    });
+    mockUseDriverGate.mockReturnValue({
+      status: "ungated", driverProfileId: null, onboardingStatus: null, isDriverOnly: false,
+    });
+    renderFlow("delivery");
+    expect(screen.queryByText("Pickup not complete")).not.toBeInTheDocument();
   });
 });

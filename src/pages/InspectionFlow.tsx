@@ -1203,6 +1203,36 @@ export const InspectionFlow = () => {
     );
   }
 
+  // WORKFLOW-004: derivePrimaryCta (JobDetail.tsx) always routes to "Start
+  // Pickup" while has_pickup_inspection is false, so "Start Delivery" is
+  // unreachable through any UI affordance — but nothing stops a driver
+  // navigating straight to /inspection/:jobId/delivery (the same bypass
+  // vector as WORKFLOW-003) for a job that was never picked up. Mirrors the
+  // server-side check added in the same fix (see
+  // supabase/migrations/*_delivery_requires_pickup_complete.sql); admins may
+  // still force a delivery-only completion.
+  if (driverGate.isDriverOnly && type === "delivery" && !job.has_pickup_inspection) {
+    return (
+      <div className="min-h-screen bg-background">
+        <AppHeader title="Delivery" showBack onBack={() => navigate(`/jobs/${jobId}${window.location.search}`)} />
+        <div className="p-4 flex flex-col items-center text-center gap-3 py-16">
+          <AlertTriangle className="w-10 h-10 text-muted-foreground" />
+          <p className="text-sm font-medium text-foreground">Pickup not complete</p>
+          <p className="text-[13px] text-muted-foreground max-w-xs">
+            Complete the pickup inspection before starting delivery.
+          </p>
+          <Button
+            variant="outline"
+            className="min-h-[44px] rounded-lg mt-2"
+            onClick={() => navigate(`/inspection/${jobId}/pickup${window.location.search}`)}
+          >
+            Start Pickup
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   // Determine which step is the signature step
   const signatureStepNumber = getSignatureStepNumber(type);
 
