@@ -96,13 +96,25 @@ const HEALTH_SCORE: Record<EvidenceHealthLevel, number> = {
   critical: 0,
 };
 
+// jobs.pickup_time_to / delivery_time_to are plain "HH:MM" text (not ISO), so
+// Date.parse() on plannedTo always returns NaN — this used to make isLate()
+// unconditionally return false. Parse it as minutes-since-midnight instead
+// (same convention as the deadline parsing in driverJobSummary.ts) and compare
+// against actualAt's own local time-of-day.
+function parseHHMMToMinutes(t: string): number | null {
+  const m = t.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+}
+
 function isLate(plannedTo: string | null | undefined, actualAt: string | null | undefined): boolean {
   if (!plannedTo || !actualAt) return false;
-  // plannedTo may be HH:MM or ISO; we compare timestamps where possible.
-  const planned = Date.parse(plannedTo);
-  const actual = Date.parse(actualAt);
-  if (Number.isNaN(planned) || Number.isNaN(actual)) return false;
-  return actual > planned;
+  const plannedMinutes = parseHHMMToMinutes(plannedTo);
+  if (plannedMinutes == null) return false;
+  const actualDate = new Date(actualAt);
+  if (Number.isNaN(actualDate.getTime())) return false;
+  const actualMinutes = actualDate.getHours() * 60 + actualDate.getMinutes();
+  return actualMinutes > plannedMinutes;
 }
 
 function jobEvidence(job: DriverPerfJob): EvidenceHealthResult | null {
