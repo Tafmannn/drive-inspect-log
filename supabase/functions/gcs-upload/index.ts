@@ -1,36 +1,18 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { authenticateCaller } from "../_shared/auth.ts";
+import { authenticateCaller, callerCanAccessPath } from "../_shared/auth.ts";
+import { createIpRateLimiter } from "../_shared/rateLimit.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-// ─── Rate limiter: 30 req/IP/min ───
-const ipHits = new Map<string, { count: number; resetAt: number }>();
-function rateLimit(req: Request): Response | null {
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  const now = Date.now();
-  const entry = ipHits.get(ip);
-  if (!entry || now > entry.resetAt) {
-    ipHits.set(ip, { count: 1, resetAt: now + 60_000 });
-    return null;
-  }
-  entry.count++;
-  if (entry.count > 30) {
-    return new Response(JSON.stringify({ error: "RATE_LIMITED" }), {
-      status: 429,
-      headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "60" },
-    });
-  }
-  return null;
-}
+const rateLimiter = createIpRateLimiter(corsHeaders);
 
 interface UploadRequest {
   fileName: string;
   contentType: string;
   fileBase64: string;
-  jobId?: string;
 }
 
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
@@ -41,7 +23,7 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const limited = rateLimit(req);
+  const limited = rateLimiter.check(req);
   if (limited) return limited;
 
   try {
@@ -117,21 +99,6 @@ serve(async (req) => {
       );
     }
 
-    // ─── Job ownership check ───
-    if (body.jobId) {
-      const { data: job } = await admin
-        .from("jobs")
-        .select("id, org_id")
-        .eq("id", body.jobId)
-        .single();
-
-      if (!job || job.org_id !== userOrgId) {
-        return new Response(JSON.stringify({ error: "FORBIDDEN" }), {
-          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-    }
-
     // Deterministic, sanitised object name (V5). The client supplies a unique,
     // namespaced path (jobs/<job>/<type>/<photoType>/<itemId>.<ext> or
     // jobs/<job>/signatures/<type>/<role>.<ext>), so retries OVERWRITE the same
@@ -144,6 +111,20 @@ serve(async (req) => {
         JSON.stringify({ error: "Invalid fileName" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // ─── Authorize the write against the caller's org (cross-org write guard) ───
+    // The jobId is derived from the object path itself — not from a separate
+    // client-supplied field — because no real caller ever sends one (the
+    // upload wrapper only ever sends fileName/contentType/fileBase64), which
+    // previously left every upload unauthorized: any authenticated user could
+    // overwrite any job's photos/signatures in any org by naming the object
+    // `jobs/<other-job-id>/...`. callerCanAccessPath extracts the jobId from
+    // the path itself and fails closed if it can't.
+    if (!(await callerCanAccessPath(admin, caller, finalName))) {
+      return new Response(JSON.stringify({ error: "FORBIDDEN" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const uploadUrl = `https://storage.googleapis.com/upload/storage/v1/b/${bucket}/o?uploadType=media&name=${encodeURIComponent(finalName)}`;

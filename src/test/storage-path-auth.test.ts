@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-// Pure path-authorization logic shared with the gcs-proxy / resolve-signature-url
-// edge functions (C1/C2 IDOR fix). This guards the rule that a storage object's
+// Pure path-authorization logic shared with the gcs-proxy / resolve-signature-url /
+// gcs-upload edge functions (C1/C2 IDOR fix, later extended to close the
+// gcs-upload cross-org write gap). This guards the rule that a storage object's
 // owning job is derived ONLY from a well-formed `jobs/<uuid>/...` path, and that
 // anything else fails closed.
 import { extractJobIdFromPath } from "../../supabase/functions/_shared/pathAuth";
