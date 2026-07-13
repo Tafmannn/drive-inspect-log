@@ -123,7 +123,25 @@ export interface QueuedSubmission {
   createdAt: string;
   /** ISO timestamp of the most recent drain attempt. */
   lastAttemptAt: string | null;
+  /**
+   * Set when status transitions to "submitting". Lets loadAllRaw()
+   * distinguish a genuinely in-flight drain from one stranded by a
+   * crash/reload/force-quit mid-RPC — see SUBMIT_STUCK_TIMEOUT_MS. Without
+   * this, a stuck entry is invisible to drainSubmitQueue's candidate filter
+   * (queued/failed only) AND the Pending Uploads UI disables its Retry
+   * button whenever status === "submitting" — the only way out is Discard,
+   * permanently losing the entire inspection submission (not just a photo).
+   */
+  submittingStartedAt?: string | null;
 }
+
+/**
+ * A real submit (signature upload + RPC round-trip) completes in seconds
+ * even on a poor connection; this threshold is deliberately generous so it
+ * can never misfire against a genuinely slow-but-active drain within a live
+ * session.
+ */
+export const SUBMIT_STUCK_TIMEOUT_MS = 5 * 60 * 1000;
 
 // ─────────────────────────────────────────────────────────────────────
 // Pub/sub bus — lets UI surfaces (PendingUploads) re-render on change.
@@ -183,11 +201,49 @@ export function useSubmitQueueVersion(): number {
 // IDB primitives
 // ─────────────────────────────────────────────────────────────────────
 
+/**
+ * Re-arms any entry stranded in "submitting" past SUBMIT_STUCK_TIMEOUT_MS
+ * (app crash/reload/force-quit mid-drain) back to "failed" — otherwise
+ * nothing (drainSubmitQueue's candidate filter, the Pending Uploads UI's
+ * disabled Retry button whenever status === "submitting") would ever
+ * recover it, and the only way out would be Discard, permanently losing the
+ * entire queued inspection submission.
+ */
+async function rearmStrandedSubmitting(data: QueuedSubmission[]): Promise<QueuedSubmission[]> {
+  const now = Date.now();
+  const stranded = data.filter(
+    (q) =>
+      q.status === "submitting" &&
+      (!q.submittingStartedAt || now - Date.parse(q.submittingStartedAt) > SUBMIT_STUCK_TIMEOUT_MS),
+  );
+  if (stranded.length === 0) return data;
+
+  const strandedIds = new Set(stranded.map((q) => q.id));
+  const next = data.map((q) =>
+    strandedIds.has(q.id)
+      ? {
+          ...q,
+          status: "failed" as SubmitQueueStatus,
+          lastError: "Submission was interrupted (app closed or crashed mid-submit). Retry to resume.",
+          submittingStartedAt: null,
+        }
+      : q,
+  );
+  await set(QUEUE_KEY, next, store);
+  void logClientEvent("submit_queue_submitting_rearmed", "warn", {
+    source: "storage",
+    type: "upload",
+    context: { rearmedCount: stranded.length, ids: stranded.map((q) => q.id) },
+  });
+  notifyChanged();
+  return next;
+}
+
 async function loadAllRaw(): Promise<QueuedSubmission[]> {
   try {
     const data = (await get<QueuedSubmission[]>(QUEUE_KEY, store)) ?? [];
     if (!Array.isArray(data)) return [];
-    return data;
+    return await rearmStrandedSubmitting(data);
   } catch (e) {
     console.warn("[submitQueue] read failed", e);
     return [];
@@ -442,6 +498,7 @@ async function drainOne(entry: QueuedSubmission): Promise<void> {
     ...q,
     status: "submitting",
     lastAttemptAt: new Date().toISOString(),
+    submittingStartedAt: new Date().toISOString(),
   }));
 
   // ── 1) Upload signatures if not already done ──
