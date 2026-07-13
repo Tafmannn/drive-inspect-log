@@ -395,6 +395,11 @@ export function ControlOverview() {
             onRowClick={(row) => navigate(`/jobs/${row.id}/pod?from=/control`)}
             maxRows={8}
           />
+          {(kpis?.podReview ?? 0) > Math.min(podQueue?.length ?? 0, 8) && (
+            <p className="text-xs text-muted-foreground mt-2 text-center">
+              Showing top {Math.min(podQueue?.length ?? 0, 8)} of {kpis?.podReview} jobs awaiting closure
+            </p>
+          )}
         </ControlSection>
 
         <ControlSection
