@@ -1065,6 +1065,29 @@ export type Database = {
           },
         ]
       }
+      invoice_number_counters: {
+        Row: {
+          last_seq: number
+          org_id: string
+        }
+        Insert: {
+          last_seq?: number
+          org_id: string
+        }
+        Update: {
+          last_seq?: number
+          org_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_number_counters_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           client_address: string | null
@@ -1285,6 +1308,7 @@ export type Database = {
           delivery_address_line2: string | null
           delivery_city: string
           delivery_company: string | null
+          delivery_contact_email: string | null
           delivery_contact_name: string
           delivery_contact_phone: string
           delivery_notes: string | null
@@ -1316,6 +1340,7 @@ export type Database = {
           pickup_address_line2: string | null
           pickup_city: string
           pickup_company: string | null
+          pickup_contact_email: string | null
           pickup_contact_name: string
           pickup_contact_phone: string
           pickup_notes: string | null
@@ -1365,6 +1390,7 @@ export type Database = {
           delivery_address_line2?: string | null
           delivery_city: string
           delivery_company?: string | null
+          delivery_contact_email?: string | null
           delivery_contact_name: string
           delivery_contact_phone: string
           delivery_notes?: string | null
@@ -1396,6 +1422,7 @@ export type Database = {
           pickup_address_line2?: string | null
           pickup_city: string
           pickup_company?: string | null
+          pickup_contact_email?: string | null
           pickup_contact_name: string
           pickup_contact_phone: string
           pickup_notes?: string | null
@@ -1445,6 +1472,7 @@ export type Database = {
           delivery_address_line2?: string | null
           delivery_city?: string
           delivery_company?: string | null
+          delivery_contact_email?: string | null
           delivery_contact_name?: string
           delivery_contact_phone?: string
           delivery_notes?: string | null
@@ -1476,6 +1504,7 @@ export type Database = {
           pickup_address_line2?: string | null
           pickup_city?: string
           pickup_company?: string | null
+          pickup_contact_email?: string | null
           pickup_contact_name?: string
           pickup_contact_phone?: string
           pickup_notes?: string | null
@@ -2385,6 +2414,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      allocate_invoice_number: { Args: { p_org_id: string }; Returns: string }
       archive_driver_profile: {
         Args: {
           p_reason?: string
@@ -2477,6 +2507,7 @@ export type Database = {
           delivery_address_line2: string | null
           delivery_city: string
           delivery_company: string | null
+          delivery_contact_email: string | null
           delivery_contact_name: string
           delivery_contact_phone: string
           delivery_notes: string | null
@@ -2508,6 +2539,7 @@ export type Database = {
           pickup_address_line2: string | null
           pickup_city: string
           pickup_company: string | null
+          pickup_contact_email: string | null
           pickup_contact_name: string
           pickup_contact_phone: string
           pickup_notes: string | null
@@ -2650,26 +2682,16 @@ export type Database = {
         Returns: Json
       }
       same_org_as_target: { Args: { target_org_id: string }; Returns: boolean }
-      submit_inspection:
-        | {
-            Args: {
-              p_damage_items: Json
-              p_inspection: Json
-              p_job_id: string
-              p_type: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_damage_items: Json
-              p_inspection: Json
-              p_job_id: string
-              p_submission_session_id?: string
-              p_type: string
-            }
-            Returns: Json
-          }
+      submit_inspection: {
+        Args: {
+          p_damage_items: Json
+          p_inspection: Json
+          p_job_id: string
+          p_submission_session_id?: string
+          p_type: string
+        }
+        Returns: Json
+      }
       suspend_user_account: {
         Args: { p_reason?: string; p_target_user_id: string }
         Returns: {
