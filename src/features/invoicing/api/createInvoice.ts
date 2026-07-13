@@ -31,23 +31,22 @@ export interface CreateInvoiceResult {
   jobCount: number;
 }
 
-/** Get the next sequential invoice number for the org */
+/**
+ * Get the next sequential invoice number for the org.
+ *
+ * Delegates to the `allocate_invoice_number` RPC, which increments a
+ * per-org counter atomically under a row lock. This replaces the old
+ * read-max-then-add-one approach, which raced under concurrency and
+ * produced duplicate numbers.
+ */
 async function getNextInvoiceNumber(orgId: string): Promise<string> {
-  const { data } = await supabase
-    .from("invoices")
-    .select("invoice_number")
-    .eq("org_id", orgId)
-    .order("created_at", { ascending: false })
-    .limit(1);
-
-  let next = 1001;
-  const last = data?.[0]?.invoice_number;
-  if (last) {
-    const match = last.match(/(\d+)$/);
-    if (match) next = parseInt(match[1]) + 1;
+  const { data, error } = await (supabase as any).rpc("allocate_invoice_number", {
+    p_org_id: orgId,
+  });
+  if (error || !data) {
+    throw new Error(error?.message ?? "Failed to allocate an invoice number");
   }
-  const year = new Date().getFullYear().toString().slice(-2);
-  return `AX${year}-${String(next).padStart(4, "0")}`;
+  return data as string;
 }
 
 /** Check which job IDs are already linked to invoice_items */
@@ -139,6 +138,14 @@ export async function createMultiJobInvoice(
   if (itemsErr) {
     // Rollback: delete the invoice header
     await supabase.from("invoices").delete().eq("id", invoiceId);
+    // 23505 = unique_violation on invoice_items.job_id: a concurrent invoice
+    // claimed one of these jobs after our duplicate guard ran (TOCTOU). The
+    // DB constraint is the real safety net; surface a clear message.
+    if ((itemsErr as { code?: string }).code === "23505") {
+      throw new Error(
+        "One or more selected jobs were just invoiced on another invoice. Refresh and try again.",
+      );
+    }
     throw new Error(`Failed to create line items: ${itemsErr.message}`);
   }
 

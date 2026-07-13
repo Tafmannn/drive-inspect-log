@@ -45,6 +45,7 @@ import {
   type EligibleJob,
 } from "../hooks/useInvoicePrepData";
 import { useCreateInvoice } from "../hooks/useCreateInvoice";
+import { getOrgId } from "@/lib/orgHelper";
 import { WarningCallout, RoleScope } from "@/components/ui-kit";
 import { useClients } from "@/hooks/useClients";
 import { useAuth } from "@/context/AuthContext";
@@ -182,10 +183,12 @@ export function InvoicePrepScreen() {
   // Create invoice handler
   const handleCreateInvoice = async () => {
     if (!selectedClient || selectedJobs.length === 0) return;
-    // Get org_id from the user's metadata
-    const { data: { user: authUser } } = await (await import("@/integrations/supabase/client")).supabase.auth.getUser();
-    const orgId = authUser?.app_metadata?.org_id || authUser?.user_metadata?.org_id;
-    if (!orgId) {
+    // Resolve org_id from the authoritative source (app_metadata / user_profiles),
+    // never self-writable user_metadata.
+    let orgId: string;
+    try {
+      orgId = await getOrgId();
+    } catch {
       toast({ title: "Error", description: "Unable to determine organisation.", variant: "destructive" });
       return;
     }
