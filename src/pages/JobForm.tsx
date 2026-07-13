@@ -547,23 +547,41 @@ export const JobForm = () => {
       } : {}),
     };
 
+    // Client linking writes the client_company/client_name/client_email
+    // fields the invoice-prep eligibility matcher depends on (see
+    // useInvoicePrepData.ts) — a silent failure here can make a job
+    // permanently invisible under its correct client's "eligible to
+    // invoice" list with no indication anything went wrong. Report it
+    // distinctly from the main save outcome rather than swallowing it.
+    const linkClientAndWarn = async (targetJobId: string) => {
+      if (!selectedClientId) return;
+      try {
+        const { linkJobToClient } = await import("@/lib/clientApi");
+        await linkJobToClient(targetJobId, selectedClientId);
+      } catch (err) {
+        logClientEvent("job_client_link_failed", "error", {
+          jobId: targetJobId,
+          message: String(err),
+        });
+        toast({
+          title: "Client link failed",
+          description: "The job was saved, but linking it to the selected client didn't take. Re-select the client and save again.",
+          variant: "destructive",
+        });
+      }
+    };
+
     try {
       if (isEdit && jobId) {
         await updateMutation.mutateAsync({ jobId, input: payload });
-        if (selectedClientId) {
-          const { linkJobToClient } = await import("@/lib/clientApi");
-          await linkJobToClient(jobId, selectedClientId).catch(() => {});
-        }
+        await linkClientAndWarn(jobId);
         const updRef = payload.external_job_number || jobId.slice(0, 8);
         toast({ title: `Job ${updRef} updated.` });
         navigate(`/jobs/${jobId}`);
       } else {
         if (dk) clearDraft(dk);
         const job = await createMutation.mutateAsync(payload);
-        if (selectedClientId) {
-          const { linkJobToClient } = await import("@/lib/clientApi");
-          await linkJobToClient(job.id, selectedClientId).catch(() => {});
-        }
+        await linkClientAndWarn(job.id);
         const newRef = job.external_job_number || job.id.slice(0, 8);
         toast({ title: `Job ${newRef} created.` });
         navigate(`/jobs/${job.id}`);
