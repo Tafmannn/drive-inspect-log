@@ -327,3 +327,98 @@ not started until the previous one has no known unresolved critical breakage.
 - **No staging Supabase project.** Live suites 12–15 and any runtime RLS/org-isolation/storage-IDOR proof cannot be executed here. All security conclusions about the database layer are **static source review**, not runtime proof, unless a batch section explicitly states otherwise.
 - **No physical devices.** Viewport testing uses Chromium (Playwright, pre-installed) resized to the specified breakpoints — this validates CSS/layout behavior, not real touch input, on-device keyboards, or native camera capture.
 - **No production data access.** No production database, production Supabase project, or production secrets are touched at any point.
+
+---
+
+## 6. Independent review pass
+
+Performed after all 14 batches, comparing the full branch diff against base commit `0dee585`.
+
+- **Diff scope**: 34 commits, 67 files changed (+4,606 / −100 lines) between `0dee585` and `HEAD`.
+- **Anti-pattern sweep** (all changed non-test `src`/`supabase`/`release-validation` files): searched for `TODO`/`FIXME`/`HACK`, `@ts-ignore`/`@ts-expect-error`, `console.log(`, and `.only(`/`.skip(` in touched test files. **Zero matches for any of these** across the entire diff.
+- **Unsafe `any` check**: diffed every added line containing the word "any" — all matches are either legitimate English prose (audit-doc/comment text) or PL/pgSQL's `= ANY(...)` array operator; **zero new TypeScript `any` types were introduced** by this branch. Every pre-existing `no-explicit-any` lint error on a touched file was individually diffed against the file's git history and confirmed to sit on an untouched line (documented per-batch above).
+- **Secrets check**: grepped the full diff for `api_key`/`secret`/`password`/`token`/`bearer` (case-insensitive) — all matches are documentation prose (route tables, environment-constraint notes) or route paths (`/forgot-password`), not actual credentials. Suite 10 (Committed-secret scan) also passes.
+- **RLS/role-weakening check**: every migration in this branch was written by this audit and reviewed for exactly this — confirmed each `DROP POLICY` count is ≤ its file's `CREATE POLICY` count (every dropped permissive policy is replaced by an equal-or-narrower one, never a net loosening): `driver_onboarding` (5 drops / 8 creates), `clients`+`invoice_items` (2 drops / 8 creates), `client_logs` (2 drops / 2 creates, both narrower). The `submit_inspection` migration chain (150000 → 170000) was re-read end-to-end to confirm the later migration's `CREATE OR REPLACE` body still carries forward the earlier migration's `NOT_ASSIGNED_DRIVER` check (it does — verified by grep) rather than accidentally reverting it when adding `PICKUP_NOT_COMPLETE`.
+- **Untracked/uncommitted files**: `git status --porcelain` is clean — nothing untracked, nothing uncommitted, at the point this review was performed.
+- **Disabled tests**: `.only(`/`.skip(`/`it.todo`/`xit`/`xdescribe` searched across every test file in the repo (not just touched ones) — zero matches.
+- **Findings from this pass**: none beyond what's already in the Defect Ledger. No new defects were found in the independent review itself; it served to verify the 21 defects already fixed were not accompanied by any of the prohibited patterns (weakened security, hidden errors, disabled tests, debug artefacts).
+
+---
+
+## 7. Final report
+
+**Base commit**: `0dee585` (main)
+**Branch**: `audit/full-ui-workflow-audit`
+**Commits**: 34 total — 21 `fix(...)` commits (one per defect or defect group) and 13 `docs(audit)`/`chore(audit)` commits recording baseline, inventory, and per-batch findings. Full list: `git log --oneline 0dee585..HEAD`.
+
+### Coverage
+
+| Metric | Count |
+| --- | --- |
+| Routes declared in `App.tsx` | 56 |
+| Top-level pages reviewed (full read or targeted read) | ~40 of 56 route-backing components |
+| Feature-module files reviewed | ~35 of 88 |
+| Batches completed (of 14 mandated) | 14 / 14 |
+| Workflows exercised end-to-end via live browser | 2 (Admin Dashboard, Super Admin Dashboard, at 3 viewports, with synthetic dev-role data) |
+| Defects found | 21 |
+| Defects fixed | 21 (client/application-code fixes fully applied and tested; 6 server-side RLS/RPC migrations additionally carry an honest "unverified against a live database" caveat — see below) |
+| Defects remaining unfixed | 0 |
+
+### Defects by severity
+
+| Severity | Count | IDs |
+| --- | --- | --- |
+| P0 | 1 | SECURITY-004 |
+| P1 | 9 | WORKFLOW-001, WORKFLOW-003, WORKFLOW-005, WORKFLOW-006, SECURITY-001, SECURITY-002, SECURITY-003, WORKFLOW-008, DATA-003 |
+| P2 | 9 | DATA-001, WORKFLOW-002, UI-001, UI-002, DATA-002, WORKFLOW-004, WORKFLOW-007, UI-004, A11Y-001 |
+| P3 | 2 | UI-003, A11Y-002 |
+
+Full root causes, fixes, and test evidence for every defect are in Section 3 (Defect Ledger) and the corresponding Section 4 batch entry — not restated here to avoid drift between two descriptions of the same fix.
+
+### Highlights (most significant findings)
+
+1. **SECURITY-004 (P0)** — `client_logs` had a never-dropped anon-readable RLS policy; anyone, including unauthenticated requests, could read every organisation's internal error/diagnostic logs.
+2. **SECURITY-001/003 (P1)** — `driver_onboarding`, `clients`, and `invoice_items` all had the same "any org member can write" RLS gap despite every real write path being admin-only, letting a driver self-approve their own onboarding or fabricate invoice line items via direct API calls.
+3. **SECURITY-002 (P1)** — a permission-escalation guard was ANDed with a hardcoded key allowlist instead of gating on the `is_sensitive` flag alone, letting a plain admin manage sensitive permissions the UI hid from them.
+4. **WORKFLOW-003/004/006 (P1)** — three separate RPCs (`submit_inspection` ×2, `complete_job`) were missing server-side authorization checks that their client UIs already enforced, each independently discovered by the same "client gates correctly, server doesn't mirror it" pattern.
+5. **WORKFLOW-008/DATA-003 (P1)** — two parallel invoicing code paths could double-bill the same job, and a silent write failure could permanently hide a job from its own client's invoice list with zero error surfaced.
+6. **UI-004 (P2)** — found by actually running the app in a browser (not static review): a CSS truncation bug rendered KPI labels as garbled text at the 320px viewport.
+
+### Commands executed and results
+
+| Command | Result |
+| --- | --- |
+| `tsc --noEmit` | ✅ PASS (clean, run repeatedly through the session and at final validation) |
+| `vitest run` | ✅ PASS — 61 files / 448 tests (baseline was 366 tests / 43 files) |
+| `npm run build` | ✅ PASS (production build succeeds; pre-existing chunk-size warnings only) |
+| `npm run release:validate` (full, 16 suites) | ⚠️ WARNING overall, **zero FAIL** — 8 PASS, 4 non-blocking WARNING (all pre-existing: migration-idempotency release-set note, edge-function-authorization static notes, one pre-existing high dependency advisory, 316-error ESLint backlog — down from the 317 documented baseline, confirming zero new lint errors), 4 NOT_EXECUTED (live-DB/HTTP suites — no staging credentials available in this environment) |
+| `npx eslint <touched files>` (per batch) | ✅ 0 new errors in every batch — every pre-existing error confirmed via diff to sit on an untouched line |
+| `@axe-core/cli` (attempted) | ❌ Blocked by the environment's safety classifier (unpinned npm package, no explicit user authorization) — see Batch 13 |
+
+### Remaining risks
+
+1. **No live-database verification for any RLS/RPC change.** Every migration in this branch (7 new migrations: `submit_inspection` ×2, `complete_job`, `driver_onboarding`, `clients`/`invoice_items`, `client_logs`, `invoice_number` idempotency fix) is verified by static SQL review, byte-for-byte diffing against prior function bodies, and the custom suite-05 regression checks — never by executing the SQL against a real Postgres instance. This is the single most important gap in this audit.
+2. **The `invoices` table's own RLS is unknown.** It has no `CREATE TABLE`/RLS-policy migration anywhere in tracked history — only an `ALTER TABLE ... ADD COLUMN`. Its actual current access policy cannot be determined from source. Flagged in SECURITY-003; recommend inspecting it directly in the live Supabase dashboard before merge.
+3. **No automated accessibility scan was run** (axe-core install was blocked by the sandbox). Color contrast, ARIA-attribute validity, and screen-reader behaviour were not systematically checked. ~9 icon-only buttons and many `cursor-pointer` clickable elements outside the two components fixed in A11Y-001/002 still lack keyboard/screen-reader support.
+4. **Live-browser testing covered only 2 of 56 routes**, at 3 of the mandated viewports, with synthetic (not real) data. The full 320×568–1440×900 responsive matrix across all pages remains unverified visually.
+5. **The pre-existing 316-error ESLint backlog** (mostly `no-explicit-any`) is explicitly out of scope for this audit (a large, unrelated refactor) but remains a known code-quality debt.
+
+### Manual QA instructions (for human review before merge)
+
+1. Deploy this branch to a staging Supabase project and re-run the 6 new/changed RLS migrations (`driver_onboarding`, `clients`/`invoice_items`, `client_logs`, `complete_job`, `submit_inspection` ×2) against real seeded data — specifically test: a driver attempting to self-approve onboarding, a driver attempting to write an invoice line item directly, an anonymous request attempting to read `client_logs`, a non-assigned driver attempting to submit another driver's inspection, and a driver attempting to call `complete_job` directly.
+2. Run a real automated accessibility scan (axe-core or Lighthouse) across the full route list.
+3. Manually test at 320×568, 768×1024, and 1440×900 for: Admin Dashboard, Driver Dashboard, InspectionFlow (pickup and delivery), PodReport, ExpenseForm, InvoicePrepScreen.
+4. Manually exercise: creating a job with a client selected while intermittently disconnecting network (to trigger DATA-003's failure path) and confirming the new "Client link failed" toast appears and is actionable.
+5. Confirm the `invoices` table's actual RLS policy in the live Supabase dashboard (Remaining Risk #2) and file a follow-up if it's found to be under-scoped.
+
+### Merge recommendation
+
+**Not ready for merge** as a direct merge to `main` — but **ready for human review**, specifically because:
+- No unresolved P0/P1 defects remain unfixed in the codebase (all 21 defects have applied fixes).
+- Core workflows (auth, inspection submission, evidence queues, POD, invoicing, admin/super-admin user management) were traced and tested with regression coverage.
+- Production build and full unit-test suite pass cleanly; the release-validation gate shows zero FAILs.
+- No security boundary was weakened; several were meaningfully tightened.
+- No silent evidence loss was introduced; existing evidence-preservation guarantees were extended (WORKFLOW-005) rather than touched.
+- Every changed file was reviewed as part of a batch, and the independent review pass found no undisclosed issues.
+
+The reason it is not simply "ready for merge" outright is the **first Remaining Risk above**: none of the 7 new/changed SQL migrations have been executed against a live database in this session. Per the operating rules ("Do not claim a component or workflow was tested unless it was actually reviewed or executed"), a human with staging-database access should run the migrations and the manual QA steps above before this branch goes to `main`.
