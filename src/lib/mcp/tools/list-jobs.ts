@@ -36,7 +36,9 @@ export default defineTool({
     const client = supabaseForUser(ctx);
     let q = client
       .from("jobs")
-      .select("id, job_ref, status, driver_name, pickup_address, delivery_address, created_at")
+      .select(
+        "id, external_job_number, status, driver_name, pickup_city, pickup_postcode, delivery_city, delivery_postcode, job_date, total_price, created_at",
+      )
       .order("created_at", { ascending: false })
       .limit(cap);
     if (status) q = q.eq("status", status);

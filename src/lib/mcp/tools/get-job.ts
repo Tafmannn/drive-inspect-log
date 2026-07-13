@@ -23,9 +23,22 @@ export default defineTool({
     if (!ctx.isAuthenticated()) {
       return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
     }
+    // Explicit allowlist: operationally useful fields only. Internal pricing
+    // (admin_rate, rate_per_mile, pricing_metadata), spreadsheet-sync columns,
+    // and raw client contact PII are deliberately excluded from the agent view.
+    const JOB_COLUMNS =
+      "id, external_job_number, status, job_type, job_date, priority, " +
+      "driver_name, driver_id, " +
+      "vehicle_reg, vehicle_make, vehicle_model, vehicle_colour, vehicle_year, vehicle_type, vehicle_fuel_type, " +
+      "pickup_company, pickup_city, pickup_postcode, pickup_contact_name, pickup_contact_phone, pickup_time_from, pickup_time_to, pickup_notes, " +
+      "delivery_company, delivery_city, delivery_postcode, delivery_contact_name, delivery_contact_phone, delivery_time_from, delivery_time_to, delivery_notes, " +
+      "client_name, client_company, " +
+      "distance_miles, total_price, " +
+      "has_pickup_inspection, has_delivery_inspection, " +
+      "created_at, updated_at, completed_at";
     const { data, error } = await supabaseForUser(ctx)
       .from("jobs")
-      .select("*")
+      .select(JOB_COLUMNS)
       .eq("id", id)
       .maybeSingle();
     if (error) {

@@ -14,10 +14,6 @@ type AnySupabase = typeof supabase & {
   };
 };
 
-function isSameOriginPath(path: string): boolean {
-  return path.startsWith("/") && !path.startsWith("//");
-}
-
 export default function OAuthConsent() {
   const [params] = useSearchParams();
   const authorizationId = params.get("authorization_id") ?? "";

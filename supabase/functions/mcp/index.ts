@@ -59,7 +59,9 @@ var list_jobs_default = defineTool2({
     }
     const cap = Math.min(Math.max(limit ?? 20, 1), 100);
     const client = supabaseForUser(ctx);
-    let q = client.from("jobs").select("id, job_ref, status, driver_name, pickup_address, delivery_address, created_at").order("created_at", { ascending: false }).limit(cap);
+    let q = client.from("jobs").select(
+      "id, external_job_number, status, driver_name, pickup_city, pickup_postcode, delivery_city, delivery_postcode, job_date, total_price, created_at"
+    ).order("created_at", { ascending: false }).limit(cap);
     if (status) q = q.eq("status", status);
     const { data, error } = await q;
     if (error) {
@@ -96,7 +98,8 @@ var get_job_default = defineTool3({
     if (!ctx.isAuthenticated()) {
       return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
     }
-    const { data, error } = await supabaseForUser2(ctx).from("jobs").select("*").eq("id", id).maybeSingle();
+    const JOB_COLUMNS = "id, external_job_number, status, job_type, job_date, priority, driver_name, driver_id, vehicle_reg, vehicle_make, vehicle_model, vehicle_colour, vehicle_year, vehicle_type, vehicle_fuel_type, pickup_company, pickup_city, pickup_postcode, pickup_contact_name, pickup_contact_phone, pickup_time_from, pickup_time_to, pickup_notes, delivery_company, delivery_city, delivery_postcode, delivery_contact_name, delivery_contact_phone, delivery_time_from, delivery_time_to, delivery_notes, client_name, client_company, distance_miles, total_price, has_pickup_inspection, has_delivery_inspection, created_at, updated_at, completed_at";
+    const { data, error } = await supabaseForUser2(ctx).from("jobs").select(JOB_COLUMNS).eq("id", id).maybeSingle();
     if (error) {
       return { content: [{ type: "text", text: error.message }], isError: true };
     }
