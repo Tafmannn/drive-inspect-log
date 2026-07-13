@@ -158,6 +158,14 @@ serve(async (req) => {
       return jsonResponse({ success: false, finalUrl: null, normalized, error: `UNRECOGNIZED_FORMAT: ${normalized.format}` }, 400);
     }
 
+    // The bucket for the supabase-sig:// form is caller-supplied. Restrict it to
+    // the known signature/object buckets so a caller can't have us sign an
+    // object in an arbitrary bucket (authz is otherwise path/jobId-scoped only).
+    const ALLOWED_BUCKETS = new Set([SIGNATURE_BUCKET, GCS_BUCKET]);
+    if (!ALLOWED_BUCKETS.has(normalized.bucket)) {
+      return jsonResponse({ success: false, finalUrl: null, normalized, error: "BUCKET_NOT_ALLOWED" }, 400);
+    }
+
     // ─── Authorize the requested object against the caller's org (C1 IDOR) ───
     if (!(await callerCanAccessPath(admin, caller, normalized.path))) {
       return jsonResponse({ success: false, finalUrl: null, normalized, error: 'FORBIDDEN' }, 403);

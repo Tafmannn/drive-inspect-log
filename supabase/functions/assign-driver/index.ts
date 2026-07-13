@@ -5,6 +5,7 @@ import {
   jsonRes,
   rolesArrayFor,
 } from "../_shared/auth.ts";
+import { findAuthUserByEmail } from "../_shared/adminUsers.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -34,12 +35,13 @@ serve(async (req) => {
     const targetOrgId = caller.isSuperAdmin ? (org_id ?? caller.orgId) : caller.orgId;
     if (!targetOrgId) return jsonRes({ error: "NO_TARGET_ORG" }, 400);
 
-    // Locate the target auth user by email.
-    const { data: listData, error: listError } = await admin.auth.admin.listUsers();
-    if (listError) return jsonRes({ error: "LIST_USERS_FAILED" }, 500);
-    const targetUser = listData.users.find(
-      (u) => u.email?.toLowerCase() === email.toLowerCase(),
-    );
+    // Locate the target auth user by email (paginates across all users).
+    let targetUser;
+    try {
+      targetUser = await findAuthUserByEmail(admin, email);
+    } catch {
+      return jsonRes({ error: "LIST_USERS_FAILED" }, 500);
+    }
     if (!targetUser) return jsonRes({ error: "USER_NOT_FOUND" }, 404);
 
     // Org admins cannot pull a user who already belongs to a different org.

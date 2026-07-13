@@ -8,6 +8,7 @@
  */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { findAuthUserByEmail, listAllAuthUsers } from "../_shared/adminUsers.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -254,10 +255,7 @@ serve(async (req) => {
 
       if (inviteErr) {
         if (inviteErr.message?.includes("already been registered")) {
-          const { data: listData } = await admin.auth.admin.listUsers();
-          const existing = listData?.users?.find(
-            (u: any) => u.email?.toLowerCase() === email.toLowerCase()
-          );
+          const existing = await findAuthUserByEmail(admin, email);
           if (!existing) return json({ error: inviteErr.message }, 500);
           authUserId = existing.id;
         } else {
@@ -573,7 +571,7 @@ serve(async (req) => {
           actor_email: callerEmail,
           target_user_id: user_id,
           permission_key,
-          action: grant_type === "allow" ? "create_override" : "create_override",
+          action: grant_type === "allow" ? "grant_override" : "deny_override",
           old_grant_type: null,
           new_grant_type: grant_type,
           reason: reason ?? null,
@@ -1008,8 +1006,12 @@ serve(async (req) => {
     if (action === "sync_profiles") {
       if (!callerIsSuper) return json({ error: "SUPER_ADMIN_ONLY" }, 403);
 
-      const { data: authUsers } = await admin.auth.admin.listUsers();
-      if (!authUsers?.users) return json({ error: "LIST_FAILED" }, 500);
+      let allAuthUsers;
+      try {
+        allAuthUsers = await listAllAuthUsers(admin);
+      } catch {
+        return json({ error: "LIST_FAILED" }, 500);
+      }
 
       const { data: existing } = await admin
         .from("user_profiles")
@@ -1017,7 +1019,7 @@ serve(async (req) => {
 
       const existingIds = new Set((existing ?? []).map((r: any) => r.auth_user_id));
 
-      const toInsert = authUsers.users
+      const toInsert = allAuthUsers
         .filter((u: any) => !existingIds.has(u.id))
         .map((u: any) => ({
           auth_user_id: u.id,
