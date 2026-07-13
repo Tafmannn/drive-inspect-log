@@ -22,6 +22,24 @@ function latestHelperBody(dir, files, name) {
   return latest; // files are sorted ascending, so the last match is newest
 }
 
+// Replay a permissive-policy's CREATE/DROP lifecycle across the migration
+// history in chronological (== lexical, per suite 02) order, exactly like
+// `latestHelperBody` resolves "latest wins" for helper functions above. A
+// blanket "does this phrase appear anywhere in history" scan (the previous
+// approach) can never go from WARN to PASS once a permissive policy is
+// closed by a later migration — it just keeps flagging the original CREATE
+// forever, which is indistinguishable from an unresolved exposure.
+export function policyExposureStillActive(dir, files, { createPattern, dropPattern }) {
+  let active = false;
+  let closedBy = null;
+  for (const f of files) {
+    const sql = readFileSync(join(dir, f), "utf8");
+    if (createPattern.test(sql)) { active = true; closedBy = null; }
+    if (dropPattern.test(sql)) { active = false; closedBy = f; }
+  }
+  return { active, closedBy };
+}
+
 export default {
   id: "05",
   name: "RLS / security-posture (static)",
@@ -66,31 +84,47 @@ export default {
       checks.push(fail("vehicle-signatures permissive policies dropped", "closure migration not found"));
     }
 
-    // 3) Known deferred (Phase 1.5) permissive exposure — surface, do not block.
-    const qr = files.some((f) =>
-      /FOR\s+ALL[\s\S]{0,80}USING\s*\(\s*true\s*\)/i.test(readFileSync(join(dir, f), "utf8")) &&
-      /qr_confirmations/i.test(readFileSync(join(dir, f), "utf8")),
-    );
+    // 3) qr_confirmations anon exposure — resolve current (latest) state, not
+    //    "did this phrase ever appear". The original "Allow all for anon on
+    //    qr_confirmations" USING(true) policy, plus two later dashboard-created
+    //    anon policies, are all explicitly DROPped by the SECURITY DEFINER RPC
+    //    closure migration (phase1_qr_handover_security_definer_rpcs).
+    const qrExposure = policyExposureStillActive(dir, files, {
+      createPattern: /CREATE\s+POLICY\s+"Allow all for anon on qr_confirmations"/i,
+      dropPattern: /DROP\s+POLICY\s+IF\s+EXISTS\s+"Allow all for anon on qr_confirmations"/i,
+    });
     checks.push(
-      qr
+      qrExposure.active
         ? warn(
             "qr_confirmations USING(true) — DEFERRED (Phase 1.5)",
             "anon-readable customer PII + tokens; acknowledged out-of-scope for this release. Track for Phase 1.5.",
           )
-        : pass("qr_confirmations USING(true)", "no permissive policy found"),
+        : pass("qr_confirmations USING(true)", `closed by ${qrExposure.closedBy}`),
     );
 
-    const vp = files.some((f) =>
-      /vehicle-photos/i.test(readFileSync(join(dir, f), "utf8")) &&
-      /Allow public[\s\S]{0,60}USING\s*\(\s*true\s*\)/i.test(readFileSync(join(dir, f), "utf8")),
-    );
+    // 4) vehicle-photos public exposure has two independent components that
+    //    must BOTH be closed: the bucket's public flag (a public bucket serves
+    //    every object via a permanent public URL regardless of RLS policies)
+    //    and the four permissive storage.objects policies.
+    const bucketExposure = policyExposureStillActive(dir, files, {
+      createPattern: /INSERT\s+INTO\s+storage\.buckets[\s\S]{0,80}'vehicle-photos'[\s\S]{0,40}true\s*\)|UPDATE\s+storage\.buckets\s+SET\s+public\s*=\s*true\s+WHERE\s+id\s*=\s*'vehicle-photos'/i,
+      dropPattern: /UPDATE\s+storage\.buckets\s+SET\s+public\s*=\s*false\s+WHERE\s+id\s*=\s*'vehicle-photos'/i,
+    });
+    const policyExposure = policyExposureStillActive(dir, files, {
+      createPattern: /CREATE\s+POLICY\s+"Allow public (read|upload|update|delete) vehicle-photos"/i,
+      dropPattern: /DROP\s+POLICY\s+IF\s+EXISTS\s+"Allow public (read|upload|update|delete) vehicle-photos"/i,
+    });
+    const vpActive = bucketExposure.active || policyExposure.active;
     checks.push(
-      vp
+      vpActive
         ? warn(
             "vehicle-photos public policies — DEFERRED (Phase 1.5)",
             "bucket still has Allow-public USING(true) policies; privatise after confirming active backend + migrating public URLs.",
           )
-        : pass("vehicle-photos public policies", "no permissive policy found"),
+        : pass(
+            "vehicle-photos public policies",
+            `bucket closed by ${bucketExposure.closedBy}; policies closed by ${policyExposure.closedBy}`,
+          ),
     );
 
     return { checks };
