@@ -183,6 +183,21 @@ describe("invoiceReadiness — Stage 5 strict gating", () => {
     ).toBeTruthy();
   });
 
+  it("requireReceipts + no receipts = blocked with a distinct missing_receipts code", () => {
+    const r = evaluateInvoiceReadiness({
+      job: cleanJob(),
+      alreadyInvoiced: false,
+      receiptCount: 0,
+      requireReceipts: true,
+    });
+    expect(r.ready).toBe(false);
+    expect(r.blockers.find((b) => b.code === "missing_receipts")).toBeTruthy();
+    // Must NOT be conflated with the unrelated billing-contact blocker.
+    expect(
+      r.blockers.find((b) => b.code === "missing_billing_contact"),
+    ).toBeUndefined();
+  });
+
   it("completed with red evidence = blocked", () => {
     const r = evaluateInvoiceReadiness({
       job: cleanJob({
