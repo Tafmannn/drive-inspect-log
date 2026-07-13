@@ -50,6 +50,11 @@ export const ExpenseForm = () => {
   const [loadingExpense, setLoadingExpense] = useState(isEdit);
   const [showDraftDialog, setShowDraftDialog] = useState(false);
   const [scanning, setScanning] = useState(false);
+  // WORKFLOW-007: if the expense row is created but a later receipt upload
+  // fails, retrying handleSubmit must resume (upload remaining receipts to
+  // the already-created row) rather than create a second expense record.
+  const [createdExpenseId, setCreatedExpenseId] = useState<string | null>(null);
+  const [receiptsUploadedCount, setReceiptsUploadedCount] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -252,6 +257,10 @@ export const ExpenseForm = () => {
     }
 
     setSaving(true);
+    // Hoisted so the catch block below can tell whether the expense row
+    // itself was created during THIS call (state updates from setCreatedExpenseId
+    // wouldn't be visible yet via the closure at this point).
+    let expenseCreatedThisAttempt = createdExpenseId !== null;
     try {
       if (isEdit && expenseId) {
         await updateExpense.mutateAsync({
@@ -264,20 +273,29 @@ export const ExpenseForm = () => {
           notes: notes || null,
         });
       } else {
-        const created = await createExpense.mutateAsync({
-          job_id: jobId,
-          date,
-          time: time || null,
-          amount: amt,
-          category,
-          label: label || null,
-          notes: notes || null,
-        });
+        // Resume onto the already-created row if a prior submit created the
+        // expense but failed partway through receipt uploads — do not create
+        // a second expense record for the same click-again.
+        let expenseIdToUse = createdExpenseId;
+        if (!expenseIdToUse) {
+          const created = await createExpense.mutateAsync({
+            job_id: jobId,
+            date,
+            time: time || null,
+            amount: amt,
+            category,
+            label: label || null,
+            notes: notes || null,
+          });
+          expenseIdToUse = created.id;
+          expenseCreatedThisAttempt = true;
+          setCreatedExpenseId(created.id);
+          clearDraft(DRAFT_KEY);
+        }
 
-        clearDraft(DRAFT_KEY);
-
-        for (const { file } of receiptFiles) {
-          await uploadReceipt.mutateAsync({ expenseId: created.id, file });
+        for (let i = receiptsUploadedCount; i < receiptFiles.length; i++) {
+          await uploadReceipt.mutateAsync({ expenseId: expenseIdToUse, file: receiptFiles[i].file });
+          setReceiptsUploadedCount(i + 1);
         }
       }
 
@@ -286,7 +304,13 @@ export const ExpenseForm = () => {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
       console.error("Failed to save expense", msg, err);
-      toast({ title: "Save failed", description: msg || "We couldn't save this expense. Please try again.", variant: "destructive" });
+      toast({
+        title: "Save failed",
+        description: expenseCreatedThisAttempt
+          ? "Your expense was saved, but a receipt failed to upload. Tap Save again to retry."
+          : (msg || "We couldn't save this expense. Please try again."),
+        variant: "destructive",
+      });
       setSaving(false);
     }
   };
