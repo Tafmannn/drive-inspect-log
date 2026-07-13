@@ -20,6 +20,7 @@ import {
   Loader2,
   Plus,
   Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import { useJob, useSubmitInspection } from "@/hooks/useJobs";
 import { storageService } from "@/lib/storage";
@@ -61,6 +62,7 @@ import {
 
 import { JOB_STATUS } from "@/lib/statusConfig";
 import { useEvidenceCapture } from "@/hooks/useEvidenceCapture";
+import { useDriverGate } from "@/hooks/useDriverGate";
 import { parseLegacyType } from "@/lib/evidence/legacyAdapter";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import {
@@ -95,8 +97,9 @@ export const InspectionFlow = () => {
 
   // ─── Memoized derived data ─────────────────────────────────────────
 
-  const { data: job, isLoading: jobLoading } = useJob(jobId ?? "");
+  const { data: job, isLoading: jobLoading, isError: jobError } = useJob(jobId ?? "");
   const submitMutation = useSubmitInspection();
+  const driverGate = useDriverGate();
 
   // ── Evidence v2 (flag-gated capture-time save + background upload) ──
   // When ON, standard/additional photos are durably saved + queued the moment
@@ -1137,6 +1140,65 @@ export const InspectionFlow = () => {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // UI-002: useJob's query throws for an invalid/inaccessible job id rather
+  // than resolving to null (Supabase .single() with 0 matching rows). Every
+  // field below is read via `job?.`, so without this check the driver would
+  // sail through the entire multi-step flow — odometer, checklist, damage
+  // capture with photos, signatures — against a job that doesn't exist or
+  // isn't theirs, discovering the problem only at the final submit. Fail
+  // fast instead, before any evidence is captured.
+  if (jobError || !job) {
+    return (
+      <div className="min-h-screen bg-background">
+        <AppHeader title={type === "pickup" ? "Pickup" : "Delivery"} showBack onBack={() => navigate("/jobs")} />
+        <div className="p-4 flex flex-col items-center text-center gap-3 py-16">
+          <AlertTriangle className="w-10 h-10 text-muted-foreground" />
+          <p className="text-sm font-medium text-foreground">Job not found</p>
+          <p className="text-[13px] text-muted-foreground max-w-xs">
+            This job doesn't exist or you don't have access to it.
+          </p>
+          <Button variant="outline" className="min-h-[44px] rounded-lg mt-2" onClick={() => navigate("/jobs")}>
+            Back to Jobs
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // WORKFLOW-003: nothing previously checked that the current driver is the
+  // job's *assigned* driver before allowing inspection actions — confirmed
+  // server-side too (submit_inspection reads driver_id only to check for a
+  // *different* active job lock, never to authorise the caller). Any active
+  // driver in the org could open any other driver's job and submit a full
+  // inspection against it. This is a client-side fail-fast mirror of the
+  // server-side check added in the same fix (see
+  // supabase/migrations/*_submit_inspection_assigned_driver_only.sql) — admins
+  // are unaffected (useDriverGate reports isDriverOnly: false for them).
+  if (driverGate.isDriverOnly && driverGate.status === "loading") {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+  if (driverGate.isDriverOnly && job.driver_id !== driverGate.driverProfileId) {
+    return (
+      <div className="min-h-screen bg-background">
+        <AppHeader title={type === "pickup" ? "Pickup" : "Delivery"} showBack onBack={() => navigate("/jobs")} />
+        <div className="p-4 flex flex-col items-center text-center gap-3 py-16">
+          <AlertTriangle className="w-10 h-10 text-muted-foreground" />
+          <p className="text-sm font-medium text-foreground">Not your job</p>
+          <p className="text-[13px] text-muted-foreground max-w-xs">
+            This job isn't assigned to you. Contact your admin if you believe this is a mistake.
+          </p>
+          <Button variant="outline" className="min-h-[44px] rounded-lg mt-2" onClick={() => navigate("/jobs")}>
+            Back to Jobs
+          </Button>
+        </div>
       </div>
     );
   }
