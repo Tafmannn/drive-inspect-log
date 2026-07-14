@@ -148,7 +148,10 @@ export default function OrganisationOnboardingWizard() {
     if (step < STEPS.length) setStep(step + 1);
     else {
       toast({ title: "Organisation onboarding saved" });
-      navigate(`/super-admin/orgs/${orgId}`);
+      // replace: true — the wizard's step state isn't in the URL, so
+      // leaving it on the back stack would reopen a fresh step-1 wizard
+      // instead of returning to wherever the admin came from.
+      navigate(`/super-admin/orgs/${orgId}`, { replace: true });
     }
   };
 
