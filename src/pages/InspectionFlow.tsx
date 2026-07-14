@@ -44,6 +44,7 @@ import { EvidenceStatusBadges } from "@/components/EvidenceStatusBadges";
 import { StorageFailureCard } from "@/components/StorageFailureCard";
 import { useAuth } from "@/context/AuthContext";
 import { saveDraft, loadDraft, clearDraft, draftKey } from "@/lib/autosave";
+import { hapticSuccess, hapticError } from "@/lib/haptics";
 import {
   loadPhotoDraft,
   saveStandardPhoto as savePhotoDraftStandard,
@@ -975,6 +976,7 @@ export const InspectionFlow = () => {
             description: `${errorMessage} (queue: ${queueMsg}). Your photos are still saved on this device — please try again before clearing the app.`,
             variant: "destructive",
           });
+          hapticError();
           setSubmitting(false);
           return;
         }
@@ -986,6 +988,7 @@ export const InspectionFlow = () => {
             `${errorMessage} — your inspection and photos are saved. Open Pending Uploads to retry once the issue is fixed.`,
           variant: "destructive",
         });
+        hapticError();
         if (dk) clearDraft(dk);
         if (jobId) void clearPhotoDraft(type, jobId);
         try { sessionStorage.removeItem(sessionKey); } catch { /* ignore */ }
@@ -1085,6 +1088,7 @@ export const InspectionFlow = () => {
             variant: "destructive",
           });
         }
+        hapticError();
         setSubmitting(false);
         return;
       }
@@ -1105,6 +1109,7 @@ export const InspectionFlow = () => {
       const jobRef = job?.external_job_number || jobId.slice(0, 8);
       const label = type === "pickup" ? "Pickup" : "Delivery";
       toast({ title: `${label} completed for job ${jobRef}.` });
+      hapticSuccess();
       if (dk) clearDraft(dk);
       if (jobId) void clearPhotoDraft(type, jobId);
       try { sessionStorage.removeItem(sessionKey); } catch { /* ignore */ }
@@ -1114,6 +1119,7 @@ export const InspectionFlow = () => {
       navigate(`/jobs/${jobId}${window.location.search}`, { replace: true });
     } catch {
       toast({ title: "Submission failed. Please try again.", variant: "destructive" });
+      hapticError();
     } finally {
       setSubmitting(false);
       setRetryingStaging(false);
