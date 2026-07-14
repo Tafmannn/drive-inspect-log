@@ -619,7 +619,9 @@ export const InspectionFlow = () => {
           try { sessionStorage.removeItem(sessionKey); } catch { /* ignore */ }
           setSubmitting(false);
           submitInFlight.current = false;
-          navigate(`/jobs/${jobId}${window.location.search}`);
+          // replace: true — the draft is gone, so this route shouldn't stay
+          // on the back stack (back would otherwise reopen a blank form).
+          navigate(`/jobs/${jobId}${window.location.search}`, { replace: true });
           return;
         }
       } catch {
@@ -871,7 +873,9 @@ export const InspectionFlow = () => {
         if (dk) clearDraft(dk);
         if (jobId) void clearPhotoDraft(type, jobId);
         try { sessionStorage.removeItem(sessionKey); } catch { /* ignore */ }
-        navigate(`/jobs/${jobId}${window.location.search}`);
+        // replace: true — draft is gone; don't leave a blank form on the
+        // back stack.
+        navigate(`/jobs/${jobId}${window.location.search}`, { replace: true });
       };
 
       // ── 4a) OFFLINE / NETWORK-DROP SHORT-CIRCUIT ──
@@ -985,7 +989,9 @@ export const InspectionFlow = () => {
         if (dk) clearDraft(dk);
         if (jobId) void clearPhotoDraft(type, jobId);
         try { sessionStorage.removeItem(sessionKey); } catch { /* ignore */ }
-        navigate(`/jobs/${jobId}${window.location.search}`);
+        // replace: true — draft is gone; don't leave a blank form on the
+        // back stack.
+        navigate(`/jobs/${jobId}${window.location.search}`, { replace: true });
         return;
       }
 
@@ -1102,7 +1108,10 @@ export const InspectionFlow = () => {
       if (dk) clearDraft(dk);
       if (jobId) void clearPhotoDraft(type, jobId);
       try { sessionStorage.removeItem(sessionKey); } catch { /* ignore */ }
-      navigate(`/jobs/${jobId}${window.location.search}`);
+      // replace: true — the inspection is submitted and the draft is gone,
+      // so back should return to wherever the driver was before this form,
+      // not reopen a blank pickup/delivery form.
+      navigate(`/jobs/${jobId}${window.location.search}`, { replace: true });
     } catch {
       toast({ title: "Submission failed. Please try again.", variant: "destructive" });
     } finally {
