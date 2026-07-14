@@ -1,0 +1,19 @@
+{
+  "name": "Axentra - Vehicle Inspection & Logistics",
+  "short_name": "Axentra",
+  "description": "Axentra professional vehicle inspection and logistics management platform",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#020817",
+  "theme_color": "#020817",
+  "icons": [
+    {
+      "src": "/axentra-logo.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
