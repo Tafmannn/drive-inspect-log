@@ -251,7 +251,10 @@ export default function DriverOnboardingWizard() {
       setStep(step + 1);
     } else {
       toast({ title: "Driver onboarding saved" });
-      navigate(`/admin/drivers/${userId}`);
+      // replace: true — the wizard's step state isn't in the URL, so
+      // leaving it on the back stack would reopen a fresh step-1 wizard
+      // instead of returning to wherever the admin came from.
+      navigate(`/admin/drivers/${userId}`, { replace: true });
     }
   };
 

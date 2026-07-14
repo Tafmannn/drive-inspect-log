@@ -76,7 +76,12 @@ export function DriverGateScreen({ gateStatus }: { gateStatus: Exclude<DriverGat
         <Button
           variant="destructive"
           className="w-full min-h-[48px]"
-          onClick={async () => { await logout(); navigate("/login"); }}
+          onClick={async () => {
+            await logout();
+            // replace: true — after logout the session is gone, so back
+            // shouldn't be able to return to an authenticated page.
+            navigate("/login", { replace: true });
+          }}
         >
           <LogOut className="w-4 h-4 mr-2" /> Sign Out
         </Button>
