@@ -31,7 +31,7 @@ interface DriverJobCardProps {
   onCardClick: () => void;
 }
 
-function mapsUrl(address: string): string {
+export function mapsUrl(address: string): string {
   return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
 }
 
@@ -54,7 +54,7 @@ export function DriverJobCard({ summary, onPrimaryAction, onCardClick }: DriverJ
 
   return (
     <Card
-      className="p-0 mb-2 border border-border overflow-hidden cursor-pointer active:bg-muted/50 transition-colors"
+      className="p-0 border border-border overflow-hidden cursor-pointer active:bg-muted/50 transition-colors"
       onClick={onCardClick}
     >
       {/* ── Header: Avatar + Client + Ref | Plate ── */}

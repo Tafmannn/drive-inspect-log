@@ -20,6 +20,7 @@ import { isValidUkPostcode, calculateRoute, type RouteResult } from "@/lib/mapsA
 import { lookupVehicle } from "@/lib/vehicleLookupApi";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import { saveDraft, loadDraft, clearDraft, draftKey } from "@/lib/autosave";
+import { hapticSuccess, hapticError } from "@/lib/haptics";
 import { lookupPostcode, type AddressSuggestion } from "@/lib/postcodeApi";
 import { BusinessSearchInput } from "@/components/BusinessSearchInput";
 import { getPlaceDetails, type BusinessResult } from "@/lib/businessSearchApi";
@@ -582,6 +583,7 @@ export const JobForm = () => {
         await linkClientAndWarn(jobId);
         const updRef = payload.external_job_number || jobId.slice(0, 8);
         toast({ title: `Job ${updRef} updated.` });
+        hapticSuccess();
         navigate(`/jobs/${jobId}`, { replace: true });
       } else {
         if (dk) clearDraft(dk);
@@ -589,11 +591,13 @@ export const JobForm = () => {
         await linkClientAndWarn(job.id);
         const newRef = job.external_job_number || job.id.slice(0, 8);
         toast({ title: `Job ${newRef} created.` });
+        hapticSuccess();
         navigate(`/jobs/${job.id}`, { replace: true });
       }
     } catch (err) {
       logClientEvent("job_save_failed", "error", { message: String(err) });
       toast({ title: "Save failed. Please try again.", variant: "destructive" });
+      hapticError();
     }
   };
 

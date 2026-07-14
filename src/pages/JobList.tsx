@@ -8,10 +8,11 @@ import { BottomNav } from "@/components/BottomNav";
 import { useNavigate } from "react-router-dom";
 import { useActiveJobs } from "@/hooks/useJobs";
 import { useDriverGate } from "@/hooks/useDriverGate";
-import { Plus, Truck } from "lucide-react";
+import { Plus, Truck, Phone, Navigation } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
-import { DriverJobCard } from "@/components/DriverJobCard";
+import { DriverJobCard, mapsUrl } from "@/components/DriverJobCard";
+import { SwipeableRow, type SwipeAction } from "@/components/SwipeableRow";
 import { DeviationPrompt } from "@/components/DeviationPrompt";
 import { rankJobs, type RankedJob } from "@/lib/executionRanking";
 import { deriveJobSummaries, type DriverJobSummary } from "@/lib/driverJobSummary";
@@ -113,14 +114,38 @@ export const JobList = () => {
           </div>
         )}
 
-        {summaries.map((summary) => (
-          <DriverJobCard
-            key={summary.job_id}
-            summary={summary}
-            onPrimaryAction={() => handleJobAction(summary)}
-            onCardClick={() => navigate(`/jobs/${summary.job_id}`)}
-          />
-        ))}
+        {summaries.map((summary) => {
+          // Quick actions for whichever contact is relevant to the job's
+          // current phase — same fields the card's own primary CTA is
+          // derived from, so this never guesses ahead of the workflow.
+          const swipeActions: SwipeAction[] = [
+            {
+              label: "Call",
+              icon: <Phone className="h-4 w-4" />,
+              className: "bg-success",
+              onAction: () => {
+                window.location.href = `tel:${summary.current_contact_phone}`;
+              },
+            },
+            {
+              label: "Navigate",
+              icon: <Navigation className="h-4 w-4" />,
+              className: "bg-primary",
+              onAction: () => {
+                window.open(mapsUrl(summary.nav_address), "_blank", "noopener,noreferrer");
+              },
+            },
+          ];
+          return (
+            <SwipeableRow key={summary.job_id} actions={swipeActions} className="mb-2">
+              <DriverJobCard
+                summary={summary}
+                onPrimaryAction={() => handleJobAction(summary)}
+                onCardClick={() => navigate(`/jobs/${summary.job_id}`)}
+              />
+            </SwipeableRow>
+          );
+        })}
       </div>
 
       {deviation && (

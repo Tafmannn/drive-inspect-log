@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
+import { hapticSuccess, hapticError } from "@/lib/haptics";
 import { useCreateExpense, useUpdateExpense, useUploadReceipt } from "@/hooks/useExpenses";
 import { EXPENSE_CATEGORIES } from "@/lib/expenseApi";
 import { supabase } from "@/integrations/supabase/client";
@@ -302,6 +303,7 @@ export const ExpenseForm = () => {
       }
 
       toast({ title: "Saved", description: "Expense has been saved successfully." });
+      hapticSuccess();
       clearDraftAndNavigateBack();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
@@ -313,6 +315,7 @@ export const ExpenseForm = () => {
           : (msg || "We couldn't save this expense. Please try again."),
         variant: "destructive",
       });
+      hapticError();
       setSaving(false);
     }
   };
