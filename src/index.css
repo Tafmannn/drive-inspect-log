@@ -132,9 +132,12 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 
-  /* Prevent iOS pull-to-refresh and overscroll bounce */
+  /* `contain` (not `none`) keeps the native iOS/Android rubber-band bounce
+     at the top/bottom of the page — the "feels like an app" elastic
+     overscroll — while still stopping the gesture from chaining past the
+     page into the browser's own pull-to-refresh/navigation. */
   html {
-    overscroll-behavior-y: none;
+    overscroll-behavior-y: contain;
     /* Matches the login screen (the first paint for unauthenticated users)
        so the standalone/home-screen launch never flashes an off-brand color
        at the edges (safe-area strip, initial paint). */
@@ -146,7 +149,7 @@ All colors MUST be HSL.
   }
 
   body {
-    overscroll-behavior-y: none;
+    overscroll-behavior-y: contain;
     -webkit-overflow-scrolling: touch;
   }
 
