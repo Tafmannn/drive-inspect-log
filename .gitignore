@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 coverage
+*.tsbuildinfo
 
 # Environment variables — never commit secrets
 .env
