@@ -135,9 +135,10 @@ All colors MUST be HSL.
   /* Prevent iOS pull-to-refresh and overscroll bounce */
   html {
     overscroll-behavior-y: none;
-    /* Matches the app's dark background so the standalone/home-screen launch
-       never flashes white at the edges (safe-area strip, initial paint). */
-    background-color: #05070b;
+    /* Matches the login screen (the first paint for unauthenticated users)
+       so the standalone/home-screen launch never flashes an off-brand color
+       at the edges (safe-area strip, initial paint). */
+    background-color: #0b1c3f;
     /* Suppress the OS gray tap-flash on every button/link so interactive
        elements rely on the app's own hover/active/focus styling instead —
        the flash reads as "website", not "app". */
