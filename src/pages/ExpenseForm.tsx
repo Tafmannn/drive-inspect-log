@@ -102,7 +102,9 @@ export const ExpenseForm = () => {
 
   const clearDraftAndNavigateBack = () => {
     if (!isEdit) clearDraft(DRAFT_KEY);
-    navigate(jobId ? `/expenses?jobId=${jobId}` : "/expenses");
+    // replace: true — draft is gone (submitted or discarded), so back
+    // shouldn't reopen a blank/stale expense form.
+    navigate(jobId ? `/expenses?jobId=${jobId}` : "/expenses", { replace: true });
   };
 
   // ─── Load Job & Existing Expense ──────────────────────

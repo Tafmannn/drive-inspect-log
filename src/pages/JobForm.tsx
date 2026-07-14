@@ -571,20 +571,25 @@ export const JobForm = () => {
       }
     };
 
+    // Both branches below use { replace: true }: the form's draft is gone
+    // (cleared or now stale vs. the saved record) by the time we navigate,
+    // so leaving this route on the history stack means the back button
+    // would land the driver back on a blank/stale form instead of where
+    // they came from.
     try {
       if (isEdit && jobId) {
         await updateMutation.mutateAsync({ jobId, input: payload });
         await linkClientAndWarn(jobId);
         const updRef = payload.external_job_number || jobId.slice(0, 8);
         toast({ title: `Job ${updRef} updated.` });
-        navigate(`/jobs/${jobId}`);
+        navigate(`/jobs/${jobId}`, { replace: true });
       } else {
         if (dk) clearDraft(dk);
         const job = await createMutation.mutateAsync(payload);
         await linkClientAndWarn(job.id);
         const newRef = job.external_job_number || job.id.slice(0, 8);
         toast({ title: `Job ${newRef} created.` });
-        navigate(`/jobs/${job.id}`);
+        navigate(`/jobs/${job.id}`, { replace: true });
       }
     } catch (err) {
       logClientEvent("job_save_failed", "error", { message: String(err) });

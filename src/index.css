@@ -138,6 +138,10 @@ All colors MUST be HSL.
     /* Matches the app's dark background so the standalone/home-screen launch
        never flashes white at the edges (safe-area strip, initial paint). */
     background-color: #05070b;
+    /* Suppress the OS gray tap-flash on every button/link so interactive
+       elements rely on the app's own hover/active/focus styling instead —
+       the flash reads as "website", not "app". */
+    -webkit-tap-highlight-color: transparent;
   }
 
   body {
