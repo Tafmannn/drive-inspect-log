@@ -14,10 +14,15 @@ dist-ssr
 coverage
 *.tsbuildinfo
 
-# Environment variables — never commit secrets
-.env
+# Environment variables
+# .env is intentionally committed on this Lovable classic Vite stack — it holds
+# only the PUBLIC Supabase URL + publishable (anon) key that Vite inlines into
+# the client bundle at build time. Ignoring it breaks the published build with
+# "Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY". Never put
+# service-role keys or real secrets in .env — those go in Project Settings → Secrets.
 .env.*
 !.env.example
+!.env
 
 # Editor directories and files
 .vscode/*
