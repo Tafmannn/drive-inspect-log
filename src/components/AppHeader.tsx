@@ -27,8 +27,12 @@ export const AppHeader = ({
 
   return (
     <div className="sticky top-0 z-40">
-      {/* Brand banner */}
-      <div className="h-11 bg-[hsl(216,100%,40%)] flex items-center justify-between px-4">
+      {/* Brand banner. The blue background extends to the true top edge (under
+          the iOS status bar in standalone/home-screen mode); padding-top
+          pushes the actual content below the status bar icons instead of
+          being overlapped by them. env() resolves to 0 in a normal browser
+          tab, so this is a no-op there. */}
+      <div className="min-h-11 bg-[hsl(216,100%,40%)] flex items-center justify-between px-4 pt-[env(safe-area-inset-top)]">
         <button
           onClick={() => navigate("/")}
           className="flex items-center gap-2"
