@@ -8,13 +8,20 @@
  *   - "Open Job"      → /jobs/:jobId        (linked job detail)
  *   - "Export CSV"     → triggers CSV download via expenseApi
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { ControlShell, ControlHeader, ControlSection } from "../components/shared/ControlShell";
 import { KpiStrip } from "../components/shared/KpiStrip";
 import { CompactTable, type CompactColumn } from "../components/shared/CompactTable";
 import { StatusChip } from "../components/shared/StatusChip";
 import { FilterBar } from "../components/shared/FilterBar";
+
+// recharts (~100KB gzip) is only needed once a KPI card is actually
+// clicked — lazy-loaded so every driver on the mobile app isn't paying for
+// an admin-only chart library in the shared bundle.
+const ExpenseBreakdownDialog = lazy(() =>
+  import("../components/ExpenseBreakdownDialog").then((m) => ({ default: m.ExpenseBreakdownDialog })),
+);
 import {
   useControlFinanceData,
   useFinanceKpis,
@@ -22,6 +29,7 @@ import {
   type FinanceFilter,
 } from "../hooks/useControlFinanceData";
 import { exportExpensesCsv } from "@/lib/expenseApi";
+import { formatGbp } from "../lib/financeBreakdown";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
@@ -38,10 +46,6 @@ const RECEIPT_OPTIONS: { label: string; value: ReceiptFilter }[] = [
   { label: "No Receipt", value: "without" },
 ];
 
-function formatGbp(amount: number): string {
-  return `£${amount.toFixed(2)}`;
-}
-
 function shortDate(iso: string): string {
   const d = new Date(iso + "T00:00:00");
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
@@ -52,6 +56,19 @@ export function ControlFinance() {
   const [search, setSearch] = useState("");
   const [receiptFilter, setReceiptFilter] = useState<ReceiptFilter>("all");
   const [exporting, setExporting] = useState(false);
+  const [breakdown, setBreakdown] = useState<{
+    title: string;
+    measure: "amount" | "count";
+    rows: { category: string; amount: number }[];
+  } | null>(null);
+  // Stays true after the first open so the dialog (and its lazy-loaded
+  // recharts chunk) doesn't unmount mid-close-animation on later closes.
+  const [breakdownEverOpened, setBreakdownEverOpened] = useState(false);
+
+  const openBreakdown = (payload: typeof breakdown) => {
+    setBreakdownEverOpened(true);
+    setBreakdown(payload);
+  };
 
   const filter: FinanceFilter = useMemo(() => ({ search, receipt: receiptFilter }), [search, receiptFilter]);
   const { data: rows, isLoading } = useControlFinanceData(filter);
@@ -70,16 +87,29 @@ export function ControlFinance() {
   };
 
   const kpiItems = [
-    { label: "Total Expenses", value: kpis?.totalExpenses, icon: PoundSterling, variant: "default" as const, loading: kpisLoading },
-    { label: "Spend Today", value: kpis ? formatGbp(kpis.spendToday) : undefined, icon: Calendar, variant: "info" as const, loading: kpisLoading },
-    { label: "Spend This Week", value: kpis ? formatGbp(kpis.spendThisWeek) : undefined, icon: CalendarDays, variant: "info" as const, loading: kpisLoading },
-    { label: "With Receipt", value: kpis?.withReceipt, icon: ImageIcon, variant: "success" as const, loading: kpisLoading },
+    {
+      label: "Total Expenses", value: kpis?.totalExpenses, icon: PoundSterling, variant: "default" as const, loading: kpisLoading,
+      onClick: kpis ? () => openBreakdown({ title: "Total Expenses", measure: "count", rows: kpis.breakdownRows.totalExpenses }) : undefined,
+    },
+    {
+      label: "Spend Today", value: kpis ? formatGbp(kpis.spendToday) : undefined, icon: Calendar, variant: "info" as const, loading: kpisLoading,
+      onClick: kpis ? () => openBreakdown({ title: "Spend Today", measure: "amount", rows: kpis.breakdownRows.spendToday }) : undefined,
+    },
+    {
+      label: "Spend This Week", value: kpis ? formatGbp(kpis.spendThisWeek) : undefined, icon: CalendarDays, variant: "info" as const, loading: kpisLoading,
+      onClick: kpis ? () => openBreakdown({ title: "Spend This Week", measure: "amount", rows: kpis.breakdownRows.spendThisWeek }) : undefined,
+    },
+    {
+      label: "With Receipt", value: kpis?.withReceipt, icon: ImageIcon, variant: "success" as const, loading: kpisLoading,
+      onClick: kpis ? () => openBreakdown({ title: "With Receipt", measure: "count", rows: kpis.breakdownRows.withReceipt }) : undefined,
+    },
     {
       label: "No Receipt",
       value: kpis?.withoutReceipt,
       icon: ImageOff,
       variant: kpis?.withoutReceipt ? "warning" as const : "default" as const,
       loading: kpisLoading,
+      onClick: kpis ? () => openBreakdown({ title: "No Receipt", measure: "count", rows: kpis.breakdownRows.withoutReceipt }) : undefined,
     },
   ];
 
@@ -232,6 +262,18 @@ export function ControlFinance() {
           onRowClick={(row) => navigate(`/expenses/${row.id}/edit?from=/control/finance`)}
         />
       </ControlSection>
+
+      {breakdownEverOpened && (
+        <Suspense fallback={null}>
+          <ExpenseBreakdownDialog
+            open={!!breakdown}
+            onOpenChange={(open) => !open && setBreakdown(null)}
+            title={breakdown?.title ?? ""}
+            measure={breakdown?.measure ?? "amount"}
+            rows={breakdown?.rows ?? []}
+          />
+        </Suspense>
+      )}
     </ControlShell>
   );
 }
