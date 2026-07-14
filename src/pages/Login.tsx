@@ -53,10 +53,10 @@ export const Login = () => {
     <div className="min-h-screen flex items-center justify-center bg-[#05070b] bg-[radial-gradient(circle_at_top,rgba(22,119,255,0.25)_0,transparent_55%)]">
       <div className="w-full max-w-md px-4">
         {/* Card */}
-        <div className="backdrop-blur-xl bg-black/60 border border-white/5 rounded-2xl shadow-[0_30px_60px_rgba(0,0,0,0.6)] p-8 space-y-7">
+        <div className="backdrop-blur-xl bg-black/60 border border-white/10 rounded-2xl shadow-[0_30px_60px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.06)] p-8 space-y-7">
           {/* Brand */}
           <div className="flex flex-col items-center gap-3">
-            <div className="h-14 w-14 rounded-2xl bg-[#0c6bbf]/15 border border-[#0c6bbf]/30 flex items-center justify-center">
+            <div className="h-14 w-14 rounded-2xl bg-[#0c6bbf]/15 border border-[#0c6bbf]/30 shadow-[0_0_24px_rgba(12,107,191,0.35)] flex items-center justify-center">
               <img
                 src="/axentra-logo.png"
                 alt="Axentra"
@@ -153,7 +153,7 @@ export const Login = () => {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full min-h-[44px] text-[0.95rem] font-medium bg-[#0c6bbf] hover:bg-[#0a5da8] text-white rounded-lg shadow-[0_12px_30px_rgba(12,107,191,0.45)] hover:-translate-y-[1px] transition-all"
+              className="w-full min-h-[44px] text-[0.95rem] font-medium bg-gradient-to-b from-[#1678d6] to-[#0b5da0] hover:from-[#1b80e3] hover:to-[#0c66ad] text-white rounded-lg shadow-[0_12px_30px_rgba(12,107,191,0.45)] hover:-translate-y-[1px] transition-all"
             >
               {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Sign in
