@@ -32,7 +32,15 @@ export function ControlTopbar({
 
   return (
     <>
-      <header className="h-14 shrink-0 border-b bg-card flex items-center justify-between px-4 lg:px-6 gap-2 lg:gap-4">
+      {/* min-h + safe-area padding (not a fixed h-14): in standalone/home-
+          screen mode, page content now paints under the iOS status bar
+          (viewport-fit=cover), so without this the menu/search/notification/
+          avatar icons sit directly under the clock/signal/battery icons. The
+          bg-card fill still extends to the true top edge; only the content
+          drops below the status bar. env() is 0 in a normal browser tab, so
+          this is a no-op there — matches the same fix already applied to
+          AppHeader (the driver-facing equivalent of this bar). */}
+      <header className="min-h-14 shrink-0 border-b bg-card flex items-center justify-between px-4 lg:px-6 gap-2 lg:gap-4 pt-[env(safe-area-inset-top)]">
         {/* Left: leading slot (mobile menu) + breadcrumb / title */}
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {leading}

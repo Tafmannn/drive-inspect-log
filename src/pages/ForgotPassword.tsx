@@ -31,19 +31,26 @@ export const ForgotPassword = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#05070b] bg-[radial-gradient(circle_at_top,rgba(22,119,255,0.25)_0,transparent_55%)]">
+    <div
+      className="min-h-screen flex items-center justify-center"
+      style={{
+        background:
+          "radial-gradient(60% 50% at 50% 0%, rgba(35,120,220,0.35), transparent 70%), " +
+          "radial-gradient(55% 45% at 85% 100%, rgba(20,90,190,0.28), transparent 70%), " +
+          "linear-gradient(180deg, #0b1c3f 0%, #071431 55%, #040c22 100%)",
+      }}
+    >
       <div className="w-full max-w-md px-4">
-        <div className="backdrop-blur-xl bg-black/60 border border-white/5 rounded-2xl shadow-[0_30px_60px_rgba(0,0,0,0.6)] p-8 space-y-7">
-          <div className="flex flex-col items-center gap-3">
-            <div className="h-14 w-14 rounded-2xl bg-[#0c6bbf]/15 border border-[#0c6bbf]/30 flex items-center justify-center">
-              <img src="/axentra-logo.png" alt="Axentra" className="h-8 w-auto"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = "none";
-                  (e.target as HTMLImageElement).parentElement!.innerHTML =
-                    '<span class="text-2xl font-bold text-white">A</span>';
-                }}
-              />
-            </div>
+        <div className="backdrop-blur-xl bg-[#0a1a35]/55 border border-white/10 rounded-2xl shadow-[0_30px_60px_rgba(3,9,28,0.55),inset_0_1px_0_rgba(255,255,255,0.08)] p-8 space-y-7">
+          <div className="flex flex-col items-center gap-4">
+            <img
+              src="/axentra-logo-lockup.webp"
+              alt="Axentra"
+              className="w-40 h-auto drop-shadow-[0_8px_28px_rgba(24,110,225,0.4)]"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+              }}
+            />
             <div className="text-center">
               <h1 className="text-[22px] font-semibold tracking-wide text-slate-200">
                 Reset Password
@@ -85,7 +92,7 @@ export const ForgotPassword = () => {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     autoComplete="email"
-                    className="min-h-[44px] pl-9 bg-slate-900/60 border-slate-700/70 rounded-lg text-slate-100 placeholder:text-slate-600 focus:border-[#0c6bbf] focus:ring-[#0c6bbf]/40"
+                    className="min-h-[44px] pl-9 bg-[#0d1f3f]/60 border-[#1e3f6e]/70 rounded-lg text-slate-100 placeholder:text-slate-500 focus:border-[#0c6bbf] focus:ring-[#0c6bbf]/40"
                   />
                 </div>
               </div>
@@ -99,7 +106,7 @@ export const ForgotPassword = () => {
               <Button
                 type="submit"
                 disabled={loading}
-                className="w-full min-h-[44px] text-[0.95rem] font-medium bg-[#0c6bbf] hover:bg-[#0a5da8] text-white rounded-lg shadow-[0_12px_30px_rgba(12,107,191,0.45)] hover:-translate-y-[1px] transition-all"
+                className="w-full min-h-[44px] text-[0.95rem] font-medium bg-gradient-to-b from-[#1678d6] to-[#0b5da0] hover:from-[#1b80e3] hover:to-[#0c66ad] text-white rounded-lg shadow-[0_12px_30px_rgba(12,107,191,0.45)] hover:-translate-y-[1px] transition-all"
               >
                 {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 Send reset link
