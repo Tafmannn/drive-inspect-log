@@ -50,32 +50,29 @@ export const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#05070b] bg-[radial-gradient(circle_at_top,rgba(22,119,255,0.25)_0,transparent_55%)]">
+    <div
+      className="min-h-screen flex items-center justify-center"
+      style={{
+        background:
+          "radial-gradient(60% 50% at 50% 0%, rgba(35,120,220,0.35), transparent 70%), " +
+          "radial-gradient(55% 45% at 85% 100%, rgba(20,90,190,0.28), transparent 70%), " +
+          "linear-gradient(180deg, #0b1c3f 0%, #071431 55%, #040c22 100%)",
+      }}
+    >
       <div className="w-full max-w-md px-4">
         {/* Card */}
-        <div className="backdrop-blur-xl bg-black/60 border border-white/10 rounded-2xl shadow-[0_30px_60px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.06)] p-8 space-y-7">
+        <div className="backdrop-blur-xl bg-[#0a1a35]/55 border border-white/10 rounded-2xl shadow-[0_30px_60px_rgba(3,9,28,0.55),inset_0_1px_0_rgba(255,255,255,0.08)] p-8 space-y-7">
           {/* Brand */}
-          <div className="flex flex-col items-center gap-3">
-            <div className="h-14 w-14 rounded-2xl bg-[#0c6bbf]/15 border border-[#0c6bbf]/30 shadow-[0_0_24px_rgba(12,107,191,0.35)] flex items-center justify-center">
-              <img
-                src="/axentra-logo.png"
-                alt="Axentra"
-                className="h-8 w-auto"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = "none";
-                  (e.target as HTMLImageElement).parentElement!.innerHTML =
-                    '<span class="text-2xl font-bold text-white">A</span>';
-                }}
-              />
-            </div>
-            <div className="text-center">
-              <h1 className="text-[22px] font-semibold tracking-wide text-slate-200">
-                AXENTRA
-              </h1>
-              <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500 mt-0.5">
-                Precision in Every Move
-              </p>
-            </div>
+          <div className="flex flex-col items-center">
+            <img
+              src="/axentra-logo-lockup.webp"
+              alt="Axentra — Precision in Every Move"
+              className="w-64 h-auto drop-shadow-[0_8px_28px_rgba(24,110,225,0.4)]"
+              onError={(e) => {
+                (e.target as HTMLImageElement).outerHTML =
+                  '<div class="text-center"><h1 class="text-[22px] font-semibold tracking-wide text-slate-100">AXENTRA</h1><p class="text-[11px] uppercase tracking-[0.22em] text-slate-400 mt-0.5">Precision in Every Move</p></div>';
+              }}
+            />
           </div>
 
           {/* Form */}
@@ -95,7 +92,7 @@ export const Login = () => {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     autoComplete="email"
-                    className="min-h-[44px] pl-9 bg-slate-900/60 border-slate-700/70 rounded-lg text-slate-100 placeholder:text-slate-600 focus:border-[#0c6bbf] focus:ring-[#0c6bbf]/40"
+                    className="min-h-[44px] pl-9 bg-[#0d1f3f]/60 border-[#1e3f6e]/70 rounded-lg text-slate-100 placeholder:text-slate-500 focus:border-[#0c6bbf] focus:ring-[#0c6bbf]/40"
                   />
                 </div>
               </div>
@@ -115,7 +112,7 @@ export const Login = () => {
                     required
                     minLength={6}
                     autoComplete="current-password"
-                    className="min-h-[44px] pl-9 bg-slate-900/60 border-slate-700/70 rounded-lg text-slate-100 placeholder:text-slate-600 focus:border-[#0c6bbf] focus:ring-[#0c6bbf]/40"
+                    className="min-h-[44px] pl-9 bg-[#0d1f3f]/60 border-[#1e3f6e]/70 rounded-lg text-slate-100 placeholder:text-slate-500 focus:border-[#0c6bbf] focus:ring-[#0c6bbf]/40"
                   />
                 </div>
               </div>
@@ -128,7 +125,7 @@ export const Login = () => {
                   id="remember"
                   checked={remember}
                   onCheckedChange={(v) => setRemember(v === true)}
-                  className="border-slate-600 data-[state=checked]:bg-[#0c6bbf] data-[state=checked]:border-[#0c6bbf]"
+                  className="border-[#2a4d80] data-[state=checked]:bg-[#0c6bbf] data-[state=checked]:border-[#0c6bbf]"
                 />
                 <Label htmlFor="remember" className="text-xs text-slate-400 cursor-pointer">
                   Remember me
