@@ -34,6 +34,14 @@ export interface FinanceKpis {
   spendThisWeek: number;
   withReceipt: number;
   withoutReceipt: number;
+  /** Raw category rows behind each KPI, for the click-to-drill-down breakdown. */
+  breakdownRows: {
+    totalExpenses: { category: string; amount: number }[];
+    spendToday: { category: string; amount: number }[];
+    spendThisWeek: { category: string; amount: number }[];
+    withReceipt: { category: string; amount: number }[];
+    withoutReceipt: { category: string; amount: number }[];
+  };
 }
 
 export function useControlFinanceData(filter: FinanceFilter) {
@@ -96,6 +104,9 @@ export function useFinanceKpis() {
         else withoutReceipt++;
       }
 
+      const toRows = (list: typeof expenses) =>
+        list.map((e) => ({ category: e.category, amount: Number(e.amount) || 0 }));
+
       return {
         totalExpenses: expenses.length,
         totalSpend,
@@ -103,6 +114,13 @@ export function useFinanceKpis() {
         spendThisWeek,
         withReceipt,
         withoutReceipt,
+        breakdownRows: {
+          totalExpenses: toRows(expenses),
+          spendToday: toRows(expenses.filter((e) => e.date >= todayStr)),
+          spendThisWeek: toRows(expenses.filter((e) => e.date >= weekStr)),
+          withReceipt: toRows(expenses.filter((e) => e.receipts.length > 0)),
+          withoutReceipt: toRows(expenses.filter((e) => e.receipts.length === 0)),
+        },
       } satisfies FinanceKpis;
     },
     staleTime: 30_000,
