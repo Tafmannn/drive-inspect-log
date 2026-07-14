@@ -1,0 +1,23 @@
+-- =====================================================================
+-- Backfilled record: drop legacy 4-arg submit_inspection overload
+-- =====================================================================
+-- This migration ran directly against the live project (between the 5-arg
+-- submit_inspection introduced in 20260713120000 and
+-- 20260713140000/invoice_number_atomic_allocation_and_constraints) but was
+-- never captured as a file in this repo — discovered during a migration-
+-- tracker reconciliation audit that diffed supabase_migrations.schema_
+-- migrations against supabase/migrations/*.sql.
+--
+-- Once p_submission_session_id was added to submit_inspection (5-arg), the
+-- original 4-arg signature (p_job_id, p_type, p_inspection, p_damage_items)
+-- became a dead overload: PostgREST would still route calls missing the
+-- new param to it, bypassing the session-based idempotency + server-side
+-- job-lock logic the 5-arg version added. Dropping it forces every caller
+-- onto the current, hardened signature.
+--
+-- Idempotent: IF EXISTS makes this a no-op on the live project (already
+-- dropped) and a real DROP on any environment provisioned from this repo
+-- before this file existed.
+-- =====================================================================
+
+DROP FUNCTION IF EXISTS public.submit_inspection(uuid, text, jsonb, jsonb);
