@@ -363,7 +363,7 @@ describe("pendingUploads — stranded uploading recovery", () => {
       photoType: "x",
       label: null,
     });
-    await promoteSubmissionSession(SESSION_A, "insp-1");
+    await promoteSubmissionSession(SESSION_A, { inspectionId: "insp-1", damageIdMap: {} });
 
     // Simulate a crash mid-upload: state="uploading", started long ago.
     const all = await __testing__.loadAll();
@@ -394,7 +394,7 @@ describe("pendingUploads — stranded uploading recovery", () => {
       photoType: "x",
       label: null,
     });
-    await promoteSubmissionSession(SESSION_A, "insp-1");
+    await promoteSubmissionSession(SESSION_A, { inspectionId: "insp-1", damageIdMap: {} });
 
     const all = await __testing__.loadAll();
     const idx = all.findIndex((u) => u.id === item.id);
@@ -414,7 +414,7 @@ describe("pendingUploads — stranded uploading recovery", () => {
       photoType: "x",
       label: null,
     });
-    await promoteSubmissionSession(SESSION_A, "insp-1");
+    await promoteSubmissionSession(SESSION_A, { inspectionId: "insp-1", damageIdMap: {} });
 
     const all = await __testing__.loadAll();
     const idx = all.findIndex((u) => u.id === item.id);
@@ -439,7 +439,7 @@ describe("pendingUploads — stranded uploading recovery", () => {
       photoType: "x",
       label: null,
     });
-    await promoteSubmissionSession(SESSION_A, "insp-1");
+    await promoteSubmissionSession(SESSION_A, { inspectionId: "insp-1", damageIdMap: {} });
 
     const all = await __testing__.loadAll();
     const idx = all.findIndex((u) => u.id === item.id);
