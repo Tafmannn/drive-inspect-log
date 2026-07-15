@@ -4,8 +4,10 @@ import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { DriverReadOnlyProfile } from "@/components/DriverReadOnlyProfile";
 import { DriverProfileForm } from "@/components/DriverProfileForm";
+import { ProfilePhotoUpload } from "@/features/users/components/ProfilePhotoUpload";
 import { useAuth } from "@/context/AuthContext";
 import { useDriverGate } from "@/hooks/useDriverGate";
+import { useOwnProfilePhotoPath } from "@/hooks/useProfilePhoto";
 import { supabase } from "@/integrations/supabase/client";
 import { getOrgId } from "@/lib/orgHelper";
 import { Badge } from "@/components/ui/badge";
@@ -14,12 +16,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
   BarChart3,
+  BadgeCheck,
   ChevronRight,
   LogOut,
   Receipt,
   Shield,
   Upload,
-  User,
 } from "lucide-react";
 
 export const Profile = () => {
@@ -30,6 +32,7 @@ export const Profile = () => {
   const [jobCount, setJobCount] = useState<number | null>(null);
   const [expenseTotal, setExpenseTotal] = useState<string | null>(null);
   const [orgId, setOrgId] = useState("a0000000-0000-0000-0000-000000000001");
+  const { data: ownPhotoPath } = useOwnProfilePhotoPath();
 
   const isDriverOnly = gate.isDriverOnly;
 
@@ -94,9 +97,14 @@ export const Profile = () => {
 
       <div className="px-4 py-6 space-y-6 max-w-lg mx-auto">
         <div className="flex flex-col items-center gap-2">
-          <div className="w-[72px] h-[72px] rounded-full bg-primary/10 flex items-center justify-center">
-            <User className="w-9 h-9 text-primary" />
-          </div>
+          {user?.id && (
+            <ProfilePhotoUpload
+              userId={user.id}
+              orgId={orgId}
+              currentPath={ownPhotoPath ?? null}
+              displayName={user.name || "Unknown user"}
+            />
+          )}
           <p className="text-lg font-semibold">{user?.name || "Unknown user"}</p>
           <p className="text-sm text-muted-foreground">{user?.email || "No email set"}</p>
           <div className="flex gap-1.5 mt-1 flex-wrap justify-center">
@@ -170,9 +178,20 @@ export const Profile = () => {
 
         {/* Driver profile: read-only for drivers, editable for admins */}
         {user?.roles?.includes("DRIVER") && user?.id && (
-          isDriverOnly
-            ? <DriverReadOnlyProfile userId={user.id} />
-            : <DriverProfileForm userId={user.id} orgId={orgId} />
+          <>
+            <Card className="cursor-pointer active:bg-muted/50 border-primary/20" onClick={() => navigate("/profile/id")}>
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <BadgeCheck className="w-5 h-5 text-primary" />
+                </div>
+                <span className="text-sm font-medium flex-1">Digital ID</span>
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              </CardContent>
+            </Card>
+            {isDriverOnly
+              ? <DriverReadOnlyProfile userId={user.id} />
+              : <DriverProfileForm userId={user.id} orgId={orgId} />}
+          </>
         )}
 
         <Separator />

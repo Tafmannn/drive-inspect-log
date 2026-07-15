@@ -5,6 +5,8 @@ import { useControlAccess } from "../hooks/useControlAccess";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { CommandPalette } from "./CommandPalette";
 import { NotificationsPopover } from "./NotificationsPopover";
+import { UserAvatar } from "@/components/UserAvatar";
+import { useOwnProfilePhotoPath } from "@/hooks/useProfilePhoto";
 
 export function ControlTopbar({
   title,
@@ -16,6 +18,7 @@ export function ControlTopbar({
   leading?: React.ReactNode;
 }) {
   const { userName } = useControlAccess();
+  const { data: ownPhotoPath } = useOwnProfilePhotoPath();
   const [cmdOpen, setCmdOpen] = useState(false);
 
   // ⌘K / Ctrl+K keyboard shortcut
@@ -76,9 +79,7 @@ export function ControlTopbar({
           <NotificationsPopover />
 
           {/* Avatar */}
-          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">
-            {userName.charAt(0).toUpperCase()}
-          </div>
+          <UserAvatar photoPath={ownPhotoPath} name={userName} />
         </div>
       </header>
 

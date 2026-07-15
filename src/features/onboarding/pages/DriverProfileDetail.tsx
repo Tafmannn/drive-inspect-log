@@ -13,9 +13,10 @@ import { BottomNav } from "@/components/BottomNav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ProfilePhotoUpload } from "@/features/users/components/ProfilePhotoUpload";
 import {
   Loader2, Pencil, FileText, Phone, Mail, MapPin,
-  ShieldCheck, Truck, CreditCard, AlertTriangle,
+  ShieldCheck, Truck, CreditCard, AlertTriangle, BadgeCheck,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { scoreDriver } from "../lib/completion";
@@ -100,7 +101,15 @@ export default function DriverProfileDetail() {
         <Card>
           <CardContent className="p-4 space-y-3">
             <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
+              {profile?.id && (
+                <ProfilePhotoUpload
+                  userId={userId}
+                  orgId={profile?.org_id ?? null}
+                  currentPath={profile?.profile_photo_path ?? null}
+                  displayName={name}
+                />
+              )}
+              <div className="min-w-0 flex-1">
                 <h2 className="text-lg font-semibold truncate">{name}</h2>
                 {driver?.display_name && driver.display_name !== name && (
                   <p className="text-xs text-muted-foreground">"{driver.display_name}"</p>
@@ -116,6 +125,17 @@ export default function DriverProfileDetail() {
                 </div>
               </div>
             </div>
+
+            {driver && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => navigate(`/admin/drivers/${userId}/id`)}
+              >
+                <BadgeCheck className="w-3.5 h-3.5 mr-1.5" /> View Digital ID
+              </Button>
+            )}
 
             <div className="space-y-1.5 pt-2 border-t border-border/60 text-sm">
               {driver?.phone && <RowItem icon={<Phone className="h-3.5 w-3.5" />} value={driver.phone} href={`tel:${driver.phone}`} />}

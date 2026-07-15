@@ -1,12 +1,23 @@
 /**
  * ProfilePhotoUpload — avatar upload/preview/remove for user profile.
+ *
+ * Writes profile_photo_path directly to user_profiles (RLS-scoped: self,
+ * or same-org admin/super-admin — see 20260317123952_...sql
+ * "user_profiles_update_self_admin_super") rather than through the
+ * user-lifecycle edge function, which is gated ADMIN_OR_SUPER_ADMIN_ONLY
+ * for every action and would 403 a driver uploading their own photo.
+ * RLS already grants exactly the scope this needs; a photo path isn't
+ * sensitive enough to warrant the edge function's audit-logged path the
+ * way role/status changes are.
  */
-import { useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { resolveProfilePhotoUrl } from "@/lib/profilePhotoUtils";
-import { useUpdateProfile } from "@/hooks/useUserManagement";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/hooks/use-toast";
+import { useProfilePhotoUrl } from "@/hooks/useProfilePhoto";
+import { getInitials } from "@/lib/utils";
 import { Camera, Trash2, Loader2 } from "lucide-react";
 
 interface ProfilePhotoUploadProps {
@@ -20,16 +31,13 @@ interface ProfilePhotoUploadProps {
 export function ProfilePhotoUpload({ userId, orgId, currentPath, displayName, disabled }: ProfilePhotoUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const updateMutation = useUpdateProfile();
+  const [localPath, setLocalPath] = useState(currentPath);
+  const queryClient = useQueryClient();
 
-  const photoUrl = resolveProfilePhotoUrl(currentPath);
-  const initials = displayName
-    .split(" ")
-    .map((w) => w[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+  useEffect(() => setLocalPath(currentPath), [currentPath]);
+
+  const photoUrl = useProfilePhotoUrl(localPath);
+  const initials = getInitials(displayName);
 
   async function handleUpload(file: File) {
     if (!orgId) return;
@@ -37,21 +45,37 @@ export function ProfilePhotoUpload({ userId, orgId, currentPath, displayName, di
     try {
       const ext = file.name.split(".").pop() ?? "jpg";
       const path = `${orgId}/${userId}/${Date.now()}.${ext}`;
-      const { error } = await supabase.storage.from("profile-photos").upload(path, file, { upsert: true });
-      if (error) throw error;
-      updateMutation.mutate({ userId, fields: { profile_photo_path: path } });
-    } catch (e: any) {
-      console.error("Photo upload failed:", e);
+      const { error: uploadError } = await supabase.storage.from("profile-photos").upload(path, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      const { error: updateError } = await supabase
+        .from("user_profiles")
+        .update({ profile_photo_path: path })
+        .eq("auth_user_id", userId);
+      if (updateError) throw updateError;
+      setLocalPath(path);
+      queryClient.invalidateQueries({ queryKey: ["user-management"] });
+      queryClient.invalidateQueries({ queryKey: ["own-profile-photo-path", userId] });
+    } catch (e) {
+      toast({ title: "Photo upload failed", description: (e as Error).message, variant: "destructive" });
     } finally {
       setUploading(false);
     }
   }
 
   async function handleRemove() {
-    if (currentPath) {
-      await supabase.storage.from("profile-photos").remove([currentPath]);
+    try {
+      if (localPath) await supabase.storage.from("profile-photos").remove([localPath]);
+      const { error } = await supabase
+        .from("user_profiles")
+        .update({ profile_photo_path: null })
+        .eq("auth_user_id", userId);
+      if (error) throw error;
+      setLocalPath(null);
+      queryClient.invalidateQueries({ queryKey: ["user-management"] });
+      queryClient.invalidateQueries({ queryKey: ["own-profile-photo-path", userId] });
+    } catch (e) {
+      toast({ title: "Remove failed", description: (e as Error).message, variant: "destructive" });
     }
-    updateMutation.mutate({ userId, fields: { profile_photo_path: null } });
   }
 
   return (
@@ -70,6 +94,7 @@ export function ProfilePhotoUpload({ userId, orgId, currentPath, displayName, di
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (file) handleUpload(file);
+            e.target.value = "";
           }}
         />
         <Button
@@ -80,9 +105,9 @@ export function ProfilePhotoUpload({ userId, orgId, currentPath, displayName, di
           onClick={() => inputRef.current?.click()}
         >
           {uploading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Camera className="h-3 w-3 mr-1" />}
-          {currentPath ? "Replace" : "Upload"}
+          {localPath ? "Replace" : "Upload"}
         </Button>
-        {currentPath && (
+        {localPath && (
           <Button
             variant="ghost"
             size="sm"

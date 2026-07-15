@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AccountStatusBadge, ArchivedBadge, RoleBadge } from "./UserStatusBadge";
-import { Search, Plus, RefreshCw, Loader2, User } from "lucide-react";
+import { UserAvatar } from "@/components/UserAvatar";
+import { Search, Plus, RefreshCw, Loader2 } from "lucide-react";
 
 interface UserIndexProps {
   onSelectUser: (userId: string) => void;
@@ -197,9 +198,7 @@ function UserRow({ user, onClick }: { user: UserProfile; onClick: () => void }) 
       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border border-transparent hover:border-border hover:bg-muted/40 transition-colors text-left"
     >
       {/* Avatar */}
-      <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
-        <User className="h-4 w-4 text-muted-foreground" />
-      </div>
+      <UserAvatar photoPath={user.profile_photo_path} name={displayName} className="shrink-0" />
 
       {/* Info */}
       <div className="flex-1 min-w-0">
