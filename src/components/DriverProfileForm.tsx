@@ -8,6 +8,7 @@ import { User, AlertCircle, MapPin, CreditCard, Car, Save, Edit2, Loader2 } from
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { EMPLOYMENT_TYPES } from "@/lib/driverProfileConstants";
 
 interface DriverProfileData {
   full_name: string; display_name: string; phone: string;
@@ -233,10 +234,9 @@ export function DriverProfileForm({ userId, orgId }: { userId: string; orgId: st
             <Select value={p.employment_type} onValueChange={v => set("employment_type", v)} disabled={!editing}>
               <SelectTrigger className="mt-1 min-h-[40px] text-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="employed">Employed</SelectItem>
-                <SelectItem value="contractor">Contractor</SelectItem>
-                <SelectItem value="agency">Agency</SelectItem>
-                <SelectItem value="self_employed">Self-Employed</SelectItem>
+                {EMPLOYMENT_TYPES.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
