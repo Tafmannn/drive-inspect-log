@@ -17,6 +17,8 @@
     "release:validate:fast": "node release-validation/run.mjs --fast"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "^5.2.8",
+    "@fontsource-variable/manrope": "^5.2.8",
     "@hookform/resolvers": "^3.10.0",
     "@lovable.dev/mcp-js": "^0.20.0",
     "@radix-ui/react-accordion": "^1.2.11",

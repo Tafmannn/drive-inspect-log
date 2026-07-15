@@ -54,6 +54,29 @@ import { installRetryTriggers, triggerRetry } from "@/lib/retryOrchestrator";
 import { installSubmitQueueDrainer, drainSubmitQueue } from "@/lib/submitQueue";
 import { installEvidenceDrainTriggers, drainEvidenceQueue } from "@/lib/evidence/queueRuntime";
 import { Loader2 } from "lucide-react";
+import { lazy, Suspense } from "react";
+
+/* ── Public marketing site ── */
+import { RootEntry } from "@/features/marketing/RootEntry";
+const MarketingServices = lazy(() => import("@/features/marketing/pages/ServicesPage"));
+const MarketingTechnology = lazy(() => import("@/features/marketing/pages/TechnologyPage"));
+const MarketingAbout = lazy(() => import("@/features/marketing/pages/AboutPage"));
+const MarketingContact = lazy(() => import("@/features/marketing/pages/ContactPage"));
+const MarketingDrivers = lazy(() => import("@/features/marketing/pages/DriversPage"));
+const MarketingPrivacy = lazy(() => import("@/features/marketing/pages/PrivacyPage"));
+const MarketingTerms = lazy(() => import("@/features/marketing/pages/TermsPage"));
+const MarketingCookies = lazy(() => import("@/features/marketing/pages/CookiesPage"));
+const MarketingAccessibility = lazy(() => import("@/features/marketing/pages/AccessibilityPage"));
+const MarketingHomePage = lazy(() => import("@/features/marketing/pages/MarketingHome"));
+
+/** Branded fallback while a lazy marketing page loads. */
+function MarketingFallback() {
+  return (
+    <div className="flex min-h-dvh items-center justify-center bg-marketing-bg-dark">
+      <Loader2 className="h-8 w-8 animate-spin text-marketing-electric" aria-label="Loading" />
+    </div>
+  );
+}
 
 /* ── Command Center imports ── */
 import { ControlLayout } from "@/features/control/layouts/ControlLayout";
@@ -248,8 +271,20 @@ const App = () => {
                 <Route path="/confirm" element={<QrConfirm />} />
                 <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
 
-                {/* ── Protected routes (flat) ── */}
-                <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                {/* ── Public marketing site (never wrapped in ProtectedRoute) ── */}
+                <Route path="/home" element={<Suspense fallback={<MarketingFallback />}><MarketingHomePage /></Suspense>} />
+                <Route path="/services" element={<Suspense fallback={<MarketingFallback />}><MarketingServices /></Suspense>} />
+                <Route path="/technology" element={<Suspense fallback={<MarketingFallback />}><MarketingTechnology /></Suspense>} />
+                <Route path="/about" element={<Suspense fallback={<MarketingFallback />}><MarketingAbout /></Suspense>} />
+                <Route path="/contact" element={<Suspense fallback={<MarketingFallback />}><MarketingContact /></Suspense>} />
+                <Route path="/drivers" element={<Suspense fallback={<MarketingFallback />}><MarketingDrivers /></Suspense>} />
+                <Route path="/privacy" element={<Suspense fallback={<MarketingFallback />}><MarketingPrivacy /></Suspense>} />
+                <Route path="/terms" element={<Suspense fallback={<MarketingFallback />}><MarketingTerms /></Suspense>} />
+                <Route path="/cookies" element={<Suspense fallback={<MarketingFallback />}><MarketingCookies /></Suspense>} />
+                <Route path="/accessibility" element={<Suspense fallback={<MarketingFallback />}><MarketingAccessibility /></Suspense>} />
+
+                {/* ── Dynamic root: marketing for guests, Dashboard for authed users ── */}
+                <Route path="/" element={<RootEntry />} />
                 <Route path="/jobs" element={<ProtectedRoute><JobList /></ProtectedRoute>} />
                 <Route path="/jobs/master" element={<ProtectedRoute><AdminRoute><JobMasterList /></AdminRoute></ProtectedRoute>} />
                 <Route path="/jobs/new" element={<ProtectedRoute><AdminRoute><JobForm /></AdminRoute></ProtectedRoute>} />

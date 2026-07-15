@@ -1,5 +1,9 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
+// Self-hosted variable fonts (Manrope for headings, Inter for body). Ships one
+// woff2 per family; no render-blocking external stylesheet, no layout shift.
+import "@fontsource-variable/manrope";
+import "@fontsource-variable/inter";
 import "./index.css";
 
 const container = document.getElementById("root");

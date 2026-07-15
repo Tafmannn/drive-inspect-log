@@ -68,6 +68,25 @@ export default {
 					DEFAULT: 'hsl(var(--app-header))',
 					foreground: 'hsl(var(--app-header-foreground))'
 				},
+				marketing: {
+					'bg-dark': 'hsl(var(--marketing-bg-dark))',
+					navy: 'hsl(var(--marketing-navy))',
+					'navy-elevated': 'hsl(var(--marketing-navy-elevated))',
+					'bg-light': 'hsl(var(--marketing-bg-light))',
+					surface: 'hsl(var(--marketing-surface))',
+					primary: 'hsl(var(--marketing-primary))',
+					'primary-hover': 'hsl(var(--marketing-primary-hover))',
+					electric: 'hsl(var(--marketing-electric))',
+					accent: 'hsl(var(--marketing-accent))',
+					text: 'hsl(var(--marketing-text))',
+					'text-secondary': 'hsl(var(--marketing-text-secondary))',
+					'text-muted': 'hsl(var(--marketing-text-muted))',
+					'on-dark': 'hsl(var(--marketing-text-on-dark))',
+					'on-dark-muted': 'hsl(var(--marketing-text-on-dark-muted))',
+					success: 'hsl(var(--marketing-success))',
+					warning: 'hsl(var(--marketing-warning))',
+					border: 'hsl(var(--marketing-border))'
+				},
 				sidebar: {
 					DEFAULT: 'hsl(var(--sidebar-background))',
 					foreground: 'hsl(var(--sidebar-foreground))',
@@ -83,6 +102,22 @@ export default {
 				lg: 'var(--radius)',
 				md: 'calc(var(--radius) - 2px)',
 				sm: 'calc(var(--radius) - 4px)'
+			},
+			fontFamily: {
+				heading: 'var(--font-heading)',
+				body: 'var(--font-body)'
+			},
+			maxWidth: {
+				content: '1280px'
+			},
+			backgroundImage: {
+				'marketing-hero': 'var(--marketing-gradient-hero)',
+				'marketing-accent': 'var(--marketing-gradient-accent)'
+			},
+			boxShadow: {
+				'marketing-sm': 'var(--marketing-shadow-sm)',
+				'marketing-md': 'var(--marketing-shadow-md)',
+				'marketing-lg': 'var(--marketing-shadow-lg)'
 			},
 			keyframes: {
 				'accordion-down': {

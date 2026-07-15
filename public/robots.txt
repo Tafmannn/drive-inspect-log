@@ -1,14 +1,22 @@
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
+# Axentra Vehicle Logistics
+# Public marketing pages are indexable. Application, auth and admin routes are
+# disallowed (note: robots rules are guidance, not access control — those routes
+# are protected by authentication).
 
 User-agent: *
 Allow: /
+Disallow: /login
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /confirm
+Disallow: /jobs
+Disallow: /admin
+Disallow: /super-admin
+Disallow: /control
+Disallow: /profile
+Disallow: /expenses
+Disallow: /pending-uploads
+Disallow: /inspection
+Disallow: /invoice
+
+Sitemap: https://axentravehicles.co.uk/sitemap.xml

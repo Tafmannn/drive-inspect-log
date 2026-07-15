@@ -123,6 +123,46 @@ All colors MUST be HSL.
   }
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+   Axentra marketing design tokens.
+   Scoped, semantic, HSL — extends (never replaces) the app design system above.
+   Consumed only by the public marketing site (src/features/marketing) via the
+   Tailwind `marketing-*` colour keys wired in tailwind.config.ts.
+   ──────────────────────────────────────────────────────────────────────── */
+@layer base {
+  :root {
+    --marketing-bg-dark: 213 70% 9%;            /* #071426 deep background   */
+    --marketing-navy: 217 71% 15%;              /* #0B1C3F Axentra navy      */
+    --marketing-navy-elevated: 214 67% 19%;     /* #102A52 elevated navy     */
+    --marketing-bg-light: 215 43% 98%;          /* #F7F9FC light background  */
+    --marketing-surface: 0 0% 100%;             /* card / panel surface      */
+    --marketing-primary: 221 83% 53%;           /* #2563EB primary blue      */
+    --marketing-primary-hover: 221 83% 47%;
+    --marketing-electric: 217 91% 60%;          /* #3B82F6 electric blue     */
+    --marketing-accent: 251 100% 65%;           /* #6D4AFF controlled violet */
+    --marketing-text: 222 47% 11%;              /* #0F172A main text         */
+    --marketing-text-secondary: 215 25% 27%;    /* #334155 secondary text    */
+    --marketing-text-muted: 215 16% 47%;        /* #64748B muted text        */
+    --marketing-text-on-dark: 0 0% 100%;
+    --marketing-text-on-dark-muted: 214 32% 78%;
+    --marketing-success: 152 74% 36%;           /* #16A36A                   */
+    --marketing-warning: 32 95% 44%;            /* #D97706                   */
+    --marketing-border: 213 30% 90%;            /* #DCE3EC light border      */
+    --marketing-border-dark: 0 0% 100%;         /* used at low alpha on dark */
+
+    --marketing-gradient-hero: linear-gradient(155deg, hsl(213 70% 9%) 0%, hsl(217 71% 15%) 55%, hsl(214 67% 24%) 100%);
+    --marketing-gradient-accent: linear-gradient(120deg, hsl(221 83% 53%), hsl(251 100% 65%));
+    --marketing-shadow-sm: 0 1px 2px hsl(217 71% 15% / 0.06), 0 1px 3px hsl(217 71% 15% / 0.10);
+    --marketing-shadow-md: 0 4px 12px hsl(217 71% 15% / 0.08), 0 2px 6px hsl(217 71% 15% / 0.06);
+    --marketing-shadow-lg: 0 24px 48px -12px hsl(217 71% 15% / 0.28);
+
+    --font-heading: "Manrope Variable", "Manrope", ui-sans-serif, system-ui, -apple-system,
+      "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-body: "Inter Variable", "Inter", ui-sans-serif, system-ui, -apple-system,
+      "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+}
+
 @layer base {
   * {
     @apply border-border;
@@ -130,6 +170,17 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* Marketing pages opt into the Inter/Manrope stack via .marketing-root so the
+     authenticated app's typography is left completely untouched. */
+  .marketing-root {
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  .marketing-root :where(h1, h2, h3, h4, h5, .font-heading) {
+    font-family: var(--font-heading);
   }
 
   /* `contain` (not `none`) keeps the native iOS/Android rubber-band bounce
@@ -182,4 +233,50 @@ All colors MUST be HSL.
   .safe-area-bottom {
     display: none !important;
   }
+}
+
+/* ── Marketing: scroll-reveal (progressive, JS toggles data-revealed) ── */
+.marketing-root [data-reveal] {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+  will-change: opacity, transform;
+}
+.marketing-root [data-reveal][data-revealed="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+/* Respect users who prefer reduced motion: no reveal transform, no delay. */
+@media (prefers-reduced-motion: reduce) {
+  .marketing-root [data-reveal],
+  .marketing-root [data-reveal][data-revealed="true"] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+    transition-delay: 0ms;
+  }
+  .marketing-root * {
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Skip-to-content link: hidden until focused. */
+.marketing-skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -3rem;
+  z-index: 100;
+  border-radius: 0.5rem;
+  background: hsl(var(--marketing-primary));
+  padding: 0.625rem 1rem;
+  color: hsl(var(--marketing-text-on-dark));
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: top 0.2s ease;
+}
+.marketing-skip-link:focus {
+  top: 1rem;
 }
