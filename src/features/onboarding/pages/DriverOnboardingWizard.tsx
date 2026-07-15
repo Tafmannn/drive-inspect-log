@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { WizardShell, WizardStepDef } from "../components/WizardShell";
 import { DocumentsUploader, DocumentSlot } from "../components/DocumentsUploader";
+import { EMPLOYMENT_TYPES } from "@/lib/driverProfileConstants";
 
 const STEPS: WizardStepDef[] = [
   { id: 1, title: "Personal", desc: "Name, contact and emergency contact" },
@@ -378,10 +379,9 @@ export default function DriverOnboardingWizard() {
               onChange={e => set("employment_type", e.target.value)}
               className="mt-1 w-full min-h-[40px] rounded-md border border-input bg-background px-3 text-sm"
             >
-              <option value="employed">Employed</option>
-              <option value="contractor">Contractor</option>
-              <option value="agency">Agency</option>
-              <option value="self_employed">Self-employed</option>
+              {EMPLOYMENT_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
             </select>
           </div>
         </>

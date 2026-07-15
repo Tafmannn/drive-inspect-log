@@ -21,6 +21,7 @@ import {
   reviewOnboarding, uploadOnboardingDoc, getDocSlots, countMissingDocs,
   type OnboardingRecord, type OnboardingStatus, type DocStatus,
 } from "@/lib/onboardingApi";
+import { EMPLOYMENT_TYPES } from "@/lib/driverProfileConstants";
 import {
   Plus, ArrowLeft, Upload, CheckCircle, XCircle, Clock,
   FileText, User, Camera, AlertTriangle, ShieldAlert,
@@ -301,9 +302,9 @@ function OnboardingDetail({
             <Select value={form.employment_type} onValueChange={v => setForm(f => ({ ...f, employment_type: v }))} disabled={!canEdit}>
               <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="contractor">Contractor</SelectItem>
-                <SelectItem value="employee">Employee</SelectItem>
-                <SelectItem value="agency">Agency</SelectItem>
+                {EMPLOYMENT_TYPES.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

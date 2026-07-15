@@ -8,6 +8,7 @@ import {
   useActivateUser, useSuspendUser, useReactivateUser, useArchiveDriver, useRestoreDriver,
 } from "@/hooks/useUserManagement";
 import type { UserProfile } from "@/lib/userLifecycleApi";
+import { EMPLOYMENT_TYPES } from "@/lib/driverProfileConstants";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -291,9 +292,9 @@ export function UserDetailEditor({ userId, onBack }: UserDetailEditorProps) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="contractor">Contractor</SelectItem>
-                  <SelectItem value="employee">Employee</SelectItem>
-                  <SelectItem value="agency">Agency</SelectItem>
+                  {EMPLOYMENT_TYPES.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
