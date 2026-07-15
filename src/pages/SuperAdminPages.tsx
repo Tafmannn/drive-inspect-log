@@ -330,7 +330,7 @@ export function SuperAdminUsers() {
             <div><Label>Role</Label>
               <Select value={newRole} onValueChange={setNewRole}>
                 <SelectTrigger className="mt-1 min-h-[44px]"><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="driver">Driver</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent>
+                <SelectContent><SelectItem value="driver">Driver</SelectItem><SelectItem value="admin">Admin</SelectItem><SelectItem value="super_admin">Super Admin</SelectItem></SelectContent>
               </Select>
             </div>
             <div><Label>Organisation</Label>
