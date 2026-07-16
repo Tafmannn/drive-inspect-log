@@ -170,6 +170,63 @@ function addSectionTitle(doc: jsPDF, title: string, y: number): number {
   return y + 7;
 }
 
+/** Draws a UK-style rear number plate (blue GB bar + yellow field). Returns width. */
+function drawUkPlate(doc: jsPDF, x: number, y: number, reg: string): number {
+  const height = 9;
+  const barW = 6;
+  const padX = 3.5;
+  const regText = (reg || "—").toUpperCase();
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  const tw = doc.getTextWidth(regText);
+  const totalW = barW + padX + tw + padX;
+
+  // yellow field
+  doc.setFillColor(252, 209, 22);
+  doc.roundedRect(x, y, totalW, height, 1.2, 1.2, "F");
+  // blue GB bar
+  doc.setFillColor(0, 51, 153);
+  doc.roundedRect(x, y, barW + 1.2, height, 1.2, 1.2, "F");
+  doc.setFillColor(0, 51, 153);
+  doc.rect(x + barW - 1, y, 2, height, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(4.5);
+  doc.text("GB", x + barW / 2, y + height / 2 + 1.4, { align: "center" });
+  // reg
+  doc.setTextColor(20, 20, 20);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  doc.text(regText, x + barW + padX, y + height / 2 + 2.2);
+  // border
+  doc.setDrawColor(140, 140, 140);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(x, y, totalW, height, 1.2, 1.2, "S");
+  return totalW;
+}
+
+/** Right-aligned coloured status pill (e.g. DELIVERED). Draws ending at xRight. */
+function drawStatusPill(
+  doc: jsPDF,
+  xRight: number,
+  y: number,
+  label: string,
+  fill: [number, number, number],
+): void {
+  const h = 7;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  const tw = doc.getTextWidth(label);
+  const padX = 4;
+  const w = tw + padX * 2;
+  const x = xRight - w;
+  doc.setFillColor(...fill);
+  doc.roundedRect(x, y, w, h, 3.5, 3.5, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.text(label, x + w / 2, y + h / 2 + 1.5, { align: "center" });
+}
+
 function addWrappedText(
   doc: jsPDF,
   text: string,
@@ -314,6 +371,8 @@ async function loadImage(
   url: string,
   options?: {
     isSignature?: boolean;
+    /** Keep PNG alpha (e.g. a white logo that must sit on a dark header). */
+    preserveTransparency?: boolean;
   }
 ): Promise<CachedImage | null> {
   try {
@@ -341,7 +400,7 @@ async function loadImage(
         quality: options?.isSignature
           ? IMAGE_LIMITS.signatureQuality
           : IMAGE_LIMITS.jpegQuality,
-        preserveTransparency: options?.isSignature ?? false,
+        preserveTransparency: options?.preserveTransparency ?? options?.isSignature ?? false,
       });
 
       if (compressed) {
@@ -368,7 +427,9 @@ async function loadImage(
 }
 
 async function loadLogo(): Promise<CachedImage | null> {
-  return loadImage("/axentra-logo.png");
+  // HD white lockup (transparent bg) so the mark sits cleanly on the dark
+  // header — no white box. preserveTransparency keeps the PNG alpha.
+  return loadImage("/axentra-pod-logo.png", { preserveTransparency: true });
 }
 
 function drawImageContain(
@@ -406,22 +467,30 @@ function renderHeader(
 
   doc.setFillColor(...PDF_THEME.dark);
   doc.rect(0, 0, pageWidth, HEADER_HEIGHT, "F");
+  // thin brand accent line along the bottom of the header
+  doc.setFillColor(...PDF_THEME.link);
+  doc.rect(0, HEADER_HEIGHT, pageWidth, 0.8, "F");
 
+  // Left: integrated HD logo lockup (white mark + AXENTRA) on the dark bar.
   if (logo) {
-    drawImageContain(doc, logo, MARGIN, 4, 36, 22);
+    drawImageContain(doc, logo, MARGIN, 8, 52, 14);
+  } else {
+    setTextStyle(doc, { size: 15, style: "bold", color: PDF_THEME.white });
+    doc.text("AXENTRA", MARGIN, 17);
   }
+  setTextStyle(doc, { size: 7, style: "normal", color: [200, 210, 225] });
+  doc.text("VEHICLE LOGISTICS · PROOF OF DELIVERY", MARGIN + 1, 25, { charSpace: 0.3 });
 
-  setTextStyle(doc, { size: 13, style: "bold", color: PDF_THEME.white });
-  doc.text("AXENTRA VEHICLE LOGISTICS", pageWidth / 2, 12, { align: "center" });
-
-  setTextStyle(doc, { size: 10, style: "normal", color: PDF_THEME.white });
-  doc.text("Proof of Delivery", pageWidth / 2, 19, { align: "center" });
-
-  setTextStyle(doc, { size: 8, style: "normal", color: PDF_THEME.white });
-  doc.text(`Job ${ref}`, pageWidth - MARGIN, 12, { align: "right" });
-  doc.text(safeDate(job.completed_at || new Date().toISOString()), pageWidth - MARGIN, 18, {
-    align: "right",
-  });
+  // Right: document / job identity.
+  setTextStyle(doc, { size: 11, style: "bold", color: PDF_THEME.white });
+  doc.text(`Job ${ref}`, pageWidth - MARGIN, 13, { align: "right" });
+  setTextStyle(doc, { size: 8, style: "normal", color: [200, 210, 225] });
+  doc.text(
+    safeDate(job.completed_at || new Date().toISOString()),
+    pageWidth - MARGIN,
+    19,
+    { align: "right" },
+  );
 }
 
 function renderFooter(doc: jsPDF, ref: string): void {
@@ -902,7 +971,19 @@ export async function generatePodPdf(
 
   renderHeader(doc, job, ref, logo);
 
-  let y = 38;
+  let y = 40;
+
+  // Branded plate + delivery status, mirroring the in-app POD header card.
+  const pageWidth = getPageWidth(doc);
+  drawUkPlate(doc, MARGIN, y - 6, job.vehicle_reg);
+  if (delivery) {
+    drawStatusPill(doc, pageWidth - MARGIN, y - 5, "DELIVERED", [22, 163, 106]);
+  } else if (pickup) {
+    drawStatusPill(doc, pageWidth - MARGIN, y - 5, "COLLECTED", [37, 99, 235]);
+  } else {
+    drawStatusPill(doc, pageWidth - MARGIN, y - 5, "IN PROGRESS", [120, 120, 120]);
+  }
+  y += 8;
 
   y = addSectionTitle(doc, "Vehicle Details", y);
   y = addPlainKeyValueTable(doc, y, [
