@@ -1,7 +1,7 @@
-import { Check } from "lucide-react";
+import { Check, Camera } from "lucide-react";
 import { MarketingSection } from "../components/MarketingSection";
 import { SectionHeading } from "../components/SectionHeading";
-import { EvidencePreview } from "../components/EvidencePreview";
+import { Photo } from "../components/Photo";
 import { evidenceBenefits } from "../content/marketingContent";
 
 export function EvidenceSection() {
@@ -9,7 +9,17 @@ export function EvidenceSection() {
     <MarketingSection tone="muted" labelledBy="evidence-heading">
       <div className="grid items-center gap-12 lg:grid-cols-2">
         <div data-reveal className="order-2 lg:order-1">
-          <EvidencePreview />
+          <Photo
+            src="/img/evidence.jpg"
+            alt="An Axentra driver photographing a vehicle to record its condition"
+            ratio="3/2"
+            rounded="3xl"
+          >
+            <div className="absolute bottom-4 left-4 flex items-center gap-2 rounded-xl bg-white/95 px-3.5 py-2 shadow-marketing-md backdrop-blur">
+              <Camera className="h-4 w-4 text-marketing-primary" aria-hidden="true" />
+              <span className="text-sm font-semibold text-marketing-text">Condition captured</span>
+            </div>
+          </Photo>
         </div>
 
         <div data-reveal className="order-1 lg:order-2">

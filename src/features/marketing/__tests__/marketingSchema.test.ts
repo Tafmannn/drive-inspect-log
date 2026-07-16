@@ -1,9 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   movementRequestSchema,
-  driverApplicationSchema,
   type MovementRequestValues,
-  type DriverApplicationValues,
 } from "../lib/marketingSchema";
 import { createEnquiryReference } from "../lib/createEnquiryReference";
 import { isLikelyPhone, isLikelyUkPostcode } from "../lib/validation";
@@ -41,23 +39,6 @@ function validMovement(): MovementRequestValues {
   };
 }
 
-function validDriver(): DriverApplicationValues {
-  return {
-    companyWebsite: "",
-    fullName: "Sam Driver",
-    email: "sam@example.com",
-    telephone: "07123 456789",
-    postcode: "LS1 4DY",
-    licenceHeld: true,
-    yearsDriving: "5",
-    experience: "Dealer and auction movements",
-    availability: "Weekdays",
-    hasSmartphone: true,
-    consentContact: true,
-    consentPrivacy: true,
-  };
-}
-
 describe("movementRequestSchema", () => {
   it("accepts a complete valid submission", () => {
     expect(movementRequestSchema.safeParse(validMovement()).success).toBe(true);
@@ -85,17 +66,6 @@ describe("movementRequestSchema", () => {
 
   it("rejects an unknown enum value", () => {
     const res = movementRequestSchema.safeParse({ ...validMovement(), customerType: "spaceship" });
-    expect(res.success).toBe(false);
-  });
-});
-
-describe("driverApplicationSchema", () => {
-  it("accepts a valid application", () => {
-    expect(driverApplicationSchema.safeParse(validDriver()).success).toBe(true);
-  });
-
-  it("requires a held licence confirmation", () => {
-    const res = driverApplicationSchema.safeParse({ ...validDriver(), licenceHeld: false });
     expect(res.success).toBe(false);
   });
 });

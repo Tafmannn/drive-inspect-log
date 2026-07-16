@@ -1,21 +1,31 @@
 import { MarketingSection } from "../components/MarketingSection";
 import { SectionHeading } from "../components/SectionHeading";
 import { MarketingButton } from "../components/MarketingButton";
+import { Photo } from "../components/Photo";
 import { techFeatures } from "../content/marketingContent";
 
 export function TechnologySection() {
   return (
     <MarketingSection tone="dark" labelledBy="technology-heading">
-      <div className="grid gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+      <div data-reveal className="max-w-2xl">
+        <SectionHeading
+          id="technology-heading"
+          eyebrow="The Axentra platform"
+          title="A clearer record of every vehicle movement."
+          description="Axentra’s operational platform supports the movement process from job assignment and inspection to evidence review and proof of delivery. It helps replace fragmented messages and unstructured photographs with a more consistent movement record."
+          tone="dark"
+        />
+      </div>
+
+      <div className="mt-12 grid gap-10 lg:grid-cols-2 lg:items-center">
         <div data-reveal>
-          <SectionHeading
-            id="technology-heading"
-            eyebrow="The Axentra platform"
-            title="A clearer record of every vehicle movement."
-            description="Axentra’s operational platform supports the movement process from job assignment and inspection to evidence review and proof of delivery. It helps replace fragmented messages and unstructured photographs with a more consistent movement record."
-            tone="dark"
+          <Photo
+            src="/img/operations.jpg"
+            alt="Axentra coordinator managing vehicle movements on-screen"
+            ratio="3/2"
+            rounded="3xl"
           />
-          <MarketingButton to="/technology" variant="outlineOnDark" size="lg" className="mt-8">
+          <MarketingButton to="/technology" variant="outlineOnDark" size="lg" className="mt-6">
             Explore Axentra technology
           </MarketingButton>
         </div>

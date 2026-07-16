@@ -14,27 +14,35 @@ In `src/features/marketing/content/marketingContent.ts` (`SITE`):
 | --- | --- | --- |
 | `origin` | `https://axentravehicles.co.uk` | Confirm the production domain; also update `public/robots.txt` and `public/sitemap.xml`. |
 | `contactEmail` | `enquiries@axentravehicles.co.uk` | Replace with the verified enquiries inbox. |
-| `driverEmail` | `drivers@axentravehicles.co.uk` | Replace with the verified driver inbox. |
 | Telephone | *(intentionally omitted)* | Add a verified number only if one exists — do not invent one. |
 
 No phone number is shown anywhere until a real one is confirmed. No insurance
 limits, statistics, client logos or testimonials appear — add only verified ones.
 
-## 2. Real photography (optional, recommended)
+## 2. Photography (in place — review before launch)
 
-The design works without photos. If/when real Axentra operational photography is
-available, it can be dropped into the hero / evidence / about areas. Suggested
-shots (local, optimised **WebP/AVIF**, explicit dimensions, descriptive alt):
+The site now uses supplied brand imagery, cropped from the collages and colour-
+graded for consistency, in `public/img/`:
 
-| Placement | Subject | Suggested size |
+| File | Used on | Source |
 | --- | --- | --- |
-| Homepage hero (optional background) | Real vehicle delivery / driver inspecting a vehicle | 1600×1200 |
-| Evidence section | Close-up of condition photography / odometer capture | 1200×900 |
-| About / founder | Professional key handover; verified founder photo | 800×800 |
+| `hero.jpg` | Homepage hero | Team + fleet outside premises |
+| `evidence.jpg` | Homepage evidence section | Driver capturing condition photos |
+| `operations.jpg` | Homepage technology section | Coordinator at workstation |
+| `team.jpg` | Homepage about + About page hero | Branded team studio shot |
+| `handover.jpg` | Services page hero | Key handover with tablet |
+| `reception.jpg` | Technology page hero | Operations desk + Axentra logo |
 
-Do **not** embed remote stock URLs in components — add local assets under
-`public/` and reference them via typed `image?` fields. Avoid transporter-lorry
-imagery (Axentra provides driven movements only).
+**These are AI-generated placeholders.** Before public launch, review each for:
+- **Text artifacts** — some backgrounds/apparel show warped lettering. Ideally
+  replace with real photography of actual Axentra operations.
+- **Vehicle badges** — frames showing recognisable manufacturer badges were
+  deliberately excluded; re-check any replacements for third-party trademarks.
+- **UK context** — for a UK audience, prefer RHD vehicles and UK number plates
+  (white front / yellow rear) in final photography.
+
+Keep assets local under `public/` (no remote stock URLs in components) and avoid
+transporter-lorry imagery — Axentra provides **driven** movements only.
 
 ## 3. Open Graph image
 
@@ -62,7 +70,6 @@ Deploy the functions and migration:
 ```
 supabase db push                              # applies 20260714210000_marketing_enquiry_tables.sql
 supabase functions deploy submit-movement-request
-supabase functions deploy submit-driver-application
 ```
 
 ## 5. Legal review

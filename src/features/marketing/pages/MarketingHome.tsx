@@ -10,7 +10,6 @@ import { TechnologySection } from "../sections/TechnologySection";
 import { EvidenceSection } from "../sections/EvidenceSection";
 import { TrustSection } from "../sections/TrustSection";
 import { AboutPreviewSection } from "../sections/AboutPreviewSection";
-import { DriverNetworkSection } from "../sections/DriverNetworkSection";
 import { FaqSection } from "../sections/FaqSection";
 import { FinalCtaSection } from "../sections/FinalCtaSection";
 import { usePageMeta } from "../hooks/usePageMeta";
@@ -53,7 +52,6 @@ export function MarketingHome() {
       <EvidenceSection />
       <TrustSection />
       <AboutPreviewSection />
-      <DriverNetworkSection />
       <FaqSection />
       <FinalCtaSection />
     </MarketingLayout>

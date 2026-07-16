@@ -35,6 +35,7 @@ export function AboutPage() {
           { name: "Home", path: "/home" },
           { name: "About", path: "/about" },
         ]}
+        image={{ src: "/img/team.jpg", alt: "The Axentra team in branded uniform" }}
       />
 
       <MarketingSection tone="light">

@@ -36,11 +36,6 @@ export function PrivacyPage() {
             name, company, contact details, vehicle information and the collection and delivery
             information needed to review the enquiry.
           </p>
-          <h3>Driver enquiry information</h3>
-          <p>
-            When you apply to drive with Axentra, we collect the details you provide about your
-            experience, availability and eligibility to register your interest.
-          </p>
           <h3>Website technical data</h3>
           <p>
             We may process limited technical information required to operate and secure the website.
@@ -49,7 +44,6 @@ export function PrivacyPage() {
           <h2>Why we use information</h2>
           <ul>
             <li>To respond to enquiries and provide requested services</li>
-            <li>To assess driver applications</li>
             <li>To operate, secure and improve the website</li>
             <li>To meet legal and regulatory obligations</li>
           </ul>

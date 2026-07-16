@@ -1,36 +1,43 @@
 import { cn } from "@/lib/utils";
-import { SITE } from "../content/marketingContent";
+import { BrandMark } from "./BrandMark";
 
 interface BrandLogoProps {
   /** Render for placement on a dark background (default) or light. */
   tone?: "dark" | "light";
+  /** Show the "Precision in every move" tagline beneath the wordmark. */
+  withTagline?: boolean;
   className?: string;
 }
 
 /**
- * Axentra wordmark lockup. Uses the existing brand image asset in /public.
- * On dark surfaces the logo is inverted to read as white; on light surfaces it
- * renders as-is (deep navy).
+ * Axentra brand lockup: the crisp SVG mark + AXENTRA wordmark, optionally with
+ * the tagline. currentColor drives the mark + wordmark so it themes cleanly on
+ * dark (white) or light (navy) surfaces.
  */
-export function BrandLogo({ tone = "dark", className }: BrandLogoProps) {
+export function BrandLogo({ tone = "dark", withTagline = false, className }: BrandLogoProps) {
   return (
-    <span className={cn("inline-flex items-center gap-2.5", className)}>
-      <img
-        src="/axentra-app-icon.png"
-        alt=""
-        width={32}
-        height={32}
-        aria-hidden="true"
-        className="h-8 w-8 rounded-lg object-contain"
-      />
-      <span
-        className={cn(
-          "font-heading text-lg font-bold tracking-tight",
-          tone === "dark" ? "text-marketing-on-dark" : "text-marketing-navy",
+    <span
+      className={cn(
+        "inline-flex items-center gap-2.5",
+        tone === "dark" ? "text-white" : "text-marketing-navy",
+        className,
+      )}
+    >
+      <BrandMark className="h-9 w-9 shrink-0" />
+      <span className="flex flex-col leading-none">
+        <span className="font-heading text-[1.35rem] font-extrabold uppercase tracking-[0.14em]">
+          Axentra
+        </span>
+        {withTagline && (
+          <span
+            className={cn(
+              "mt-1 text-[0.6rem] font-semibold uppercase tracking-[0.28em]",
+              tone === "dark" ? "text-marketing-on-dark-muted" : "text-marketing-text-muted",
+            )}
+          >
+            Precision in every move
+          </span>
         )}
-      >
-        {SITE.shortName}
-        <span className="font-semibold text-marketing-electric"> Vehicles</span>
       </span>
     </span>
   );

@@ -39,12 +39,6 @@ export const pageMeta = {
       "Tell Axentra about the vehicle you need moved. Provide collection, delivery and vehicle details and we will review the request and respond with availability and pricing.",
     path: "/contact",
   },
-  drivers: {
-    title: "Drive With Axentra | Vehicle Movement Driver Opportunities",
-    description:
-      "Axentra is building a trusted driver network built around professional standards, accurate inspections, clear communication and quality customer handovers.",
-    path: "/drivers",
-  },
   privacy: {
     title: "Privacy Policy | Axentra Vehicle Logistics",
     description: `How ${SITE.name} collects, uses and protects information submitted through this website.`,

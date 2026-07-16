@@ -1,5 +1,5 @@
-// Shared helpers for the public marketing enquiry edge functions
-// (submit-movement-request, submit-driver-application).
+// Shared helpers for the public marketing enquiry edge function
+// (submit-movement-request).
 //
 // These endpoints are PUBLIC (no caller auth) — anyone on the marketing site
 // posts to them — so they lean on: per-IP rate limiting, a honeypot, strict

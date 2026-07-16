@@ -1,11 +1,10 @@
 -- =====================================================================
--- Public marketing enquiry tables: movement_enquiries + driver_applications
+-- Public marketing enquiry table: movement_enquiries
 -- =====================================================================
--- These back the public website's "Request a vehicle movement" and driver
--- application forms. Rows are written ONLY by the submit-movement-request and
--- submit-driver-application edge functions using the service role (which
--- bypasses RLS). They are deliberately kept OUT of the live `jobs` table: a
--- website enquiry is an unconfirmed lead, not a booked job.
+-- Backs the public website's "Request a vehicle movement" form. Rows are
+-- written ONLY by the submit-movement-request edge function using the service
+-- role (which bypasses RLS). They are deliberately kept OUT of the live `jobs`
+-- table: a website enquiry is an unconfirmed lead, not a booked job.
 --
 -- SECURITY MODEL:
 --   * RLS is enabled with NO anon/authenticated INSERT/UPDATE/DELETE policies,
@@ -82,42 +81,3 @@ CREATE INDEX IF NOT EXISTS movement_enquiries_created_at_idx
   ON public.movement_enquiries (created_at DESC);
 CREATE INDEX IF NOT EXISTS movement_enquiries_status_idx
   ON public.movement_enquiries (status);
-
-
--- ── driver_applications ──────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS public.driver_applications (
-  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  public_reference    text NOT NULL UNIQUE,
-  idempotency_key     text UNIQUE,
-  status              text NOT NULL DEFAULT 'new',
-
-  full_name           text NOT NULL,
-  email               text NOT NULL,
-  telephone           text NOT NULL,
-  postcode            text,
-  years_driving       text,
-  experience          text,
-  availability        text,
-
-  consent_timestamp   timestamptz NOT NULL DEFAULT now(),
-  source              text NOT NULL DEFAULT 'website',
-  created_at          timestamptz NOT NULL DEFAULT now(),
-  updated_at          timestamptz NOT NULL DEFAULT now(),
-  reviewed_at         timestamptz
-);
-
-ALTER TABLE public.driver_applications ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "driver_applications admin read" ON public.driver_applications;
-CREATE POLICY "driver_applications admin read"
-  ON public.driver_applications FOR SELECT
-  USING (public.is_admin_or_super_admin());
-
-DROP POLICY IF EXISTS "driver_applications admin update" ON public.driver_applications;
-CREATE POLICY "driver_applications admin update"
-  ON public.driver_applications FOR UPDATE
-  USING (public.is_admin_or_super_admin())
-  WITH CHECK (public.is_admin_or_super_admin());
-
-CREATE INDEX IF NOT EXISTS driver_applications_created_at_idx
-  ON public.driver_applications (created_at DESC);

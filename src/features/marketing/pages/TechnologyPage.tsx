@@ -22,7 +22,7 @@ const plannedDevelopment = [
   "Customer visibility",
   "Recurring accounts",
   "Operational reporting",
-  "Driver-network expansion",
+  "Expanded service coverage",
   "Improved service consistency",
 ];
 
@@ -44,6 +44,7 @@ export function TechnologyPage() {
           { name: "Home", path: "/home" },
           { name: "Technology", path: "/technology" },
         ]}
+        image={{ src: "/img/reception.jpg", alt: "Axentra operations team coordinating vehicle movements" }}
       />
 
       <MarketingSection tone="light">

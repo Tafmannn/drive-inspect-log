@@ -62,7 +62,6 @@ const MarketingServices = lazy(() => import("@/features/marketing/pages/Services
 const MarketingTechnology = lazy(() => import("@/features/marketing/pages/TechnologyPage"));
 const MarketingAbout = lazy(() => import("@/features/marketing/pages/AboutPage"));
 const MarketingContact = lazy(() => import("@/features/marketing/pages/ContactPage"));
-const MarketingDrivers = lazy(() => import("@/features/marketing/pages/DriversPage"));
 const MarketingPrivacy = lazy(() => import("@/features/marketing/pages/PrivacyPage"));
 const MarketingTerms = lazy(() => import("@/features/marketing/pages/TermsPage"));
 const MarketingCookies = lazy(() => import("@/features/marketing/pages/CookiesPage"));
@@ -277,7 +276,6 @@ const App = () => {
                 <Route path="/technology" element={<Suspense fallback={<MarketingFallback />}><MarketingTechnology /></Suspense>} />
                 <Route path="/about" element={<Suspense fallback={<MarketingFallback />}><MarketingAbout /></Suspense>} />
                 <Route path="/contact" element={<Suspense fallback={<MarketingFallback />}><MarketingContact /></Suspense>} />
-                <Route path="/drivers" element={<Suspense fallback={<MarketingFallback />}><MarketingDrivers /></Suspense>} />
                 <Route path="/privacy" element={<Suspense fallback={<MarketingFallback />}><MarketingPrivacy /></Suspense>} />
                 <Route path="/terms" element={<Suspense fallback={<MarketingFallback />}><MarketingTerms /></Suspense>} />
                 <Route path="/cookies" element={<Suspense fallback={<MarketingFallback />}><MarketingCookies /></Suspense>} />

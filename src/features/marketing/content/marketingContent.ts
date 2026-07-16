@@ -88,8 +88,8 @@ export const SITE = {
   coverage: "UK-wide",
   // ⚠️ Placeholder — verify before launch.
   contactEmail: "enquiries@axentravehicles.co.uk",
-  driverEmail: "drivers@axentravehicles.co.uk",
-  tagline: "Vehicle movement without the blind spots.",
+  /** Registered brand tagline. */
+  tagline: "Precision in every move.",
   promise: "Every vehicle. Every handover. Clearly documented.",
 } as const;
 
@@ -100,7 +100,6 @@ export const primaryNav: NavLink[] = [
   { key: "how", label: "How it works", to: "/home", homeAnchor: "how-it-works" },
   { key: "technology", label: "Technology", to: "/technology" },
   { key: "about", label: "About", to: "/about" },
-  { key: "drivers", label: "Drivers", to: "/drivers" },
   { key: "contact", label: "Contact", to: "/contact" },
 ].map((n) => ({ label: n.label, to: n.to, homeAnchor: n.homeAnchor }));
 
@@ -330,25 +329,15 @@ export const trustPoints = [
 export const insuranceQualifier =
   "Insurance cover is subject to policy terms, conditions and vehicle eligibility. Details are available on request.";
 
-/* ── Driver expectations ──────────────────────────────────────────────── */
+/* ── Standards that back every movement (service credibility, not hiring) ── */
 
-export const driverExpectations: string[] = [
-  "Professional conduct",
-  "Accurate inspections",
-  "Vehicle care",
-  "Reliable communication",
-  "Correct use of movement systems",
-  "Respectful customer handovers",
-  "Compliance documentation",
-];
-
-export const driverProcess: string[] = [
-  "Submit your interest",
-  "Document and identity review",
-  "Experience and suitability review",
-  "Onboarding",
-  "Approval decision",
-  "Access to eligible work where available",
+export const movementStandards: string[] = [
+  "Professional, vetted drivers",
+  "Structured collection inspections",
+  "Consistent photographic evidence",
+  "Clear customer communication",
+  "Careful vehicle handling",
+  "Dependable proof of delivery",
 ];
 
 /* ── FAQs ─────────────────────────────────────────────────────────────── */
@@ -408,45 +397,6 @@ export const faqs: Faq[] = [
     answer:
       "Axentra operates with Road Risk and Public Liability cover, subject to policy terms, conditions and vehicle eligibility. Details are available on request.",
   },
-  {
-    key: "drivers",
-    question: "How are drivers approved?",
-    answer:
-      "Drivers go through document and identity review, a suitability review and onboarding before being approved for eligible work. Availability of work is never guaranteed.",
-  },
-];
-
-export const driverFaqs: Faq[] = [
-  {
-    key: "guaranteed",
-    question: "Is work guaranteed?",
-    answer:
-      "No. Applying registers your interest. Access to work depends on approval, availability and suitability for each movement.",
-  },
-  {
-    key: "experience",
-    question: "Do I need vehicle movement experience?",
-    answer:
-      "Relevant experience is valued and may be required for some work. Tell us about your background when you apply.",
-  },
-  {
-    key: "documents",
-    question: "What documents are required?",
-    answer:
-      "A full valid driving licence and appropriate right to work are expected. Further documents may be requested during review and onboarding.",
-  },
-  {
-    key: "own-vehicle",
-    question: "Do I need my own vehicle?",
-    answer:
-      "Requirements depend on the type of movement. Availability, location and reliable transport arrangements are discussed during onboarding.",
-  },
-  {
-    key: "assigned",
-    question: "How are movements assigned?",
-    answer:
-      "Eligible, approved drivers are matched to movements based on availability, location and the requirements of each job.",
-  },
 ];
 
 /* ── Footer navigation ────────────────────────────────────────────────── */
@@ -476,7 +426,6 @@ export const footerColumns: FooterColumn[] = [
     links: [
       { label: "About", to: "/about" },
       { label: "Technology", to: "/technology" },
-      { label: "Drivers", to: "/drivers" },
       { label: "Contact", to: "/contact" },
     ],
   },
@@ -485,9 +434,7 @@ export const footerColumns: FooterColumn[] = [
     heading: "Account",
     links: [
       { label: "Sign in", to: "/login" },
-      { label: "Driver sign in", to: "/login" },
-      { label: "Customer access", to: "/login" },
-      { label: "Administrator access", to: "/login" },
+      { label: "Request a movement", to: "/contact" },
     ],
   },
   {

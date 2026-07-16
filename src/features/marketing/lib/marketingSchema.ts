@@ -97,22 +97,3 @@ export const movementRequestSchema = z.object({
 
 export type MovementRequestInput = z.input<typeof movementRequestSchema>;
 export type MovementRequestValues = z.infer<typeof movementRequestSchema>;
-
-export const driverApplicationSchema = z.object({
-  companyWebsite: z.string().max(0).optional().default(""), // honeypot
-
-  fullName: requiredText("Full name"),
-  email: z.string().trim().min(1, "Email is required").email("Enter a valid email address"),
-  telephone: phone,
-  postcode,
-  licenceHeld: consentTrue("A full valid driving licence is required"),
-  yearsDriving: z.string().trim().max(20).optional().default(""),
-  experience: z.string().trim().max(2000).optional().default(""),
-  availability: z.string().trim().max(200).optional().default(""),
-  hasSmartphone: consentTrue("Smartphone capability is required for the role"),
-  consentContact: consentTrue("Please agree to be contacted about your application"),
-  consentPrivacy: consentTrue("Please confirm you have read the privacy policy"),
-});
-
-export type DriverApplicationInput = z.input<typeof driverApplicationSchema>;
-export type DriverApplicationValues = z.infer<typeof driverApplicationSchema>;

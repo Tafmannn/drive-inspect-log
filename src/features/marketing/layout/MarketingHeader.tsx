@@ -33,7 +33,9 @@ export function MarketingHeader({ transparentAtTop = false }: MarketingHeaderPro
         "sticky top-0 z-50 transition-colors duration-300",
         solid
           ? "border-b border-white/10 bg-marketing-navy/95 backdrop-blur supports-[backdrop-filter]:bg-marketing-navy/80"
-          : "bg-transparent",
+          // At the top, match the announcement bar's dark so the two read as one
+          // seamless bar over the navy hero (keeps the white logo/nav legible).
+          : "bg-marketing-bg-dark",
       )}
     >
       <div className="mx-auto flex h-16 max-w-content items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
