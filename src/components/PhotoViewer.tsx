@@ -164,7 +164,7 @@ export const PhotoViewer = ({ photos, title, totalExpected, onRetry }: PhotoView
         <DialogContent className="max-w-[100vw] max-h-[100vh] w-screen h-screen p-0 border-none bg-black/95 [&>button]:hidden">
           <div className="relative w-full h-full flex flex-col">
             {/* Top bar */}
-            <div className="flex items-center justify-between px-4 py-3 bg-black/80 z-10">
+            <div className="flex items-center justify-between px-4 py-3 bg-black/80 z-10 pt-[calc(0.75rem+env(safe-area-inset-top))]">
               <span className="text-white text-sm truncate mr-2">
                 {selectedIndex !== null && photos[selectedIndex]?.label
                   ? photos[selectedIndex].label
@@ -225,7 +225,7 @@ export const PhotoViewer = ({ photos, title, totalExpected, onRetry }: PhotoView
 
             {/* Dot indicators */}
             {photos.length > 1 && photos.length <= 20 && (
-              <div className="flex justify-center gap-1.5 py-3 bg-black/80">
+              <div className="flex justify-center gap-1.5 py-3 bg-black/80 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
                 {photos.map((_, idx) => (
                   <button
                     key={idx}
