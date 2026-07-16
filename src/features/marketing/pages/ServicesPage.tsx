@@ -50,7 +50,7 @@ export function ServicesPage() {
           { name: "Home", path: "/home" },
           { name: "Services", path: "/services" },
         ]}
-        image={{ src: "/img/handover.jpg", alt: "An Axentra driver completing a documented vehicle handover" }}
+        image={{ src: "/img/handover.jpg", alt: "An Axentra driver completing a digital handover form in a vehicle" }}
         actions={
           <MarketingButton to="/contact" variant="primary" size="lg">
             Request a movement

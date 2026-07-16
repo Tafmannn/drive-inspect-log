@@ -61,7 +61,7 @@ export function HeroSection() {
         <div className="relative">
           <Photo
             src="/img/hero.jpg"
-            alt="Axentra team with a fleet of vehicles outside the Axentra premises"
+            alt="Axentra staff inspecting a vehicle at a UK dealership"
             ratio="3/2"
             rounded="3xl"
             priority

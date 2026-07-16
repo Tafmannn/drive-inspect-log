@@ -28,7 +28,7 @@ export function AboutPreviewSection() {
         <div data-reveal>
           <Photo
             src="/img/team.jpg"
-            alt="The Axentra team in branded uniform"
+            alt="Axentra staff reviewing a vehicle movement on a tablet"
             ratio="3/2"
             rounded="3xl"
           />
