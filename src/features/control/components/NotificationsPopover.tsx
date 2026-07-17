@@ -1,8 +1,16 @@
 /**
  * Notifications popover for the Control Centre topbar.
- * Shows top active attention exceptions with unread count badge.
+ * Shows top active attention exceptions with an unread count badge.
+ *
+ * - Clicking a notification navigates to that exception's own action route
+ *   (driver profile for compliance gaps, the job for timing/evidence, etc.),
+ *   not a generic dashboard.
+ * - The red badge counts UNSEEN exceptions only: opening the popover marks
+ *   everything currently listed as seen (persisted per-browser), so the
+ *   badge clears once viewed and only reappears when something new fires.
+ *   Exceptions stay listed until they are actually resolved/acknowledged.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,17 +31,58 @@ const SEVERITY_COLORS: Record<string, string> = {
   low: "text-muted-foreground",
 };
 
+const SEEN_STORAGE_KEY = "axentra-notifications-seen-v1";
+
+function loadSeenIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(SEEN_STORAGE_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    return new Set(Array.isArray(parsed) ? parsed.filter((v) => typeof v === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function persistSeenIds(ids: Set<string>): void {
+  try {
+    localStorage.setItem(SEEN_STORAGE_KEY, JSON.stringify([...ids]));
+  } catch {
+    // best-effort — private mode / quota
+  }
+}
+
 export function NotificationsPopover() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [seenIds, setSeenIds] = useState<Set<string>>(() => loadSeenIds());
   const { data, isLoading } = useAttentionData({
     scope: "org",
     filters: DEFAULT_FILTERS,
   });
 
   const exceptions = data?.exceptions ?? [];
-  const count = exceptions.length;
+  const activeCount = exceptions.length;
+  const unseenCount = exceptions.filter((ex) => !seenIds.has(ex.id)).length;
   const top5 = exceptions.slice(0, 5);
+
+  // Opening the popover = viewing the notifications: mark everything
+  // currently active as seen. Persisted pruned to active ids so the set
+  // never grows unboundedly and a resolved-then-refired exception counts
+  // as new again.
+  useEffect(() => {
+    if (!open || exceptions.length === 0) return;
+    const allSeen = exceptions.every((ex) => seenIds.has(ex.id));
+    if (allSeen) return;
+    const next = new Set(exceptions.map((ex) => ex.id));
+    setSeenIds(next);
+    persistSeenIds(next);
+  }, [open, exceptions, seenIds]);
+
+  const openException = (route: string | undefined) => {
+    setOpen(false);
+    navigate(route || "/control");
+  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -42,12 +91,18 @@ export function NotificationsPopover() {
           variant="ghost"
           size="icon"
           className="h-8 w-8 relative"
-          aria-label={count > 0 ? `Notifications (${count} unread)` : "Notifications"}
+          aria-label={
+            unseenCount > 0
+              ? `Notifications (${unseenCount} unread)`
+              : activeCount > 0
+              ? `Notifications (${activeCount} active)`
+              : "Notifications"
+          }
         >
           <Bell className="h-4 w-4 text-muted-foreground" />
-          {count > 0 && (
+          {unseenCount > 0 && (
             <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground px-1">
-              {count > 99 ? "99+" : count}
+              {unseenCount > 99 ? "99+" : unseenCount}
             </span>
           )}
         </Button>
@@ -56,7 +111,7 @@ export function NotificationsPopover() {
         <div className="px-4 py-3 border-b">
           <p className="text-sm font-semibold">Notifications</p>
           <p className="text-[11px] text-muted-foreground">
-            {count} active exception{count !== 1 ? "s" : ""}
+            {activeCount} active exception{activeCount !== 1 ? "s" : ""}
           </p>
         </div>
 
@@ -77,23 +132,25 @@ export function NotificationsPopover() {
                 <li
                   key={ex.id}
                   className="px-4 py-2.5 hover:bg-muted/50 cursor-pointer"
-                  onClick={() => {
-                    setOpen(false);
-                    navigate("/control");
-                  }}
+                  onClick={() => openException(ex.actionRoute)}
                 >
                   <p className="text-xs font-medium truncate">{ex.title}</p>
                   <p className="text-[11px] text-muted-foreground truncate mt-0.5">
                     {ex.detail}
                   </p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge
-                      variant="outline"
-                      className={`text-[9px] uppercase ${SEVERITY_COLORS[ex.severity] ?? ""}`}
-                    >
-                      {ex.severity}
-                    </Badge>
-                    <span className="text-[10px] text-muted-foreground">{ex.category}</span>
+                  <div className="flex items-center justify-between gap-2 mt-1">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Badge
+                        variant="outline"
+                        className={`text-[9px] uppercase ${SEVERITY_COLORS[ex.severity] ?? ""}`}
+                      >
+                        {ex.severity}
+                      </Badge>
+                      <span className="text-[10px] text-muted-foreground">{ex.category}</span>
+                    </div>
+                    <span className="text-[10px] text-primary font-medium shrink-0">
+                      {ex.actionLabel || "View"}
+                    </span>
                   </div>
                 </li>
               ))}
@@ -101,7 +158,7 @@ export function NotificationsPopover() {
           )}
         </div>
 
-        {count > 5 && (
+        {activeCount > 5 && (
           <div className="border-t px-4 py-2">
             <Button
               variant="ghost"
@@ -112,7 +169,7 @@ export function NotificationsPopover() {
                 navigate("/control");
               }}
             >
-              View all {count} exceptions
+              View all {activeCount} exceptions
             </Button>
           </div>
         )}
