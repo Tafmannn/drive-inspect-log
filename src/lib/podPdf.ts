@@ -1424,7 +1424,11 @@ export type EmailPodResult =
 
 export async function emailPodPdf(
   job: JobWithRelations,
-  expenses?: PodExpense[]
+  expenses?: PodExpense[],
+  /** Admin-confirmed recipient (PodEmailConfirmDialog). Overrides the
+   *  job's stored contact email — the whole point of that dialog is to
+   *  catch a wrong/stale address before it's used to actually send. */
+  recipientOverride?: string
 ): Promise<EmailPodResult> {
   const photosZipUrl = await tryBuildAndUploadPhotosZip(job);
   const blob = await generatePodPdf(job, expenses, photosZipUrl);
@@ -1438,6 +1442,7 @@ export async function emailPodPdf(
   const subject = `Axentra POD – ${ref} – ${job.vehicle_reg}`;
 
   let downloadLink = "";
+  const recipient = recipientOverride?.trim() || job.delivery_contact_email || job.pickup_contact_email;
 
   try {
     const { supabase } = await import("@/integrations/supabase/client");
@@ -1479,7 +1484,6 @@ export async function emailPodPdf(
     // navigator.share/mailto flow below on any failure — missing recipient,
     // RESEND_API_KEY not configured yet, network error, etc. — so the
     // feature never appears broken while that setup is pending.
-    const recipient = job.delivery_contact_email || job.pickup_contact_email;
     if (recipient && downloadLink) {
       try {
         const { data, error } = await supabase.functions.invoke("send-pod-email", {
@@ -1537,7 +1541,11 @@ export async function emailPodPdf(
     }
   }
 
-  const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  // Pre-fill the confirmed recipient — previously left blank, forcing the
+  // admin to retype it in their mail app and reopening the exact mistake
+  // this confirmation step exists to prevent.
+  const mailtoTo = recipient ? encodeURIComponent(recipient) : "";
+  const mailto = `mailto:${mailtoTo}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   window.open(mailto, "_blank");
   return { method: "mailto" };
 }
