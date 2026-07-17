@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { PhotoViewer } from "@/components/PhotoViewer";
+import { PodEmailConfirmDialog } from "@/components/PodEmailConfirmDialog";
 import { useJob, useUpdateJob } from "@/hooks/useJobs";
 import { useJobExpenses } from "@/hooks/useExpenses";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -137,6 +138,8 @@ export const PodReport = () => {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [downloadingPhotos, setDownloadingPhotos] = useState(false);
   const [confirmingReview, setConfirmingReview] = useState(false);
+  const [emailConfirmOpen, setEmailConfirmOpen] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   // Note: actual gating uses podReadiness below — this only enables the
   // button shell for admins on the right job statuses. Approval still
@@ -383,10 +386,17 @@ export const PodReport = () => {
     }
   };
 
-  const handleEmailPdf = async () => {
+  // "Email" button only opens the confirm dialog — the actual send happens
+  // in handleConfirmedEmailPdf once the recipient is confirmed/amended.
+  const handleEmailPdf = () => {
+    if (!job) return;
+    setEmailConfirmOpen(true);
+  };
+
+  const handleConfirmedEmailPdf = async (confirmedEmail: string) => {
     if (!job) return;
 
-    setPdfLoading(true);
+    setSendingEmail(true);
     try {
       const billable = (jobExpenses ?? []).map((e) => ({
         id: e.id,
@@ -395,7 +405,8 @@ export const PodReport = () => {
         amount: Number(e.amount),
         billable_on_pod: (e as any).billable_on_pod ?? true,
       }));
-      const result = await emailPodPdf(job, billable);
+      const result = await emailPodPdf(job, billable, confirmedEmail);
+      setEmailConfirmOpen(false);
 
       if (result.method === "resend") {
         toast({
@@ -417,7 +428,7 @@ export const PodReport = () => {
         });
       }
     } finally {
-      setPdfLoading(false);
+      setSendingEmail(false);
     }
   };
 
@@ -1011,6 +1022,15 @@ export const PodReport = () => {
           </Card>
         </div>
       </main>
+
+      <PodEmailConfirmDialog
+        open={emailConfirmOpen}
+        onOpenChange={setEmailConfirmOpen}
+        defaultEmail={job.delivery_contact_email || job.pickup_contact_email || ""}
+        jobRef={ref}
+        sending={sendingEmail}
+        onConfirm={handleConfirmedEmailPdf}
+      />
     </div>
   );
 };
