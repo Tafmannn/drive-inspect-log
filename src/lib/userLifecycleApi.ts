@@ -104,6 +104,11 @@ export async function createUser(params: {
   return result.user_id;
 }
 
+/** Re-send the branded set-password invite email to a pending_activation user. */
+export async function resendInvite(userId: string): Promise<void> {
+  await invoke({ _action: "resend_invite", user_id: userId });
+}
+
 export async function updateProfile(
   userId: string,
   fields: Partial<Pick<UserProfile, "first_name" | "last_name" | "display_name" | "phone" | "internal_notes" | "profile_photo_path">>

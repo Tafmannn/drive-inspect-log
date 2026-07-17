@@ -1,8 +1,8 @@
 /**
  * user-lifecycle — unified edge function for user management.
- * Actions: list, get, create, update_profile, set_role, activate, suspend, reactivate,
- *          archive_driver, restore_driver, sync_profiles, update_driver_profile,
- *          get_permissions, set_permission_override
+ * Actions: list, get, create, resend_invite, update_profile, set_role, activate,
+ *          suspend, reactivate, archive_driver, restore_driver, sync_profiles,
+ *          update_driver_profile, get_permissions, set_permission_override
  *
  * Auth: JWT verified in code. Caller must be admin (org-scoped) or super_admin (global).
  */
@@ -62,6 +62,119 @@ async function writeAudit(
   } catch {
     // non-blocking
   }
+}
+
+// ── Branded invite email (Resend) ───────────────────────────────────────
+// Supabase's built-in invite email is generic and comes from the shared
+// supabase.io sender. Instead we mint the action link ourselves
+// (auth.admin.generateLink) and deliver it in an Axentra-branded email via
+// Resend, reusing the RESEND_API_KEY already configured for send-pod-email.
+// If Resend is not configured we fall back to Supabase's built-in email so
+// invites never silently stop working.
+
+function escapeHtml(s: string): string {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// The set-password page the invite link lands on. Prefer an explicit APP_URL
+// secret; otherwise use the calling admin app's Origin. Supabase Auth only
+// redirects to allow-listed URLs, so a forged Origin cannot leak the token to
+// an attacker-controlled host — the redirect would fall back to the Site URL.
+function welcomeRedirectUrl(req: Request): string | undefined {
+  const candidate = Deno.env.get("APP_URL") || req.headers.get("origin") || "";
+  try {
+    const u = new URL(candidate);
+    if (u.protocol !== "https:" && u.protocol !== "http:") return undefined;
+    return `${u.origin}/welcome`;
+  } catch {
+    return undefined;
+  }
+}
+
+function renderInviteHtml(opts: { firstName: string | null; actionLink: string }): string {
+  const greeting = opts.firstName ? `Hi ${escapeHtml(opts.firstName)},` : "Hi,";
+  const href = escapeHtml(opts.actionLink);
+  return `<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:24px 0;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;">
+            <tr>
+              <td style="background:#111827;padding:20px 32px;">
+                <span style="color:#ffffff;font-size:18px;font-weight:bold;">Axentra Vehicle Logistics</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:32px;color:#1f2937;font-size:15px;line-height:1.6;">
+                <p style="margin:0 0 16px;">${greeting}</p>
+                <p style="margin:0 0 24px;">
+                  You've been invited to join <strong>Axentra Vehicle Logistics</strong>.
+                  Click the button below to create your password and finish setting up
+                  your account.
+                </p>
+                <p style="margin:0 0 24px;text-align:center;">
+                  <a href="${href}"
+                     style="background:#111827;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:bold;display:inline-block;">
+                    Set up my account
+                  </a>
+                </p>
+                <p style="margin:0 0 16px;color:#6b7280;font-size:13px;">
+                  This link is valid for 24 hours and can only be used once. If it has
+                  expired, ask your administrator to resend the invitation.
+                </p>
+                <p style="margin:0 0 16px;color:#6b7280;font-size:13px;word-break:break-all;">
+                  If the button doesn't work, copy and paste this link into your browser:<br/>
+                  <a href="${href}" style="color:#2563eb;">${href}</a>
+                </p>
+                <p style="margin:24px 0 0;">Kind regards,<br/>Axentra Vehicle Logistics<br/>info@axentravehicles.com</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
+
+async function sendInviteEmail(opts: {
+  to: string;
+  firstName: string | null;
+  actionLink: string;
+  subject: string;
+}): Promise<{ ok: boolean; detail?: unknown }> {
+  const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+  if (!RESEND_API_KEY) return { ok: false, detail: "RESEND_API_KEY not configured" };
+
+  const fromAddress =
+    Deno.env.get("INVITE_EMAIL_FROM") ||
+    Deno.env.get("POD_EMAIL_FROM") ||
+    "Axentra Vehicle Logistics <onboarding@resend.dev>";
+
+  const resp = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: fromAddress,
+      to: [opts.to],
+      subject: opts.subject,
+      html: renderInviteHtml({ firstName: opts.firstName, actionLink: opts.actionLink }),
+    }),
+  });
+  if (!resp.ok) {
+    const detail = await resp.json().catch(() => ({}));
+    return { ok: false, detail };
+  }
+  return { ok: true };
 }
 
 async function loadDriverProfilesForUsers(admin: any, userIds: string[]) {
@@ -247,29 +360,76 @@ serve(async (req) => {
         return json({ error: "ORG_SCOPE_VIOLATION" }, 403);
       }
 
-      const { data: inviteData, error: inviteErr } =
-        await admin.auth.admin.inviteUserByEmail(email, {
-          data: { role: targetRole, org_id },
-        });
+      const redirectTo = welcomeRedirectUrl(req);
+      const useBrandedEmail = Boolean(Deno.env.get("RESEND_API_KEY"));
 
       let authUserId: string;
+      // "sent"     — branded email delivered via Resend
+      // "builtin"  — Supabase's default template was used (Resend unavailable)
+      // "failed"   — user was created but no email went out; use Resend Invite
+      let inviteEmail: "sent" | "builtin" | "failed";
 
-      if (inviteErr) {
-        if (inviteErr.message?.includes("already been registered")) {
-          const existing = await findAuthUserByEmail(admin, email);
-          if (!existing) return json({ error: inviteErr.message }, 500);
-          authUserId = existing.id;
+      if (useBrandedEmail) {
+        // generateLink creates the auth user WITHOUT sending Supabase's
+        // generic template email; we deliver the link ourselves via Resend.
+        const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+          type: "invite",
+          email,
+          options: { data: { role: targetRole, org_id }, redirectTo },
+        });
+
+        if (linkErr) {
+          if (linkErr.message?.includes("already been registered")) {
+            const existing = await findAuthUserByEmail(admin, email);
+            if (!existing) return json({ error: linkErr.message }, 500);
+            authUserId = existing.id;
+            inviteEmail = "failed"; // no fresh link for an existing auth user here
+          } else {
+            return json({ error: linkErr.message }, 500);
+          }
         } else {
-          return json({ error: inviteErr.message }, 500);
+          // Defensive: guard against a resolved call with no user/link payload
+          // rather than letting `undefined` flow into updateUserById below.
+          if (!linkData?.user?.id || !linkData?.properties?.action_link) {
+            return json({ error: "Invite succeeded but returned no user" }, 500);
+          }
+          authUserId = linkData.user.id;
+          const sent = await sendInviteEmail({
+            to: email,
+            firstName: first_name ?? null,
+            actionLink: linkData.properties.action_link,
+            subject: "You've been invited to Axentra",
+          });
+          // A failed send must not abort creation — the profile below still
+          // gets created and the admin can use "Resend Invite" to retry.
+          inviteEmail = sent.ok ? "sent" : "failed";
+          if (!sent.ok) console.error("invite email send failed", sent.detail);
         }
       } else {
-        // Defensive: inviteUserByEmail can resolve without an error yet without
-        // a user object. A non-null assertion (`!`) only silences the compiler
-        // and would let `undefined` flow into updateUserById below, so guard.
-        if (!inviteData?.user?.id) {
-          return json({ error: "Invite succeeded but returned no user" }, 500);
+        // No Resend key: keep the original built-in Supabase invite email so
+        // invites still arrive (generic template, but pointed at /welcome).
+        const { data: inviteData, error: inviteErr } =
+          await admin.auth.admin.inviteUserByEmail(email, {
+            data: { role: targetRole, org_id },
+            redirectTo,
+          });
+
+        if (inviteErr) {
+          if (inviteErr.message?.includes("already been registered")) {
+            const existing = await findAuthUserByEmail(admin, email);
+            if (!existing) return json({ error: inviteErr.message }, 500);
+            authUserId = existing.id;
+            inviteEmail = "failed";
+          } else {
+            return json({ error: inviteErr.message }, 500);
+          }
+        } else {
+          if (!inviteData?.user?.id) {
+            return json({ error: "Invite succeeded but returned no user" }, 500);
+          }
+          authUserId = inviteData.user.id;
+          inviteEmail = "builtin";
         }
-        authUserId = inviteData.user.id;
       }
 
       await admin.auth.admin.updateUserById(authUserId, {
@@ -306,10 +466,73 @@ serve(async (req) => {
       await writeAudit(admin, caller, "create_user", {
         target_user_id: authUserId,
         target_org_id: org_id,
-        after_state: { email, role: targetRole, org_id },
+        after_state: { email, role: targetRole, org_id, invite_email: inviteEmail },
       });
 
-      return json({ success: true, user_id: authUserId });
+      return json({ success: true, user_id: authUserId, invite_email: inviteEmail });
+    }
+
+    // ── RESEND INVITE ──
+    // Re-sends the branded set-password email to a pending_activation user
+    // whose original invite link expired (links are single-use, 24h). The
+    // auth user already exists, so a "recovery" link is minted instead of an
+    // "invite" link — both verify the email and land the user on /welcome
+    // with a session so they can set their first password.
+    if (action === "resend_invite") {
+      const { user_id } = body;
+      if (!user_id) return json({ error: "USER_ID_REQUIRED" }, 400);
+
+      const { data: target } = await admin
+        .from("user_profiles")
+        .select("email, first_name, org_id, account_status")
+        .eq("auth_user_id", user_id)
+        .maybeSingle();
+
+      if (!target) return json({ error: "NOT_FOUND" }, 404);
+      if (!callerIsSuper && target.org_id !== callerOrgId(caller)) {
+        return json({ error: "ORG_SCOPE_VIOLATION" }, 403);
+      }
+      if (target.account_status !== "pending_activation") {
+        return json({ error: "USER_NOT_PENDING_ACTIVATION" }, 400);
+      }
+
+      const redirectTo = welcomeRedirectUrl(req);
+
+      if (Deno.env.get("RESEND_API_KEY")) {
+        const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+          type: "recovery",
+          email: target.email,
+          options: { redirectTo },
+        });
+        if (linkErr || !linkData?.properties?.action_link) {
+          return json({ error: linkErr?.message ?? "LINK_GENERATION_FAILED" }, 500);
+        }
+        const sent = await sendInviteEmail({
+          to: target.email,
+          firstName: target.first_name,
+          actionLink: linkData.properties.action_link,
+          subject: "Your Axentra invite link",
+        });
+        if (!sent.ok) {
+          console.error("invite email resend failed", sent.detail);
+          return json({ error: "EMAIL_SEND_FAILED" }, 500);
+        }
+      } else {
+        // No Resend key: Supabase's built-in recovery email still delivers a
+        // working set-password link (generic template).
+        const { error: resetErr } = await admin.auth.resetPasswordForEmail(
+          target.email,
+          { redirectTo }
+        );
+        if (resetErr) return json({ error: resetErr.message }, 500);
+      }
+
+      await writeAudit(admin, caller, "resend_invite", {
+        target_user_id: user_id,
+        target_org_id: target.org_id,
+      });
+
+      return json({ success: true });
     }
 
     // ── UPDATE PROFILE ──
