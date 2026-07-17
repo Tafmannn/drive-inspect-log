@@ -166,6 +166,17 @@ function executionReason(cls: ExecutionClass, job: Job, execEval: ExecutableEval
 // ── Stage B: Deterministic sort within class ─────────────────────────
 
 function withinClassSort(a: RankedJob, b: RankedJob, lastDeliveryPostcode: string | null): number {
+  // 0. Admin-set run order (jobs.route_order) — explicit dispatcher intent
+  // beats every automatic heuristic. Jobs without one sort after ordered
+  // jobs and fall through to the heuristics below.
+  const aOrder = a.route_order ?? null;
+  const bOrder = b.route_order ?? null;
+  if (aOrder !== null || bOrder !== null) {
+    if (aOrder !== null && bOrder !== null && aOrder !== bOrder) return aOrder - bOrder;
+    if (aOrder !== null && bOrder === null) return -1;
+    if (aOrder === null && bOrder !== null) return 1;
+  }
+
   // 1. Workflow continuation: in_transit > pickup_complete > others
   const workflowPriority: Record<string, number> = {
     pickup_in_progress: 1,

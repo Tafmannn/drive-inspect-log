@@ -75,19 +75,11 @@ export function deriveTimingExceptions(
     // columns exist in the schema. Fallback to updated_at is the only option.
     const ts = j.updated_at;
 
-    if (
-      (j.status === "ready_for_pickup" || j.status === "assigned") &&
-      minutesAgo(ts) > T.readyForPickupNoStartMinutes
-    ) {
-      out.push(exc({
-        ...base, severity: "high", category: "timing",
-        title: "No pickup started",
-        detail: `${Math.round(minutesAgo(ts))}m since ready — threshold ${T.readyForPickupNoStartMinutes}m`,
-        createdAt: ts,
-        actionLabel: "View job", actionRoute: `/jobs/${j.id}`,
-      }, "no-pickup-started"));
-    }
-
+    // NOTE: newly created / assigned jobs (ready_for_pickup, assigned) are
+    // deliberately NOT flagged here. A "No pickup started" countdown used to
+    // fire 30 minutes after creation, which flooded admins with alerts for
+    // jobs that simply hadn't been scheduled to start yet. Timing alerts now
+    // begin only once a driver actually starts work on a job.
     if (j.status === "pickup_in_progress" && minutesAgo(ts) > T.pickupInProgressMinutes) {
       out.push(exc({
         ...base, severity: "high", category: "timing",
