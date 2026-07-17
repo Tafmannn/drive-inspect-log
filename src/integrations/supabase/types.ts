@@ -1356,6 +1356,7 @@ export type Database = {
           rate_per_mile: number | null
           route_distance_miles: number | null
           route_eta_minutes: number | null
+          route_order: number | null
           sheet_job_id: string | null
           sheet_row_index: number | null
           sort_order: number | null
@@ -1438,6 +1439,7 @@ export type Database = {
           rate_per_mile?: number | null
           route_distance_miles?: number | null
           route_eta_minutes?: number | null
+          route_order?: number | null
           sheet_job_id?: string | null
           sheet_row_index?: number | null
           sort_order?: number | null
@@ -1520,6 +1522,7 @@ export type Database = {
           rate_per_mile?: number | null
           route_distance_miles?: number | null
           route_eta_minutes?: number | null
+          route_order?: number | null
           sheet_job_id?: string | null
           sheet_row_index?: number | null
           sort_order?: number | null
@@ -2555,6 +2558,7 @@ export type Database = {
           rate_per_mile: number | null
           route_distance_miles: number | null
           route_eta_minutes: number | null
+          route_order: number | null
           sheet_job_id: string | null
           sheet_row_index: number | null
           sort_order: number | null

@@ -114,6 +114,8 @@ export interface Job {
   route_distance_miles?: number | null;
   route_eta_minutes?: number | null;
   maps_validated?: boolean;
+  /** Admin-set run order for the assigned driver's list; null = automatic. */
+  route_order?: number | null;
 }
 
 export interface Inspection {

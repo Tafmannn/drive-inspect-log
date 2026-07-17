@@ -23,6 +23,7 @@ import { AdminJobCard, type AdminJobRow } from "@/components/AdminJobCard";
 import { isJobStale } from "@/features/control/pages/jobs/jobsUtils";
 import { useAdminJobQueues, useAdminJobQueueKpis } from "@/hooks/useAdminJobQueues";
 import { AssignDriverModal } from "@/features/control/components/AssignDriverModal";
+import { RunOrderModal } from "@/features/control/components/RunOrderModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { qk } from "@/lib/queryKeys";
@@ -32,7 +33,7 @@ import { toast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   AlertTriangle, Truck, ClipboardCheck, CheckCircle, Search,
-  UserX, Clock, ImageOff, ShieldCheck,
+  UserX, Clock, ImageOff, ShieldCheck, ListOrdered,
 } from "lucide-react";
 
 type QueueFilter = "all" | "attention" | "stale" | "unassigned" | "evidence" | "in_progress" | "review" | "completed";
@@ -68,6 +69,7 @@ export function AdminJobsQueue() {
   const [assignTarget, setAssignTarget] = useState<{
     jobId: string; jobRef: string; driverId: string | null;
   } | null>(null);
+  const [runOrderOpen, setRunOrderOpen] = useState(false);
 
   const actions = {
     onView: (job: AdminJobRow) => navigate(`/jobs/${job.id}`),
@@ -124,7 +126,18 @@ export function AdminJobsQueue() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <AppHeader title="Admin Jobs" showBack onBack={() => navigate("/admin")} />
+      <AppHeader title="Admin Jobs" showBack onBack={() => navigate("/admin")}>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="min-h-[44px] gap-1.5 text-xs text-muted-foreground hover:bg-muted"
+          onClick={() => setRunOrderOpen(true)}
+          aria-label="Set driver run order"
+        >
+          <ListOrdered className="h-4 w-4" />
+          Run Order
+        </Button>
+      </AppHeader>
 
       <div className="p-4 max-w-lg mx-auto space-y-4">
         {/* ── KPI STRIP ── */}
@@ -268,6 +281,9 @@ export function AdminJobsQueue() {
           </>
         )}
       </div>
+
+      {/* ── RUN ORDER MODAL ── */}
+      <RunOrderModal open={runOrderOpen} onOpenChange={setRunOrderOpen} />
 
       {/* ── ASSIGN MODAL ── */}
       {assignTarget && (
