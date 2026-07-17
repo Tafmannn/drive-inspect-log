@@ -17,10 +17,9 @@ export const ForgotPassword = () => {
     setError(null);
     setLoading(true);
     try {
-      const { error: err } = await supabase.auth.resetPasswordForEmail(
-        email.trim(),
-        { redirectTo: `${window.location.origin}/reset-password` }
-      );
+      const { error: err } = await supabase.functions.invoke("request-password-reset", {
+        body: { email: email.trim() },
+      });
       if (err) throw err;
       setSent(true);
     } catch (err: unknown) {
