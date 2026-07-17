@@ -45,6 +45,8 @@ import {
   type EligibleJob,
 } from "../hooks/useInvoicePrepData";
 import { useCreateInvoice } from "../hooks/useCreateInvoice";
+import { useInvoices, invoiceRecordToPdfData } from "../hooks/useInvoices";
+import type { Client } from "@/lib/clientApi";
 import { getOrgId } from "@/lib/orgHelper";
 import { WarningCallout, RoleScope } from "@/components/ui-kit";
 import { useClients } from "@/hooks/useClients";
@@ -74,7 +76,7 @@ import {
   downloadBlob,
   type ReceiptDiscoveryResult,
 } from "../api/receiptExport";
-import { generateInvoicePdf, type InvoiceData } from "@/lib/invoicePdf";
+import { generateInvoicePdf, downloadInvoicePdf, type InvoiceData } from "@/lib/invoicePdf";
 import { cn } from "@/lib/utils";
 
 function fmtGbp(n: number): string {
@@ -112,7 +114,22 @@ export function InvoicePrepScreen() {
   // Auth & invoice creation
   const { user } = useAuth();
   const createInvoice = useCreateInvoice();
-  const [createdInvoiceNumber, setCreatedInvoiceNumber] = useState<string | null>(null);
+  // Full snapshot of what was just invoiced. Job selection is cleared after
+  // creation (the jobs stop being eligible), so the download buttons must
+  // work from this snapshot, not from the live selection.
+  const [createdInvoice, setCreatedInvoice] = useState<{
+    invoiceNumber: string;
+    client: Client;
+    jobs: EligibleJob[];
+    vatRate: number;
+    total: number;
+  } | null>(null);
+  const createdInvoiceNumber = createdInvoice?.invoiceNumber ?? null;
+  const [isDownloadingInvoicePdf, setIsDownloadingInvoicePdf] = useState(false);
+
+  // Previously created invoices (re-downloadable at any time)
+  const { data: recentInvoices, isLoading: invoicesLoading } = useInvoices();
+  const [downloadingInvoiceId, setDownloadingInvoiceId] = useState<string | null>(null);
 
   // Receipt export state
   const [receiptDiscovery, setReceiptDiscovery] = useState<ReceiptDiscoveryResult | null>(null);
@@ -177,8 +194,28 @@ export function InvoicePrepScreen() {
   const handleClientChange = (id: string | null) => {
     setSelectedClientId(id);
     setSelectedJobIds(new Set());
-    setCreatedInvoiceNumber(null);
+    setCreatedInvoice(null);
   };
+
+  const buildInvoicePdfData = (
+    invoiceNumber: string,
+    client: Client,
+    invoiceJobs: EligibleJob[],
+    rate: number
+  ): InvoiceData => ({
+    invoiceNumber,
+    issueDate: new Date().toISOString(),
+    clientName: client.name,
+    clientCompany: client.company || undefined,
+    clientEmail: client.email || undefined,
+    clientAddress: client.address || undefined,
+    vatRate: rate,
+    lineItems: invoiceJobs.map((j) => ({
+      description: "Vehicle transport - " + j.vehicle_reg + " (" + j.vehicle_make + " " + j.vehicle_model + ")",
+      quantity: 1,
+      unitPrice: j.total_price ?? 0,
+    })),
+  });
 
   // Create invoice handler
   const handleCreateInvoice = async () => {
@@ -200,7 +237,13 @@ export function InvoicePrepScreen() {
         vatRate,
         orgId,
       });
-      setCreatedInvoiceNumber(result.invoiceNumber);
+      setCreatedInvoice({
+        invoiceNumber: result.invoiceNumber,
+        client: selectedClient,
+        jobs: selectedJobs,
+        vatRate,
+        total: preview.total,
+      });
       setSelectedJobIds(new Set());
       toast({
         title: "Invoice Created",
@@ -212,6 +255,79 @@ export function InvoicePrepScreen() {
         description: err.message || "Something went wrong.",
         variant: "destructive",
       });
+    }
+  };
+
+  // Download the just-created invoice as a PDF (from the creation snapshot)
+  const handleDownloadCreatedInvoice = async () => {
+    if (!createdInvoice) return;
+    setIsDownloadingInvoicePdf(true);
+    try {
+      await downloadInvoicePdf(
+        buildInvoicePdfData(
+          createdInvoice.invoiceNumber,
+          createdInvoice.client,
+          createdInvoice.jobs,
+          createdInvoice.vatRate
+        )
+      );
+      toast({ title: "Invoice PDF Downloaded", description: createdInvoice.invoiceNumber });
+    } catch (err: any) {
+      toast({ title: "Download Failed", description: err.message || "Unknown error", variant: "destructive" });
+    } finally {
+      setIsDownloadingInvoicePdf(false);
+    }
+  };
+
+  // Download the just-created invoice as a full pack (PDF + receipts)
+  const handleDownloadCreatedPack = async () => {
+    if (!createdInvoice) return;
+    setIsDownloadingPack(true);
+    try {
+      const pdfBlob = await generateInvoicePdf(
+        buildInvoicePdfData(
+          createdInvoice.invoiceNumber,
+          createdInvoice.client,
+          createdInvoice.jobs,
+          createdInvoice.vatRate
+        )
+      );
+      const discovery = await discoverReceipts(createdInvoice.jobs);
+      const { blob, succeeded, failed } = await buildInvoicePack(
+        pdfBlob,
+        createdInvoice.invoiceNumber,
+        discovery.files
+      );
+      downloadBlob(blob, "invoice_pack_" + createdInvoice.invoiceNumber + ".zip");
+      const desc = "PDF + " + succeeded + " receipt(s)";
+      if (failed.length > 0) {
+        toast({
+          title: "Pack Downloaded (" + failed.length + " receipts failed)",
+          description: desc,
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Invoice Pack Downloaded", description: desc });
+      }
+    } catch (err: any) {
+      toast({ title: "Pack Download Failed", description: err.message || "Unknown error", variant: "destructive" });
+    } finally {
+      setIsDownloadingPack(false);
+    }
+  };
+
+  // Download any previously created invoice, rebuilt from its stored row
+  const handleDownloadStoredInvoice = async (invoiceId: string) => {
+    const record = recentInvoices?.find((i) => i.id === invoiceId);
+    if (!record) return;
+    setDownloadingInvoiceId(invoiceId);
+    try {
+      await downloadInvoicePdf(invoiceRecordToPdfData(record));
+      toast({ title: "Invoice PDF Downloaded", description: record.invoice_number });
+    } catch (err: any) {
+      toast({ title: "Download Failed", description: err.message || "Unknown error", variant: "destructive" });
+    } finally {
+      setDownloadingInvoiceId(null);
     }
   };
 
@@ -593,6 +709,54 @@ export function InvoicePrepScreen() {
         </>
       )}
 
+      {/* Created-invoice success card — independent of job selection, which
+          is cleared on creation. This is where the invoice gets downloaded. */}
+      {createdInvoice && (
+        <div className="p-4 rounded-lg border border-success/30 bg-success/5 space-y-3">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
+            <div>
+              <p className="text-sm text-foreground font-semibold">
+                Invoice {createdInvoice.invoiceNumber} created
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {createdInvoice.client.name} · {createdInvoice.jobs.length} job
+                {createdInvoice.jobs.length !== 1 ? "s" : ""} · {fmtGbp(createdInvoice.total)}
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              onClick={handleDownloadCreatedInvoice}
+              disabled={isDownloadingInvoicePdf}
+              size="sm"
+              className="gap-1.5"
+            >
+              {isDownloadingInvoicePdf ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              Download Invoice PDF
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadCreatedPack}
+              disabled={isDownloadingPack}
+              className="gap-1.5"
+            >
+              {isDownloadingPack ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Package className="h-4 w-4" />
+              )}
+              Download Pack (PDF + Receipts)
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Step 3: Preview totals */}
       {selectedJobs.length > 0 && (
         <>
@@ -713,16 +877,6 @@ export function InvoicePrepScreen() {
                 </Button>
               </div>
 
-              {/* Success banner */}
-              {createdInvoiceNumber && (
-                <div className="flex items-center gap-2.5 p-3 rounded-lg border border-success/30 bg-success/5">
-                  <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
-                  <p className="text-sm text-success font-medium">
-                    Invoice {createdInvoiceNumber} created successfully.
-                  </p>
-                </div>
-              )}
-
               {/* Receipt Export Section */}
               <Separator />
               <div className="space-y-3">
@@ -821,6 +975,98 @@ export function InvoicePrepScreen() {
           </ControlSection>
         </>
       )}
+
+      {/* Created invoices — download any invoice again at any time */}
+      <ControlSection
+        title="Created Invoices"
+        description="Download the PDF for any previously created invoice"
+        flush
+      >
+        {invoicesLoading ? (
+          <div className="p-6 text-center text-sm text-muted-foreground">
+            Loading invoices…
+          </div>
+        ) : !recentInvoices || recentInvoices.length === 0 ? (
+          <div className="p-6 text-center text-sm text-muted-foreground">
+            No invoices created yet.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-[11px] font-medium uppercase tracking-wider">
+                    Invoice
+                  </TableHead>
+                  <TableHead className="text-[11px] font-medium uppercase tracking-wider">
+                    Client
+                  </TableHead>
+                  <TableHead className="text-[11px] font-medium uppercase tracking-wider">
+                    Date
+                  </TableHead>
+                  <TableHead className="text-[11px] font-medium uppercase tracking-wider text-right">
+                    Total
+                  </TableHead>
+                  <TableHead className="text-[11px] font-medium uppercase tracking-wider text-right">
+                    PDF
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {recentInvoices.map((inv) => (
+                  <TableRow key={inv.id}>
+                    <TableCell>
+                      <span className="text-sm font-medium text-foreground">
+                        {inv.invoice_number}
+                      </span>
+                      {inv.status && (
+                        <Badge variant="outline" className="ml-2 text-[9px] capitalize">
+                          {inv.status}
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-xs text-foreground">{inv.client_name}</span>
+                      {inv.client_company && (
+                        <span className="text-xs text-muted-foreground ml-1.5">
+                          {inv.client_company}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-xs text-muted-foreground">
+                        {shortDate(inv.issue_date || inv.created_at)}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <span className="text-sm font-semibold tabular-nums text-foreground">
+                        {inv.total != null ? fmtGbp(Number(inv.total)) : "—"}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownloadStoredInvoice(inv.id)}
+                        disabled={downloadingInvoiceId === inv.id}
+                        className="gap-1.5 text-xs h-7"
+                        aria-label={`Download invoice ${inv.invoice_number}`}
+                      >
+                        {downloadingInvoiceId === inv.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Download className="h-3.5 w-3.5" />
+                        )}
+                        Download
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </ControlSection>
     </ControlShell>
   );
 }
