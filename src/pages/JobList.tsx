@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { DriverJobCard, mapsUrl } from "@/components/DriverJobCard";
 import { SwipeableRow, type SwipeAction } from "@/components/SwipeableRow";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import { DeviationPrompt } from "@/components/DeviationPrompt";
 import { rankJobs, type RankedJob } from "@/lib/executionRanking";
 import { deriveJobSummaries, type DriverJobSummary } from "@/lib/driverJobSummary";
@@ -24,7 +25,7 @@ export const JobList = () => {
   const navigate = useNavigate();
   const { user, isAdmin, isSuperAdmin } = useAuth();
   const gate = useDriverGate();
-  const { data: jobs, isLoading } = useActiveJobs();
+  const { data: jobs, isLoading, refetch } = useActiveJobs();
   const [deviation, setDeviation] = useState<{
     target: DriverJobSummary;
     recommended: DriverJobSummary;
@@ -91,6 +92,7 @@ export const JobList = () => {
         </RoleScope>
       </AppHeader>
 
+      <PullToRefresh onRefresh={() => refetch()}>
       <div className="p-4 max-w-lg mx-auto">
         {isLoading && <DashboardSkeleton />}
 
@@ -147,6 +149,7 @@ export const JobList = () => {
           );
         })}
       </div>
+      </PullToRefresh>
 
       {deviation && (
         <DeviationPrompt
