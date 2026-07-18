@@ -40,6 +40,7 @@ import { createQrConfirmation, getQrConfirmationsForJob, buildQrUrl, type QrConf
 import { QrDisplayModal } from "@/components/QrDisplayModal";
 import { useAuth } from "@/context/AuthContext";
 import { getStatusStyle } from "@/lib/statusConfig";
+import { logClientEvent } from "@/lib/logger";
 
 import { PhotoViewer } from "@/components/PhotoViewer";
 import { resolveMediaUrlAsync } from "@/lib/mediaResolver";
@@ -164,7 +165,10 @@ export const JobDetail = () => {
 
       // Retry pass after 2s for any failures
       if (failed.length > 0 && !cancelled) {
-        console.info('[JobDetail] Retrying ' + failed.length + ' failed photos');
+        void logClientEvent("job_detail_photo_retry", "info", {
+          jobId, source: "storage", type: "upload",
+          context: { failedCount: failed.length },
+        });
         await new Promise(r => setTimeout(r, 2000));
         await Promise.all(
           failed.map(async (p: any) => {
@@ -173,11 +177,17 @@ export const JobDetail = () => {
               if (!cancelled && resolved) {
                 setResolvedPhotos(prev => ({ ...prev, [p.id]: resolved }));
               } else if (!cancelled) {
-                console.warn('[JobDetail] Photo failed after retry', { id: p.id, url: (p.url || '').slice(0, 80) });
+                void logClientEvent("job_detail_photo_failed", "warn", {
+                  jobId, source: "storage", type: "upload",
+                  context: { photoId: p.id },
+                });
               }
             } catch {
               if (!cancelled) {
-                console.warn('[JobDetail] Photo exception after retry', { id: p.id });
+                void logClientEvent("job_detail_photo_exception", "warn", {
+                  jobId, source: "storage", type: "upload",
+                  context: { photoId: p.id },
+                });
               }
             }
           })
@@ -368,78 +378,71 @@ export const JobDetail = () => {
           </div>
         )}
 
-        {/* ── 3. PICKUP ── */}
-        <Section>
-          <SectionLabel>Collect From</SectionLabel>
-          <ContactRow icon={Building} text={job.pickup_contact_name} />
-          {job.pickup_company && (
-            <span className="text-xs text-foreground/70 pl-6 font-medium">{job.pickup_company}</span>
+        {/* ── NEXT STEP — the primary action, surfaced at the top ── */}
+        <div className="p-4 rounded-xl bg-card border border-border shadow-sm space-y-3">
+          <div className="flex items-center gap-2">
+            {isBlocked ? (
+              <AlertTriangle className="h-4 w-4 text-muted-foreground shrink-0" />
+            ) : (
+              <span className={`h-2 w-2 rounded-full shrink-0 ${isReviewOnly ? "bg-muted-foreground" : "bg-primary"}`} />
+            )}
+            <span className="text-sm font-medium text-foreground">
+              {isBlocked
+                ? `Blocked — ${execEval.reason}`
+                : isReviewOnly
+                  ? (execEval.reason || "Awaiting review")
+                  : `Next: ${primaryCta.label}`}
+            </span>
+          </div>
+          {!isBlocked && (
+            <Button
+              className="w-full min-h-[48px] rounded-lg text-base"
+              variant={isReviewOnly ? "outline" : "default"}
+              onClick={() => navigate(
+                isReviewOnly
+                  ? withFrom(`/jobs/${job.id}/pod`, searchParams)
+                  : withFrom(primaryCta.route(job.id), searchParams)
+              )}
+            >
+              {isReviewOnly ? "View POD" : primaryCta.label}
+              <ChevronRight className="ml-1 h-5 w-5" />
+            </Button>
           )}
-          <ContactRow icon={Phone} text={job.pickup_contact_phone} href={`tel:${job.pickup_contact_phone}`} />
-          <ContactRow icon={MapPin} text={pickupAddr} href={mapsUrl(pickupAddr)} external />
-          {job.pickup_time_from && (
-            <p className="text-xs text-foreground/70 pl-6">
-              Time: {job.pickup_time_from}{job.pickup_time_to ? ` – ${job.pickup_time_to}` : ""}
-            </p>
-          )}
-          {job.pickup_notes && <NoteStrip text={job.pickup_notes} />}
-          {job.pickup_access_notes && <NoteStrip text={`Access: ${job.pickup_access_notes}`} />}
-          {/* Navigate action */}
-          <Button
-            variant="outline"
-            size="sm"
-            className="mt-2 min-h-[44px] w-full rounded-lg"
-            onClick={() => window.open(mapsNavUrl(pickupAddr), "_blank")}
-          >
-            <Navigation className="h-4 w-4 mr-1.5" /> Navigate to Pickup
-          </Button>
-        </Section>
+        </div>
 
-        {/* ── 4. DELIVERY ── */}
-        <Section>
-          <SectionLabel>Deliver To</SectionLabel>
-          <ContactRow icon={Building} text={job.delivery_contact_name} />
-          {job.delivery_company && (
-            <span className="text-xs text-foreground/70 pl-6 font-medium">{job.delivery_company}</span>
-          )}
-          <ContactRow icon={Phone} text={job.delivery_contact_phone} href={`tel:${job.delivery_contact_phone}`} />
-          <ContactRow icon={MapPin} text={deliveryAddr} href={mapsUrl(deliveryAddr)} external />
-          {job.delivery_time_from && (
-            <p className="text-xs text-foreground/70 pl-6">
-              Time: {job.delivery_time_from}{job.delivery_time_to ? ` – ${job.delivery_time_to}` : ""}
-            </p>
-          )}
-          {job.delivery_notes && <NoteStrip text={job.delivery_notes} />}
-          {job.delivery_access_notes && <NoteStrip text={`Access: ${job.delivery_access_notes}`} />}
-          <Button
-            variant="outline"
-            size="sm"
-            className="mt-2 min-h-[44px] w-full rounded-lg"
-            onClick={() => window.open(mapsNavUrl(deliveryAddr), "_blank")}
-          >
-            <Navigation className="h-4 w-4 mr-1.5" /> Navigate to Delivery
-          </Button>
-        </Section>
+        {/* ── COLLECT FROM ── */}
+        <LegCard
+          title="Collect From"
+          accent="primary"
+          contactName={job.pickup_contact_name}
+          company={job.pickup_company}
+          address={pickupAddr}
+          timeFrom={job.pickup_time_from}
+          timeTo={job.pickup_time_to}
+          notes={job.pickup_notes}
+          accessNotes={job.pickup_access_notes}
+          phone={job.pickup_contact_phone}
+        />
 
-        {/* ── 5. INSPECTIONS ── */}
+        {/* ── DELIVER TO ── */}
+        <LegCard
+          title="Deliver To"
+          accent="success"
+          contactName={job.delivery_contact_name}
+          company={job.delivery_company}
+          address={deliveryAddr}
+          timeFrom={job.delivery_time_from}
+          timeTo={job.delivery_time_to}
+          notes={job.delivery_notes}
+          accessNotes={job.delivery_access_notes}
+          phone={job.delivery_contact_phone}
+        />
+
+        {/* ── INSPECTIONS (status only — action lives in Next step) ── */}
         <Section>
           <SectionLabel>Inspections</SectionLabel>
-          <InspectionRow
-            label="Pickup Inspection"
-            done={!!pickupInspection}
-            onAction={() => navigate(withFrom(`/inspection/${job.id}/pickup`, searchParams))}
-            actionIcon={ClipboardCheck}
-            warning={isBlocked ? execEval.reason : undefined}
-            blocked={isBlocked}
-          />
-          <InspectionRow
-            label="Delivery Inspection"
-            done={!!deliveryInspection}
-            onAction={() => navigate(withFrom(`/inspection/${job.id}/delivery`, searchParams))}
-            actionIcon={Truck}
-            warning={isBlocked || isReviewOnly ? (execEval.reason || "Awaiting review") : undefined}
-            blocked={isBlocked}
-          />
+          <StatusLine label="Pickup Inspection" done={!!pickupInspection} />
+          <StatusLine label="Delivery Inspection" done={!!deliveryInspection} />
         </Section>
 
         {/* ── 6. QR HANDOVER ── */}
@@ -481,34 +484,8 @@ export const JobDetail = () => {
           </Section>
         )}
 
-        {/* ── 8. ACTIONS ── */}
+        {/* ── ACTIONS (secondary — primary lives in the Next step card up top) ── */}
         <div className="space-y-2 pb-4">
-          {/* Executable state banner */}
-          {(isBlocked || isReviewOnly) && (
-            <div className="flex items-center gap-2 p-3 rounded-xl bg-muted/60 border border-border">
-              <AlertTriangle className="h-4 w-4 text-muted-foreground shrink-0" />
-              <span className="text-xs text-muted-foreground font-medium">
-                {isBlocked ? `Blocked: ${execEval.reason}` : execEval.reason}
-              </span>
-            </div>
-          )}
-
-          {/* Primary CTA — hidden for blocked, view-only for review */}
-          {!isBlocked && (
-            <Button
-              className="w-full min-h-[44px] rounded-lg"
-              variant={isReviewOnly ? "outline" : "default"}
-              onClick={() => navigate(
-                isReviewOnly
-                  ? withFrom(`/jobs/${job.id}/pod`, searchParams)
-                  : withFrom(primaryCta.route(job.id), searchParams)
-              )}
-            >
-              {isReviewOnly ? "View POD" : primaryCta.label}
-              <ChevronRight className="ml-1 h-4 w-4" />
-            </Button>
-          )}
-
           {/* Secondary: Expenses */}
           <div className="flex gap-2">
             <Button variant="outline" size="sm" className="flex-1 min-h-[44px] rounded-lg" onClick={() => navigate(withFrom(`/expenses?jobId=${job.id}`, searchParams))}>
@@ -684,6 +661,85 @@ function ContactRow({
 function NoteStrip({ text }: { text: string }) {
   return (
     <p className="text-xs text-muted-foreground italic pl-6 leading-snug">{text}</p>
+  );
+}
+
+/**
+ * A route leg (Collect From / Deliver To) as a card with a coloured left
+ * accent so pickup and delivery read apart at a glance, plain-text address,
+ * and one clear Call + Navigate action pair (replacing the old tiny tel:/maps
+ * text links and the duplicate full-width navigate button).
+ */
+function LegCard({
+  title, accent, contactName, company, address, timeFrom, timeTo, notes, accessNotes, phone,
+}: {
+  title: string;
+  accent: "primary" | "success";
+  contactName: string;
+  company?: string | null;
+  address: string;
+  timeFrom?: string | null;
+  timeTo?: string | null;
+  notes?: string | null;
+  accessNotes?: string | null;
+  phone?: string | null;
+}) {
+  const borderClass = accent === "primary" ? "border-l-primary" : "border-l-success";
+  const dotClass = accent === "primary" ? "bg-primary" : "bg-success";
+  return (
+    <div className={`p-4 rounded-xl bg-card border border-border border-l-4 ${borderClass} shadow-sm space-y-2`}>
+      <h3 className="text-[14px] font-semibold text-muted-foreground flex items-center gap-1.5 mb-1">
+        <span className={`h-2 w-2 rounded-full ${dotClass}`} /> {title}
+      </h3>
+      <ContactRow icon={Building} text={contactName} />
+      {company && <span className="text-xs text-foreground/70 pl-6 font-medium">{company}</span>}
+      <div className="flex items-start gap-2 min-h-[36px]">
+        <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+        <span className="text-sm text-foreground">{address}</span>
+      </div>
+      {timeFrom && (
+        <p className="text-xs text-foreground/70 pl-6">
+          Time: {timeFrom}{timeTo ? ` – ${timeTo}` : ""}
+        </p>
+      )}
+      {notes && <NoteStrip text={notes} />}
+      {accessNotes && <NoteStrip text={`Access: ${accessNotes}`} />}
+      <div className="flex gap-2 mt-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="flex-1 min-h-[44px] rounded-lg"
+          disabled={!phone}
+          onClick={() => { if (phone) window.location.href = `tel:${phone}`; }}
+        >
+          <Phone className="h-4 w-4 mr-1.5" /> Call
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="flex-1 min-h-[44px] rounded-lg"
+          onClick={() => window.open(mapsNavUrl(address), "_blank")}
+        >
+          <Navigation className="h-4 w-4 mr-1.5" /> Navigate
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** A read-only inspection status row (the action now lives in the Next-step card). */
+function StatusLine({ label, done }: { label: string; done: boolean }) {
+  return (
+    <div className="flex items-center justify-between min-h-[36px]">
+      <span className="text-sm text-foreground">{label}</span>
+      <span
+        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase leading-none ${
+          done ? "bg-success text-success-foreground" : "border border-border text-muted-foreground"
+        }`}
+      >
+        {done ? "Complete" : "Pending"}
+      </span>
+    </div>
   );
 }
 
