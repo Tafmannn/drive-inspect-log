@@ -187,10 +187,17 @@ export function SuperAdminUsers() {
   useEffect(() => { load(); }, [load]);
 
   const handleCreate = async () => {
-    if (!newEmail.trim() || !newOrgId) return;
+    const trimmedEmail = newEmail.trim();
+    if (!trimmedEmail || !newOrgId) return;
+    // Validate before the round-trip — GoTrue rejects malformed addresses
+    // with an opaque error, so catch the obvious cases client-side.
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      toast({ title: "Please enter a valid email address", variant: "destructive" });
+      return;
+    }
     setCreating(true);
     try {
-      await createUser(newEmail.trim(), newRole, newOrgId);
+      await createUser(trimmedEmail, newRole, newOrgId);
       toast({ title: `User invited as ${newRole}` });
       setNewEmail(""); setNewRole("driver"); setNewOrgId(""); setShowCreate(false); load();
     } catch (e: any) { toast({ title: "Failed", description: e.message, variant: "destructive" }); } finally { setCreating(false); }
