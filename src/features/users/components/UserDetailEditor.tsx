@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import {
   useUserDetail, useUpdateProfile, useUpdateDriverProfile, useSetUserRole,
   useActivateUser, useSuspendUser, useReactivateUser, useArchiveDriver, useRestoreDriver,
+  useResendInvite,
 } from "@/hooks/useUserManagement";
 import type { UserProfile } from "@/lib/userLifecycleApi";
 import { EMPLOYMENT_TYPES } from "@/lib/driverProfileConstants";
@@ -21,7 +22,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Loader2, Save, Shield, ShieldOff, Archive, RotateCcw, UserCheck } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Shield, ShieldOff, Archive, RotateCcw, UserCheck, Mail } from "lucide-react";
 
 interface UserDetailEditorProps {
   userId: string;
@@ -39,6 +40,7 @@ export function UserDetailEditor({ userId, onBack }: UserDetailEditorProps) {
   const reactivateMutation = useReactivateUser();
   const archiveMutation = useArchiveDriver();
   const restoreMutation = useRestoreDriver();
+  const resendInviteMutation = useResendInvite();
 
   const [form, setForm] = useState({
     first_name: "",
@@ -221,12 +223,20 @@ export function UserDetailEditor({ userId, onBack }: UserDetailEditorProps) {
 
         <div className="flex flex-wrap gap-2">
           {user.account_status === "pending_activation" && (
-            <ConfirmAction
-              title="Activate User"
-              description="This will allow the user to access the application."
-              trigger={<Button size="sm" className="h-7 text-xs" disabled={isMutating}><UserCheck className="h-3 w-3 mr-1" /> Activate</Button>}
-              onConfirm={() => activateMutation.mutate(userId)}
-            />
+            <>
+              <ConfirmAction
+                title="Activate User"
+                description="This will allow the user to access the application."
+                trigger={<Button size="sm" className="h-7 text-xs" disabled={isMutating}><UserCheck className="h-3 w-3 mr-1" /> Activate</Button>}
+                onConfirm={() => activateMutation.mutate(userId)}
+              />
+              <ConfirmAction
+                title="Resend Invite"
+                description="This will email the user a fresh link to set their password. Any previous invite link stops working."
+                trigger={<Button size="sm" variant="outline" className="h-7 text-xs" disabled={isMutating || resendInviteMutation.isPending}><Mail className="h-3 w-3 mr-1" /> Resend Invite</Button>}
+                onConfirm={() => resendInviteMutation.mutate(userId)}
+              />
+            </>
           )}
 
           {user.account_status === "active" && !isProtected && (

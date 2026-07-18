@@ -3,6 +3,7 @@ import {
   listUsers,
   getUser,
   createUser,
+  resendInvite,
   updateProfile,
   updateDriverProfile,
   setUserRole,
@@ -52,6 +53,15 @@ export function useCreateUser() {
   return useMutation({
     mutationFn: (params: Parameters<typeof createUser>[0]) => createUser(params),
     onSuccess: () => onSuccess(qc, "User created"),
+    onError,
+  });
+}
+
+export function useResendInvite() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => resendInvite(userId),
+    onSuccess: () => onSuccess(qc, "Invite email sent"),
     onError,
   });
 }
