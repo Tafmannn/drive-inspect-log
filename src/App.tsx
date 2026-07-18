@@ -38,6 +38,7 @@ import { Login } from "./pages/Login";
 import OAuthConsent from "./pages/OAuthConsent";
 import { ForgotPassword } from "./pages/ForgotPassword";
 import { ResetPassword } from "./pages/ResetPassword";
+import { Welcome } from "./pages/Welcome";
 import NotFound from "./pages/NotFound";
 import DriverOnboardingWizard from "./features/onboarding/pages/DriverOnboardingWizard";
 import ClientOnboardingWizard from "./features/onboarding/pages/ClientOnboardingWizard";
@@ -246,6 +247,7 @@ const App = () => {
                 <Route path="/index" element={<Navigate to="/" replace />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/welcome" element={<Welcome />} />
                 <Route path="/confirm" element={<QrConfirm />} />
                 <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
 
