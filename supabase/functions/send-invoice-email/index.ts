@@ -11,9 +11,9 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-// Only http(s) links belong in the "Download POD" button. Reject anything else
-// (javascript:, data:, etc.) so a malformed/hostile downloadUrl can never become
-// a live link, and attribute-escape the value like every other interpolation.
+// Only http(s) links belong in the "Download Invoice" button. Reject anything
+// else (javascript:, data:, etc.) so a malformed/hostile downloadUrl can never
+// become a live link, and attribute-escape it like every other interpolation.
 function safeHref(url: string): string | null {
   try {
     const parsed = new URL(url);
@@ -24,23 +24,25 @@ function safeHref(url: string): string | null {
   }
 }
 
+function fmtGbp(n: number): string {
+  return `£${n.toFixed(2)}`;
+}
+
 function renderHtml(opts: {
-  jobRef: string;
-  vehicleReg: string;
-  pickupCity: string;
-  deliveryCity: string;
-  dateStr: string;
+  invoiceNumber: string;
+  clientName: string;
+  total: number | null;
+  issueDate: string;
+  dueDate: string | null;
   downloadHref: string;
-  photosHref: string | null;
 }): string {
-  const { jobRef, vehicleReg, pickupCity, deliveryCity, dateStr, downloadHref, photosHref } = opts;
-  const photosLink = photosHref
-    ? `<p style="margin:0 0 16px;text-align:center;">
-                  <a href="${photosHref}" style="color:#6b7280;font-size:13px;text-decoration:underline;">
-                    Download original photos (optional)
-                  </a>
-                </p>`
+  const { invoiceNumber, clientName, total, issueDate, dueDate, downloadHref } = opts;
+  const dueLine = dueDate
+    ? `<p style="margin:0 0 4px;"><strong>Due date:</strong> ${escapeHtml(dueDate)}</p>`
     : "";
+  const totalLine = total != null
+    ? `<p style="margin:0 0 24px;"><strong>Amount due:</strong> ${escapeHtml(fmtGbp(total))}</p>`
+    : `<p style="margin:0 0 24px;"></p>`;
   return `<!doctype html>
 <html>
   <body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
@@ -55,22 +57,21 @@ function renderHtml(opts: {
             </tr>
             <tr>
               <td style="padding:32px;color:#1f2937;font-size:15px;line-height:1.6;">
-                <p style="margin:0 0 16px;">Dear Customer,</p>
+                <p style="margin:0 0 16px;">Dear ${escapeHtml(clientName || "Customer")},</p>
                 <p style="margin:0 0 16px;">
-                  Please find your Proof of Delivery for job <strong>${escapeHtml(jobRef)}</strong>
-                  (${escapeHtml(vehicleReg)}) below.
+                  Please find your invoice <strong>${escapeHtml(invoiceNumber)}</strong> below.
                 </p>
-                <p style="margin:0 0 4px;"><strong>Route:</strong> ${escapeHtml(pickupCity)} &rarr; ${escapeHtml(deliveryCity)}</p>
-                <p style="margin:0 0 24px;"><strong>Date:</strong> ${escapeHtml(dateStr)}</p>
+                <p style="margin:0 0 4px;"><strong>Invoice date:</strong> ${escapeHtml(issueDate)}</p>
+                ${dueLine}
+                ${totalLine}
                 <p style="margin:0 0 24px;text-align:center;">
                   <a href="${downloadHref}"
                      style="background:#111827;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:bold;display:inline-block;">
-                    Download POD
+                    Download Invoice
                   </a>
                 </p>
-                ${photosLink}
-                <p style="margin:0 0 16px;color:#6b7280;font-size:13px;">Link(s) expire in 30 days.</p>
-                <p style="margin:0 0 16px;">If you have any queries, please do not hesitate to contact us.</p>
+                <p style="margin:0 0 16px;color:#6b7280;font-size:13px;">Link expires in 30 days.</p>
+                <p style="margin:0 0 16px;">Payment details are shown on the invoice. Please use the invoice number as your payment reference.</p>
                 <p style="margin:24px 0 0;">Kind regards,<br/>Axentra Vehicle Logistics<br/>info@axentravehicles.com</p>
               </td>
             </tr>
@@ -88,13 +89,23 @@ serve(async (req) => {
   }
 
   try {
-    // ─── Auth: requires a real signed-in user with a resolvable org (this
-    // sends email — and reads job contact details — on the org's behalf,
-    // never a public/anon action). Same authoritative caller/org resolution
-    // as every other edge function, via _shared/auth.ts.
     const authResult = await authenticateCaller(req);
     if ("error" in authResult) return authResult.error;
     const { caller, admin } = authResult;
+
+    // ─── Invoicing is an admin capability throughout the app (all invoice
+    // screens are admin-routed and invoices RLS is admin-only for writes).
+    // Requiring admin here is also what makes the free-recipient rule below
+    // safe: unlike send-pod-email, whose callers include drivers and which
+    // therefore pins recipients to on-file contacts, this function trusts
+    // the org's admins to direct their own invoices — the confirm dialog in
+    // the UI is the safeguard against typos.
+    if (!caller.isAdmin && !caller.isSuperAdmin) {
+      return new Response(
+        JSON.stringify({ error: "FORBIDDEN" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
     if (!RESEND_API_KEY) {
@@ -103,10 +114,13 @@ serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    const fromAddress = Deno.env.get("POD_EMAIL_FROM") || "Axentra Vehicle Logistics <onboarding@resend.dev>";
+    const fromAddress =
+      Deno.env.get("INVOICE_EMAIL_FROM") ||
+      Deno.env.get("POD_EMAIL_FROM") ||
+      "Axentra Vehicle Logistics <onboarding@resend.dev>";
 
     const body = await req.json();
-    const { to, jobId, jobRef, vehicleReg, pickupCity, deliveryCity, dateStr, downloadUrl, photosZipUrl } = body ?? {};
+    const { to, invoiceId, downloadUrl } = body ?? {};
 
     if (!to || typeof to !== "string" || !EMAIL_RE.test(to)) {
       return new Response(
@@ -114,9 +128,9 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    if (!jobId || typeof jobId !== "string") {
+    if (!invoiceId || typeof invoiceId !== "string") {
       return new Response(
-        JSON.stringify({ error: "jobId is required" }),
+        JSON.stringify({ error: "invoiceId is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -127,51 +141,33 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    // Optional — omit the link rather than fail the whole send if it's missing/invalid.
-    const photosHref = typeof photosZipUrl === "string" ? safeHref(photosZipUrl) : null;
 
-    // ─── Authorization: this sends on the org's behalf via a shared sending
-    // identity/reputation, so a caller must not be able to reach jobs outside
-    // their own org, or redirect delivery to an address that isn't actually
-    // on file for the job (an open relay via the org's Resend account).
-    const { data: job } = await admin
-      .from("jobs")
-      .select("org_id, pickup_contact_email, delivery_contact_email")
-      .eq("id", jobId)
+    // ─── The invoice itself is the authority for what gets sent: number,
+    // client, totals all come from the stored row, never from the request —
+    // a caller can't spoof another org's invoice or inflate the figures in
+    // the email. Org ownership is enforced the same way as send-pod-email.
+    const { data: invoice } = await admin
+      .from("invoices")
+      .select("org_id, invoice_number, client_name, total, issue_date, due_date, created_at")
+      .eq("id", invoiceId)
       .maybeSingle();
 
-    if (!job || (!caller.isSuperAdmin && job.org_id !== caller.orgId)) {
+    if (!invoice || (!caller.isSuperAdmin && invoice.org_id !== caller.orgId)) {
       return new Response(
         JSON.stringify({ error: "FORBIDDEN" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Admins/super-admins may amend the recipient in the UI's confirm dialog
-    // (PodEmailConfirmDialog), so their confirmed address is honoured as-is.
-    // Non-admin callers (drivers) remain pinned to the contact emails on
-    // file for the job — the original anti-open-relay rule.
-    if (!caller.isAdmin && !caller.isSuperAdmin) {
-      const onFileEmails = [job.pickup_contact_email, job.delivery_contact_email]
-        .filter((e): e is string => typeof e === "string" && e.length > 0)
-        .map((e) => e.toLowerCase());
-      if (!onFileEmails.includes(to.toLowerCase())) {
-        return new Response(
-          JSON.stringify({ error: "Recipient must be a contact email on file for this job" }),
-          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-    }
-
-    const subject = `Axentra POD – ${jobRef ?? ""} – ${vehicleReg ?? ""}`.trim();
+    const issueDate = String(invoice.issue_date ?? invoice.created_at ?? "").slice(0, 10);
+    const subject = `Axentra Invoice ${invoice.invoice_number}`;
     const html = renderHtml({
-      jobRef: String(jobRef ?? ""),
-      vehicleReg: String(vehicleReg ?? ""),
-      pickupCity: String(pickupCity ?? "Unknown"),
-      deliveryCity: String(deliveryCity ?? "Unknown"),
-      dateStr: String(dateStr ?? ""),
+      invoiceNumber: String(invoice.invoice_number ?? ""),
+      clientName: String(invoice.client_name ?? ""),
+      total: invoice.total != null ? Number(invoice.total) : null,
+      issueDate,
+      dueDate: invoice.due_date ? String(invoice.due_date).slice(0, 10) : null,
       downloadHref,
-      photosHref,
     });
 
     const resendResp = await fetch("https://api.resend.com/emails", {

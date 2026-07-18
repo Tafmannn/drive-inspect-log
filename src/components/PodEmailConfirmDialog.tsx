@@ -1,13 +1,13 @@
 /**
- * PodEmailConfirmDialog — last-chance confirmation before a POD email
- * actually sends.
+ * PodEmailConfirmDialog — last-chance recipient confirmation before a
+ * customer-facing email (POD, invoice) actually sends.
  *
- * emailPodPdf() silently sends via Resend to whatever address is stored on
- * the job (delivery_contact_email, falling back to pickup_contact_email)
- * with no opportunity to catch a typo'd or stale contact email before the
- * customer's Proof of Delivery — which can include damage photos and
- * pricing — goes to the wrong inbox. This dialog surfaces that address,
- * editable, and requires a plausible email before Send is enabled.
+ * The send paths otherwise use whatever address is stored on the record
+ * (job contact emails, client email) with no opportunity to catch a
+ * typo'd or stale address before a document that can include damage
+ * photos and pricing goes to the wrong inbox. This dialog surfaces that
+ * address, editable, and requires a plausible email before Send is
+ * enabled. `documentLabel` names what's being sent.
  */
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -22,7 +22,8 @@ interface PodEmailConfirmDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultEmail: string;
-  jobRef: string;
+  /** What is being sent, e.g. "Job AX0063's POD" or "Invoice AX-INV-0042". */
+  documentLabel: string;
   sending: boolean;
   onConfirm: (email: string) => void | Promise<void>;
 }
@@ -31,7 +32,7 @@ export function PodEmailConfirmDialog({
   open,
   onOpenChange,
   defaultEmail,
-  jobRef,
+  documentLabel,
   sending,
   onConfirm,
 }: PodEmailConfirmDialogProps) {
@@ -60,9 +61,8 @@ export function PodEmailConfirmDialog({
             Confirm recipient
           </DialogTitle>
           <DialogDescription>
-            Double-check the email address for Job {jobRef}'s POD before sending. This is
-            your last chance to correct it — the customer's Proof of Delivery cannot be
-            un-sent.
+            Double-check the email address for {documentLabel} before sending. This is
+            your last chance to correct it — the email cannot be un-sent.
           </DialogDescription>
         </DialogHeader>
 
@@ -99,7 +99,7 @@ export function PodEmailConfirmDialog({
           </Button>
           <Button onClick={handleSend} disabled={!isValid || sending} className="gap-1.5">
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-            Send POD
+            Send Email
           </Button>
         </DialogFooter>
       </DialogContent>

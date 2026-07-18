@@ -1027,7 +1027,7 @@ export const PodReport = () => {
         open={emailConfirmOpen}
         onOpenChange={setEmailConfirmOpen}
         defaultEmail={job.delivery_contact_email || job.pickup_contact_email || ""}
-        jobRef={ref}
+        documentLabel={`Job ${ref}'s POD`}
         sending={sendingEmail}
         onConfirm={handleConfirmedEmailPdf}
       />

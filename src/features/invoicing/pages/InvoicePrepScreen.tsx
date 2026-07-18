@@ -46,6 +46,8 @@ import {
 } from "../hooks/useInvoicePrepData";
 import { useCreateInvoice } from "../hooks/useCreateInvoice";
 import { useInvoices, invoiceRecordToPdfData } from "../hooks/useInvoices";
+import { emailInvoice } from "../api/emailInvoice";
+import { PodEmailConfirmDialog } from "@/components/PodEmailConfirmDialog";
 import type { Client } from "@/lib/clientApi";
 import { getOrgId } from "@/lib/orgHelper";
 import { WarningCallout, RoleScope } from "@/components/ui-kit";
@@ -68,6 +70,7 @@ import {
   Download,
   Package,
   FileWarning,
+  Mail,
 } from "lucide-react";
 import {
   discoverReceipts,
@@ -118,6 +121,7 @@ export function InvoicePrepScreen() {
   // creation (the jobs stop being eligible), so the download buttons must
   // work from this snapshot, not from the live selection.
   const [createdInvoice, setCreatedInvoice] = useState<{
+    invoiceId: string;
     invoiceNumber: string;
     client: Client;
     jobs: EligibleJob[];
@@ -130,6 +134,15 @@ export function InvoicePrepScreen() {
   // Previously created invoices (re-downloadable at any time)
   const { data: recentInvoices, isLoading: invoicesLoading } = useInvoices();
   const [downloadingInvoiceId, setDownloadingInvoiceId] = useState<string | null>(null);
+
+  // Email-invoice confirm dialog target (from success card or list row)
+  const [invoiceEmailTarget, setInvoiceEmailTarget] = useState<{
+    invoiceId: string;
+    invoiceNumber: string;
+    pdfData: InvoiceData;
+    defaultEmail: string;
+  } | null>(null);
+  const [sendingInvoiceEmail, setSendingInvoiceEmail] = useState(false);
 
   // Receipt export state
   const [receiptDiscovery, setReceiptDiscovery] = useState<ReceiptDiscoveryResult | null>(null);
@@ -238,6 +251,7 @@ export function InvoicePrepScreen() {
         orgId,
       });
       setCreatedInvoice({
+        invoiceId: result.invoiceId,
         invoiceNumber: result.invoiceNumber,
         client: selectedClient,
         jobs: selectedJobs,
@@ -328,6 +342,63 @@ export function InvoicePrepScreen() {
       toast({ title: "Download Failed", description: err.message || "Unknown error", variant: "destructive" });
     } finally {
       setDownloadingInvoiceId(null);
+    }
+  };
+
+  // Open the email confirm dialog for the just-created invoice
+  const handleEmailCreatedInvoice = () => {
+    if (!createdInvoice) return;
+    setInvoiceEmailTarget({
+      invoiceId: createdInvoice.invoiceId,
+      invoiceNumber: createdInvoice.invoiceNumber,
+      pdfData: buildInvoicePdfData(
+        createdInvoice.invoiceNumber,
+        createdInvoice.client,
+        createdInvoice.jobs,
+        createdInvoice.vatRate
+      ),
+      defaultEmail: createdInvoice.client.email || "",
+    });
+  };
+
+  // Open the email confirm dialog for a stored invoice (list row)
+  const handleEmailStoredInvoice = (invoiceId: string) => {
+    const record = recentInvoices?.find((i) => i.id === invoiceId);
+    if (!record) return;
+    setInvoiceEmailTarget({
+      invoiceId: record.id,
+      invoiceNumber: record.invoice_number,
+      pdfData: invoiceRecordToPdfData(record),
+      defaultEmail: record.client_email || "",
+    });
+  };
+
+  // Actually send, once the recipient is confirmed in the dialog
+  const handleConfirmedInvoiceEmail = async (confirmedEmail: string) => {
+    if (!invoiceEmailTarget) return;
+    setSendingInvoiceEmail(true);
+    try {
+      const orgId = await getOrgId();
+      const { recipient } = await emailInvoice({
+        invoiceId: invoiceEmailTarget.invoiceId,
+        invoiceNumber: invoiceEmailTarget.invoiceNumber,
+        orgId,
+        pdfData: invoiceEmailTarget.pdfData,
+        to: confirmedEmail,
+      });
+      setInvoiceEmailTarget(null);
+      toast({
+        title: "Invoice emailed",
+        description: `${invoiceEmailTarget.invoiceNumber} sent to ${recipient}.`,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Invoice Email Failed",
+        description: err.message || "Something went wrong.",
+        variant: "destructive",
+      });
+    } finally {
+      setSendingInvoiceEmail(false);
     }
   };
 
@@ -753,6 +824,15 @@ export function InvoicePrepScreen() {
               )}
               Download Pack (PDF + Receipts)
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleEmailCreatedInvoice}
+              className="gap-1.5"
+            >
+              <Mail className="h-4 w-4" />
+              Email Invoice
+            </Button>
           </div>
         </div>
       )}
@@ -1044,21 +1124,33 @@ export function InvoicePrepScreen() {
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDownloadStoredInvoice(inv.id)}
-                        disabled={downloadingInvoiceId === inv.id}
-                        className="gap-1.5 text-xs h-7"
-                        aria-label={`Download invoice ${inv.invoice_number}`}
-                      >
-                        {downloadingInvoiceId === inv.id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Download className="h-3.5 w-3.5" />
-                        )}
-                        Download
-                      </Button>
+                      <div className="flex justify-end gap-1.5">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDownloadStoredInvoice(inv.id)}
+                          disabled={downloadingInvoiceId === inv.id}
+                          className="gap-1.5 text-xs h-7"
+                          aria-label={`Download invoice ${inv.invoice_number}`}
+                        >
+                          {downloadingInvoiceId === inv.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Download className="h-3.5 w-3.5" />
+                          )}
+                          Download
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEmailStoredInvoice(inv.id)}
+                          className="gap-1.5 text-xs h-7"
+                          aria-label={`Email invoice ${inv.invoice_number}`}
+                        >
+                          <Mail className="h-3.5 w-3.5" />
+                          Email
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -1067,6 +1159,18 @@ export function InvoicePrepScreen() {
           </div>
         )}
       </ControlSection>
+
+      {/* Last-chance recipient confirmation before an invoice email sends */}
+      <PodEmailConfirmDialog
+        open={!!invoiceEmailTarget}
+        onOpenChange={(open) => {
+          if (!open && !sendingInvoiceEmail) setInvoiceEmailTarget(null);
+        }}
+        defaultEmail={invoiceEmailTarget?.defaultEmail ?? ""}
+        documentLabel={`Invoice ${invoiceEmailTarget?.invoiceNumber ?? ""}`}
+        sending={sendingInvoiceEmail}
+        onConfirm={handleConfirmedInvoiceEmail}
+      />
     </ControlShell>
   );
 }
