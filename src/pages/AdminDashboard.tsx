@@ -23,6 +23,7 @@ import { useAdminMissingEvidence, useAdminComplianceCounts } from "@/hooks/useAd
 import { useAdminOperationsBuckets } from "@/hooks/useAdminOperationsBuckets";
 import { BUCKET_DEFS, type BucketKey } from "@/lib/operationsBuckets";
 import { useAttentionData } from "@/features/attention/hooks/useAttentionData";
+import { KpiPill } from "@/components/KpiPill";
 import { AssignDriverModal } from "@/features/control/components/AssignDriverModal";
 import { getStatusStyle } from "@/lib/statusConfig";
 import { humanAge, isJobStale, isUnassigned } from "@/features/control/pages/jobs/jobsUtils";
@@ -32,7 +33,7 @@ import { cn } from "@/lib/utils";
 import {
   UserX, Clock, FileSearch, ImageOff, ChevronRight,
   Zap, Eye, UserPlus, MapPin, AlertTriangle, User,
-  Truck, Users, ClipboardCheck, Receipt, ShieldAlert,
+  Truck, Users, ClipboardCheck, Receipt, ShieldAlert, Globe,
 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -57,43 +58,10 @@ interface NeedsActionItem {
 
 // ── Tier 1: Intervention KPI Strip ───────────────────────────────────
 
-export function KpiPill({
-  label, value, icon: Icon, variant = "default", loading, onClick,
-}: {
-  label: string;
-  value: number;
-  icon: React.ComponentType<{ className?: string }>;
-  variant?: "default" | "warning" | "destructive";
-  loading?: boolean;
-  onClick: () => void;
-}) {
-  const styles = {
-    default: "bg-card border-border text-muted-foreground",
-    warning: "bg-warning/5 border-warning/30 text-warning",
-    destructive: "bg-destructive/5 border-destructive/30 text-destructive",
-  };
-
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "flex flex-col items-center gap-0.5 rounded-lg border p-2.5 min-w-0 flex-1 transition-colors active:bg-muted/50",
-        styles[variant],
-      )}
-    >
-      <Icon className="h-3.5 w-3.5 shrink-0" />
-      {loading ? (
-        <Skeleton className="h-5 w-7" />
-      ) : (
-        <span className="text-base font-bold tabular-nums leading-tight">{value}</span>
-      )}
-      <span className="w-full flex items-center justify-center gap-0.5 min-w-0">
-        <span className="min-w-0 truncate text-[9px] font-semibold uppercase tracking-wider">{label}</span>
-        <ChevronRight className="h-2 w-2 shrink-0" />
-      </span>
-    </button>
-  );
-}
+// KpiPill lives in its own module so the eager driver home can reuse it
+// without pulling this heavy admin dashboard into the initial bundle.
+// Re-exported here so existing `@/pages/AdminDashboard` importers stay stable.
+export { KpiPill };
 
 function InterventionKpis() {
   const navigate = useNavigate();
@@ -647,6 +615,7 @@ function OperationsBuckets() {
 
 function ManagementRoutes() {
   const navigate = useNavigate();
+  const { isSuperAdmin } = useAuth();
 
   const routes = [
     { label: "Full Jobs Queue", icon: Truck, path: "/admin/jobs" },
@@ -654,6 +623,11 @@ function ManagementRoutes() {
     { label: "Driver Onboarding", icon: ClipboardCheck, path: "/admin/onboarding" },
     { label: "POD Closure", icon: ClipboardCheck, path: "/control/pod-review" },
     { label: "Expenses & Finance", icon: Receipt, path: "/control/finance" },
+    // Super Admins reach the global console here — a neutral globe, not a red
+    // shield (red read as an error state on the old dashboard).
+    ...(isSuperAdmin
+      ? [{ label: "Super Admin Console", icon: Globe, path: "/super-admin" }]
+      : []),
   ];
 
   return (
@@ -678,9 +652,15 @@ function ManagementRoutes() {
 
 // ── Main Page ────────────────────────────────────────────────────────
 
-export const AdminDashboard = () => {
+/**
+ * The operational dashboard body (Tiers 1–4), without any page chrome
+ * (no AppHeader / BottomNav). Extracted so it can back BOTH the `/admin`
+ * route and the role-aware home screen (`/`) — an admin/super-admin lands
+ * on this instead of the driver launcher. Owns its own data hooks and the
+ * focus/realtime refresh wiring so both mount points behave identically.
+ */
+export function AdminDashboardBody() {
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
   const { data: queues, isLoading } = useAdminJobQueues();
 
   // Refresh every admin queue on tab focus / bfcache restore so returning
@@ -698,6 +678,50 @@ export const AdminDashboard = () => {
   // Live updates when evidence acks change in any tab/admin session.
   useEvidenceAckRealtime();
 
+  return (
+    <div className="p-3 max-w-lg mx-auto space-y-4">
+      {/* Tier 1 — Intervention KPIs */}
+      <InterventionKpis />
+
+      {/* Compliance intervention strip */}
+      <ComplianceStrip />
+
+      {/* Tier 2 — Ranked Needs Action (primary section) */}
+      <NeedsActionQueue />
+
+      {/* Tier 3 — Queue Snapshots (broader view, not top interventions) */}
+      <div className="space-y-3">
+        <QueuePreviewSection
+          title="Stale Active"
+          count={(queues?.needsAttention ?? []).filter(j => isJobStale(j)).length}
+          items={(queues?.needsAttention ?? []).filter(j => isJobStale(j))}
+          loading={isLoading}
+          emptyText="No stale jobs."
+          onViewAll={() => navigate("/admin/jobs?filter=stale")}
+        />
+        <QueuePreviewSection
+          title="Awaiting Review"
+          count={queues?.review?.length}
+          items={queues?.review ?? []}
+          loading={isLoading}
+          emptyText="No PODs pending."
+          onViewAll={() => navigate("/admin/jobs?filter=review")}
+        />
+      </div>
+
+      {/* Tier 3.5 — Operations Buckets overview */}
+      <OperationsBuckets />
+
+      {/* Tier 4 — Management Routes */}
+      <ManagementRoutes />
+    </div>
+  );
+}
+
+export const AdminDashboard = () => {
+  const navigate = useNavigate();
+  const { isAdmin } = useAuth();
+
   if (!isAdmin) {
     return (
       <div className="min-h-screen bg-background pb-20">
@@ -711,44 +735,7 @@ export const AdminDashboard = () => {
   return (
     <div className="min-h-screen bg-background pb-20">
       <AppHeader title="Admin" showBack onBack={() => navigate("/")} />
-
-      <div className="p-3 max-w-lg mx-auto space-y-4">
-        {/* Tier 1 — Intervention KPIs */}
-        <InterventionKpis />
-
-        {/* Compliance intervention strip */}
-        <ComplianceStrip />
-
-        {/* Tier 2 — Ranked Needs Action (primary section) */}
-        <NeedsActionQueue />
-
-        {/* Tier 3 — Queue Snapshots (broader view, not top interventions) */}
-        <div className="space-y-3">
-          <QueuePreviewSection
-            title="Stale Active"
-            count={(queues?.needsAttention ?? []).filter(j => isJobStale(j)).length}
-            items={(queues?.needsAttention ?? []).filter(j => isJobStale(j))}
-            loading={isLoading}
-            emptyText="No stale jobs."
-            onViewAll={() => navigate("/admin/jobs?filter=stale")}
-          />
-          <QueuePreviewSection
-            title="Awaiting Review"
-            count={queues?.review?.length}
-            items={queues?.review ?? []}
-            loading={isLoading}
-            emptyText="No PODs pending."
-            onViewAll={() => navigate("/admin/jobs?filter=review")}
-          />
-        </div>
-
-        {/* Tier 3.5 — Operations Buckets overview */}
-        <OperationsBuckets />
-
-        {/* Tier 4 — Management Routes */}
-        <ManagementRoutes />
-      </div>
-
+      <AdminDashboardBody />
       <BottomNav />
     </div>
   );
