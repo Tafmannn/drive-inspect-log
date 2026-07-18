@@ -13,22 +13,44 @@ export const ResetPassword = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [hasRecovery, setHasRecovery] = useState(false);
+  // null = still resolving; false = no usable session (bad/expired/used link);
+  // true = recovery session established, show the set-password form.
+  const [hasSession, setHasSession] = useState<boolean | null>(null);
+  const [linkError, setLinkError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Supabase appends #access_token=...&type=recovery to the URL
+    // A used/expired link comes back as #error=access_denied&error_code=otp_expired&…
     const hash = window.location.hash;
-    if (hash.includes("type=recovery")) {
-      setHasRecovery(true);
+    if (hash.includes("error=")) {
+      const params = new URLSearchParams(hash.replace(/^#/, ""));
+      const description = params.get("error_description")?.replace(/\+/g, " ");
+      setLinkError(description || "This reset link is invalid or has expired.");
+      setHasSession(false);
+      return;
     }
 
-    // Also listen for PASSWORD_RECOVERY event
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
-        setHasRecovery(true);
-      }
+    // supabase-js auto-consumes the #access_token=…&type=recovery hash
+    // (detectSessionInUrl) and strips it — often BEFORE this component mounts —
+    // so checking the raw hash / waiting for the PASSWORD_RECOVERY event alone
+    // races and misses a perfectly valid link (the old bug: the link verified
+    // server-side but the page still said "invalid"). Check the established
+    // session directly, and also listen for the auth event as a backstop.
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) setHasSession(true);
     });
-    return () => subscription.unsubscribe();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) setHasSession(true);
+    });
+
+    // If nothing resolves shortly, the link was invalid/used or opened directly.
+    const timer = setTimeout(() => {
+      setHasSession((current) => (current === null ? false : current));
+    }, 2500);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timer);
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -96,9 +118,24 @@ export const ResetPassword = () => {
                 <p className="text-xs text-emerald-300/70 mt-1">Redirecting to sign in…</p>
               </div>
             </div>
-          ) : !hasRecovery ? (
-            <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-200">
-              This link is invalid or has expired. Please request a new password reset from the login page.
+          ) : hasSession === null ? (
+            <div className="flex flex-col items-center gap-3 py-6">
+              <Loader2 className="h-6 w-6 animate-spin text-slate-300" />
+              <p className="text-xs text-slate-400">Verifying your reset link…</p>
+            </div>
+          ) : hasSession === false ? (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-200">
+                {linkError ||
+                  "This reset link is invalid or has already been used. Password reset links only work once — please request a new one."}
+              </div>
+              <Button
+                type="button"
+                onClick={() => navigate("/forgot-password")}
+                className="w-full min-h-[44px] text-[0.95rem] font-medium bg-gradient-to-b from-[#1678d6] to-[#0b5da0] hover:from-[#1b80e3] hover:to-[#0c66ad] text-white rounded-lg shadow-[0_12px_30px_rgba(12,107,191,0.45)]"
+              >
+                Request a new reset link
+              </Button>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
