@@ -45,13 +45,14 @@ export const Dashboard = () => {
 
   const handleExport = async (type: "jobs" | "inspections" | "expenses") => {
     setExporting(true);
+    const label = type === "jobs" ? "Jobs" : type === "inspections" ? "Inspections" : "Expenses";
     try {
       if (type === "jobs") await exportJobsCsv();
       else if (type === "inspections") await exportInspectionsCsv();
       else await exportExpensesCsv();
-      toast({ title: "Exported." });
+      toast({ title: `${label} exported`, description: "Your CSV download has started." });
     } catch {
-      toast({ title: "Export failed.", variant: "destructive" });
+      toast({ title: `Couldn't export ${label.toLowerCase()}`, description: "Please try again.", variant: "destructive" });
     } finally {
       setExporting(false);
     }

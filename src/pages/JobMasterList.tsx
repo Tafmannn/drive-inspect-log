@@ -206,10 +206,10 @@ export function JobMasterList() {
                   <TableRow key={job.id} className="cursor-pointer hover:bg-muted/50">
                     <TableCell>
                       <div className="flex gap-0.5">
-                        <Button size="icon" variant="ghost" className="h-7 w-7" disabled={idx === 0} onClick={(e) => { e.stopPropagation(); moveJob(job.id, "up"); }}>
+                        <Button size="icon" variant="ghost" className="h-7 w-7" disabled={idx === 0} aria-label="Move job up" onClick={(e) => { e.stopPropagation(); moveJob(job.id, "up"); }}>
                           <ArrowUp className="w-3 h-3" />
                         </Button>
-                        <Button size="icon" variant="ghost" className="h-7 w-7" disabled={idx === filtered.length - 1} onClick={(e) => { e.stopPropagation(); moveJob(job.id, "down"); }}>
+                        <Button size="icon" variant="ghost" className="h-7 w-7" disabled={idx === filtered.length - 1} aria-label="Move job down" onClick={(e) => { e.stopPropagation(); moveJob(job.id, "down"); }}>
                           <ArrowDown className="w-3 h-3" />
                         </Button>
                       </div>
