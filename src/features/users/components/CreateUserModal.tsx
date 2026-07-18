@@ -10,6 +10,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useCreateUser } from "@/hooks/useUserManagement";
+import { getOrgId } from "@/lib/orgHelper";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -31,7 +32,7 @@ interface CreateUserModalProps {
 }
 
 export function CreateUserModal({ open, onOpenChange }: CreateUserModalProps) {
-  const { isSuperAdmin, user } = useAuth();
+  const { isSuperAdmin } = useAuth();
   const navigate = useNavigate();
   const createMutation = useCreateUser();
 
@@ -57,10 +58,26 @@ export function CreateUserModal({ open, onOpenChange }: CreateUserModalProps) {
     setRole("driver"); setOrgId("");
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const targetOrg = isSuperAdmin ? orgId : (user as any)?.org_id;
+    // AppUser (AuthContext) carries no org_id — the old `(user as any)?.org_id`
+    // was always undefined, so org-admin creation ALWAYS failed with
+    // "Organisation is required". Resolve the caller's org from the
+    // authoritative helper instead (app_metadata → user_profiles).
+    let targetOrg = orgId;
+    if (!isSuperAdmin) {
+      try {
+        targetOrg = await getOrgId();
+      } catch {
+        toast({
+          title: "Unable to determine your organisation",
+          description: "Please refresh and try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
     const trimmedEmail = email.trim();
     const trimmedFirst = firstName.trim();
     const trimmedLast = lastName.trim();

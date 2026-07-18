@@ -1,8 +1,8 @@
 /**
  * user-lifecycle — unified edge function for user management.
- * Actions: list, get, create, update_profile, set_role, activate, suspend, reactivate,
- *          archive_driver, restore_driver, sync_profiles, update_driver_profile,
- *          get_permissions, set_permission_override
+ * Actions: list, get, create, resend_invite, update_profile, set_role, activate,
+ *          suspend, reactivate, archive_driver, restore_driver, sync_profiles,
+ *          update_driver_profile, get_permissions, set_permission_override
  *
  * Auth: JWT verified in code. Caller must be admin (org-scoped) or super_admin (global).
  */
@@ -10,6 +10,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { findAuthUserByEmail, listAllAuthUsers } from "../_shared/adminUsers.ts";
 import { isSensitivePermissionBlockedForNonSuperAdmin } from "../_shared/permissionEscalation.ts";
+import { renderActionEmailHtml, resolveRedirectUrl, sendBrandedEmail } from "../_shared/brandedEmail.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -62,6 +63,41 @@ async function writeAudit(
   } catch {
     // non-blocking
   }
+}
+
+// ── Branded invite email (Resend) ───────────────────────────────────────
+// Supabase's built-in invite email is generic and comes from the shared
+// supabase.io sender. Instead we mint the action link ourselves
+// (auth.admin.generateLink) and deliver it in an Axentra-branded email via
+// Resend (see _shared/brandedEmail.ts), reusing the RESEND_API_KEY already
+// configured for send-pod-email. If Resend is not configured we fall back to
+// Supabase's built-in email so invites never silently stop working.
+
+function welcomeRedirectUrl(req: Request): string | undefined {
+  return resolveRedirectUrl(req, "/welcome");
+}
+
+async function sendInviteEmail(opts: {
+  to: string;
+  firstName: string | null;
+  actionLink: string;
+  subject: string;
+}): Promise<{ ok: boolean; detail?: unknown }> {
+  return sendBrandedEmail({
+    to: opts.to,
+    subject: opts.subject,
+    html: renderActionEmailHtml({
+      firstName: opts.firstName,
+      introHtml:
+        "You've been invited to join <strong>Axentra Vehicle Logistics</strong>. " +
+        "Click the button below to create your password and finish setting up your account.",
+      buttonLabel: "Set up my account",
+      actionLink: opts.actionLink,
+      noteHtml:
+        "This link is valid for 24 hours and can only be used once. If it has " +
+        "expired, ask your administrator to resend the invitation.",
+    }),
+  });
 }
 
 async function loadDriverProfilesForUsers(admin: any, userIds: string[]) {
@@ -225,7 +261,7 @@ serve(async (req) => {
     // ── CREATE (invite + profile) ──
     if (action === "create") {
       const {
-        email,
+        email: rawEmail,
         role: newRole,
         org_id,
         first_name,
@@ -234,7 +270,16 @@ serve(async (req) => {
         phone,
       } = body;
 
+      // Normalise + validate up front. GoTrue rejects malformed addresses
+      // with a raw "Unable to validate email address: invalid format" that
+      // previously surfaced to admins as an opaque 500 — a single stray
+      // space from a mobile keyboard was enough to hit it (observed live).
+      const email =
+        typeof rawEmail === "string" ? rawEmail.trim().toLowerCase() : "";
       if (!email) return json({ error: "EMAIL_REQUIRED" }, 400);
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return json({ error: "Please enter a valid email address." }, 400);
+      }
       if (!org_id) return json({ error: "ORG_ID_REQUIRED" }, 400);
 
       const targetRole = newRole ?? "driver";
@@ -247,29 +292,103 @@ serve(async (req) => {
         return json({ error: "ORG_SCOPE_VIOLATION" }, 403);
       }
 
-      const { data: inviteData, error: inviteErr } =
-        await admin.auth.admin.inviteUserByEmail(email, {
-          data: { role: targetRole, org_id },
-        });
+      const redirectTo = welcomeRedirectUrl(req);
+      const useBrandedEmail = Boolean(Deno.env.get("RESEND_API_KEY"));
+
+      // An already-registered email must NOT silently hijack the existing
+      // account. The previous behaviour adopted the existing auth user
+      // unconditionally and then overwrote their app_metadata and
+      // user_profiles row (role, names, account_status → pending_activation),
+      // corrupting a live account while reporting success — observed live
+      // against an active driver. Adoption is only safe for ORPHANED auth
+      // users (an auth record with no user_profiles row, e.g. a previous
+      // half-failed create); anything else is a hard 409.
+      const adoptOrphanOr409 = async (
+        authErrMessage: string,
+      ): Promise<Response | string> => {
+        const existing = await findAuthUserByEmail(admin, email);
+        if (!existing) return json({ error: authErrMessage }, 500);
+        const { data: existingProfile } = await admin
+          .from("user_profiles")
+          .select("auth_user_id")
+          .eq("auth_user_id", existing.id)
+          .maybeSingle();
+        if (existingProfile) {
+          return json(
+            { error: "A user with this email address already exists." },
+            409,
+          );
+        }
+        return existing.id;
+      };
 
       let authUserId: string;
+      // "sent"     — branded email delivered via Resend
+      // "builtin"  — Supabase's default template was used (Resend unavailable)
+      // "failed"   — user was created but no email went out; use Resend Invite
+      let inviteEmail: "sent" | "builtin" | "failed";
 
-      if (inviteErr) {
-        if (inviteErr.message?.includes("already been registered")) {
-          const existing = await findAuthUserByEmail(admin, email);
-          if (!existing) return json({ error: inviteErr.message }, 500);
-          authUserId = existing.id;
+      if (useBrandedEmail) {
+        // generateLink creates the auth user WITHOUT sending Supabase's
+        // generic template email; we deliver the link ourselves via Resend.
+        const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+          type: "invite",
+          email,
+          options: { data: { role: targetRole, org_id }, redirectTo },
+        });
+
+        if (linkErr) {
+          if (linkErr.message?.includes("already been registered")) {
+            const adopted = await adoptOrphanOr409(linkErr.message);
+            if (adopted instanceof Response) return adopted;
+            authUserId = adopted;
+            inviteEmail = "failed"; // no fresh link for an existing auth user here
+          } else {
+            return json({ error: linkErr.message }, 500);
+          }
         } else {
-          return json({ error: inviteErr.message }, 500);
+          // Defensive: guard against a resolved call with no user/link payload
+          // rather than letting `undefined` flow into updateUserById below.
+          if (!linkData?.user?.id || !linkData?.properties?.action_link) {
+            return json({ error: "Invite succeeded but returned no user" }, 500);
+          }
+          authUserId = linkData.user.id;
+          const sent = await sendInviteEmail({
+            to: email,
+            firstName: first_name ?? null,
+            actionLink: linkData.properties.action_link,
+            subject: "You've been invited to Axentra",
+          });
+          // A failed send must not abort creation — the profile below still
+          // gets created and the admin can use "Resend Invite" to retry.
+          inviteEmail = sent.ok ? "sent" : "failed";
+          if (!sent.ok) console.error("invite email send failed", sent.detail);
         }
       } else {
-        // Defensive: inviteUserByEmail can resolve without an error yet without
-        // a user object. A non-null assertion (`!`) only silences the compiler
-        // and would let `undefined` flow into updateUserById below, so guard.
-        if (!inviteData?.user?.id) {
-          return json({ error: "Invite succeeded but returned no user" }, 500);
+        // No Resend key: keep the original built-in Supabase invite email so
+        // invites still arrive (generic template, but pointed at /welcome).
+        const { data: inviteData, error: inviteErr } =
+          await admin.auth.admin.inviteUserByEmail(email, {
+            data: { role: targetRole, org_id },
+            redirectTo,
+          });
+
+        if (inviteErr) {
+          if (inviteErr.message?.includes("already been registered")) {
+            const adopted = await adoptOrphanOr409(inviteErr.message);
+            if (adopted instanceof Response) return adopted;
+            authUserId = adopted;
+            inviteEmail = "failed";
+          } else {
+            return json({ error: inviteErr.message }, 500);
+          }
+        } else {
+          if (!inviteData?.user?.id) {
+            return json({ error: "Invite succeeded but returned no user" }, 500);
+          }
+          authUserId = inviteData.user.id;
+          inviteEmail = "builtin";
         }
-        authUserId = inviteData.user.id;
       }
 
       await admin.auth.admin.updateUserById(authUserId, {
@@ -306,10 +425,73 @@ serve(async (req) => {
       await writeAudit(admin, caller, "create_user", {
         target_user_id: authUserId,
         target_org_id: org_id,
-        after_state: { email, role: targetRole, org_id },
+        after_state: { email, role: targetRole, org_id, invite_email: inviteEmail },
       });
 
-      return json({ success: true, user_id: authUserId });
+      return json({ success: true, user_id: authUserId, invite_email: inviteEmail });
+    }
+
+    // ── RESEND INVITE ──
+    // Re-sends the branded set-password email to a pending_activation user
+    // whose original invite link expired (links are single-use, 24h). The
+    // auth user already exists, so a "recovery" link is minted instead of an
+    // "invite" link — both verify the email and land the user on /welcome
+    // with a session so they can set their first password.
+    if (action === "resend_invite") {
+      const { user_id } = body;
+      if (!user_id) return json({ error: "USER_ID_REQUIRED" }, 400);
+
+      const { data: target } = await admin
+        .from("user_profiles")
+        .select("email, first_name, org_id, account_status")
+        .eq("auth_user_id", user_id)
+        .maybeSingle();
+
+      if (!target) return json({ error: "NOT_FOUND" }, 404);
+      if (!callerIsSuper && target.org_id !== callerOrgId(caller)) {
+        return json({ error: "ORG_SCOPE_VIOLATION" }, 403);
+      }
+      if (target.account_status !== "pending_activation") {
+        return json({ error: "USER_NOT_PENDING_ACTIVATION" }, 400);
+      }
+
+      const redirectTo = welcomeRedirectUrl(req);
+
+      if (Deno.env.get("RESEND_API_KEY")) {
+        const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+          type: "recovery",
+          email: target.email,
+          options: { redirectTo },
+        });
+        if (linkErr || !linkData?.properties?.action_link) {
+          return json({ error: linkErr?.message ?? "LINK_GENERATION_FAILED" }, 500);
+        }
+        const sent = await sendInviteEmail({
+          to: target.email,
+          firstName: target.first_name,
+          actionLink: linkData.properties.action_link,
+          subject: "Your Axentra invite link",
+        });
+        if (!sent.ok) {
+          console.error("invite email resend failed", sent.detail);
+          return json({ error: "EMAIL_SEND_FAILED" }, 500);
+        }
+      } else {
+        // No Resend key: Supabase's built-in recovery email still delivers a
+        // working set-password link (generic template).
+        const { error: resetErr } = await admin.auth.resetPasswordForEmail(
+          target.email,
+          { redirectTo }
+        );
+        if (resetErr) return json({ error: resetErr.message }, 500);
+      }
+
+      await writeAudit(admin, caller, "resend_invite", {
+        target_user_id: user_id,
+        target_org_id: target.org_id,
+      });
+
+      return json({ success: true });
     }
 
     // ── UPDATE PROFILE ──
