@@ -10,6 +10,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { UKPlate } from "@/components/UKPlate";
 import { useAdminDrivers, type AdminDriverRow, type DriverFilter } from "@/hooks/useAdminDrivers";
 import { useDriverPerformance } from "@/hooks/useDriverPerformance";
@@ -19,7 +20,7 @@ import { useAuth } from "@/context/AuthContext";
 import { getStatusStyle } from "@/lib/statusConfig";
 import {
   AlertTriangle, Phone, Truck, User, ShieldAlert, CreditCard,
-  Activity, CheckCircle2, AlertOctagon, ChevronRight,
+  Activity, CheckCircle2, AlertOctagon, ChevronRight, Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { scoreDriver } from "@/features/onboarding/lib/completion";
@@ -230,6 +231,7 @@ export function AdminDrivers() {
   const driverUserIds = (drivers ?? []).map(d => d.userId).filter(Boolean);
   const { data: perfMap } = useDriverPerformance(driverUserIds);
   const [filter, setFilter] = useState<DriverFilter>("all");
+  const [search, setSearch] = useState("");
 
   if (!isAdmin) {
     return (
@@ -241,7 +243,12 @@ export function AdminDrivers() {
     );
   }
 
-  const filtered = filterDrivers(drivers ?? [], filter);
+  const q = search.trim().toLowerCase();
+  const filtered = filterDrivers(drivers ?? [], filter).filter((d) => {
+    if (!q) return true;
+    return [d.displayName, d.fullName, d.phone, d.latestJobReg, d.licenceNumber]
+      .some((v) => v && String(v).toLowerCase().includes(q));
+  });
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -254,6 +261,18 @@ export function AdminDrivers() {
           <>
             {/* KPIs */}
             <DriverKpis drivers={drivers ?? []} />
+
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search name, phone or plate…"
+                className="pl-9 h-10"
+                aria-label="Search drivers"
+              />
+            </div>
 
             {/* Filters */}
             <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-none">

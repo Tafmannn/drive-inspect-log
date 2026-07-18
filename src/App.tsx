@@ -6,32 +6,21 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigationType } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { DevRoleBanner } from "@/components/DevRoleBanner";
+import { OfflineBanner } from "@/components/OfflineBanner";
+
+// ── Driver hot path: kept eager so the screens a driver opens on every job
+// (dashboard, jobs, a job, the inspection walk-around, uploads, profile,
+// expenses) render instantly with no chunk-load flash. Auth screens are here
+// too so first paint after a cold open is immediate.
 import { Dashboard } from "./pages/Dashboard";
 import { JobList } from "./pages/JobList";
-import { JobMasterList } from "./pages/JobMasterList";
-import { JobForm } from "./pages/JobForm";
 import { JobDetail } from "./pages/JobDetail";
 import { CompletedJobs } from "./pages/CompletedJobs";
 import { PendingJobs } from "./pages/PendingJobs";
 import { InspectionFlow } from "./pages/InspectionFlow";
-import { PodReport } from "./pages/PodReport";
 import { PendingUploads } from "./pages/PendingUploads";
 import { Expenses } from "./pages/Expenses";
 import { ExpenseForm } from "./pages/ExpenseForm";
-import { AdminDashboard } from "./pages/AdminDashboard";
-import { AdminJobsQueue } from "./pages/AdminJobsQueue";
-import { Timesheets } from "./pages/Timesheets";
-import { AdminUsers } from "./pages/AdminUsers";
-import { AdminDrivers } from "./pages/AdminDrivers";
-import { AdminPodReview } from "./pages/AdminPodReview";
-import { AdminFinance } from "./pages/AdminFinance";
-import { AdminOnboarding } from "./pages/AdminOnboarding";
-import { SuperAdminDashboard } from "./pages/SuperAdminDashboard";
-import {
-  SuperAdminOrgs, SuperAdminUsers, SuperAdminJobs,
-  SuperAdminAudit, SuperAdminErrors, SuperAdminAttention, SuperAdminSettings,
-} from "./pages/SuperAdminPages";
-import { InvoiceGenerator } from "./pages/InvoiceGenerator";
 import { Profile } from "./pages/Profile";
 import { QrConfirm } from "./pages/QrConfirm";
 import { Login } from "./pages/Login";
@@ -40,37 +29,69 @@ import { ForgotPassword } from "./pages/ForgotPassword";
 import { ResetPassword } from "./pages/ResetPassword";
 import { Welcome } from "./pages/Welcome";
 import NotFound from "./pages/NotFound";
-import DriverOnboardingWizard from "./features/onboarding/pages/DriverOnboardingWizard";
-import ClientOnboardingWizard from "./features/onboarding/pages/ClientOnboardingWizard";
-import OrganisationOnboardingWizard from "./features/onboarding/pages/OrganisationOnboardingWizard";
-import DriverProfileDetail from "./features/onboarding/pages/DriverProfileDetail";
 import DriverDigitalId from "./features/onboarding/pages/DriverDigitalId";
-import ClientProfileDetail from "./features/onboarding/pages/ClientProfileDetail";
-import OrganisationProfileDetail from "./features/onboarding/pages/OrganisationProfileDetail";
+
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { AccountStatusGate } from "./components/AccountStatusGate";
 import { DriverGateScreen } from "./components/DriverGateScreen";
 import { useDriverGate } from "@/hooks/useDriverGate";
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect, type ComponentType } from "react";
 import { installRetryTriggers, triggerRetry } from "@/lib/retryOrchestrator";
 import { installSubmitQueueDrainer, drainSubmitQueue } from "@/lib/submitQueue";
 import { installEvidenceDrainTriggers, drainEvidenceQueue } from "@/lib/evidence/queueRuntime";
 import { Loader2 } from "lucide-react";
-
-/* ── Command Center imports ── */
-import { ControlLayout } from "@/features/control/layouts/ControlLayout";
 import { ControlRoute } from "@/features/control/guards/ControlRoute";
-import { ControlOverview } from "@/features/control/pages/ControlOverview";
-import { ControlJobs } from "@/features/control/pages/ControlJobs";
-import { ControlDrivers } from "@/features/control/pages/ControlDrivers";
-import { ControlCompliance } from "@/features/control/pages/ControlCompliance";
-import { ControlPodReview } from "@/features/control/pages/ControlPodReview";
-import { ControlFinance } from "@/features/control/pages/ControlFinance";
-import { ControlClients } from "@/features/control/pages/ControlClients";
-import { InvoicePrepScreen } from "@/features/invoicing/pages/InvoicePrepScreen";
-import { ControlAdmin } from "@/features/control/pages/ControlAdmin";
-import { ControlSuperAdmin } from "@/features/control/pages/ControlSuperAdmin";
-import { ExportsPage } from "@/features/exports/pages/ExportsPage";
+
+// ── Management surface: admin, super-admin, the Control Center, invoicing,
+// onboarding wizards and the PDF-heavy report/generator screens are lazy-
+// loaded. A driver never opens these, so their code stays out of the initial
+// download; each becomes its own chunk fetched on first visit and cached for
+// the session behind the <Suspense> fallback below.
+function lazyNamed<T extends Record<string, unknown>>(
+  loader: () => Promise<T>,
+  name: keyof T,
+) {
+  return lazy(() => loader().then((m) => ({ default: m[name] as ComponentType })));
+}
+
+const JobMasterList = lazyNamed(() => import("./pages/JobMasterList"), "JobMasterList");
+const JobForm = lazyNamed(() => import("./pages/JobForm"), "JobForm");
+const PodReport = lazyNamed(() => import("./pages/PodReport"), "PodReport");
+const AdminDashboard = lazyNamed(() => import("./pages/AdminDashboard"), "AdminDashboard");
+const AdminJobsQueue = lazyNamed(() => import("./pages/AdminJobsQueue"), "AdminJobsQueue");
+const Timesheets = lazyNamed(() => import("./pages/Timesheets"), "Timesheets");
+const AdminUsers = lazyNamed(() => import("./pages/AdminUsers"), "AdminUsers");
+const AdminDrivers = lazyNamed(() => import("./pages/AdminDrivers"), "AdminDrivers");
+const AdminPodReview = lazyNamed(() => import("./pages/AdminPodReview"), "AdminPodReview");
+const AdminFinance = lazyNamed(() => import("./pages/AdminFinance"), "AdminFinance");
+const AdminOnboarding = lazyNamed(() => import("./pages/AdminOnboarding"), "AdminOnboarding");
+const SuperAdminDashboard = lazyNamed(() => import("./pages/SuperAdminDashboard"), "SuperAdminDashboard");
+const SuperAdminOrgs = lazyNamed(() => import("./pages/SuperAdminPages"), "SuperAdminOrgs");
+const SuperAdminUsers = lazyNamed(() => import("./pages/SuperAdminPages"), "SuperAdminUsers");
+const SuperAdminJobs = lazyNamed(() => import("./pages/SuperAdminPages"), "SuperAdminJobs");
+const SuperAdminAudit = lazyNamed(() => import("./pages/SuperAdminPages"), "SuperAdminAudit");
+const SuperAdminErrors = lazyNamed(() => import("./pages/SuperAdminPages"), "SuperAdminErrors");
+const SuperAdminAttention = lazyNamed(() => import("./pages/SuperAdminPages"), "SuperAdminAttention");
+const SuperAdminSettings = lazyNamed(() => import("./pages/SuperAdminPages"), "SuperAdminSettings");
+const InvoiceGenerator = lazyNamed(() => import("./pages/InvoiceGenerator"), "InvoiceGenerator");
+const DriverOnboardingWizard = lazy(() => import("./features/onboarding/pages/DriverOnboardingWizard"));
+const ClientOnboardingWizard = lazy(() => import("./features/onboarding/pages/ClientOnboardingWizard"));
+const OrganisationOnboardingWizard = lazy(() => import("./features/onboarding/pages/OrganisationOnboardingWizard"));
+const DriverProfileDetail = lazy(() => import("./features/onboarding/pages/DriverProfileDetail"));
+const ClientProfileDetail = lazy(() => import("./features/onboarding/pages/ClientProfileDetail"));
+const OrganisationProfileDetail = lazy(() => import("./features/onboarding/pages/OrganisationProfileDetail"));
+const ControlLayout = lazyNamed(() => import("@/features/control/layouts/ControlLayout"), "ControlLayout");
+const ControlOverview = lazyNamed(() => import("@/features/control/pages/ControlOverview"), "ControlOverview");
+const ControlJobs = lazyNamed(() => import("@/features/control/pages/ControlJobs"), "ControlJobs");
+const ControlDrivers = lazyNamed(() => import("@/features/control/pages/ControlDrivers"), "ControlDrivers");
+const ControlCompliance = lazyNamed(() => import("@/features/control/pages/ControlCompliance"), "ControlCompliance");
+const ControlPodReview = lazyNamed(() => import("@/features/control/pages/ControlPodReview"), "ControlPodReview");
+const ControlFinance = lazyNamed(() => import("@/features/control/pages/ControlFinance"), "ControlFinance");
+const ControlClients = lazyNamed(() => import("@/features/control/pages/ControlClients"), "ControlClients");
+const InvoicePrepScreen = lazyNamed(() => import("@/features/invoicing/pages/InvoicePrepScreen"), "InvoicePrepScreen");
+const ControlAdmin = lazyNamed(() => import("@/features/control/pages/ControlAdmin"), "ControlAdmin");
+const ControlSuperAdmin = lazyNamed(() => import("@/features/control/pages/ControlSuperAdmin"), "ControlSuperAdmin");
+const ExportsPage = lazyNamed(() => import("@/features/exports/pages/ExportsPage"), "ExportsPage");
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -170,6 +191,16 @@ function DriverOnboardingGate({ children }: { children: React.ReactNode }) {
 
 /* ── Admin-only route guard ── */
 
+/* ── Suspense fallback for lazily-loaded route chunks ── */
+
+function PageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+    </div>
+  );
+}
+
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { isAdmin } = useAuth();
   if (!isAdmin) return <Navigate to="/" replace />;
@@ -241,6 +272,8 @@ const App = () => {
             <DevRoleBanner />
             <BrowserRouter>
               <ScrollToTop />
+              <OfflineBanner />
+              <Suspense fallback={<PageLoader />}>
               <Routes>
                 {/* ── Public routes ── */}
                 <Route path="/login" element={<Login />} />
@@ -333,6 +366,7 @@ const App = () => {
                 {/* ── Catch-all ── */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
+              </Suspense>
             </BrowserRouter>
           </AuthProvider>
           </ConfirmProvider>
