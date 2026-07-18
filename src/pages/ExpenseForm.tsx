@@ -413,11 +413,11 @@ export const ExpenseForm = () => {
                   <p className="text-xs text-muted-foreground">Add clear photos of your receipts for this expense.</p>
                 </div>
                 <div className="flex gap-2">
-                  <Button type="button" size="icon" variant="outline" onClick={() => cameraInputRef.current?.click()}>
+                  <Button type="button" size="icon" variant="outline" aria-label="Take a photo of a receipt" onClick={() => cameraInputRef.current?.click()}>
                     <Camera className="w-4 h-4" />
                   </Button>
                   {canUseGallery && (
-                    <Button type="button" size="icon" variant="outline" onClick={() => fileInputRef.current?.click()}>
+                    <Button type="button" size="icon" variant="outline" aria-label="Add a receipt from your photos" onClick={() => fileInputRef.current?.click()}>
                       <ImagePlus className="w-4 h-4" />
                     </Button>
                   )}

@@ -93,6 +93,7 @@ function LineItemRow({ item, onChange, onRemove, isOnly }: LineItemRowProps) {
           className="h-9 w-9 text-destructive hover:text-destructive"
           onClick={() => onRemove(item.id)}
           disabled={isOnly}
+          aria-label="Remove line item"
         >
           <Trash2 className="w-4 h-4" />
         </Button>

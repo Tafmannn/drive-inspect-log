@@ -134,6 +134,7 @@ export function ControlSidebar() {
           size="icon"
           className="h-8 w-8 text-sidebar-foreground/50 hover:text-sidebar-foreground mx-auto"
           onClick={() => setCollapsed((v) => !v)}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {collapsed ? (
             <ChevronsRight className="h-4 w-4" />
