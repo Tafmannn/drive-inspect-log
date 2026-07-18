@@ -11,7 +11,7 @@ describe("PodEmailConfirmDialog", () => {
         open
         onOpenChange={() => {}}
         defaultEmail="onfile@example.com"
-        jobRef="AX0063"
+        documentLabel="Job AX0063's POD"
         sending={false}
         onConfirm={onConfirm}
       />
@@ -20,7 +20,7 @@ describe("PodEmailConfirmDialog", () => {
     const input = screen.getByLabelText(/recipient email/i) as HTMLInputElement;
     expect(input.value).toBe("onfile@example.com");
     // A pre-filled valid address should already enable Send.
-    expect(screen.getByRole("button", { name: /send pod/i })).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: /send email/i })).not.toBeDisabled();
   });
 
   it("lets the admin amend the address and sends the edited value, not the original", () => {
@@ -30,7 +30,7 @@ describe("PodEmailConfirmDialog", () => {
         open
         onOpenChange={() => {}}
         defaultEmail="wrong@example.com"
-        jobRef="AX0063"
+        documentLabel="Job AX0063's POD"
         sending={false}
         onConfirm={onConfirm}
       />
@@ -38,7 +38,7 @@ describe("PodEmailConfirmDialog", () => {
 
     const input = screen.getByLabelText(/recipient email/i);
     fireEvent.change(input, { target: { value: "corrected@example.com" } });
-    fireEvent.click(screen.getByRole("button", { name: /send pod/i }));
+    fireEvent.click(screen.getByRole("button", { name: /send email/i }));
 
     expect(onConfirm).toHaveBeenCalledWith("corrected@example.com");
   });
@@ -49,13 +49,13 @@ describe("PodEmailConfirmDialog", () => {
         open
         onOpenChange={() => {}}
         defaultEmail=""
-        jobRef="AX0063"
+        documentLabel="Job AX0063's POD"
         sending={false}
         onConfirm={vi.fn()}
       />
     );
 
-    const sendButton = screen.getByRole("button", { name: /send pod/i });
+    const sendButton = screen.getByRole("button", { name: /send email/i });
     expect(sendButton).toBeDisabled();
 
     const input = screen.getByLabelText(/recipient email/i);
@@ -74,7 +74,7 @@ describe("PodEmailConfirmDialog", () => {
         open
         onOpenChange={() => {}}
         defaultEmail="first-job@example.com"
-        jobRef="AX0001"
+        documentLabel="Job AX0001's POD"
         sending={false}
         onConfirm={onConfirm}
       />
@@ -90,7 +90,7 @@ describe("PodEmailConfirmDialog", () => {
         open={false}
         onOpenChange={() => {}}
         defaultEmail="first-job@example.com"
-        jobRef="AX0001"
+        documentLabel="Job AX0001's POD"
         sending={false}
         onConfirm={onConfirm}
       />
@@ -100,7 +100,7 @@ describe("PodEmailConfirmDialog", () => {
         open
         onOpenChange={() => {}}
         defaultEmail="second-job@example.com"
-        jobRef="AX0002"
+        documentLabel="Job AX0002's POD"
         sending={false}
         onConfirm={onConfirm}
       />
@@ -118,13 +118,13 @@ describe("PodEmailConfirmDialog", () => {
         open
         onOpenChange={onOpenChange}
         defaultEmail="onfile@example.com"
-        jobRef="AX0063"
+        documentLabel="Job AX0063's POD"
         sending
         onConfirm={vi.fn()}
       />
     );
 
-    expect(screen.getByRole("button", { name: /send pod/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /send email/i })).toBeDisabled();
     expect(screen.getByRole("button", { name: /cancel/i })).toBeDisabled();
   });
 });
