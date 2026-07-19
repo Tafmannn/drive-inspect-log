@@ -5,6 +5,12 @@ import { AppHeader } from "@/components/AppHeader";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import { PhotoViewer } from "@/components/PhotoViewer";
 import { PodEmailConfirmDialog } from "@/components/PodEmailConfirmDialog";
 import { useJob, useUpdateJob } from "@/hooks/useJobs";
@@ -23,6 +29,7 @@ import {
   Images,
   Receipt,
   CheckCircle,
+  MoreVertical,
 } from "lucide-react";
 import { completeJobRpc } from "@/lib/api";
 import { openPodEmail, generatePodEmailBody } from "@/lib/podEmail";
@@ -515,32 +522,9 @@ export const PodReport = () => {
     <div className="min-h-screen bg-muted flex flex-col print:bg-white">
       <div className="print:hidden">
         <AppHeader title="POD Report" showBack onBack={goBack}>
-          <div className="flex gap-1">
-            {(isAdmin || isSuperAdmin) && (
-              <Button
-                size="sm"
-                variant="ghost"
-                className="gap-1"
-                onClick={() => navigate(`/invoice/new?jobId=${jobId}`)}
-              >
-                <Receipt className="h-4 w-4" />
-                Invoice
-              </Button>
-            )}
-            <Button
-              size="sm"
-              variant="ghost"
-              className="gap-1"
-              onClick={handleSharePdf}
-              disabled={pdfLoading}
-            >
-              {pdfLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <FileDown className="h-4 w-4" />
-              )}
-              PDF
-            </Button>
+          {/* Email is the primary action; the rest live in an overflow menu
+              so four icon+text buttons no longer overflow the mobile header. */}
+          <div className="flex items-center gap-1">
             <Button
               size="sm"
               variant="ghost"
@@ -548,13 +532,29 @@ export const PodReport = () => {
               onClick={handleEmailPdf}
               disabled={pdfLoading}
             >
-              <Mail className="h-4 w-4" />
+              {pdfLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
               Email
             </Button>
-            <Button size="sm" variant="ghost" className="gap-1" onClick={handleShare}>
-              <Share2 className="h-4 w-4" />
-              Share
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="icon" variant="ghost" className="h-9 w-9" aria-label="More POD actions">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleSharePdf} disabled={pdfLoading}>
+                  <FileDown className="h-4 w-4 mr-2" /> Download PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleShare}>
+                  <Share2 className="h-4 w-4 mr-2" /> Share…
+                </DropdownMenuItem>
+                {(isAdmin || isSuperAdmin) && (
+                  <DropdownMenuItem onClick={() => navigate(`/invoice/new?jobId=${jobId}`)}>
+                    <Receipt className="h-4 w-4 mr-2" /> Create invoice
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </AppHeader>
       </div>
