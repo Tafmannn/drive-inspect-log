@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { EvidenceStatusBadges } from "@/components/EvidenceStatusBadges";
 import { PhotoUploadsStatusGroup } from "@/components/PhotoUploadsStatusGroup";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import { useNavigate } from "react-router-dom";
 import {
   getPendingUploadsByJob,
@@ -163,6 +164,7 @@ export const PendingUploads = () => {
   return (
     <div className="min-h-screen bg-background pb-20">
       <AppHeader title="Pending Uploads" showBack onBack={() => navigate('/')} />
+      <PullToRefresh onRefresh={refresh}>
       <div className="p-4 space-y-4 max-w-lg mx-auto">
         <QueuedSubmissionsSection />
 
@@ -299,6 +301,7 @@ export const PendingUploads = () => {
           );
         })}
       </div>
+      </PullToRefresh>
 
       <AlertDialog
         open={!!confirmDiscardId}

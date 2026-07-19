@@ -2,6 +2,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { JobCard } from "@/components/JobCard";
 import { BottomNav } from "@/components/BottomNav";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import { useNavigate } from "react-router-dom";
 import { usePendingJobs } from "@/hooks/useJobs";
 import { useDriverGate } from "@/hooks/useDriverGate";
@@ -9,7 +10,7 @@ import { Clock } from "lucide-react";
 
 export const PendingJobs = () => {
   const navigate = useNavigate();
-  const { data: jobs, isLoading } = usePendingJobs();
+  const { data: jobs, isLoading, refetch } = usePendingJobs();
   const gate = useDriverGate();
 
   // Scope to driver's own jobs if driver-only
@@ -20,6 +21,7 @@ export const PendingJobs = () => {
   return (
     <div className="min-h-screen bg-background pb-20">
       <AppHeader title="Pending Jobs" showBack onBack={() => navigate('/')} />
+      <PullToRefresh onRefresh={() => refetch()}>
       <div className="p-4 max-w-lg mx-auto">
         {isLoading && <DashboardSkeleton />}
         {!isLoading && (!filteredJobs || filteredJobs.length === 0) && (
@@ -48,6 +50,7 @@ export const PendingJobs = () => {
           />
         ))}
       </div>
+      </PullToRefresh>
       <BottomNav />
     </div>
   );

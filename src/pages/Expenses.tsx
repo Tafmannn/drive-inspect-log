@@ -44,18 +44,26 @@ export const Expenses = () => {
   const { data: scopedJob } = useJob(scopedJobId);
   const { data: scopedExpenses, isLoading: scopedLoading } = useJobExpenses(scopedJobId);
 
-  const globalFilters = {
-    dateFrom: getDateFrom(dateRange),
-    category: categoryFilter !== "all" ? categoryFilter : undefined,
-  };
-  const { data: globalExpenses, isLoading: globalLoading } = useExpenses(
-    isScoped ? undefined : globalFilters
-  );
+  const isDriverOnly = gate.isDriverOnly;
+  const myDriverId = gate.driverProfileId;
+
+  // Global list. For a driver this is scoped to THEIR OWN expenses via an
+  // explicit driver_id filter — the expenses RLS policy is org-wide, so
+  // without this a driver would see every colleague's spend. Kept disabled
+  // until the driver's id is known.
+  const globalFilters =
+    isScoped || (isDriverOnly && !myDriverId)
+      ? undefined
+      : {
+          dateFrom: getDateFrom(dateRange),
+          category: categoryFilter !== "all" ? categoryFilter : undefined,
+          driverId: isDriverOnly ? myDriverId ?? undefined : undefined,
+        };
+  const { data: globalExpenses, isLoading: globalLoading } = useExpenses(globalFilters);
   const { data: totals } = useExpenseTotals();
 
-  // For driver-only users in global mode, filter to only their assigned jobs' expenses
-  const isDriverOnly = gate.isDriverOnly;
-  let expenses = isScoped ? scopedExpenses : globalExpenses;
+  const expenses = isScoped ? scopedExpenses : globalExpenses;
+  const driverTotal = (globalExpenses ?? []).reduce((s, e) => s + Number(e.amount ?? 0), 0);
 
   const isLoading = isScoped ? scopedLoading : globalLoading;
 
@@ -115,7 +123,7 @@ export const Expenses = () => {
           </div>
         )}
 
-        {/* Totals — global mode, admin only */}
+        {/* Totals — global mode, admin only (org-wide) */}
         {!isScoped && !isDriverOnly && (
           <div className="grid grid-cols-3 gap-3">
             {[
@@ -131,8 +139,18 @@ export const Expenses = () => {
           </div>
         )}
 
-        {/* Filters — global mode, admin only */}
-        {!isScoped && !isDriverOnly && (
+        {/* Totals — driver's own spend for the selected range */}
+        {!isScoped && isDriverOnly && (
+          <div className="p-3 rounded-xl bg-card border border-border text-center">
+            <p className="text-[13px] text-muted-foreground uppercase tracking-wide">
+              Your spend · {DATE_RANGES.find(r => r.value === dateRange)?.label ?? ""}
+            </p>
+            <p className="text-[18px] font-semibold text-foreground tabular-nums">{fmt(driverTotal)}</p>
+          </div>
+        )}
+
+        {/* Filters — global mode (drivers get date + category too) */}
+        {!isScoped && (
           <>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => setShowFilters(f => !f)} className="min-h-[44px] rounded-lg">
@@ -169,21 +187,8 @@ export const Expenses = () => {
           </>
         )}
 
-        {/* Driver-only global mode: redirect message */}
-        {!isScoped && isDriverOnly && (
-          <div className="text-center py-12 space-y-3">
-            <Receipt className="w-12 h-12 mx-auto text-muted-foreground stroke-[1.5]" />
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-foreground">No expenses to show</p>
-              <p className="text-[13px] text-muted-foreground">
-                Your expenses are linked to your assigned jobs. Open a job to view or add expenses.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* List — only show for scoped or admin global */}
-        {(!isDriverOnly || isScoped) && (
+        {/* List — scoped job, admin global, or a driver's own expenses */}
+        {(
           <>
             {isLoading && <DashboardSkeleton />}
 
@@ -236,6 +241,13 @@ export const Expenses = () => {
                 </div>
               );
             })}
+
+            {/* Drivers add expenses from a job (no global add), so guide them. */}
+            {isDriverOnly && !isScoped && (
+              <p className="text-[12px] text-muted-foreground text-center pt-1">
+                To add an expense, open the relevant job and tap “Expenses”.
+              </p>
+            )}
 
             {/* FAB */}
             {isScoped && (

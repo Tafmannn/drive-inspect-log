@@ -8,19 +8,23 @@ import { ProfilePhotoUpload } from "@/features/users/components/ProfilePhotoUplo
 import { useAuth } from "@/context/AuthContext";
 import { useDriverGate } from "@/hooks/useDriverGate";
 import { useOwnProfilePhotoPath } from "@/hooks/useProfilePhoto";
+import { useDashboardCounts } from "@/hooks/useJobs";
 import { supabase } from "@/integrations/supabase/client";
 import { getOrgId } from "@/lib/orgHelper";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { KpiPill } from "@/components/KpiPill";
 import {
   BarChart3,
   BadgeCheck,
   ChevronRight,
+  Clock,
   LogOut,
   Receipt,
   Shield,
+  Truck,
   Upload,
 } from "lucide-react";
 
@@ -35,6 +39,10 @@ export const Profile = () => {
   const { data: ownPhotoPath } = useOwnProfilePhotoPath();
 
   const isDriverOnly = gate.isDriverOnly;
+  // Driver's own workload for the stat row (admins keep the org totals below).
+  const { data: driverCounts, isLoading: driverCountsLoading } = useDashboardCounts(
+    isDriverOnly ? gate.driverProfileId : undefined,
+  );
 
   useEffect(() => {
     const loadOrgId = async () => {
@@ -114,8 +122,33 @@ export const Profile = () => {
           </div>
         </div>
 
-        {/* Stats — admin only */}
-        {!isDriverOnly && (
+        {/* Stats — driver: own workload (tappable); admin: org totals */}
+        {isDriverOnly ? (
+          <div className="grid grid-cols-3 gap-2">
+            <KpiPill
+              label="Active"
+              value={driverCounts?.myJobs ?? 0}
+              icon={Truck}
+              loading={driverCountsLoading}
+              onClick={() => navigate("/jobs")}
+            />
+            <KpiPill
+              label="Done 14d"
+              value={driverCounts?.completedLast14Days ?? 0}
+              icon={Clock}
+              loading={driverCountsLoading}
+              onClick={() => navigate("/jobs/completed")}
+            />
+            <KpiPill
+              label="Uploads"
+              value={driverCounts?.pendingUploads ?? 0}
+              icon={Upload}
+              variant={(driverCounts?.pendingUploads ?? 0) > 0 ? "warning" : "default"}
+              loading={driverCountsLoading}
+              onClick={() => navigate("/pending-uploads")}
+            />
+          </div>
+        ) : (
           <div className="grid grid-cols-2 gap-3">
             <Card>
               <CardContent className="p-4 text-center">
@@ -132,25 +165,24 @@ export const Profile = () => {
           </div>
         )}
 
-        {/* Quick links — admin only */}
-        {!isDriverOnly && (
-          <div className="space-y-2">
-            {[
-              { icon: Receipt, label: "Expenses", path: "/expenses" },
-              { icon: Upload, label: "Pending Uploads", path: "/pending-uploads" },
-            ].map(({ icon: Icon, label, path }) => (
-              <Card key={path} className="cursor-pointer active:bg-muted/50" onClick={() => navigate(path)}>
-                <CardContent className="p-4 flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <Icon className="w-5 h-5 text-primary" />
-                  </div>
-                  <span className="text-sm font-medium flex-1">{label}</span>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+        {/* Quick links — Expenses for everyone; Pending Uploads is admin-only
+            (drivers already have it in the bottom nav and the stat row). */}
+        <div className="space-y-2">
+          {[
+            { icon: Receipt, label: "Expenses", path: "/expenses" },
+            ...(!isDriverOnly ? [{ icon: Upload, label: "Pending Uploads", path: "/pending-uploads" }] : []),
+          ].map(({ icon: Icon, label, path }) => (
+            <Card key={path} className="cursor-pointer active:bg-muted/50" onClick={() => navigate(path)}>
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Icon className="w-5 h-5 text-primary" />
+                </div>
+                <span className="text-sm font-medium flex-1">{label}</span>
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
 
         {adminLinks.length > 0 && (
           <>
