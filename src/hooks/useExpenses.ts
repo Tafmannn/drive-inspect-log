@@ -7,6 +7,7 @@ export function useExpenses(filters?: {
   category?: string;
   dateFrom?: string;
   dateTo?: string;
+  driverId?: string;
 } | undefined) {
   // When filters is explicitly undefined (e.g. scoped mode), disable the query
   const enabled = filters !== undefined;

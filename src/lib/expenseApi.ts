@@ -71,6 +71,13 @@ export async function listExpenses(filters?: {
   category?: string;
   dateFrom?: string;
   dateTo?: string;
+  /**
+   * Narrow to a single driver's own expenses. The `expenses` RLS policy is
+   * org-scoped (any org member can read all org expenses), so a driver's
+   * "my expenses" view MUST pass this explicitly — otherwise it would show
+   * the whole org's spend.
+   */
+  driverId?: string;
 }): Promise<ExpenseWithJob[]> {
   let query = supabase
     .from('expenses')
@@ -83,6 +90,7 @@ export async function listExpenses(filters?: {
   if (filters?.category) query = query.eq('category', filters.category);
   if (filters?.dateFrom) query = query.gte('date', filters.dateFrom);
   if (filters?.dateTo) query = query.lte('date', filters.dateTo);
+  if (filters?.driverId) query = query.eq('driver_id', filters.driverId);
 
   const { data, error } = await query;
   if (error) throw error;
