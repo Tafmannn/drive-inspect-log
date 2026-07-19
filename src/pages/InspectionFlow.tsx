@@ -589,7 +589,8 @@ export const InspectionFlow = () => {
     const missing = validateBeforeSubmit();
     if (missing.length > 0) {
       toast({
-        title: `Please complete ${missing.length} required field(s).`,
+        title: "Please complete the required fields",
+        description: missing.join(", "),
         variant: "destructive",
       });
       submitInFlight.current = false;
@@ -1256,7 +1257,8 @@ export const InspectionFlow = () => {
     const missing = validateStep(currentStep);
     if (missing.length > 0) {
       toast({
-        title: `Please complete ${missing.length} required field(s).`,
+        title: "Please complete the required fields",
+        description: missing.join(", "),
         variant: "destructive",
       });
       return;
