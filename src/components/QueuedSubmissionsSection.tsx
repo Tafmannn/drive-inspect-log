@@ -196,7 +196,7 @@ export function QueuedSubmissionsSection() {
         <h2 className="text-[15px] font-semibold text-foreground">
           Queued Inspection Submissions
         </h2>
-        <span className="text-[12px] text-muted-foreground">
+        <span className="text-xs text-muted-foreground">
           {items.length} total
         </span>
       </div>
@@ -236,7 +236,7 @@ export function QueuedSubmissionsSection() {
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="text-[16px] font-medium text-foreground truncate">
+                  <p className="text-base font-medium text-foreground truncate">
                     {item.jobNumber || `Job ${item.jobId.slice(0, 8)}`}
                   </p>
                   <p className="text-[13px] text-muted-foreground truncate">
@@ -257,7 +257,7 @@ export function QueuedSubmissionsSection() {
                 </span>
               </div>
 
-              <div className="flex items-center gap-3 text-[12px] text-muted-foreground">
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
                 <span className="inline-flex items-center gap-1">
                   <Clock className="w-3 h-3" />
                   Created {formatRelative(item.createdAt)}
@@ -271,7 +271,7 @@ export function QueuedSubmissionsSection() {
               {item.lastError && (
                 <div
                   className={[
-                    "text-[12px] rounded-md p-2 break-words",
+                    "text-xs rounded-md p-2 break-words",
                     isNeedsAttention
                       ? "bg-red-500/10 text-red-800 dark:text-red-200 border border-red-500/30"
                       : "bg-orange-500/10 text-orange-800 dark:text-orange-200 border border-orange-500/30",

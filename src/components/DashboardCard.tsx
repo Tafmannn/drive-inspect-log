@@ -40,14 +40,14 @@ export const DashboardCard = ({
           {icon}
         </div>
         <div className="flex flex-col">
-          <p className="text-[16px] font-medium text-foreground">{title}</p>
-          <p className="text-[14px] text-muted-foreground">{subtitle}</p>
+          <p className="text-base font-medium text-foreground">{title}</p>
+          <p className="text-sm text-muted-foreground">{subtitle}</p>
         </div>
       </div>
       {count !== undefined && (
         <div
           className={cn(
-            "w-7 h-7 rounded-full text-[12px] font-medium flex items-center justify-center shrink-0",
+            "w-7 h-7 rounded-full text-xs font-medium flex items-center justify-center shrink-0",
             count > 0
               ? "bg-success text-success-foreground"
               : "bg-muted text-muted-foreground"

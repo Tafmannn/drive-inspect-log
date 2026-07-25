@@ -367,7 +367,7 @@ function QueueSection({
         onClick={() => collapsible && setCollapsed(!collapsed)}
       >
         <Icon className={`h-4 w-4 ${iconClass ?? "text-muted-foreground"}`} />
-        <h2 className="text-[14px] font-semibold text-foreground">{title}</h2>
+        <h2 className="text-sm font-semibold text-foreground">{title}</h2>
         <span className="text-[11px] font-medium text-muted-foreground">({count})</span>
         {collapsible && (
           <span className="text-[10px] text-muted-foreground ml-auto">

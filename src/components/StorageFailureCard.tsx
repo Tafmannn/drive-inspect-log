@@ -73,11 +73,7 @@ export function StorageFailureCard({
           >
             {failure.title}
           </p>
-          <p
-            className={
-              "text-foreground " + (dense ? "text-[12px]" : "text-xs")
-            }
-          >
+          <p className="text-foreground text-xs">
             {failure.description}
           </p>
 

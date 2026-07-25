@@ -620,7 +620,7 @@ function Section({ children }: { children: React.ReactNode }) {
 
 function SectionLabel({ children, icon: Icon }: { children: React.ReactNode; icon?: React.ComponentType<{ className?: string }> }) {
   return (
-    <h3 className="text-[14px] font-semibold text-muted-foreground flex items-center gap-1.5 mb-1">
+    <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5 mb-1">
       {Icon && <Icon className="w-4 h-4" />}
       {children}
     </h3>
@@ -688,7 +688,7 @@ function LegCard({
   const dotClass = accent === "primary" ? "bg-primary" : "bg-success";
   return (
     <div className={`p-4 rounded-xl bg-card border border-border border-l-4 ${borderClass} shadow-sm space-y-2`}>
-      <h3 className="text-[14px] font-semibold text-muted-foreground flex items-center gap-1.5 mb-1">
+      <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5 mb-1">
         <span className={`h-2 w-2 rounded-full ${dotClass}`} /> {title}
       </h3>
       <ContactRow icon={Building} text={contactName} />

@@ -189,7 +189,7 @@ export const PendingUploads = () => {
         {!loading && jobs.length === 0 && (
           <div className="text-center py-12">
             <Upload className="w-12 h-12 mx-auto text-muted-foreground mb-3 stroke-[2]" />
-            <p className="text-[14px] text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               No pending uploads. All photos are synced.
             </p>
           </div>
@@ -204,11 +204,11 @@ export const PendingUploads = () => {
             <div key={job.jobId} className="p-4 rounded-xl bg-card border border-border shadow-sm space-y-3">
               <div className="flex items-center justify-between">
                 <div className="min-w-0 flex-1">
-                  <p className="text-[16px] font-medium text-foreground truncate">
+                  <p className="text-base font-medium text-foreground truncate">
                     {job.jobNumber || job.jobId.slice(0, 8)}
                   </p>
                   {job.vehicleReg && (
-                    <p className="text-[14px] text-muted-foreground">{job.vehicleReg}</p>
+                    <p className="text-sm text-muted-foreground">{job.vehicleReg}</p>
                   )}
                 </div>
                 <EvidenceStatusBadges jobId={job.jobId} />
@@ -240,7 +240,7 @@ export const PendingUploads = () => {
 
               {stuck.length > 0 && (
                 <div className="pt-2 border-t border-border space-y-2">
-                  <p className="text-[12px] font-medium text-foreground flex items-center gap-1">
+                  <p className="text-xs font-medium text-foreground flex items-center gap-1">
                     <AlertTriangle className="w-3.5 h-3.5 text-destructive stroke-[2.5]" />
                     {stuck.length} photo{stuck.length !== 1 ? "s" : ""} need attention
                   </p>

@@ -183,7 +183,7 @@ export function JobMasterList() {
         <p className="text-[13px] text-muted-foreground">{filtered.length} job{filtered.length !== 1 ? "s" : ""}</p>
 
         {isLoading ? <DashboardSkeleton /> : filtered.length === 0 ? (
-          <p className="text-center py-12 text-[14px] text-muted-foreground">No jobs found.</p>
+          <p className="text-center py-12 text-sm text-muted-foreground">No jobs found.</p>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-border">
             <Table>

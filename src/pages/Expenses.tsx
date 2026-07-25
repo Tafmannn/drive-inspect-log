@@ -105,7 +105,7 @@ export const Expenses = () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-[12px] h-7 px-2 text-muted-foreground"
+                  className="text-xs h-7 px-2 text-muted-foreground"
                   onClick={() => navigate("/expenses")}
                 >
                   <ExternalLink className="h-3 w-3 mr-1" /> View all expenses
@@ -114,7 +114,7 @@ export const Expenses = () => {
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-[12px] h-7 px-2 text-muted-foreground"
+                className="text-xs h-7 px-2 text-muted-foreground"
                 onClick={() => navigate(`/jobs/${scopedJobId}`)}
               >
                 <ArrowLeft className="h-3 w-3 mr-1" /> Back to job
@@ -133,7 +133,7 @@ export const Expenses = () => {
             ].map(t => (
               <div key={t.label} className="p-3 rounded-xl bg-card border border-border text-center">
                 <p className="text-[13px] text-muted-foreground uppercase tracking-wide">{t.label}</p>
-                <p className="text-[16px] font-semibold text-foreground">{fmt(t.value)}</p>
+                <p className="text-base font-semibold text-foreground">{fmt(t.value)}</p>
               </div>
             ))}
           </div>
@@ -145,7 +145,7 @@ export const Expenses = () => {
             <p className="text-[13px] text-muted-foreground uppercase tracking-wide">
               Your spend · {DATE_RANGES.find(r => r.value === dateRange)?.label ?? ""}
             </p>
-            <p className="text-[18px] font-semibold text-foreground tabular-nums">{fmt(driverTotal)}</p>
+            <p className="text-lg font-semibold text-foreground tabular-nums">{fmt(driverTotal)}</p>
           </div>
         )}
 
@@ -195,7 +195,7 @@ export const Expenses = () => {
             {!isLoading && (!expenses || expenses.length === 0) && (
               <div className="text-center py-12">
                 <Receipt className="w-12 h-12 mx-auto text-muted-foreground mb-3 stroke-[2]" />
-                <p className="text-[14px] text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                   {isScoped ? "No expenses logged for this job yet" : "No expenses found"}
                 </p>
               </div>
@@ -218,7 +218,7 @@ export const Expenses = () => {
                   }}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[16px] font-semibold text-foreground tabular-nums">{fmt(Number(e.amount))}</span>
+                    <span className="text-base font-semibold text-foreground tabular-nums">{fmt(Number(e.amount))}</span>
                     <div className="flex items-center gap-1.5">
                       {hasReceipts ? (
                         <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
@@ -233,7 +233,7 @@ export const Expenses = () => {
                   </div>
                   <div className="flex items-center justify-between">
                     <Badge variant="secondary" className="text-[11px]">{e.category}</Badge>
-                    <span className="text-[12px] text-muted-foreground">{new Date(e.date).toLocaleDateString("en-GB")}</span>
+                    <span className="text-xs text-muted-foreground">{new Date(e.date).toLocaleDateString("en-GB")}</span>
                   </div>
                   {e.label && (
                     <p className="text-[11px] text-muted-foreground truncate">{e.label}</p>
@@ -244,7 +244,7 @@ export const Expenses = () => {
 
             {/* Drivers add expenses from a job (no global add), so guide them. */}
             {isDriverOnly && !isScoped && (
-              <p className="text-[12px] text-muted-foreground text-center pt-1">
+              <p className="text-xs text-muted-foreground text-center pt-1">
                 To add an expense, open the relevant job and tap “Expenses”.
               </p>
             )}
