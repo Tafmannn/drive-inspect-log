@@ -22,7 +22,7 @@ export function AttentionKpis({ kpis, loading }: Props) {
             <Icon className="w-5 h-5 stroke-[2]" />
           </div>
           <div>
-            <p className="text-[20px] font-semibold text-foreground tabular-nums">
+            <p className="text-xl font-semibold text-foreground tabular-nums">
               {loading ? "…" : (kpis?.[key] ?? 0)}
             </p>
             <p className="text-[13px] text-muted-foreground">{label}</p>

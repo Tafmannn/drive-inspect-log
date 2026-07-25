@@ -77,7 +77,7 @@ export function AdminPendingUploads() {
     return (
       <div className="text-center py-8 space-y-2">
         <HardDrive className="w-10 h-10 mx-auto text-muted-foreground stroke-[2]" />
-        <p className="text-[14px] text-muted-foreground">No pending uploads on this device.</p>
+        <p className="text-sm text-muted-foreground">No pending uploads on this device.</p>
       </div>
     );
   }
@@ -99,12 +99,12 @@ export function AdminPendingUploads() {
           <TableBody>
             {groups.map((g) => (
               <TableRow key={g.jobId}>
-                <TableCell className="text-[14px] font-medium">
+                <TableCell className="text-sm font-medium">
                   {g.jobNumber || g.jobId.slice(0, 8)}
                 </TableCell>
-                <TableCell className="text-[14px]">{g.vehicleReg || "—"}</TableCell>
-                <TableCell className="text-[14px]">{g.pendingCount}</TableCell>
-                <TableCell className="text-[14px] text-destructive">{g.failedCount}</TableCell>
+                <TableCell className="text-sm">{g.vehicleReg || "—"}</TableCell>
+                <TableCell className="text-sm">{g.pendingCount}</TableCell>
+                <TableCell className="text-sm text-destructive">{g.failedCount}</TableCell>
                 <TableCell className="text-[13px] text-muted-foreground">
                   {g.lastErrorAt ? new Date(g.lastErrorAt).toLocaleString() : "—"}
                 </TableCell>
@@ -129,7 +129,7 @@ export function AdminPendingUploads() {
           </TableBody>
         </Table>
       </div>
-      <p className="text-[12px] text-muted-foreground text-center">
+      <p className="text-xs text-muted-foreground text-center">
         This data is stored offline on this device.
       </p>
     </div>

@@ -40,7 +40,7 @@ export const AppHeader = ({
           aria-label="Go to dashboard"
         >
           <img src="/axentra-logo.png" alt="Axentra" className="h-5 w-auto brightness-0 invert" />
-          <span className="text-[14px] font-semibold text-white tracking-tight">Axentra Vehicles</span>
+          <span className="text-sm font-semibold text-white tracking-tight">Axentra Vehicles</span>
         </button>
         <span className="text-[11px] text-white/60 font-medium">{roleLabel}</span>
       </div>
@@ -62,7 +62,7 @@ export const AppHeader = ({
             </button>
           )}
           {title && (
-            <h1 className="text-[20px] font-semibold text-foreground truncate">{title}</h1>
+            <h1 className="text-xl font-semibold text-foreground truncate">{title}</h1>
           )}
         </div>
         <div className="flex items-center gap-2">

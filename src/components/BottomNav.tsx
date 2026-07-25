@@ -45,7 +45,7 @@ export const BottomNav = () => {
             aria-label={label}
           >
             <Icon className="w-6 h-6 stroke-[2]" />
-            <span className="text-[12px] font-medium">{label}</span>
+            <span className="text-xs font-medium">{label}</span>
           </button>
         );
       })}
