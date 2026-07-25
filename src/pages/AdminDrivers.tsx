@@ -120,7 +120,7 @@ function DriverCard({ driver, perf, onOpen }: { driver: AdminDriverRow; perf?: D
             <User className="h-4 w-4" />
           </div>
           <div className="min-w-0">
-            <p className="text-[15px] font-medium text-foreground truncate">
+            <p className="text-base font-medium text-foreground truncate">
               {driver.displayName || driver.fullName}
             </p>
             {driver.phone && (

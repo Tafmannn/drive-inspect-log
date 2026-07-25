@@ -193,7 +193,7 @@ export function QueuedSubmissionsSection() {
   return (
     <section className="space-y-3" aria-label="Queued inspection submissions">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-[15px] font-semibold text-foreground">
+        <h2 className="text-sm font-semibold text-foreground">
           Queued Inspection Submissions
         </h2>
         <span className="text-xs text-muted-foreground">
