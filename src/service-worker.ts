@@ -48,3 +48,51 @@ self.addEventListener("message", (event) => {
     void self.skipWaiting();
   }
 });
+
+// ── Web Push ────────────────────────────────────────────────────────────
+// Payloads are validated (type whitelist, uuid job id, length caps) before
+// anything is shown; the click destination is always an internal job route
+// derived from the validated id — never a URL taken from the payload.
+import { parsePushPayload, clickUrlFor } from "./lib/pushPayload";
+
+self.addEventListener("push", (event) => {
+  const payload = parsePushPayload(event.data?.text() ?? "");
+  if (!payload) return;
+  event.waitUntil(
+    self.registration.showNotification(payload.title, {
+      body: payload.body,
+      icon: "/axentra-app-icon.png",
+      badge: "/axentra-app-icon.png",
+      tag: `job-assigned-${payload.jobId}`,
+      data: { jobId: payload.jobId },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = clickUrlFor((event.notification.data as { jobId?: unknown })?.jobId);
+  event.waitUntil(
+    (async () => {
+      const clientList = await self.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+      // Prefer focusing an existing app window and navigating it.
+      for (const client of clientList) {
+        if ("focus" in client) {
+          await client.focus();
+          if ("navigate" in client) {
+            try {
+              await (client as WindowClient).navigate(url);
+            } catch {
+              // Ignore — the window is focused either way.
+            }
+          }
+          return;
+        }
+      }
+      await self.clients.openWindow(url);
+    })(),
+  );
+});
