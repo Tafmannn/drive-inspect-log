@@ -44,7 +44,8 @@ import { EvidenceStatusBadges } from "@/components/EvidenceStatusBadges";
 import { StorageFailureCard } from "@/components/StorageFailureCard";
 import { useAuth } from "@/context/AuthContext";
 import { saveDraft, loadDraft, clearDraft, draftKey } from "@/lib/autosave";
-import { hapticSuccess, hapticError } from "@/lib/haptics";
+import { hapticError } from "@/lib/haptics";
+import { SuccessMoment, type SuccessMomentVariant } from "@/components/SuccessMoment";
 import {
   loadPhotoDraft,
   saveStandardPhoto as savePhotoDraftStandard,
@@ -121,6 +122,13 @@ export const InspectionFlow = () => {
   const [pendingDamagePosition, setPendingDamagePosition] =
     useState<{ x: number; y: number } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Set only after a submit genuinely succeeded (or was durably queued
+  // offline); the overlay shows briefly, then its onDone runs the exact
+  // navigation the success path used to run inline.
+  const [successMoment, setSuccessMoment] = useState<{
+    variant: SuccessMomentVariant;
+    dest: string;
+  } | null>(null);
   const [showDraftPrompt, setShowDraftPrompt] = useState(false);
   // Tracks that we're in an active editing session — prevents draft modal
   // from re-appearing after camera/photo capture or screen rotation causes a remount.
@@ -862,22 +870,16 @@ export const InspectionFlow = () => {
           damageClientIdOrder,
         });
 
-        const jobRef = job?.external_job_number || jobId!.slice(0, 8);
-        const label = type === "pickup" ? "Pickup" : "Delivery";
-        toast({
-          title:
-            reason === "offline"
-              ? `${label} saved offline for job ${jobRef}.`
-              : `${label} queued for job ${jobRef}.`,
-          description:
-            "It will submit automatically when your connection comes back.",
-        });
         if (dk) clearDraft(dk);
         if (jobId) void clearPhotoDraft(type, jobId);
         try { sessionStorage.removeItem(sessionKey); } catch { /* ignore */ }
-        // replace: true — draft is gone; don't leave a blank form on the
-        // back stack.
-        navigate(`/jobs/${jobId}${window.location.search}`, { replace: true });
+        // The enqueue above IS the durable save — only now is the overlay
+        // allowed to appear. Its onDone runs the replace-navigation (draft
+        // is gone; don't leave a blank form on the back stack).
+        setSuccessMoment({
+          variant: "saved-offline",
+          dest: `/jobs/${jobId}${window.location.search}`,
+        });
       };
 
       // ── 4a) OFFLINE / NETWORK-DROP SHORT-CIRCUIT ──
@@ -1107,19 +1109,25 @@ export const InspectionFlow = () => {
         .then((m) => m.triggerRetry("manual"))
         .catch(() => {});
 
-      const jobRef = job?.external_job_number || jobId.slice(0, 8);
-      const label = type === "pickup" ? "Pickup" : "Delivery";
-      toast({ title: `${label} completed for job ${jobRef}.` });
-      hapticSuccess();
       if (dk) clearDraft(dk);
       if (jobId) void clearPhotoDraft(type, jobId);
       try { sessionStorage.removeItem(sessionKey); } catch { /* ignore */ }
-      // replace: true — the inspection is submitted and the draft is gone,
-      // so back should return to wherever the driver was before this form,
-      // not reopen a blank pickup/delivery form.
-      navigate(`/jobs/${jobId}${window.location.search}`, { replace: true });
+      // Submit committed + evidence linked — show the completion moment
+      // (delivery completion = the job is done). Its onDone runs the
+      // replace-navigation: back should return to wherever the driver was
+      // before this form, not reopen a blank pickup/delivery form. The
+      // success haptic fires inside SuccessMoment.
+      setSuccessMoment({
+        variant: type === "delivery" ? "delivery-completed" : "completed",
+        dest: `/jobs/${jobId}${window.location.search}`,
+      });
     } catch {
-      toast({ title: "Submission failed. Please try again.", variant: "destructive" });
+      const label = type === "pickup" ? "Pickup" : "Delivery";
+      toast({
+        title: `${label} submission failed.`,
+        description: "Nothing was lost — please try again.",
+        variant: "destructive",
+      });
       hapticError();
     } finally {
       setSubmitting(false);
@@ -2132,6 +2140,12 @@ export const InspectionFlow = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {successMoment && (
+        <SuccessMoment
+          variant={successMoment.variant}
+          onDone={() => navigate(successMoment.dest, { replace: true })}
+        />
+      )}
       <AppHeader
         title={`${
           type === "pickup" ? "Pickup" : "Delivery"
