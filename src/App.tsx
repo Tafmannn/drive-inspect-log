@@ -8,6 +8,7 @@ import { ThemeProvider } from "next-themes";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { DevRoleBanner } from "@/components/DevRoleBanner";
 import { OfflineBanner } from "@/components/OfflineBanner";
+import { UpdatePrompt } from "@/components/UpdatePrompt";
 
 // ── Driver hot path: kept eager so the screens a driver opens on every job
 // (dashboard, jobs, a job, the inspection walk-around, uploads, profile,
@@ -278,6 +279,7 @@ const App = () => {
             <BrowserRouter>
               <ScrollToTop />
               <OfflineBanner />
+              <UpdatePrompt />
               <Suspense fallback={<PageLoader />}>
               <Routes>
                 {/* ── Public routes ── */}
