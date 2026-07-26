@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { resolveBackTarget } from "@/lib/navigationUtils";
 import { useAuth } from "@/context/AuthContext";
 import { AppHeader } from "@/components/AppHeader";
+import { FormSkeleton } from "@/components/skeletons";
 import { BottomNav } from "@/components/BottomNav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -319,8 +320,8 @@ export function InvoiceGenerator() {
       </AppHeader>
 
       {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <div className="max-w-3xl mx-auto">
+          <FormSkeleton fields={5} />
         </div>
       ) : (
         <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">

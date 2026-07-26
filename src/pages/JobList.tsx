@@ -93,7 +93,7 @@ export const JobList = () => {
       </AppHeader>
 
       <PullToRefresh onRefresh={() => refetch()}>
-      <div className="p-4 max-w-lg mx-auto">
+      <div className="p-4 max-w-lg mx-auto page-enter">
         {isLoading && <DashboardSkeleton />}
 
         {!isLoading && summaries.length === 0 && (

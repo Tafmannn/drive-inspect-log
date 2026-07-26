@@ -165,6 +165,20 @@ All colors MUST be HSL.
   }
 }
 
+/* Gentle screen-mount entrance. Applied to route-level page containers, so it
+   runs once per navigation and never replays on refetches/filter changes
+   (those don't remount the container). */
+@layer utilities {
+  .page-enter {
+    @apply animate-in fade-in slide-in-from-bottom-2 duration-200;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .page-enter {
+      animation: none;
+    }
+  }
+}
+
 /* Safe area for iOS bottom nav */
 .safe-area-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0px);

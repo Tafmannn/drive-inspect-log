@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
+import { FormSkeleton } from "@/components/skeletons";
 import { BottomNav } from "@/components/BottomNav";
 import { PhotoViewer } from "@/components/PhotoViewer";
 import { resolveMediaUrlAsync } from "@/lib/mediaResolver";
@@ -335,8 +336,8 @@ export const ExpenseForm = () => {
     return (
       <div className="min-h-screen flex flex-col">
         <AppHeader title={isEdit ? "Edit Expense" : "New Expense"} onBack={handleBack} />
-        <main className="flex-1 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        <main className="flex-1">
+          <FormSkeleton fields={4} />
         </main>
         <BottomNav />
       </div>

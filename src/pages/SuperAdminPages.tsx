@@ -14,6 +14,7 @@ import {
 } from "@/lib/adminApi";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
+import { ListRowsSkeleton } from "@/components/skeletons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -52,7 +53,7 @@ function PageShell({ title, children }: { title: string; children: React.ReactNo
 }
 
 function LoadingSpinner() {
-  return <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
+  return <div className="py-2"><ListRowsSkeleton rows={4} /></div>;
 }
 
 function ErrorPanel({ message, onRetry }: { message: string; onRetry?: () => void }) {

@@ -22,7 +22,7 @@ export const PendingJobs = () => {
     <div className="min-h-screen bg-background pb-20">
       <AppHeader title="Pending Jobs" showBack onBack={() => navigate('/')} />
       <PullToRefresh onRefresh={() => refetch()}>
-      <div className="p-4 max-w-lg mx-auto">
+      <div className="p-4 max-w-lg mx-auto page-enter">
         {isLoading && <DashboardSkeleton />}
         {!isLoading && (!filteredJobs || filteredJobs.length === 0) && (
           <div className="text-center py-12 space-y-3">

@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AnimatedNumber } from "@/components/AnimatedNumber";
 import { ChevronRight } from "lucide-react";
 
 /**
@@ -37,7 +38,7 @@ export function KpiPill({
       {loading ? (
         <Skeleton className="h-5 w-7" />
       ) : (
-        <span className="text-base font-bold tabular-nums leading-tight">{value}</span>
+        <AnimatedNumber value={value} className="text-base font-bold tabular-nums leading-tight" />
       )}
       <span className="w-full flex items-center justify-center gap-0.5 min-w-0">
         <span className="min-w-0 truncate text-[9px] font-semibold uppercase tracking-wider">{label}</span>

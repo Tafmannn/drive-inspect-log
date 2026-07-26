@@ -104,7 +104,7 @@ export const Profile = () => {
     <div className="min-h-screen bg-background pb-24">
       <AppHeader title="My Profile" />
 
-      <div className="px-4 py-6 space-y-6 max-w-lg mx-auto">
+      <div className="px-4 py-6 space-y-6 max-w-lg mx-auto page-enter">
         <div className="flex flex-col items-center gap-2">
           {user?.id && (
             <ProfilePhotoUpload

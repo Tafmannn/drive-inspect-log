@@ -165,7 +165,7 @@ export const PendingUploads = () => {
     <div className="min-h-screen bg-background pb-20">
       <AppHeader title="Pending Uploads" showBack onBack={() => navigate('/')} />
       <PullToRefresh onRefresh={refresh}>
-      <div className="p-4 space-y-4 max-w-lg mx-auto">
+      <div className="p-4 space-y-4 max-w-lg mx-auto page-enter">
         <QueuedSubmissionsSection />
 
         {jobs.length > 0 && (
