@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { DriverReadOnlyProfile } from "@/components/DriverReadOnlyProfile";
 import { DriverProfileForm } from "@/components/DriverProfileForm";
 import { ProfilePhotoUpload } from "@/features/users/components/ProfilePhotoUpload";
@@ -227,6 +228,8 @@ export const Profile = () => {
         )}
 
         <Separator />
+
+        <ThemeToggle />
 
         <Button
           variant="destructive"

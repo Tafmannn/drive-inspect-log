@@ -183,4 +183,18 @@ All colors MUST be HSL.
   .safe-area-bottom {
     display: none !important;
   }
+
+  /* Always print on light surfaces, even when the app is in dark mode —
+     a dark POD wastes ink and photocopies badly. */
+  .dark {
+    --background: 0 0% 100%;
+    --foreground: 215 28% 17%;
+    --card: 0 0% 100%;
+    --card-foreground: 215 28% 17%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 13% 46%;
+    --border: 214 32% 91%;
+    --primary: 215 84% 32%;
+    --primary-foreground: 0 0% 100%;
+  }
 }
