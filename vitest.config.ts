@@ -26,6 +26,14 @@ export default defineConfig({
     },
   },
   resolve: {
-    alias: { "@": path.resolve(__dirname, "./src") },
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+      // Build-time virtual module from vite-plugin-pwa; tests run without
+      // that plugin, so resolve it to an inert stub.
+      "virtual:pwa-register/react": path.resolve(
+        __dirname,
+        "./src/test/stubs/pwa-register-react.ts",
+      ),
+    },
   },
 });
