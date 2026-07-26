@@ -1,4 +1,5 @@
 import { Truck, AlertTriangle, FileSignature, Upload } from "lucide-react";
+import { AnimatedNumber } from "@/components/AnimatedNumber";
 import type { AttentionKpiData } from "../types/exceptionTypes";
 
 interface Props {
@@ -23,7 +24,7 @@ export function AttentionKpis({ kpis, loading }: Props) {
           </div>
           <div>
             <p className="text-xl font-semibold text-foreground tabular-nums">
-              {loading ? "…" : (kpis?.[key] ?? 0)}
+              {loading ? "…" : <AnimatedNumber value={kpis?.[key] ?? 0} />}
             </p>
             <p className="text-[13px] text-muted-foreground">{label}</p>
           </div>

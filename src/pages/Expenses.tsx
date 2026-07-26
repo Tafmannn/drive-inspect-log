@@ -87,7 +87,7 @@ export const Expenses = () => {
     <div className="min-h-screen bg-background pb-20">
       <AppHeader title={pageTitle} showBack onBack={handleBack} />
 
-      <div className="p-4 space-y-4 max-w-lg mx-auto">
+      <div className="p-4 space-y-4 max-w-lg mx-auto page-enter">
         {/* Scoped mode banner */}
         {isScoped && scopedJob && (
           <div className="p-3 rounded-xl bg-primary/5 border border-primary/20 space-y-2">

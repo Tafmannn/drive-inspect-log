@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { resolveBackTarget } from "@/lib/navigationUtils";
 import { AppHeader } from "@/components/AppHeader";
+import { FormSkeleton } from "@/components/skeletons";
 import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -606,8 +607,8 @@ export const JobForm = () => {
 
   if (isEdit && jobLoading && !existingJob) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-background max-w-lg mx-auto">
+        <FormSkeleton fields={6} />
       </div>
     );
   }

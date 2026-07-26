@@ -325,7 +325,7 @@ export const JobDetail = () => {
     <div className="min-h-screen bg-background pb-20">
       <AppHeader title={`Job ${jobRef}`} showBack onBack={goBack} />
 
-      <div className="p-4 space-y-3 max-w-lg mx-auto">
+      <div className="p-4 space-y-3 max-w-lg mx-auto page-enter">
         {/* ── 1. HEADER ── */}
         <JobHeaderCard
           jobRef={jobRef}

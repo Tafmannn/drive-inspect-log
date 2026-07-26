@@ -18,7 +18,8 @@ import { DashboardCard } from "@/components/DashboardCard";
 import { BottomNav } from "@/components/BottomNav";
 import { DriverGateScreen } from "@/components/DriverGateScreen";
 import { KpiPill } from "@/components/KpiPill";
-import { Truck, Clock, AlertTriangle, Receipt, Loader2 } from "lucide-react";
+import { KpiRowSkeleton, ListRowsSkeleton } from "@/components/skeletons";
+import { Truck, Clock, AlertTriangle, Receipt } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useDashboardCounts } from "@/hooks/useJobs";
 import { useDriverGate } from "@/hooks/useDriverGate";
@@ -47,11 +48,15 @@ export const Dashboard = () => {
     gate.isDriverOnly ? gate.driverProfileId : undefined,
   );
 
-  // Driver gate: show holding screen for non-active drivers.
+  // Driver gate: show a home-shaped placeholder while the role resolves.
   if (gate.isDriverOnly && gate.status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-background pb-20">
+        <AppHeader title={greetingFor(user?.name)} />
+        <div className="p-4 space-y-4">
+          <KpiRowSkeleton items={3} />
+          <ListRowsSkeleton rows={3} />
+        </div>
       </div>
     );
   }
@@ -70,8 +75,9 @@ export const Dashboard = () => {
         // Admins / super-admins → the operational dashboard.
         <Suspense
           fallback={
-            <div className="flex justify-center py-16">
-              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            <div className="p-4 space-y-4">
+              <KpiRowSkeleton items={4} />
+              <ListRowsSkeleton rows={3} />
             </div>
           }
         >
@@ -79,7 +85,7 @@ export const Dashboard = () => {
         </Suspense>
       ) : (
         // Drivers → compact launcher.
-        <div className="p-4 space-y-5 max-w-lg mx-auto">
+        <div className="p-4 space-y-5 max-w-lg mx-auto page-enter">
           {/* At-a-glance stat row (replaces three stacked full-width cards) */}
           <section>
             <div className="grid grid-cols-3 gap-2">

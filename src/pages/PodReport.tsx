@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { resolveMediaUrlAsync } from "@/lib/mediaResolver";
 import { resolveSignatureUrlSimple } from "@/lib/resolveSignatureUrlSimple";
 import { AppHeader } from "@/components/AppHeader";
+import { DetailSkeleton } from "@/components/skeletons";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -443,9 +444,7 @@ export const PodReport = () => {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <AppHeader title="POD Report" showBack onBack={goBack} />
-        <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
+        <DetailSkeleton sections={3} />
       </div>
     );
   }
