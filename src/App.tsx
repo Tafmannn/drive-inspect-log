@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ConfirmProvider } from "@/components/ui/confirm-dialog";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigationType } from "react-router-dom";
+import { ThemeProvider } from "next-themes";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { DevRoleBanner } from "@/components/DevRoleBanner";
 import { OfflineBanner } from "@/components/OfflineBanner";
@@ -260,7 +261,11 @@ function ScrollToTop() {
 const App = () => {
   const overrideRoles = getDevOverrideRoles();
 
+  // defaultTheme="light" (not "system"): the app has always rendered light,
+  // so existing users keep what they have until they opt in via the
+  // Appearance switch — which includes a follow-system option.
   return (
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
@@ -373,6 +378,7 @@ const App = () => {
         </AppErrorBoundary>
       </TooltipProvider>
     </QueryClientProvider>
+    </ThemeProvider>
   );
 };
 
