@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Search, UserCheck, X, ShieldAlert } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { notifyJobAssigned } from "@/lib/pushApi";
 import type { OnboardingRecord } from "@/lib/onboardingApi";
 
 interface AssignDriverModalProps {
@@ -138,6 +139,9 @@ export function AssignDriverModal({
     },
     onSuccess: (displayName) => {
       invalidateForEvent(queryClient, "driver_assignment_changed");
+      // Best-effort push to the driver's opted-in devices; never blocks
+      // or fails the assignment itself.
+      notifyJobAssigned(jobId);
       toast({ title: `${displayName} assigned to ${jobRef}` });
       onOpenChange(false);
     },

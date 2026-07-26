@@ -14,6 +14,7 @@ import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { DriverJobCard, mapsUrl } from "@/components/DriverJobCard";
 import { SwipeableRow, type SwipeAction } from "@/components/SwipeableRow";
 import { PullToRefresh } from "@/components/PullToRefresh";
+import { PushOptIn } from "@/components/PushOptIn";
 import { DeviationPrompt } from "@/components/DeviationPrompt";
 import { rankJobs, type RankedJob } from "@/lib/executionRanking";
 import { deriveJobSummaries, type DriverJobSummary } from "@/lib/driverJobSummary";
@@ -94,6 +95,12 @@ export const JobList = () => {
 
       <PullToRefresh onRefresh={() => refetch()}>
       <div className="p-4 max-w-lg mx-auto page-enter">
+        {/* One-time nudge for drivers to enable job-assignment notifications */}
+        {isDriverOnly && (
+          <div className="mb-3">
+            <PushOptIn variant="prompt" />
+          </div>
+        )}
         {isLoading && <DashboardSkeleton />}
 
         {!isLoading && summaries.length === 0 && (

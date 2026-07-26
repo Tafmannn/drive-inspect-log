@@ -22,6 +22,7 @@ import { lookupVehicle } from "@/lib/vehicleLookupApi";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import { saveDraft, loadDraft, clearDraft, draftKey } from "@/lib/autosave";
 import { hapticSuccess, hapticError } from "@/lib/haptics";
+import { notifyJobAssigned } from "@/lib/pushApi";
 import { lookupPostcode, type AddressSuggestion } from "@/lib/postcodeApi";
 import { BusinessSearchInput } from "@/components/BusinessSearchInput";
 import { getPlaceDetails, type BusinessResult } from "@/lib/businessSearchApi";
@@ -578,10 +579,17 @@ export const JobForm = () => {
     // so leaving this route on the history stack means the back button
     // would land the driver back on a blank/stale form instead of where
     // they came from.
+    // Push-notify the assigned driver (fire-and-forget, best-effort): only
+    // when this save actually put a (new) driver on the job.
+    const driverNewlyAssigned =
+      !!selectedDriverId &&
+      selectedDriverId !== ((existingJob as any)?.driver_id ?? null);
+
     try {
       if (isEdit && jobId) {
         await updateMutation.mutateAsync({ jobId, input: payload });
         await linkClientAndWarn(jobId);
+        if (driverNewlyAssigned) notifyJobAssigned(jobId);
         const updRef = payload.external_job_number || jobId.slice(0, 8);
         toast({ title: `Job ${updRef} updated.` });
         hapticSuccess();
@@ -590,6 +598,7 @@ export const JobForm = () => {
         if (dk) clearDraft(dk);
         const job = await createMutation.mutateAsync(payload);
         await linkClientAndWarn(job.id);
+        if (driverNewlyAssigned) notifyJobAssigned(job.id);
         const newRef = job.external_job_number || job.id.slice(0, 8);
         toast({ title: `Job ${newRef} created.` });
         hapticSuccess();
