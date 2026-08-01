@@ -4,6 +4,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { PushOptIn } from "@/components/PushOptIn";
+import { InstallPrompt } from "@/components/InstallPrompt";
 import { DriverReadOnlyProfile } from "@/components/DriverReadOnlyProfile";
 import { DriverProfileForm } from "@/components/DriverProfileForm";
 import { ProfilePhotoUpload } from "@/features/users/components/ProfilePhotoUpload";
@@ -233,6 +234,8 @@ export const Profile = () => {
         <ThemeToggle />
 
         <PushOptIn />
+
+        <InstallPrompt />
 
         <Button
           variant="destructive"
