@@ -15,6 +15,8 @@ import { DriverJobCard, mapsUrl } from "@/components/DriverJobCard";
 import { SwipeableRow, type SwipeAction } from "@/components/SwipeableRow";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { PushOptIn } from "@/components/PushOptIn";
+import { OfflineListState } from "@/components/OfflineListState";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { DeviationPrompt } from "@/components/DeviationPrompt";
 import { rankJobs, type RankedJob } from "@/lib/executionRanking";
 import { deriveJobSummaries, type DriverJobSummary } from "@/lib/driverJobSummary";
@@ -26,7 +28,8 @@ export const JobList = () => {
   const navigate = useNavigate();
   const { user, isAdmin, isSuperAdmin } = useAuth();
   const gate = useDriverGate();
-  const { data: jobs, isLoading, refetch } = useActiveJobs();
+  const { data: jobs, isLoading, isError, refetch } = useActiveJobs();
+  const online = useOnlineStatus();
   const [deviation, setDeviation] = useState<{
     target: DriverJobSummary;
     recommended: DriverJobSummary;
@@ -103,7 +106,12 @@ export const JobList = () => {
         )}
         {isLoading && <DashboardSkeleton />}
 
-        {!isLoading && summaries.length === 0 && (
+        {/* A failed fetch while offline is NOT an empty list — say so. */}
+        {!isLoading && summaries.length === 0 && isError && !online && (
+          <OfflineListState noun="jobs" />
+        )}
+
+        {!isLoading && summaries.length === 0 && !(isError && !online) && (
           <div className="text-center py-12 space-y-4">
             <Truck className="w-12 h-12 mx-auto text-muted-foreground stroke-[1.5]" />
             <div className="space-y-1">

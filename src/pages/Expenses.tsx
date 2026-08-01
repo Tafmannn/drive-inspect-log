@@ -12,6 +12,8 @@ import { useDriverGate } from "@/hooks/useDriverGate";
 import { useAuth } from "@/context/AuthContext";
 import { EXPENSE_CATEGORIES } from "@/lib/expenseApi";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
+import { OfflineListState } from "@/components/OfflineListState";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { Plus, Receipt, Filter, ArrowLeft, ExternalLink, Paperclip } from "lucide-react";
 
 const DATE_RANGES = [
@@ -42,7 +44,8 @@ export const Expenses = () => {
   const [showFilters, setShowFilters] = useState(false);
 
   const { data: scopedJob } = useJob(scopedJobId);
-  const { data: scopedExpenses, isLoading: scopedLoading } = useJobExpenses(scopedJobId);
+  const { data: scopedExpenses, isLoading: scopedLoading, isError: scopedError } =
+    useJobExpenses(scopedJobId);
 
   const isDriverOnly = gate.isDriverOnly;
   const myDriverId = gate.driverProfileId;
@@ -59,13 +62,18 @@ export const Expenses = () => {
           category: categoryFilter !== "all" ? categoryFilter : undefined,
           driverId: isDriverOnly ? myDriverId ?? undefined : undefined,
         };
-  const { data: globalExpenses, isLoading: globalLoading } = useExpenses(globalFilters);
+  const { data: globalExpenses, isLoading: globalLoading, isError: globalError } =
+    useExpenses(globalFilters);
   const { data: totals } = useExpenseTotals();
 
   const expenses = isScoped ? scopedExpenses : globalExpenses;
   const driverTotal = (globalExpenses ?? []).reduce((s, e) => s + Number(e.amount ?? 0), 0);
 
   const isLoading = isScoped ? scopedLoading : globalLoading;
+  const isError = isScoped ? scopedError : globalError;
+  const online = useOnlineStatus();
+  // A failed fetch while offline is NOT "no expenses".
+  const offlineEmpty = isError && !online;
 
   const fmt = (n: number) => `£${n.toFixed(2)}`;
 
@@ -192,7 +200,11 @@ export const Expenses = () => {
           <>
             {isLoading && <DashboardSkeleton />}
 
-            {!isLoading && (!expenses || expenses.length === 0) && (
+            {!isLoading && (!expenses || expenses.length === 0) && offlineEmpty && (
+              <OfflineListState noun="expenses" />
+            )}
+
+            {!isLoading && (!expenses || expenses.length === 0) && !offlineEmpty && (
               <div className="text-center py-12">
                 <Receipt className="w-12 h-12 mx-auto text-muted-foreground mb-3 stroke-[2]" />
                 <p className="text-sm text-muted-foreground">
