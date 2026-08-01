@@ -63,15 +63,16 @@ self.addEventListener("push", (event) => {
       body: payload.body,
       icon: "/axentra-app-icon.png",
       badge: "/axentra-app-icon.png",
-      tag: `job-assigned-${payload.jobId}`,
-      data: { jobId: payload.jobId },
+      tag: `${payload.type}-${payload.jobId}`,
+      data: { jobId: payload.jobId, type: payload.type },
     }),
   );
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = clickUrlFor((event.notification.data as { jobId?: unknown })?.jobId);
+  const data = event.notification.data as { jobId?: unknown; type?: unknown };
+  const url = clickUrlFor(data?.jobId, data?.type);
   event.waitUntil(
     (async () => {
       const clientList = await self.clients.matchAll({

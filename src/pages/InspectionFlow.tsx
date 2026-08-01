@@ -46,6 +46,7 @@ import { useAuth } from "@/context/AuthContext";
 import { saveDraft, loadDraft, clearDraft, draftKey } from "@/lib/autosave";
 import { hapticError } from "@/lib/haptics";
 import { SuccessMoment, type SuccessMomentVariant } from "@/components/SuccessMoment";
+import { notifyPodSubmitted } from "@/lib/pushApi";
 import {
   loadPhotoDraft,
   saveStandardPhoto as savePhotoDraftStandard,
@@ -1108,6 +1109,10 @@ export const InspectionFlow = () => {
       import("@/lib/retryOrchestrator")
         .then((m) => m.triggerRetry("manual"))
         .catch(() => {});
+
+      // Delivery submitted = a POD is now waiting for review. Tell the
+      // org's admins (best-effort; can't fail the submission).
+      if (type === "delivery" && jobId) notifyPodSubmitted(jobId);
 
       if (dk) clearDraft(dk);
       if (jobId) void clearPhotoDraft(type, jobId);
