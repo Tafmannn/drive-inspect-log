@@ -50,6 +50,7 @@ import {
   type PendingUpload,
 } from "./pendingUploads";
 import { logClientEvent } from "./logger";
+import { notifyPodSubmitted } from "./pushApi";
 import { supabase } from "@/integrations/supabase/client";
 import type { InspectionType, Inspection, DamageItem } from "./types";
 
@@ -423,6 +424,14 @@ export async function drainSubmitQueue(): Promise<DrainResult> {
       try {
         await drainOne(entry);
         succeeded++;
+        // A delivery that finally synced is a POD now waiting for review —
+        // notify the org's admins, same as an online submit would have.
+        // Best-effort: never allowed to affect the drain result.
+        if (entry.inspectionType === "delivery") {
+          try {
+            notifyPodSubmitted(entry.jobId);
+          } catch { /* ignore — notifications are never critical */ }
+        }
       } catch (e) {
         failed++;
         const message = formatErrorMessage(e);

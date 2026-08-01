@@ -1,15 +1,22 @@
-// Web Push sender — job-assignment notifications.
+// Web Push sender — job-assignment and POD-ready notifications.
 //
-// SECURITY MODEL: this is NOT a general notification endpoint. Callers must
-// be authenticated admins (authoritative role from user_profiles, never JWT
-// metadata) and may supply ONLY { event, jobId }. Everything else — the
-// recipient, title, body, deep link — is resolved server-side from trusted
-// job data, so no caller can push arbitrary content or target arbitrary
-// users. Admins are org-scoped to their own jobs. Delivery is best-effort:
-// a push failure must never surface as an assignment failure.
+// SECURITY MODEL: this is NOT a general notification endpoint. Callers are
+// authenticated (authoritative role from user_profiles, never JWT metadata)
+// and may supply ONLY { event, jobId }. Everything else — the recipients,
+// title, body, deep link — is resolved server-side from trusted job data,
+// so no caller can push arbitrary content or target arbitrary users.
 //
-// Lock-screen privacy: the notification carries only the vehicle
-// registration — never customer names, phones, addresses or notes.
+//   job-assigned   admin/super-admin only, org-scoped to their own jobs.
+//                  Notifies the job's assigned driver.
+//   pod-submitted  the job's OWN assigned driver (or an admin in the job's
+//                  org). Notifies that org's admins/super-admins. A driver
+//                  can never notify about someone else's job.
+//
+// Delivery is best-effort: a push failure must never surface as an
+// assignment or submission failure.
+//
+// Lock-screen privacy: notifications carry only the vehicle registration —
+// never customer names, phones, addresses or notes.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import webpush from "npm:web-push@3.6.7";
@@ -36,15 +43,17 @@ serve(async (req) => {
     if (caller.accountStatus === "suspended") {
       return jsonRes({ error: "ACCOUNT_SUSPENDED" }, 403);
     }
-    if (!caller.isAdmin) {
-      return jsonRes({ error: "ADMIN_OR_SUPER_ADMIN_ONLY" }, 403);
-    }
 
     const body = await req.json().catch(() => null);
     const event = body?.event;
     const jobId = body?.jobId;
-    if (event !== "job-assigned") {
+    if (event !== "job-assigned" && event !== "pod-submitted") {
       return jsonRes({ error: "UNSUPPORTED_EVENT" }, 400);
+    }
+    // Assignment notices are an admin action; POD notices are raised by the
+    // driver who just submitted (own-job check below) or by an admin.
+    if (event === "job-assigned" && !caller.isAdmin) {
+      return jsonRes({ error: "ADMIN_OR_SUPER_ADMIN_ONLY" }, 403);
     }
     if (typeof jobId !== "string" || !/^[0-9a-f-]{36}$/i.test(jobId)) {
       return jsonRes({ error: "INVALID_JOB_ID" }, 400);
@@ -60,27 +69,64 @@ serve(async (req) => {
     if (!job) return jsonRes({ error: "JOB_NOT_FOUND" }, 404);
 
     // Org admins can only notify about their own org's jobs.
-    if (!caller.isSuperAdmin && job.org_id !== caller.orgId) {
+    if (caller.isAdmin && !caller.isSuperAdmin && job.org_id !== caller.orgId) {
       return jsonRes({ error: "CROSS_ORG_FORBIDDEN" }, 403);
     }
-    if (!job.driver_id) {
-      return jsonRes({ sent: 0, reason: "NO_DRIVER_ASSIGNED" });
+
+    // Who receives this notification?
+    let recipientUserIds: string[] = [];
+
+    if (event === "job-assigned") {
+      if (!job.driver_id) {
+        return jsonRes({ sent: 0, reason: "NO_DRIVER_ASSIGNED" });
+      }
+      // driver_profiles.user_id → the auth user whose devices we notify.
+      const { data: driver, error: driverErr } = await admin
+        .from("driver_profiles")
+        .select("user_id")
+        .eq("id", job.driver_id)
+        .maybeSingle();
+      if (driverErr || !driver?.user_id) {
+        return jsonRes({ sent: 0, reason: "DRIVER_HAS_NO_USER" });
+      }
+      recipientUserIds = [driver.user_id];
+    } else {
+      // pod-submitted. A non-admin caller MUST be the job's own assigned
+      // driver — resolve their driver profile and compare to jobs.driver_id.
+      // This is the only thing stopping a driver notifying an org's admins
+      // about a job that isn't theirs.
+      if (!caller.isAdmin) {
+        const { data: ownProfile } = await admin
+          .from("driver_profiles")
+          .select("id")
+          .eq("user_id", caller.id)
+          .maybeSingle();
+        if (!ownProfile?.id || ownProfile.id !== job.driver_id) {
+          return jsonRes({ error: "NOT_YOUR_JOB" }, 403);
+        }
+      }
+      if (!job.org_id) {
+        return jsonRes({ sent: 0, reason: "JOB_HAS_NO_ORG" });
+      }
+      const { data: admins, error: adminsErr } = await admin
+        .from("user_profiles")
+        .select("auth_user_id")
+        .eq("org_id", job.org_id)
+        .in("role", ["admin", "super_admin"]);
+      if (adminsErr) return jsonRes({ error: "RECIPIENT_LOOKUP_FAILED" }, 500);
+      recipientUserIds = (admins ?? [])
+        .map((a) => a.auth_user_id as string | null)
+        .filter((id): id is string => !!id);
     }
 
-    // driver_profiles.user_id → the auth user whose devices we notify.
-    const { data: driver, error: driverErr } = await admin
-      .from("driver_profiles")
-      .select("user_id")
-      .eq("id", job.driver_id)
-      .maybeSingle();
-    if (driverErr || !driver?.user_id) {
-      return jsonRes({ sent: 0, reason: "DRIVER_HAS_NO_USER" });
+    if (recipientUserIds.length === 0) {
+      return jsonRes({ sent: 0, reason: "NO_RECIPIENTS" });
     }
 
     const { data: subs, error: subsErr } = await admin
       .from("push_subscriptions")
       .select("id, endpoint, p256dh, auth, failure_count")
-      .eq("user_id", driver.user_id);
+      .in("user_id", recipientUserIds);
     if (subsErr) return jsonRes({ error: "SUBSCRIPTION_LOOKUP_FAILED" }, 500);
     if (!subs || subs.length === 0) {
       return jsonRes({ sent: 0, reason: "NO_SUBSCRIPTIONS" });
@@ -101,12 +147,21 @@ serve(async (req) => {
     );
 
     const reg = job.vehicle_reg || job.external_job_number || "A vehicle";
-    const payload = JSON.stringify({
-      type: "job-assigned",
-      jobId: job.id,
-      title: "New job assigned",
-      body: `${reg} is ready to review.`,
-    });
+    const payload = JSON.stringify(
+      event === "job-assigned"
+        ? {
+            type: "job-assigned",
+            jobId: job.id,
+            title: "New job assigned",
+            body: `${reg} is ready to review.`,
+          }
+        : {
+            type: "pod-submitted",
+            jobId: job.id,
+            title: "POD ready to review",
+            body: `${reg} — inspection submitted.`,
+          },
+    );
 
     let sent = 0;
     let pruned = 0;

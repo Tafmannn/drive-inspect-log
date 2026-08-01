@@ -110,3 +110,16 @@ export function notifyJobAssigned(jobId: string): void {
     .invoke("send-push", { body: { event: "job-assigned", jobId } })
     .catch(() => {});
 }
+
+/**
+ * Fire-and-forget notify to the org's admins once a delivery inspection
+ * (the POD) has been submitted. The edge function checks that the caller is
+ * either that job's own assigned driver or an admin in its org, and builds
+ * the notification from trusted job data. Never throws, never blocks
+ * submission.
+ */
+export function notifyPodSubmitted(jobId: string): void {
+  void supabase.functions
+    .invoke("send-push", { body: { event: "pod-submitted", jobId } })
+    .catch(() => {});
+}

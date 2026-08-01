@@ -21,6 +21,19 @@ describe("push payload validation (service-worker side)", () => {
     expect(p!.body.length).toBe(160);
   });
 
+  it("accepts the pod-submitted type", () => {
+    const p = parsePushPayload(
+      JSON.stringify({
+        type: "pod-submitted",
+        jobId: JOB_ID,
+        title: "POD ready to review",
+        body: "AB12 CDE — inspection submitted.",
+      }),
+    );
+    expect(p?.type).toBe("pod-submitted");
+    expect(p?.jobId).toBe(JOB_ID);
+  });
+
   it("rejects unknown types, bad job ids and non-JSON", () => {
     expect(parsePushPayload("not json")).toBeNull();
     expect(
@@ -34,8 +47,12 @@ describe("push payload validation (service-worker side)", () => {
 
   it("click destination is always an internal route, never payload-controlled", () => {
     expect(clickUrlFor(JOB_ID)).toBe(`/jobs/${JOB_ID}`);
+    expect(clickUrlFor(JOB_ID, "job-assigned")).toBe(`/jobs/${JOB_ID}`);
+    // A POD notice opens the report the admin needs to review.
+    expect(clickUrlFor(JOB_ID, "pod-submitted")).toBe(`/jobs/${JOB_ID}/pod`);
     expect(clickUrlFor("https://evil.example.com")).toBe("/");
     expect(clickUrlFor("//evil.example.com")).toBe("/");
+    expect(clickUrlFor("https://evil.example.com", "pod-submitted")).toBe("/");
     expect(clickUrlFor(undefined)).toBe("/");
   });
 });
@@ -54,7 +71,12 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
-import { subscribeToPush, notifyJobAssigned, VAPID_PUBLIC_KEY } from "@/lib/pushApi";
+import {
+  subscribeToPush,
+  notifyJobAssigned,
+  notifyPodSubmitted,
+  VAPID_PUBLIC_KEY,
+} from "@/lib/pushApi";
 
 describe("subscribeToPush", () => {
   const subscribe = vi.fn();
@@ -113,6 +135,17 @@ describe("subscribeToPush", () => {
     expect(() => notifyJobAssigned(JOB_ID)).not.toThrow();
     expect(invoke).toHaveBeenCalledWith("send-push", {
       body: { event: "job-assigned", jobId: JOB_ID },
+    });
+  });
+
+  it("notifyPodSubmitted sends only the jobId and never throws", () => {
+    invoke.mockClear();
+    invoke.mockRejectedValueOnce(new Error("boom"));
+    expect(() => notifyPodSubmitted(JOB_ID)).not.toThrow();
+    // The client never supplies recipients or message text — the edge
+    // function derives both from trusted job data.
+    expect(invoke).toHaveBeenCalledWith("send-push", {
+      body: { event: "pod-submitted", jobId: JOB_ID },
     });
   });
 
