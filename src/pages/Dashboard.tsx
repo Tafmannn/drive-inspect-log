@@ -19,6 +19,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { DriverGateScreen } from "@/components/DriverGateScreen";
 import { KpiPill } from "@/components/KpiPill";
 import { KpiRowSkeleton, ListRowsSkeleton } from "@/components/skeletons";
+import { InstallPrompt } from "@/components/InstallPrompt";
 import { Truck, Clock, AlertTriangle, Receipt } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useDashboardCounts } from "@/hooks/useJobs";
@@ -116,6 +117,10 @@ export const Dashboard = () => {
               Completed shows the last 14 days
             </p>
           </section>
+
+          {/* Browser-tab users: nudge once to install the app (needed for
+              push on iPhone; instant offline launch everywhere). */}
+          <InstallPrompt />
 
           {/* Shortcuts that aren't already in the bottom nav */}
           <section className="space-y-3">
