@@ -3,6 +3,8 @@ import { JobCard } from "@/components/JobCard";
 import { BottomNav } from "@/components/BottomNav";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { PullToRefresh } from "@/components/PullToRefresh";
+import { OfflineListState } from "@/components/OfflineListState";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useNavigate } from "react-router-dom";
 import { useCompletedJobs } from "@/hooks/useJobs";
 import { useDriverGate } from "@/hooks/useDriverGate";
@@ -10,7 +12,8 @@ import { Clock } from "lucide-react";
 
 export const CompletedJobs = () => {
   const navigate = useNavigate();
-  const { data: jobs, isLoading, refetch } = useCompletedJobs();
+  const { data: jobs, isLoading, isError, refetch } = useCompletedJobs();
+  const online = useOnlineStatus();
   const gate = useDriverGate();
 
   // Scope to driver's own jobs if driver-only
@@ -24,7 +27,11 @@ export const CompletedJobs = () => {
       <PullToRefresh onRefresh={() => refetch()}>
       <div className="p-4 max-w-lg mx-auto page-enter">
         {isLoading && <DashboardSkeleton />}
-        {!isLoading && (!filteredJobs || filteredJobs.length === 0) && (
+        {/* A failed fetch while offline is NOT an empty list — say so. */}
+        {!isLoading && (!filteredJobs || filteredJobs.length === 0) && isError && !online && (
+          <OfflineListState noun="completed jobs" />
+        )}
+        {!isLoading && (!filteredJobs || filteredJobs.length === 0) && !(isError && !online) && (
           <div className="text-center py-12 space-y-3">
             <Clock className="w-12 h-12 mx-auto text-muted-foreground stroke-[1.5]" />
             <p className="text-sm text-muted-foreground">
