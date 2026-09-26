@@ -47,6 +47,7 @@ export function ControlHeader({
 
 /** Section container with optional title */
 export function ControlSection({
+  id,
   title,
   description,
   actions,
@@ -54,6 +55,8 @@ export function ControlSection({
   className,
   flush,
 }: {
+  /** DOM id — lets KPI tiles / links jump straight to this section. */
+  id?: string;
   title?: string;
   description?: string;
   actions?: React.ReactNode;
@@ -62,7 +65,7 @@ export function ControlSection({
   flush?: boolean;
 }) {
   return (
-    <section className={cn("rounded-lg border bg-card", flush ? "" : "p-4", className)}>
+    <section id={id} className={cn("rounded-lg border bg-card scroll-mt-4", flush ? "" : "p-4", className)}>
       {title && (
         <div className={cn("flex items-start justify-between gap-3", flush ? "px-4 pt-4" : "", "mb-3")}>
           <div className="min-w-0">
