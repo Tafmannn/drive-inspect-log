@@ -679,7 +679,7 @@ export function AdminDashboardBody() {
   useEvidenceAckRealtime();
 
   return (
-    <div className="p-3 max-w-lg mx-auto space-y-4">
+    <div className="p-3 max-w-lg lg:max-w-3xl mx-auto space-y-4">
       {/* Tier 1 — Intervention KPIs */}
       <InterventionKpis />
 

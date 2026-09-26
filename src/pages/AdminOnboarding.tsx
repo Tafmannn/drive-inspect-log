@@ -431,7 +431,7 @@ export function AdminOnboarding() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <AppHeader title="Driver Onboarding" showBack onBack={() => navigate("/admin")} />
-      <div className="p-4 max-w-lg mx-auto">
+      <div className="p-4 max-w-lg lg:max-w-3xl mx-auto">
         {view === "list" ? (
           <OnboardingList
             onSelect={(id) => { setSelectedId(id); setView("detail"); }}

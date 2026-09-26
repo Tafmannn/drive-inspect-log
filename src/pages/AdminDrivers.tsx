@@ -254,7 +254,7 @@ export function AdminDrivers() {
     <div className="min-h-screen bg-background pb-20">
       <AppHeader title="Drivers" showBack onBack={() => navigate("/admin")} />
 
-      <div className="p-4 max-w-lg mx-auto space-y-4">
+      <div className="p-4 max-w-lg lg:max-w-3xl mx-auto space-y-4">
         {isLoading ? (
           <DashboardSkeleton />
         ) : (

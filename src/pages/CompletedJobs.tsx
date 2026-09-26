@@ -25,7 +25,7 @@ export const CompletedJobs = () => {
     <div className="min-h-screen bg-background pb-20">
       <AppHeader title="Last 14 Days" showBack onBack={() => navigate('/')} />
       <PullToRefresh onRefresh={() => refetch()}>
-      <div className="p-4 max-w-lg mx-auto page-enter">
+      <div className="p-4 max-w-lg lg:max-w-3xl mx-auto page-enter">
         {isLoading && <DashboardSkeleton />}
         {/* A failed fetch while offline is NOT an empty list — say so. */}
         {!isLoading && (!filteredJobs || filteredJobs.length === 0) && isError && !online && (

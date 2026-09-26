@@ -348,7 +348,7 @@ export const ExpenseForm = () => {
     <div className="min-h-screen flex flex-col">
       <AppHeader title={isEdit ? "Edit Expense" : "New Expense"} onBack={handleBack} />
       <main className="flex-1 overflow-y-auto pb-24">
-        <div className="max-w-lg mx-auto p-4 space-y-4">
+        <div className="max-w-lg lg:max-w-3xl mx-auto p-4 space-y-4">
           {job && (
             <Card className="p-3 text-sm">
               <p className="font-medium">{job.vehicle_reg}</p>

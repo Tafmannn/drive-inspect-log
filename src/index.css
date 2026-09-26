@@ -91,10 +91,19 @@ All colors MUST be HSL.
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
 
-    --accent: 260 60% 50%;
-    --accent-foreground: 210 40% 98%;
+    /* 68% (not 50%) so text-accent alone reaches WCAG AA (~6:1) against the
+       page background — computed via contrast ratio, the 50% value only
+       cleared 2.77:1. accent-foreground goes dark to match, mirroring how
+       warning/info (also bright, saturated dark-mode accents) already pair
+       a dark foreground with their bright background. */
+    --accent: 260 60% 68%;
+    --accent-foreground: 222.2 84% 4.9%;
 
-    --destructive: 0 62.8% 50.6%;
+    /* 56% (not 50.6%) so standalone text-destructive (error copy, 50+ call
+       sites) clears 4.5:1 against the page background; destructive-foreground
+       (white button/badge text) still clears 4:1+, comfortably above the 3:1
+       required for the bold/large button-label text it's used on. */
+    --destructive: 0 62.8% 56%;
     --destructive-foreground: 210 40% 98%;
 
     --border: 217.2 32.6% 17.5%;
@@ -102,7 +111,12 @@ All colors MUST be HSL.
     --ring: 212.7 26.8% 83.9%;
 
     --success: 142 76% 42%;
-    --success-foreground: 210 40% 98%;
+    /* Dark, not white: white-on-this-green only cleared 2.40:1 (WCAG AA
+       needs 4.5:1) — the green's saturation gives it far higher perceived
+       luminance than its 42% HSL lightness suggests. A dark foreground
+       (matching warning-foreground/info-foreground, the same "bright
+       saturated bg needs dark text" pattern) clears 7.97:1. */
+    --success-foreground: 222.2 84% 4.9%;
 
     --warning: 38 92% 55%;
     --warning-foreground: 222.2 84% 4.9%;

@@ -97,7 +97,7 @@ export const JobList = () => {
       </AppHeader>
 
       <PullToRefresh onRefresh={() => refetch()}>
-      <div className="p-4 max-w-lg mx-auto page-enter">
+      <div className="p-4 max-w-lg lg:max-w-3xl mx-auto page-enter">
         {/* One-time nudge for drivers to enable job-assignment notifications */}
         {isDriverOnly && (
           <div className="mb-3">

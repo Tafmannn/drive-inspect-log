@@ -139,7 +139,7 @@ export function AdminJobsQueue() {
         </Button>
       </AppHeader>
 
-      <div className="p-4 max-w-lg mx-auto space-y-4">
+      <div className="p-4 max-w-lg lg:max-w-3xl mx-auto space-y-4">
         {/* ── KPI STRIP ── */}
         <div className="grid grid-cols-4 gap-2">
           <KpiPill icon={UserX} label="Unassigned" value={kpis?.unassigned ?? 0} variant={kpis?.unassigned ? "warning" : "default"} />

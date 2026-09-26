@@ -72,7 +72,7 @@ export default function DriverDigitalId() {
     return (
       <div className="min-h-screen bg-background">
         <AppHeader title="Digital ID" showBack onBack={() => navigate(backTarget)} />
-        <div className="p-6 max-w-lg mx-auto text-center space-y-3">
+        <div className="p-6 max-w-lg lg:max-w-3xl mx-auto text-center space-y-3">
           <AlertTriangle className="w-8 h-8 mx-auto text-muted-foreground" />
           <h2 className="text-lg font-semibold">No driver profile yet</h2>
           <p className="text-sm text-muted-foreground">

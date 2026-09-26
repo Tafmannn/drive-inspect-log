@@ -288,7 +288,7 @@ export function AdminPodReview() {
     <div className="min-h-screen bg-background pb-20">
       <AppHeader title="POD Review" showBack onBack={() => navigate("/admin")} />
 
-      <div className="p-4 max-w-lg mx-auto space-y-4">
+      <div className="p-4 max-w-lg lg:max-w-3xl mx-auto space-y-4">
         {/* ── KPI STRIP ── */}
         <div className="grid grid-cols-4 gap-2">
           <KpiPill
