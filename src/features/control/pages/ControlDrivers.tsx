@@ -45,10 +45,10 @@ export function ControlDrivers() {
   const { data: kpis, isLoading: kpisLoading } = useDriversKpis();
 
   const kpiItems = [
-    { label: "Total Drivers", value: kpis?.total, icon: Users, variant: "default" as const, loading: kpisLoading },
-    { label: "Active", value: kpis?.active, icon: CheckCircle, variant: "success" as const, loading: kpisLoading },
-    { label: "Licence Expiring (30d)", value: kpis?.licenceExpiring, icon: AlertTriangle, variant: kpis?.licenceExpiring ? "warning" as const : "default" as const, loading: kpisLoading },
-    { label: "Missing Trade Plate", value: kpis?.missingPlate, icon: ShieldAlert, variant: kpis?.missingPlate ? "warning" as const : "default" as const, loading: kpisLoading },
+    { label: "Total Drivers", value: kpis?.total, icon: Users, variant: "default" as const, loading: kpisLoading, onClick: () => setFilter("all") },
+    { label: "Active", value: kpis?.active, icon: CheckCircle, variant: "success" as const, loading: kpisLoading, onClick: () => setFilter("active") },
+    { label: "Licence Expiring (30d)", value: kpis?.licenceExpiring, icon: AlertTriangle, variant: kpis?.licenceExpiring ? "warning" as const : "default" as const, loading: kpisLoading, onClick: () => setFilter("licence-expiring") },
+    { label: "Missing Trade Plate", value: kpis?.missingPlate, icon: ShieldAlert, variant: kpis?.missingPlate ? "warning" as const : "default" as const, loading: kpisLoading, onClick: () => setFilter("missing-plate") },
   ];
 
   const columns: CompactColumn<DriverControlRow>[] = [
@@ -255,6 +255,7 @@ export function ControlDrivers() {
                 ? "No drivers match your search."
                 : "No drivers found."
           }
+          onRowClick={(r) => navigate(`/admin/drivers/${r.user_id}`)}
         />
       </ControlSection>
     </ControlShell>

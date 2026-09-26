@@ -52,11 +52,11 @@ export function ControlSuperAdmin() {
   const highSevCount = exceptions.filter(e => e.severity === "critical" || e.severity === "high").length;
 
   const kpiItems = [
-    { label: "Organisations", value: kpis?.totalOrgs, icon: Building2, variant: "default" as const, loading: kpisLoading },
-    { label: "Total Users", value: kpis?.totalUsers, icon: Users, variant: "default" as const, loading: kpisLoading },
-    { label: "Active Jobs", value: kpis?.activeJobs, icon: Truck, variant: "info" as const, loading: kpisLoading },
-    { label: "Platform Exceptions", value: highSevCount, icon: AlertTriangle, variant: highSevCount > 0 ? "destructive" as const : "default" as const, loading: attentionLoading },
-    { label: "Audit Events Today", value: kpis?.auditEventsToday, icon: ScrollText, variant: "default" as const, loading: kpisLoading },
+    { label: "Organisations", value: kpis?.totalOrgs, icon: Building2, variant: "default" as const, loading: kpisLoading, href: "/super-admin/orgs" },
+    { label: "Total Users", value: kpis?.totalUsers, icon: Users, variant: "default" as const, loading: kpisLoading, href: "/super-admin/users" },
+    { label: "Active Jobs", value: kpis?.activeJobs, icon: Truck, variant: "info" as const, loading: kpisLoading, href: "/control/jobs?status=active" },
+    { label: "Platform Exceptions", value: highSevCount, icon: AlertTriangle, variant: highSevCount > 0 ? "destructive" as const : "default" as const, loading: attentionLoading, href: "/super-admin/attention" },
+    { label: "Audit Events Today", value: kpis?.auditEventsToday, icon: ScrollText, variant: "default" as const, loading: kpisLoading, href: "/super-admin/audit" },
   ];
 
   const quickActions = [
@@ -64,7 +64,7 @@ export function ControlSuperAdmin() {
     { label: "Manage Users", icon: UserPlus, onClick: () => navigate("/super-admin/users"), variant: "outline" as const },
     { label: "Review Audit", icon: ScrollText, onClick: () => navigate("/super-admin/audit"), variant: "outline" as const },
     { label: "Review Exceptions", icon: AlertTriangle, onClick: () => navigate("/super-admin/attention"), variant: "outline" as const },
-    { label: "Export Report", icon: FileDown, onClick: () => {}, variant: "outline" as const, disabled: true },
+    { label: "Export Report", icon: FileDown, onClick: () => navigate("/control/exports"), variant: "outline" as const },
   ];
 
   // Org table columns
@@ -213,6 +213,7 @@ export function ControlSuperAdmin() {
             data={orgs ?? []}
             loading={orgsLoading}
             emptyMessage="No organisations."
+            onRowClick={(r) => navigate(`/super-admin/orgs/${r.id}`)}
           />
         </ControlSection>
 
@@ -223,6 +224,9 @@ export function ControlSuperAdmin() {
             data={auditLogs ?? []}
             loading={auditLoading}
             emptyMessage="No audit entries yet."
+            onRowClick={(r) =>
+              navigate(r.target_org_id ? `/super-admin/orgs/${r.target_org_id}` : "/super-admin/audit")
+            }
           />
         </ControlSection>
 
@@ -233,6 +237,9 @@ export function ControlSuperAdmin() {
             data={errorLogs ?? []}
             loading={errorsLoading}
             emptyMessage="No errors logged."
+            onRowClick={(r) =>
+              navigate(r.job_id ? `/jobs/${r.job_id}?from=/control/super-admin` : "/super-admin/errors")
+            }
           />
         </ControlSection>
       </div>

@@ -34,6 +34,17 @@ function row(overrides: Partial<ClosureReviewRow>): ClosureReviewRow {
 }
 
 describe("selectClosureRows", () => {
+  it('"missing_delivery_inspection" matches the No Delivery Insp. KPI tile', () => {
+    const data: ClosureReviewData = {
+      queue: [
+        row({ id: "ok" }),
+        row({ id: "gap", status: "delivery_complete", missingDeliveryInspection: true }),
+      ],
+      recentlyCompleted: [row({ id: "done", status: "completed", missingDeliveryInspection: true })],
+    };
+    expect(selectClosureRows(data, "missing_delivery_inspection").map((r) => r.id)).toEqual(["gap"]);
+  });
+
   it("returns [] when data is missing", () => {
     expect(selectClosureRows(undefined, "all")).toEqual([]);
     expect(selectClosureRows(null, "all")).toEqual([]);

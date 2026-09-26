@@ -97,6 +97,7 @@ export type ClosureStatusFilter =
   | "all"
   | "pod_ready"
   | "delivery_complete"
+  | "missing_delivery_inspection"
   | "recently_completed";
 
 export interface ClosureReviewData {
@@ -129,6 +130,8 @@ export function selectClosureRows(
     rows = data.queue.filter(r => r.status === "pod_ready");
   } else if (statusFilter === "delivery_complete") {
     rows = data.queue.filter(r => r.status === "delivery_complete");
+  } else if (statusFilter === "missing_delivery_inspection") {
+    rows = data.queue.filter(r => r.missingDeliveryInspection);
   } else {
     rows = data.queue;
   }

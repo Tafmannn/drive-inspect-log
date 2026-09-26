@@ -65,11 +65,11 @@ export function ControlJobs() {
   }, []);
 
   const kpiItems = [
-    { label: "Total Jobs", value: kpis?.total, icon: LayoutList, variant: "default" as const, loading: kpisLoading },
-    { label: "Active", value: kpis?.active, icon: Truck, variant: "info" as const, loading: kpisLoading },
-    { label: "POD Review", value: kpis?.podReview, icon: ClipboardCheck, variant: "warning" as const, loading: kpisLoading },
-    { label: "Unassigned", value: kpis?.unassigned, icon: UserX, variant: kpis?.unassigned ? "destructive" as const : "default" as const, loading: kpisLoading },
-    { label: "Stale (>24h)", value: kpis?.stale, icon: Clock, variant: kpis?.stale ? "warning" as const : "default" as const, loading: kpisLoading },
+    { label: "Total Jobs", value: kpis?.total, icon: LayoutList, variant: "default" as const, loading: kpisLoading, onClick: () => setStatusFilter("all") },
+    { label: "Active", value: kpis?.active, icon: Truck, variant: "info" as const, loading: kpisLoading, onClick: () => setStatusFilter("active") },
+    { label: "POD Review", value: kpis?.podReview, icon: ClipboardCheck, variant: "warning" as const, loading: kpisLoading, onClick: () => setStatusFilter("pod_review") },
+    { label: "Unassigned", value: kpis?.unassigned, icon: UserX, variant: kpis?.unassigned ? "destructive" as const : "default" as const, loading: kpisLoading, onClick: () => setStatusFilter("unassigned") },
+    { label: "Stale (>24h)", value: kpis?.stale, icon: Clock, variant: kpis?.stale ? "warning" as const : "default" as const, loading: kpisLoading, onClick: () => setStatusFilter("stale") },
   ];
 
   return (
