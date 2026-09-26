@@ -1,0 +1,48 @@
+name: Supabase keep-alive
+
+# Supabase auto-pauses a project after ~7 days with no database activity,
+# which takes the whole app down (login and every data call fail while the
+# frontend still loads). This runs a tiny real query twice a week so the
+# project never goes idle long enough to pause. Max gap between runs is
+# 4 days (Thu -> Mon), comfortably inside the 7-day window.
+#
+# If this workflow ever FAILS, GitHub emails the repo owner — treat that as
+# an early warning that the project may already be paused (restore it from
+# the Supabase dashboard).
+
+on:
+  schedule:
+    - cron: "0 6 * * 1,4" # 06:00 UTC every Monday and Thursday
+  workflow_dispatch: {} # allow a manual run from the Actions tab
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      # The project URL and PUBLISHABLE key are public by design — the same
+      # values ship in the app's client-side JavaScript. Access is governed
+      # by row-level security, not by keeping these secret.
+      SUPABASE_URL: https://lynkvfduzqdyvlzgriyh.supabase.co
+      SUPABASE_PUBLISHABLE_KEY: sb_publishable_38EwI8yoYAoX66WZjlaw3A_nZC57B5d
+    steps:
+      - name: Query the database
+        run: |
+          set -u
+          for attempt in 1 2 3; do
+            status=$(curl -sS -o /tmp/body.txt -w '%{http_code}' \
+              "$SUPABASE_URL/rest/v1/app_settings?select=key&limit=1" \
+              -H "apikey: $SUPABASE_PUBLISHABLE_KEY" \
+              -H "Authorization: Bearer $SUPABASE_PUBLISHABLE_KEY" || echo "000")
+            echo "Attempt $attempt: HTTP $status"
+            if [ "$status" = "200" ]; then
+              echo "Supabase responded — project is active."
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "::error::Supabase did not respond with 200 after 3 attempts (last HTTP $status). The project may be paused — restore it from the Supabase dashboard."
+          head -c 500 /tmp/body.txt || true
+          exit 1
