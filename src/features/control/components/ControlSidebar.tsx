@@ -57,9 +57,11 @@ export function ControlSidebar() {
     >
       {/* Brand */}
       <div className="flex items-center gap-3 px-4 h-14 border-b border-sidebar-border shrink-0">
-        <div className="h-8 w-8 rounded-md bg-primary flex items-center justify-center shrink-0">
-          <span className="text-xs font-bold text-primary-foreground">AX</span>
-        </div>
+        <img
+          src="/axentra-logo.png"
+          alt="Axentra"
+          className="h-8 w-8 object-contain shrink-0"
+        />
         {!collapsed && (
           <div className="min-w-0">
             <span className="text-sm font-semibold text-sidebar-foreground block truncate">

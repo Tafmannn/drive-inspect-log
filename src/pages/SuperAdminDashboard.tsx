@@ -287,7 +287,7 @@ export function SuperAdminDashboard() {
     <div className="min-h-screen bg-background pb-20">
       <AppHeader title="Super Admin" showBack onBack={() => navigate("/")} />
 
-      <div className="p-4 max-w-lg mx-auto space-y-5">
+      <div className="p-4 max-w-lg lg:max-w-3xl mx-auto space-y-5">
         {/* 1. Governance KPIs */}
         <GovernanceKpis />
 

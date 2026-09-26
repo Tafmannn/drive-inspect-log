@@ -86,7 +86,7 @@ export const Dashboard = () => {
         </Suspense>
       ) : (
         // Drivers → compact launcher.
-        <div className="p-4 space-y-5 max-w-lg mx-auto page-enter">
+        <div className="p-4 space-y-5 max-w-lg lg:max-w-3xl mx-auto page-enter">
           {/* At-a-glance stat row (replaces three stacked full-width cards) */}
           <section>
             <div className="grid grid-cols-3 gap-2">

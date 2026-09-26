@@ -74,7 +74,7 @@ export default function DriverProfileDetail() {
     return (
       <div className="min-h-screen bg-background">
         <AppHeader title="Driver Profile" showBack onBack={() => navigate("/admin/drivers")} />
-        <div className="p-6 max-w-lg mx-auto text-center space-y-3">
+        <div className="p-6 max-w-lg lg:max-w-3xl mx-auto text-center space-y-3">
           <AlertTriangle className="w-8 h-8 mx-auto text-muted-foreground" />
           <h2 className="text-lg font-semibold">Driver not found</h2>
           <p className="text-sm text-muted-foreground">
@@ -96,7 +96,7 @@ export default function DriverProfileDetail() {
     <div className="min-h-screen bg-background pb-32">
       <AppHeader title="Driver Profile" showBack onBack={() => navigate("/admin/drivers")} />
 
-      <div className="p-4 max-w-lg mx-auto space-y-4">
+      <div className="p-4 max-w-lg lg:max-w-3xl mx-auto space-y-4">
         {/* Identity card */}
         <Card>
           <CardContent className="p-4 space-y-3">
@@ -215,8 +215,11 @@ export default function DriverProfileDetail() {
       </div>
 
       {/* Sticky edit bar */}
-      <div className="fixed bottom-16 inset-x-0 px-4 py-3 bg-background/95 backdrop-blur border-t border-border z-30 lg:bottom-0">
-        <div className="max-w-lg mx-auto">
+      {/* bottom-16 at all sizes: BottomNav stays fixed+visible on desktop too
+          (no lg:hidden), so pinning this to bottom-0 on large screens made
+          BottomNav's higher z-index paint over this action bar entirely. */}
+      <div className="fixed bottom-16 inset-x-0 px-4 py-3 bg-background/95 backdrop-blur border-t border-border z-30">
+        <div className="max-w-lg lg:max-w-3xl mx-auto">
           <Button
             className="w-full min-h-[48px]"
             onClick={() => navigate(`/admin/drivers/${userId}/complete`)}

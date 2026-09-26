@@ -616,7 +616,7 @@ export const JobForm = () => {
 
   if (isEdit && jobLoading && !existingJob) {
     return (
-      <div className="min-h-screen bg-background max-w-lg mx-auto">
+      <div className="min-h-screen bg-background max-w-lg lg:max-w-3xl mx-auto">
         <FormSkeleton fields={6} />
       </div>
     );
@@ -650,7 +650,7 @@ export const JobForm = () => {
         showBack
         onBack={() => navigate(backTarget)}
       />
-      <div className="p-4 space-y-6 max-w-lg mx-auto">
+      <div className="p-4 space-y-6 max-w-lg lg:max-w-3xl mx-auto">
         <form
           ref={formRef}
           className="space-y-8"
@@ -1135,6 +1135,10 @@ export const JobForm = () => {
                     existingJob?.pickup_postcode ?? ""
                   }
                   className="mt-1"
+                  onChange={(e) => {
+                    const deliveryPC = formRef.current ? new FormData(formRef.current).get("delivery_postcode") as string : "";
+                    if (deliveryPC) triggerRouteCalc(e.target.value, deliveryPC);
+                  }}
                   onBlur={(e) => {
                     const deliveryPC = formRef.current ? new FormData(formRef.current).get("delivery_postcode") as string : "";
                     if (deliveryPC) triggerRouteCalc(e.target.value, deliveryPC);
@@ -1297,6 +1301,10 @@ export const JobForm = () => {
                     existingJob?.delivery_postcode ?? ""
                   }
                   className="mt-1"
+                  onChange={(e) => {
+                    const pickupPC = formRef.current ? new FormData(formRef.current).get("pickup_postcode") as string : "";
+                    if (pickupPC) triggerRouteCalc(pickupPC, e.target.value);
+                  }}
                   onBlur={(e) => {
                     const pickupPC = formRef.current ? new FormData(formRef.current).get("pickup_postcode") as string : "";
                     if (pickupPC) triggerRouteCalc(pickupPC, e.target.value);

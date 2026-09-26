@@ -55,7 +55,7 @@ export default function OrganisationProfileDetail() {
     return (
       <div className="min-h-screen bg-background">
         <AppHeader title="Organisation" showBack onBack={() => navigate("/super-admin/orgs")} />
-        <div className="p-6 max-w-lg mx-auto text-center space-y-3">
+        <div className="p-6 max-w-lg lg:max-w-3xl mx-auto text-center space-y-3">
           <AlertTriangle className="w-8 h-8 mx-auto text-muted-foreground" />
           <h2 className="text-lg font-semibold">Organisation not found</h2>
           <p className="text-sm text-muted-foreground">This organisation may have been removed or the link is no longer valid.</p>
@@ -71,7 +71,7 @@ export default function OrganisationProfileDetail() {
     <div className="min-h-screen bg-background pb-32">
       <AppHeader title="Organisation" showBack onBack={() => navigate("/super-admin/orgs")} />
 
-      <div className="p-4 max-w-lg mx-auto space-y-4">
+      <div className="p-4 max-w-lg lg:max-w-3xl mx-auto space-y-4">
         <Card>
           <CardContent className="p-4 space-y-3">
             <div className="flex items-start gap-3">
@@ -160,8 +160,11 @@ export default function OrganisationProfileDetail() {
         </Card>
       </div>
 
-      <div className="fixed bottom-16 inset-x-0 px-4 py-3 bg-background/95 backdrop-blur border-t border-border z-30 lg:bottom-0">
-        <div className="max-w-lg mx-auto">
+      {/* bottom-16 at all sizes: BottomNav stays fixed+visible on desktop too
+          (no lg:hidden), so pinning this to bottom-0 on large screens made
+          BottomNav's higher z-index paint over this action bar entirely. */}
+      <div className="fixed bottom-16 inset-x-0 px-4 py-3 bg-background/95 backdrop-blur border-t border-border z-30">
+        <div className="max-w-lg lg:max-w-3xl mx-auto">
           <Button className="w-full min-h-[48px]" onClick={() => navigate(`/super-admin/orgs/${orgId}/complete`)}>
             <Pencil className="w-4 h-4 mr-2" />
             {completion.pct >= 100 ? "Edit organisation" : "Resume onboarding"}

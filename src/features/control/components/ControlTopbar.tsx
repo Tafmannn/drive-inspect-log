@@ -47,6 +47,14 @@ export function ControlTopbar({
         {/* Left: leading slot (mobile menu) + breadcrumb / title */}
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {leading}
+          {/* Below lg the persistent sidebar (and its logo) is hidden behind
+              the drawer, so this is the only brand mark visible until the
+              drawer is opened. */}
+          <img
+            src="/axentra-logo.png"
+            alt="Axentra"
+            className="h-6 w-6 object-contain shrink-0 lg:hidden"
+          />
           <div className="min-w-0 hidden sm:block">
             <Breadcrumbs compact />
           </div>

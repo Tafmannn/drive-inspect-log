@@ -1608,7 +1608,7 @@ export const InspectionFlow = () => {
           <h2 className="text-xl font-semibold">Review & Submit</h2>
           <div className="flex items-center gap-2">
             {isCollected ? (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-success/20 text-success-foreground">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-success/20 text-success">
                 ✓ Collected
               </span>
             ) : (
