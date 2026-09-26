@@ -30,6 +30,7 @@ import {
   Mail,
   Phone,
   MoreHorizontal,
+  X,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -44,6 +45,8 @@ import { toast } from "@/hooks/use-toast";
 export function ControlClients() {
   const [search, setSearch] = useState("");
   const [showArchived, setShowArchived] = useState(false);
+  // Set by the "Archived" KPI tile — narrows the list to archived clients only.
+  const [archivedOnly, setArchivedOnly] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const navigate = useNavigate();
   const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -53,6 +56,12 @@ export function ControlClients() {
     includeArchived: showArchived,
   });
   const { data: stats, isLoading: statsLoading } = useClientStats();
+  const visibleClients = archivedOnly ? (clients ?? []).filter((c) => !c.is_active) : (clients ?? []);
+
+  const showClients = (view: "all" | "active" | "archived") => {
+    setShowArchived(view !== "active");
+    setArchivedOnly(view === "archived");
+  };
   const archiveMutation = useArchiveClient();
   const restoreMutation = useRestoreClient();
 
@@ -63,6 +72,7 @@ export function ControlClients() {
       icon: Users,
       variant: "default",
       loading: statsLoading,
+      onClick: () => showClients("all"),
     },
     {
       label: "Active",
@@ -70,6 +80,7 @@ export function ControlClients() {
       icon: Building2,
       variant: "success",
       loading: statsLoading,
+      onClick: () => showClients("active"),
     },
     {
       label: "Archived",
@@ -77,6 +88,7 @@ export function ControlClients() {
       icon: Archive,
       variant: "warning",
       loading: statsLoading,
+      onClick: () => showClients("archived"),
     },
   ];
 
@@ -230,17 +242,31 @@ export function ControlClients() {
             <Switch
               id="show-archived"
               checked={showArchived}
-              onCheckedChange={setShowArchived}
+              onCheckedChange={(v) => {
+                setShowArchived(v);
+                if (!v) setArchivedOnly(false);
+              }}
             />
             <Label htmlFor="show-archived" className="text-xs text-muted-foreground cursor-pointer">
               Show archived
             </Label>
           </div>
+          {archivedOnly && (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-7 text-xs gap-1"
+              onClick={() => setArchivedOnly(false)}
+              aria-label="Clear archived-only filter"
+            >
+              Archived only <X className="h-3 w-3" />
+            </Button>
+          )}
         </div>
 
         <CompactTable
           columns={columns}
-          data={clients ?? []}
+          data={visibleClients}
           loading={isLoading}
           emptyMessage="No clients found. Create your first client profile."
           onRowClick={(row) => navigate(`/control/clients/${row.id}`)}

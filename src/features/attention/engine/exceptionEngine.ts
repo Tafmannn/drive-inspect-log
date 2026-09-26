@@ -182,7 +182,10 @@ export function deriveEvidenceExceptions(
       title: "Signature resolution failed",
       detail: l.context?.originalUrl?.slice(0, 80) ?? "Could not resolve signature URL",
       createdAt: l.created_at,
-      actionLabel: "Open logs", actionRoute: "/admin/logs",
+      // There is no /admin/logs route — open the job whose signature failed
+      // (the POD shows the broken image), else the super-admin error feed.
+      actionLabel: l.job_id ? "Open job" : "Open logs",
+      actionRoute: l.job_id ? `/jobs/${l.job_id}` : "/super-admin/errors",
     }));
   }
 
@@ -236,7 +239,7 @@ export function deriveSyncExceptions(
       title: "Duplicate row skipped",
       detail: JSON.stringify(l.context ?? {}).slice(0, 100),
       createdAt: l.created_at,
-      actionLabel: "Open logs", actionRoute: "/super-admin",
+      actionLabel: "Open logs", actionRoute: "/super-admin/errors",
     }));
   }
 

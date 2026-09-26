@@ -319,12 +319,12 @@ export function deriveWorkflowState(input: WorkflowInput): WorkflowState {
   } else if (isTerminal) {
     nextAction = {
       label: "View POD",
-      route: `/pod-report/${job.id}`,
+      route: `/jobs/${job.id}/pod`,
     };
   } else if (phase === "pod_ready") {
     nextAction = {
       label: canGeneratePod ? "Review POD" : "Resolve POD blockers",
-      route: `/pod-report/${job.id}`,
+      route: `/jobs/${job.id}/pod`,
       disabled: !canGeneratePod,
       reason: canGeneratePod ? undefined : podBlockers[0]?.message,
     };
@@ -731,13 +731,13 @@ export function getWorkflowBrain(input: BrainInput): WorkflowBrain {
       adminNextAction = {
         label: "Raise invoice",
         code: "raise_invoice",
-        route: `/admin/invoices/new?jobId=${job.id}`,
+        route: `/invoice/new/${job.id}`,
       };
     } else {
       adminNextAction = {
         label: "View POD",
         code: "view_pod",
-        route: `/pod-report/${job.id}`,
+        route: `/jobs/${job.id}/pod`,
         disabled: false,
         reason: invoiceBlockerMessages[0],
       };

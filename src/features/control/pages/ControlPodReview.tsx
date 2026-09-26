@@ -43,6 +43,7 @@ const STATUS_OPTIONS: { label: string; value: ClosureStatusFilter }[] = [
   { label: "Review Queue", value: "all" },
   { label: "POD Ready", value: "pod_ready" },
   { label: "Delivery Complete", value: "delivery_complete" },
+  { label: "No Delivery Insp.", value: "missing_delivery_inspection" },
   { label: "Recently Completed", value: "recently_completed" },
 ];
 
@@ -88,16 +89,17 @@ export function ControlPodReview() {
 
   // ── KPI Strip ──
   const kpiItems = [
-    { label: "Review Queue", value: kpis?.reviewQueue, icon: ClipboardCheck, variant: "warning" as const, loading: kpisLoading },
-    { label: "POD Ready", value: kpis?.podReady, icon: FileCheck, variant: "info" as const, loading: kpisLoading },
-    { label: "Delivery Complete", value: kpis?.deliveryComplete, icon: Truck, variant: "default" as const, loading: kpisLoading },
-    { label: "Completed (7d)", value: kpis?.completedRecent, icon: ClipboardList, variant: "success" as const, loading: kpisLoading },
+    { label: "Review Queue", value: kpis?.reviewQueue, icon: ClipboardCheck, variant: "warning" as const, loading: kpisLoading, onClick: () => setStatusFilter("all") },
+    { label: "POD Ready", value: kpis?.podReady, icon: FileCheck, variant: "info" as const, loading: kpisLoading, onClick: () => setStatusFilter("pod_ready") },
+    { label: "Delivery Complete", value: kpis?.deliveryComplete, icon: Truck, variant: "default" as const, loading: kpisLoading, onClick: () => setStatusFilter("delivery_complete") },
+    { label: "Completed (7d)", value: kpis?.completedRecent, icon: ClipboardList, variant: "success" as const, loading: kpisLoading, onClick: () => setStatusFilter("recently_completed") },
     {
       label: "No Delivery Insp.",
       value: kpis?.missingDeliveryInspection,
       icon: AlertTriangle,
       variant: kpis?.missingDeliveryInspection ? "destructive" as const : "default" as const,
       loading: kpisLoading,
+      onClick: () => setStatusFilter("missing_delivery_inspection"),
     },
   ];
 

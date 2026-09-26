@@ -103,7 +103,7 @@ export const VehicleDiagram = ({ onAddDamage, damages }: VehicleDiagramProps) =>
           {damages.map((damage) => (
             <div
               key={damage.id}
-              className="absolute w-3 h-3 bg-primary rounded-full border-2 border-white shadow-lg transform -translate-x-1/2 -translate-y-1/2 cursor-pointer"
+              className="absolute w-3 h-3 bg-primary rounded-full border-2 border-white shadow-lg transform -translate-x-1/2 -translate-y-1/2 cursor-help"
               style={{ 
                 left: `${damage.x}%`, 
                 top: `${damage.y}%`,
