@@ -435,11 +435,19 @@ export async function insertPhoto(
   }
 
   const { run_id: _ignored, ...rest } = payload as any;
-  const { data, error } = await supabase
-    .from('photos')
-    .insert({ ...rest, org_id: orgId, run_id: runId } as any)
-    .select()
-    .single();
+  const row = { ...rest, org_id: orgId, run_id: runId } as any;
+
+  // Idempotent on backend_ref (see migration
+  // 20260927120000_photos_idempotent_insert_on_retry): the storage path is
+  // deterministic per captured photo, so a retry after the response leg was
+  // lost — a very plausible drop on a weak mobile connection right after the
+  // insert actually committed — updates the existing row instead of
+  // creating a duplicate. Plain insert when backend_ref is absent (no
+  // conflict target to upsert on).
+  const query = row.backend_ref
+    ? supabase.from('photos').upsert(row, { onConflict: 'backend_ref' })
+    : supabase.from('photos').insert(row);
+  const { data, error } = await query.select().single();
   if (error) throw error;
 
   // Defensive integrity check: server echoed run_id should match what we

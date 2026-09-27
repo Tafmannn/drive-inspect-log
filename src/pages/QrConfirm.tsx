@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -46,8 +46,15 @@ export const QrConfirm = () => {
     load();
   }, [token]);
 
+  // Hard single-flight mutex, same pattern as InspectionFlow's submit guard:
+  // React state updates are async and can be outraced by a second tap
+  // before re-render, especially on a slow/janky mobile browser.
+  const confirmInFlight = useRef(false);
+
   const handleConfirm = async () => {
     if (!customerName.trim()) return;
+    if (confirmInFlight.current) return;
+    confirmInFlight.current = true;
     setStatus("confirming");
     const { data, error } = await supabase.rpc("qr_confirm", {
       p_token: token,
@@ -55,7 +62,20 @@ export const QrConfirm = () => {
       p_notes: notes.trim() || null,
     });
     const result = (data ?? {}) as { status?: string };
-    setStatus(!error && result.status === "done" ? "done" : "error");
+    if (!error && result.status === "done") {
+      setStatus("done");
+      confirmInFlight.current = false;
+      return;
+    }
+    // qr_confirm's own guard (token + confirmed_at IS NULL) means a losing
+    // race against a second tap — or another device confirming the same
+    // handover — returns "invalid" even though the handover itself was
+    // correctly recorded by the winning call. Re-check the real status via
+    // qr_lookup before telling the customer their confirmation failed.
+    const { data: lookup } = await supabase.rpc("qr_lookup", { p_token: token });
+    const lookupResult = (lookup ?? {}) as { status?: string };
+    setStatus(lookupResult.status === "done" ? "done" : "error");
+    confirmInFlight.current = false;
   };
 
   return (
