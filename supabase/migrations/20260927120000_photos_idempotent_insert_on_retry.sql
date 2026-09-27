@@ -1,0 +1,34 @@
+-- 20260927120000_photos_idempotent_insert_on_retry
+--
+-- Found during a mobile-conditions audit ("photo uploads interrupted
+-- mid-flight"): insertPhoto() does a plain INSERT with no idempotency key.
+-- retryUpload()'s retry loop re-runs the full upload+insert step on any
+-- failure, including one that happens in the RESPONSE leg — i.e. the storage
+-- write AND the photos row both already committed server-side, but the
+-- client never received the ack (a plausible drop on a flaky mobile
+-- connection right after the request completes). On a weak-signal retry the
+-- client re-uploads (harmless — the storage path is deterministic and the
+-- object upload uses upsert) but then INSERTs a second `photos` row for the
+-- same evidence, since nothing stopped it.
+--
+-- This already happened in production: 3 jobs' pickup inspections, each hit
+-- by sustained connectivity trouble, produced 18 duplicate groups / 135
+-- extra rows over several retry cycles ~20 minutes apart. Cleaned up ahead of
+-- this migration: the 135 extra rows were archived (earliest row per group
+-- kept active), and backend_ref was cleared on those now-archived rows so a
+-- single, simple unique index can cover the whole table.
+--
+-- `photos.backend_ref` is already deterministic and unique per captured
+-- photo by construction (jobs/<jobId>/<inspectionType>/<photoType>/<pending
+-- upload item id>.<ext> — a fresh client id every time a NEW photo is
+-- staged), so it's a safe, natural idempotency key. The index is
+-- deliberately NOT partial: PostgREST's upsert (`on_conflict=backend_ref`,
+-- what the client's .upsert() call sends) can only infer a conflict target
+-- by column list — it cannot express a partial index's WHERE clause, so
+-- ON CONFLICT (backend_ref) against a partial index fails at runtime with
+-- "no unique or exclusion constraint matching the ON CONFLICT specification"
+-- (confirmed against a live rolled-back probe before settling on this
+-- shape). A plain unique index already allows unlimited NULLs, which is all
+-- the nullability handling this needed anyway.
+CREATE UNIQUE INDEX IF NOT EXISTS photos_backend_ref_unique
+  ON public.photos (backend_ref);
