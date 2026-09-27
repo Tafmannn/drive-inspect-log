@@ -1,0 +1,59 @@
+name: Temp Load Drill (manual, throwaway)
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  drill:
+    runs-on: ubuntu-latest
+    steps:
+      - name: REST read-only burst (app_settings, anon key, 50 concurrent)
+        env:
+          SUPABASE_URL: https://lynkvfduzqdyvlzgriyh.supabase.co
+          SUPABASE_PUBLISHABLE_KEY: sb_publishable_38EwI8yoYAoX66WZjlaw3A_nZC57B5d
+        run: |
+          set -uo pipefail
+          echo "### REST: 50 concurrent reads of app_settings ###"
+          seq 1 50 | xargs -P 50 -I{} bash -c '
+            t0=$(date +%s%3N)
+            code=$(curl -s -o /dev/null -w "%{http_code}" \
+              -H "apikey: $SUPABASE_PUBLISHABLE_KEY" \
+              "$SUPABASE_URL/rest/v1/app_settings?select=key&limit=1")
+            t1=$(date +%s%3N)
+            echo "$code $((t1-t0))ms"
+          ' | sort | tee /tmp/rest_results.txt
+          echo "--- summary ---"
+          awk "{print \$1}" /tmp/rest_results.txt | sort | uniq -c
+          awk "{gsub(/ms/,\"\",\$2); sum+=\$2; n++; if(\$2>max) max=\$2} END {print \"mean_ms=\" sum/n, \"max_ms=\" max, \"n=\" n}" /tmp/rest_results.txt
+
+      - name: Edge function burst (postcode-lookup, public/anon, 50 concurrent, invalid postcode → cheap 400, no Maps call)
+        env:
+          SUPABASE_URL: https://lynkvfduzqdyvlzgriyh.supabase.co
+          SUPABASE_PUBLISHABLE_KEY: sb_publishable_38EwI8yoYAoX66WZjlaw3A_nZC57B5d
+        run: |
+          set -uo pipefail
+          echo "### Edge fn: 50 concurrent postcode-lookup calls (invalid postcode, exercises the per-IP rate limiter) ###"
+          seq 1 50 | xargs -P 50 -I{} bash -c '
+            t0=$(date +%s%3N)
+            code=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+              -H "Authorization: Bearer $SUPABASE_PUBLISHABLE_KEY" \
+              -H "Content-Type: application/json" \
+              -d "{\"postcode\":\"NOTREAL\"}" \
+              "$SUPABASE_URL/functions/v1/postcode-lookup")
+            t1=$(date +%s%3N)
+            echo "$code $((t1-t0))ms"
+          ' | sort | tee /tmp/fn_results.txt
+          echo "--- summary ---"
+          awk "{print \$1}" /tmp/fn_results.txt | sort | uniq -c
+          awk "{gsub(/ms/,\"\",\$2); sum+=\$2; n++; if(\$2>max) max=\$2} END {print \"mean_ms=\" sum/n, \"max_ms=\" max, \"n=\" n}" /tmp/fn_results.txt
+
+      - name: Auth health check burst (10x, sequential-ish sanity)
+        env:
+          SUPABASE_URL: https://lynkvfduzqdyvlzgriyh.supabase.co
+        run: |
+          for i in $(seq 1 10); do
+            curl -s -o /dev/null -w "%{http_code} " "$SUPABASE_URL/auth/v1/health"
+          done
+          echo
