@@ -399,10 +399,14 @@ export const InspectionFlow = () => {
 
       const targetStatus = type === "pickup" ? JOB_STATUS.PICKUP_IN_PROGRESS : JOB_STATUS.DELIVERY_IN_PROGRESS;
       const earlyStatuses: string[] = [JOB_STATUS.READY_FOR_PICKUP, JOB_STATUS.PICKUP_COMPLETE, JOB_STATUS.IN_TRANSIT];
+      const deliveryEarlyStatuses: string[] = [JOB_STATUS.PICKUP_COMPLETE, JOB_STATUS.IN_TRANSIT];
+      // Optimistic concurrency: only apply if nothing has touched the job
+      // since we read it, so a slow fire-and-forget poke can never clobber
+      // a status the real submission has since moved past.
       if (type === "pickup" && earlyStatuses.includes(freshJob.status)) {
-        api.updateJob(jobId, { status: targetStatus } as Partial<Job>).catch(() => {});
-      } else if (type === "delivery" && ([JOB_STATUS.PICKUP_COMPLETE, JOB_STATUS.IN_TRANSIT] as string[]).includes(freshJob.status)) {
-        api.updateJob(jobId, { status: targetStatus } as Partial<Job>).catch(() => {});
+        api.markJobInProgressIfUnchanged(jobId, targetStatus, freshJob.updated_at).catch(() => {});
+      } else if (type === "delivery" && deliveryEarlyStatuses.includes(freshJob.status)) {
+        api.markJobInProgressIfUnchanged(jobId, targetStatus, freshJob.updated_at).catch(() => {});
       }
     } catch {
       // Non-critical — status update is best-effort

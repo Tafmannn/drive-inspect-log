@@ -150,6 +150,39 @@ export async function updateJob(jobId: string, input: Partial<Job>): Promise<Job
   return data as Job;
 }
 
+// Optimistic-concurrency status poke: only writes `status` when the job's
+// `updated_at` still matches what we read it as, i.e. nothing has touched
+// the row since.
+//
+// Concurrency bug this closes (found by a load-test drill simulating an
+// offline-queue reconnection burst): InspectionFlow's "mark in_progress"
+// poke reads the job, checks the status looks early enough, then fires this
+// update fire-and-forget. If the driver finishes and submits before that
+// write lands, submit_inspection() moves the job past this stage — and the
+// poke's write, arriving after, unconditionally overwrote status back to
+// pickup_in_progress even though the submission had already completed,
+// leaving job.status inconsistent with has_pickup_inspection and the actual
+// inspection row. A plain `.in('status', earlyStatuses)` guard isn't enough
+// on its own: pickup_complete is a deliberately-allowed "re-do pickup"
+// source status, so a stale poke racing a fresh submission can still match
+// it. Gating on `updated_at` instead makes the poke a no-op the instant
+// *anything* — the real submission included — has touched the row since we
+// read it, regardless of what the new value happens to be.
+export async function markJobInProgressIfUnchanged(
+  jobId: string,
+  targetStatus: string,
+  expectedUpdatedAt: string,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('jobs')
+    .update({ status: targetStatus } as any)
+    .eq('id', jobId)
+    .eq('updated_at', expectedUpdatedAt)
+    .select('id');
+  if (error) throw error;
+  return (data?.length ?? 0) > 0;
+}
+
 // ─── Soft Delete ─────────────────────────────────────────────────────
 
 export async function deleteJob(jobId: string): Promise<void> {
