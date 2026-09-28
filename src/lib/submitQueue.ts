@@ -571,10 +571,26 @@ async function drainOne(entry: QueuedSubmission): Promise<void> {
     if (cid && sid) damageIdMap[cid] = sid;
   });
 
-  await promoteSubmissionSession(entry.submissionSessionId, {
+  const { promoted } = await promoteSubmissionSession(entry.submissionSessionId, {
     inspectionId,
     damageIdMap,
   });
+
+  // Defense-in-depth: {promoted: 0} means no staged photos were found for
+  // this session — either the driver genuinely captured none, or (the bug
+  // this used to hide silently) they were staged and then lost before the
+  // queue drained. pendingUploads.ts's TTL purge now protects any staged
+  // item with a live submitQueue entry, so this should be unreachable via
+  // that path, but log it rather than let a future regression commit an
+  // inspection with missing evidence without a trace.
+  if (promoted === 0) {
+    void logClientEvent("submit_queue_promoted_zero_evidence", "warn", {
+      jobId: entry.jobId,
+      source: "storage",
+      type: "upload",
+      context: { submissionSessionId: entry.submissionSessionId, inspectionId },
+    });
+  }
 
   // ── 4) Done — remove from the queue. ──
   await removeOne(entry.id);
