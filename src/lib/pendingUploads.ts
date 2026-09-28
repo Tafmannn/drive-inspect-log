@@ -389,16 +389,56 @@ async function loadAllRaw(): Promise<PendingUpload[]> {
  * mid-upload — see WORKFLOW-005 above) on every read, so workers cannot
  * inadvertently promote zombie sessions and stranded evidence is never
  * permanently unretriable.
+ *
+ * Long-offline data-loss regression: STAGED_TTL_MS exists to purge items
+ * abandoned BEFORE the driver ever tapped Submit (staging succeeded, the
+ * app closed, enqueueSubmission never ran). It has no way to tell that
+ * case apart from a submission that WAS queued and is just waiting for
+ * connectivity — submitQueue.ts's queued entries have no TTL of their own,
+ * by design, since the driver is not abandoning anything. A device offline
+ * for longer than STAGED_TTL_MS (very plausible — an overnight signal
+ * loss, a rural collection point, a phone left in a bag) used to have its
+ * staged photos purged here while the submission still sat queued; when
+ * connectivity returned, submit_inspection() committed the inspection
+ * regardless (it never touches photos), promoteSubmissionSession() found
+ * nothing left to promote and returned {promoted: 0} with no error, and
+ * drainOne() never checked that return value — the submission reported
+ * success with zero evidence, silently. Fix: never purge a staged item
+ * whose session still has a live (queued/failed/submitting) submitQueue
+ * entry — dynamic import to avoid a static circular dependency
+ * (submitQueue.ts already imports this module directly).
  */
 async function loadAll(): Promise<PendingUpload[]> {
   const all = await loadAllRaw();
   const now = Date.now();
   const stale: PendingUpload[] = [];
   const survivors: PendingUpload[] = [];
+
+  const staleCandidates = all.filter(
+    (u) => u.state === "staged" && now - new Date(u.createdAt).getTime() > STAGED_TTL_MS,
+  );
+  let liveQueuedSessionIds: Set<string> | null = null;
+  if (staleCandidates.length > 0) {
+    try {
+      const { loadAllSubmissions } = await import("./submitQueue");
+      const queued = await loadAllSubmissions();
+      liveQueuedSessionIds = new Set(queued.map((q) => q.submissionSessionId));
+    } catch {
+      // Can't verify — fail safe by not purging anything this pass rather
+      // than risk discarding evidence for a submission that's still queued.
+      liveQueuedSessionIds = null;
+    }
+  }
+
   for (const u of all) {
     if (u.state === "staged") {
       const age = now - new Date(u.createdAt).getTime();
-      if (age > STAGED_TTL_MS) {
+      const protectedByLiveQueueEntry =
+        liveQueuedSessionIds !== null &&
+        !!u.submissionSessionId &&
+        liveQueuedSessionIds.has(u.submissionSessionId);
+      const canCheck = liveQueuedSessionIds !== null;
+      if (age > STAGED_TTL_MS && (!canCheck ? false : !protectedByLiveQueueEntry)) {
         stale.push(u);
         continue;
       }
