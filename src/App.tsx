@@ -89,6 +89,7 @@ const ControlDrivers = lazyNamed(() => import("@/features/control/pages/ControlD
 const ControlCompliance = lazyNamed(() => import("@/features/control/pages/ControlCompliance"), "ControlCompliance");
 const ControlPodReview = lazyNamed(() => import("@/features/control/pages/ControlPodReview"), "ControlPodReview");
 const ControlFinance = lazyNamed(() => import("@/features/control/pages/ControlFinance"), "ControlFinance");
+const ControlProfitability = lazyNamed(() => import("@/features/control/pages/ControlProfitability"), "ControlProfitability");
 const ControlClients = lazyNamed(() => import("@/features/control/pages/ControlClients"), "ControlClients");
 const InvoicePrepScreen = lazyNamed(() => import("@/features/invoicing/pages/InvoicePrepScreen"), "InvoicePrepScreen");
 const ControlAdmin = lazyNamed(() => import("@/features/control/pages/ControlAdmin"), "ControlAdmin");
@@ -356,6 +357,7 @@ const App = () => {
                   <Route path="drivers" element={<ControlDrivers />} />
                   <Route path="compliance" element={<ControlCompliance />} />
                   <Route path="finance" element={<ControlFinance />} />
+                  <Route path="profitability" element={<ControlProfitability />} />
                   <Route path="clients" element={<ControlClients />} />
                   <Route path="invoice-prep" element={<InvoicePrepScreen />} />
                   <Route path="admin" element={<ControlAdmin />} />

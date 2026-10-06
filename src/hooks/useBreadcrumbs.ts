@@ -46,6 +46,7 @@ const ROUTE_LABELS: Record<string, string> = {
   "/control/drivers": "Drivers",
   "/control/compliance": "Compliance",
   "/control/finance": "Finance",
+  "/control/profitability": "Profitability",
   "/control/admin": "Admin",
   "/control/super-admin": "Super Admin",
   // Misc

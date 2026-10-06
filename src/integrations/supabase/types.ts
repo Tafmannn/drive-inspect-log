@@ -514,6 +514,8 @@ export type Database = {
           max_daily_distance: number | null
           notes: string | null
           org_id: string
+          pay_basis: string | null
+          pay_rate: number | null
           payout_terms: string | null
           phone: string | null
           postcode: string | null
@@ -559,6 +561,8 @@ export type Database = {
           max_daily_distance?: number | null
           notes?: string | null
           org_id: string
+          pay_basis?: string | null
+          pay_rate?: number | null
           payout_terms?: string | null
           phone?: string | null
           postcode?: string | null
@@ -604,6 +608,8 @@ export type Database = {
           max_daily_distance?: number | null
           notes?: string | null
           org_id?: string
+          pay_basis?: string | null
+          pay_rate?: number | null
           payout_terms?: string | null
           phone?: string | null
           postcode?: string | null
@@ -2454,6 +2460,8 @@ export type Database = {
           max_daily_distance: number | null
           notes: string | null
           org_id: string
+          pay_basis: string | null
+          pay_rate: number | null
           payout_terms: string | null
           phone: string | null
           postcode: string | null
@@ -2654,6 +2662,8 @@ export type Database = {
           max_daily_distance: number | null
           notes: string | null
           org_id: string
+          pay_basis: string | null
+          pay_rate: number | null
           payout_terms: string | null
           phone: string | null
           postcode: string | null
