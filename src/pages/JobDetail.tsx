@@ -308,7 +308,10 @@ export const JobDetail = () => {
   // Restrictions / alerts
   const restrictions: string[] = [];
   if (job.earliest_delivery_date) restrictions.push(`Do not deliver before ${job.earliest_delivery_date}`);
-  if (job.caz_ulez_flag) restrictions.push(`CAZ/ULEZ: ${job.caz_ulez_flag}`);
+  if (job.caz_ulez_flag) {
+    const cazCost = typeof job.caz_ulez_cost === "number" ? ` (est. £${job.caz_ulez_cost.toFixed(2)})` : "";
+    restrictions.push(`CAZ/ULEZ: ${job.caz_ulez_flag}${cazCost}`);
+  }
 
   // Admin-only evidence health snapshot (presentational; PodReport remains
   // the authoritative gate for closure / PDF generation).
