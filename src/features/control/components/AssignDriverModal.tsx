@@ -3,7 +3,7 @@
  * COMPLIANCE ENFORCEMENT: Checks onboarding eligibility before assignment.
  * Uses domain event invalidation for mutation coherence.
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { invalidateForEvent } from "@/lib/mutationEvents";
@@ -17,10 +17,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Search, UserCheck, X, ShieldAlert } from "lucide-react";
+import { Loader2, Search, UserCheck, X, ShieldAlert, Navigation } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { notifyJobAssigned } from "@/lib/pushApi";
 import type { OnboardingRecord } from "@/lib/onboardingApi";
+import { isFeatureEnabled } from "@/lib/featureFlags";
+import { calculateRoute } from "@/lib/mapsApi";
+import { rankDriverCandidates } from "@/lib/driverAssignmentSuggestion";
 
 interface AssignDriverModalProps {
   open: boolean;
@@ -39,6 +42,8 @@ interface DriverOption {
   is_active: boolean;
   trade_plate_number: string | null;
   licence_expiry: string | null;
+  home_postcode: string | null;
+  max_daily_distance: number | null;
 }
 
 interface DriverEligibility {
@@ -82,14 +87,37 @@ export function AssignDriverModal({
   currentDriverId,
 }: AssignDriverModalProps) {
   const [search, setSearch] = useState("");
+  const [mapsEnabled, setMapsEnabled] = useState(false);
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    isFeatureEnabled("MAPS_ENABLED").then(setMapsEnabled);
+  }, []);
+
+  // Pickup postcode for the job being assigned — fetched here rather than
+  // threaded through both callers (ControlOverview, ControlJobs) as a prop,
+  // to keep this feature self-contained to the modal.
+  const { data: pickupPostcode } = useQuery({
+    queryKey: ["assign-driver-job-pickup", jobId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("jobs")
+        .select("pickup_postcode")
+        .eq("id", jobId)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.pickup_postcode ?? null;
+    },
+    enabled: open && mapsEnabled,
+    staleTime: 30_000,
+  });
 
   const { data: drivers, isLoading: driversLoading } = useQuery({
     queryKey: ["assign-driver-list"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("driver_profiles")
-        .select("id, user_id, full_name, display_name, phone, is_active, trade_plate_number, licence_expiry, archived_at")
+        .select("id, user_id, full_name, display_name, phone, is_active, trade_plate_number, licence_expiry, home_postcode, max_daily_distance, archived_at")
         .eq("is_active", true)
         .is("archived_at", null)
         .order("full_name", { ascending: true })
@@ -100,6 +128,41 @@ export function AssignDriverModal({
     enabled: open,
     staleTime: 30_000,
   });
+
+  // Proximity ranking — advisory only, never hides a driver. A driver with
+  // no home_postcode, or whose route lookup fails, simply ranks after
+  // drivers with a known distance (see driverAssignmentSuggestion.ts).
+  const { data: rankedCandidates } = useQuery({
+    queryKey: ["assign-driver-ranking", jobId, pickupPostcode, (drivers ?? []).map((d) => d.id).join(",")],
+    queryFn: async () => {
+      if (!pickupPostcode || !drivers || drivers.length === 0) return [];
+      const distances = await Promise.all(
+        drivers.map(async (d) => {
+          if (!d.home_postcode) return { driverId: d.id, distanceMiles: null as number | null };
+          try {
+            const r = await calculateRoute(d.home_postcode, pickupPostcode);
+            return { driverId: d.id, distanceMiles: r.valid ? r.distanceMiles : null };
+          } catch {
+            return { driverId: d.id, distanceMiles: null as number | null };
+          }
+        }),
+      );
+      return rankDriverCandidates(
+        distances.map((d) => ({
+          ...d,
+          maxDailyDistanceMiles: drivers.find((dr) => dr.id === d.driverId)?.max_daily_distance ?? null,
+        })),
+      );
+    },
+    enabled: open && mapsEnabled && !!pickupPostcode && !!drivers && drivers.length > 0,
+    staleTime: 30_000,
+  });
+
+  const rankIndexByDriverId = useMemo(() => {
+    const map = new Map<string, { distanceMiles: number | null; outsideRange: boolean; order: number }>();
+    (rankedCandidates ?? []).forEach((c, i) => map.set(c.driverId, { ...c, order: i }));
+    return map;
+  }, [rankedCandidates]);
 
   // Load onboarding records for compliance checks
   const { data: onboardingRecords } = useQuery({
@@ -181,16 +244,26 @@ export function AssignDriverModal({
 
   const filtered = useMemo(() => {
     if (!drivers) return [];
-    if (!search.trim()) return drivers;
-    const s = search.toLowerCase();
-    return drivers.filter(
-      (d) =>
-        d.full_name.toLowerCase().includes(s) ||
-        d.display_name?.toLowerCase().includes(s) ||
-        d.phone?.toLowerCase().includes(s) ||
-        d.trade_plate_number?.toLowerCase().includes(s)
-    );
-  }, [drivers, search]);
+    const s = search.trim().toLowerCase();
+    const bySearch = !s
+      ? drivers
+      : drivers.filter(
+          (d) =>
+            d.full_name.toLowerCase().includes(s) ||
+            d.display_name?.toLowerCase().includes(s) ||
+            d.phone?.toLowerCase().includes(s) ||
+            d.trade_plate_number?.toLowerCase().includes(s)
+        );
+
+    if (rankIndexByDriverId.size === 0) return bySearch;
+    // Nearest-first when a ranking is available; drivers the ranking
+    // didn't cover (shouldn't happen, but fail open) keep their place.
+    return [...bySearch].sort((a, b) => {
+      const ra = rankIndexByDriverId.get(a.id)?.order ?? Number.MAX_SAFE_INTEGER;
+      const rb = rankIndexByDriverId.get(b.id)?.order ?? Number.MAX_SAFE_INTEGER;
+      return ra - rb;
+    });
+  }, [drivers, search, rankIndexByDriverId]);
 
   const isMutating = assignMutation.isPending || unassignMutation.isPending;
 
@@ -201,6 +274,7 @@ export function AssignDriverModal({
           <DialogTitle className="text-sm">Assign Driver — {jobRef}</DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
             Select an active, eligible driver to assign to this job.
+            {rankIndexByDriverId.size > 0 && " Sorted nearest-first by home postcode."}
           </DialogDescription>
         </DialogHeader>
 
@@ -244,6 +318,7 @@ export function AssignDriverModal({
               const isCurrentDriver = driver.id === currentDriverId;
               const label = driver.display_name || driver.full_name;
               const eligibility = checkDriverEligibility(driver, onboardingMap);
+              const rank = rankIndexByDriverId.get(driver.id);
               return (
                 <button
                   key={driver.id}
@@ -274,6 +349,20 @@ export function AssignDriverModal({
                     {isCurrentDriver && (
                       <Badge variant="outline" className="text-[9px] px-1.5 py-0 text-primary border-primary/30">
                         <UserCheck className="h-2.5 w-2.5 mr-0.5" /> Current
+                      </Badge>
+                    )}
+                    {rank?.distanceMiles != null && !isCurrentDriver && (
+                      <Badge
+                        variant="outline"
+                        className={`text-[9px] px-1.5 py-0 ${
+                          rank.outsideRange
+                            ? "text-muted-foreground border-border"
+                            : "text-foreground border-border"
+                        }`}
+                        title={rank.outsideRange ? "Beyond this driver's stated max daily distance" : undefined}
+                      >
+                        <Navigation className="h-2.5 w-2.5 mr-0.5" />
+                        {rank.distanceMiles.toFixed(0)} mi{rank.outsideRange ? " (far)" : ""}
                       </Badge>
                     )}
                     {!eligibility.eligible && !isCurrentDriver && (
