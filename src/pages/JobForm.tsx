@@ -18,6 +18,7 @@ import { toast } from "@/hooks/use-toast";
 import { Loader2, MapPin, Navigation, Search, UserCheck, ChevronsUpDown, X } from "lucide-react";
 import { CAR_MAKES, getModelsForMake } from "@/lib/carData";
 import { isValidUkPostcode, calculateRoute, type RouteResult } from "@/lib/mapsApi";
+import { computeJobCaz, lookupCazZone } from "@/lib/cazLookup";
 import { lookupVehicle } from "@/lib/vehicleLookupApi";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import { saveDraft, loadDraft, clearDraft, draftKey } from "@/lib/autosave";
@@ -128,6 +129,9 @@ export const JobForm = () => {
   // Route calculation state
   const [routeResult, setRouteResult] = useState<RouteResult | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
+  // CAZ/ULEZ — pure/synchronous lookup, kept live in step with route calc
+  // so the pricing panel's advisory suggestion can include it.
+  const [cazRisk, setCazRisk] = useState<{ zoneCount: number; estimatedCost: number } | null>(null);
   const [mapsEnabled, setMapsEnabled] = useState(false);
   const routeDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -248,6 +252,19 @@ export const JobForm = () => {
 
   // Debounced route calculation
   const triggerRouteCalc = useCallback((pickupPC: string, deliveryPC: string) => {
+    // CAZ/ULEZ is a pure static-table lookup (no network call), so it's
+    // updated synchronously here rather than debounced like the route call.
+    const zones = new Map<string, number>();
+    for (const pc of [pickupPC, deliveryPC]) {
+      const zone = pc ? lookupCazZone(pc) : null;
+      if (zone) zones.set(zone.name, zone.dailyCharge);
+    }
+    setCazRisk(
+      zones.size > 0
+        ? { zoneCount: zones.size, estimatedCost: Array.from(zones.values()).reduce((s, c) => s + c, 0) }
+        : null,
+    );
+
     if (!mapsEnabled) return;
     if (routeDebounce.current) clearTimeout(routeDebounce.current);
     if (!isValidUkPostcode(pickupPC) || !isValidUkPostcode(deliveryPC)) {
@@ -534,6 +551,10 @@ export const JobForm = () => {
       delivery_city: getStr(data, "delivery_city"),
       delivery_postcode: getStr(data, "delivery_postcode"),
       delivery_notes: getStr(data, "delivery_notes") || null,
+      ...(() => {
+        const caz = computeJobCaz(getStr(data, "pickup_postcode"), getStr(data, "delivery_postcode"));
+        return { caz_ulez_flag: caz.flag, caz_ulez_cost: caz.cost };
+      })(),
 
       earliest_delivery_date: getStr(data, "earliest_delivery_date") || null,
       // Driver assignment — canonical FK + display name
@@ -1468,6 +1489,7 @@ export const JobForm = () => {
               urgency: "standard",
               ratePerMileOverride: parseNumOrNull(ratePerMileInput),
               minimumChargeOverride: parseNumOrNull(minimumChargeInput),
+              cazRisk,
             }}
             onAccepted={(p) => setAdminPriceInput(String(p))}
           />
