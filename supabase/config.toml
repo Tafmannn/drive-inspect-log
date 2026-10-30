@@ -41,3 +41,9 @@ verify_jwt = false
 
 [functions.request-password-reset]
 verify_jwt = false
+
+[functions.portal-evidence]
+verify_jwt = false
+
+[functions.portal-access]
+verify_jwt = false
