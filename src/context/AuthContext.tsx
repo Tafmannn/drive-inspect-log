@@ -24,7 +24,7 @@ const AUTH_ENABLED =
 
 /* ── Public types ──────────────────────────────────────────────────── */
 
-export type AppRole = "DRIVER" | "ADMIN" | "SUPERADMIN";
+export type AppRole = "DRIVER" | "ADMIN" | "SUPERADMIN" | "CLIENT";
 
 export interface AppUser {
   id: string;
@@ -176,7 +176,11 @@ function RealAuthProvider({ children }: { children: ReactNode }) {
         if (data?.account_status) {
           user.accountStatus = data.account_status as AppUser["accountStatus"];
         }
-        if (data?.role) {
+        if (data?.role === "client") {
+          // Customer-portal login: CLIENT only, never the baseline DRIVER role,
+          // so no driver/admin route or driver-only UI treats them as staff.
+          user.roles = ["CLIENT"];
+        } else if (data?.role) {
           const dbRole =
             data.role === "super_admin" ? "SUPERADMIN" : String(data.role).toUpperCase();
           if (
