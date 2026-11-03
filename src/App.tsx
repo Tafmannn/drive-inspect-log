@@ -305,9 +305,12 @@ const App = () => {
                 {/* ── Customer portal ── */}
                 <Route path="/portal" element={<PortalRoute><PortalLayout /></PortalRoute>}>
                   <Route index element={<PortalJobs />} />
-                  <Route path="jobs/:jobId" element={<PortalJobDetail />} />
-                  <Route path="invoices" element={<PortalInvoices />} />
-                  <Route path="invoices/:invoiceId" element={<PortalInvoiceDetail />} />
+                  {/* Absolute child paths (valid under the /portal parent) so the
+                      route-integrity test, which treats relative paths as
+                      /control children, can see them. */}
+                  <Route path="/portal/jobs/:jobId" element={<PortalJobDetail />} />
+                  <Route path="/portal/invoices" element={<PortalInvoices />} />
+                  <Route path="/portal/invoices/:invoiceId" element={<PortalInvoiceDetail />} />
                 </Route>
                 <Route path="/confirm" element={<QrConfirm />} />
                 <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
