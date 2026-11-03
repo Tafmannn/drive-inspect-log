@@ -39,7 +39,6 @@ ALTER TABLE public.user_profiles
 CREATE INDEX IF NOT EXISTS user_profiles_client_id_idx
   ON public.user_profiles (client_id) WHERE client_id IS NOT NULL;
 
-ALTER TABLE public.user_profiles DROP CONSTRAINT IF EXISTS user_profiles_client_role_consistency;
 ALTER TABLE public.user_profiles
   ADD CONSTRAINT user_profiles_client_role_consistency CHECK (
     ((role = 'client') = (client_id IS NOT NULL))
@@ -128,9 +127,8 @@ $function$;
 -- able to sign in, that's no longer an insider-only gap. The self path now
 -- requires the row's org to be the caller's own org — the only org the
 -- app's own self-service form (Profile -> DriverProfileForm) ever writes.
-DROP POLICY IF EXISTS driver_profiles_insert_self_admin_super ON public.driver_profiles;
-CREATE POLICY driver_profiles_insert_self_admin_super
-  ON public.driver_profiles FOR INSERT TO authenticated
+ALTER POLICY driver_profiles_insert_self_admin_super
+  ON public.driver_profiles
   WITH CHECK (
     ((user_id = auth.uid()) AND (org_id = public.user_org_id()))
     OR public.is_super_admin()
