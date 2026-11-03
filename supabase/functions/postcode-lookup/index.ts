@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { checkStaff } from "../_shared/staffAuth.ts";
 import { createIpRateLimiter } from "../_shared/rateLimit.ts";
 
 const corsHeaders = {
@@ -7,7 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-// Public + billed third-party API — see rateLimit.ts.
+// Staff-only + billed third-party API — see rateLimit.ts.
 const rateLimiter = createIpRateLimiter(corsHeaders);
 
 const UK_POSTCODE_RE = /^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i;
@@ -57,29 +57,16 @@ serve(async (req) => {
   if (limited) return limited;
 
   try {
-    // ─── Optional auth ───
-    const authHeader = req.headers.get("Authorization") ?? "";
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const isPublicCall = !authHeader || authHeader === `Bearer ${supabaseAnonKey}`;
-    if (!isPublicCall) {
-      if (!authHeader.startsWith("Bearer ")) {
-        return new Response(JSON.stringify({ error: "UNAUTHENTICATED" }), {
-          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-        global: { headers: { Authorization: authHeader } },
+    // ─── Staff only ───
+    // Billed third-party API: only active staff (driver/admin/super_admin
+    // with a live profile) may call it. Signed-out callers and customer-portal
+    // logins are refused — see _shared/staffGate.ts.
+    const denied = await checkStaff(req);
+    if (denied) {
+      return new Response(JSON.stringify({ error: denied.error }), {
+        status: denied.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-      const token = authHeader.replace("Bearer ", "");
-      const { data: claimsData, error: authError } = await supabase.auth.getClaims(token);
-      if (authError || !claimsData?.claims?.sub) {
-        return new Response(JSON.stringify({ error: "UNAUTHENTICATED" }), {
-          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
     }
-    // Public and authenticated sessions can both use postcode lookup.
 
     // ─── Original logic ───
     const MAPS_KEY = Deno.env.get("GOOGLE_MAPS_API_KEY");
