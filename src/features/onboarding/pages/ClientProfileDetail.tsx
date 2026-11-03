@@ -16,6 +16,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { scoreClient } from "../lib/completion";
 import { CompletionBadge } from "../components/CompletionBadge";
+import { PortalAccessCard } from "@/features/clients/components/PortalAccessCard";
 
 export default function ClientProfileDetail() {
   const navigate = useNavigate();
@@ -148,6 +149,8 @@ export default function ClientProfileDetail() {
             )}
           </CardContent>
         </Card>
+
+        <PortalAccessCard clientId={clientId} defaultName={client?.contact_name} defaultEmail={client?.contact_email} />
       </div>
 
       {/* bottom-16 at all sizes: BottomNav stays fixed+visible on desktop too

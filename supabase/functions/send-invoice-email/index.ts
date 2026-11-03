@@ -193,6 +193,19 @@ serve(async (req) => {
       );
     }
 
+    // First successful send marks the invoice as issued — this is what makes
+    // it visible in the client portal. Best-effort: the email has already
+    // gone out, so a failure here must not turn the response into an error.
+    try {
+      await admin
+        .from("invoices")
+        .update({ sent_at: new Date().toISOString() })
+        .eq("id", invoiceId)
+        .is("sent_at", null);
+    } catch (e) {
+      console.error("send-invoice-email: sent_at stamp failed", e instanceof Error ? e.message : e);
+    }
+
     return new Response(
       JSON.stringify({ sent: true, id: resendData?.id ?? null }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }

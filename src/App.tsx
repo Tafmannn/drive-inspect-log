@@ -43,6 +43,7 @@ import { installSubmitQueueDrainer, drainSubmitQueue } from "@/lib/submitQueue";
 import { installEvidenceDrainTriggers, drainEvidenceQueue } from "@/lib/evidence/queueRuntime";
 import { Loader2 } from "lucide-react";
 import { ControlRoute } from "@/features/control/guards/ControlRoute";
+import { PortalRoute } from "@/features/portal/components/PortalRoute";
 
 // ── Management surface: admin, super-admin, the Control Center, invoicing,
 // onboarding wizards and the PDF-heavy report/generator screens are lazy-
@@ -55,6 +56,13 @@ function lazyNamed<T extends Record<string, unknown>>(
 ) {
   return lazy(() => loader().then((m) => ({ default: m[name] as ComponentType })));
 }
+
+// Customer portal — its own chunks; drivers and staff never download them.
+const PortalLayout = lazyNamed(() => import("@/features/portal/components/PortalLayout"), "PortalLayout");
+const PortalJobs = lazy(() => import("@/features/portal/pages/PortalJobs"));
+const PortalJobDetail = lazy(() => import("@/features/portal/pages/PortalJobDetail"));
+const PortalInvoices = lazy(() => import("@/features/portal/pages/PortalInvoices"));
+const PortalInvoiceDetail = lazy(() => import("@/features/portal/pages/PortalInvoiceDetail"));
 
 const JobMasterList = lazyNamed(() => import("./pages/JobMasterList"), "JobMasterList");
 const JobForm = lazyNamed(() => import("./pages/JobForm"), "JobForm");
@@ -112,7 +120,8 @@ function BackgroundUploader() {
   // Drain queued offline submissions FIRST so their photos get
   // promoted before the photo-upload worker picks anything up.
   useEffect(() => {
-    if (authLoading || !user) return;
+    // Portal (CLIENT) users never capture evidence — nothing to drain.
+    if (authLoading || !user || user.roles.includes("CLIENT")) return;
     void drainSubmitQueue().finally(() => {
       void triggerRetry("auth_ready");
       // Evidence v2 uploads (capture-time queue) — independent of the legacy
@@ -159,6 +168,9 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (user.accountStatus === "suspended" || user.accountStatus === "pending_activation") {
     return <AccountStatusGate user={user} />;
   }
+
+  // Customer-portal logins never see the driver/admin app.
+  if (user.roles.includes("CLIENT")) return <Navigate to="/portal" replace />;
 
   return <DriverOnboardingGate>{children}</DriverOnboardingGate>;
 }
@@ -289,6 +301,17 @@ const App = () => {
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/welcome" element={<Welcome />} />
+
+                {/* ── Customer portal ── */}
+                <Route path="/portal" element={<PortalRoute><PortalLayout /></PortalRoute>}>
+                  <Route index element={<PortalJobs />} />
+                  {/* Absolute child paths (valid under the /portal parent) so the
+                      route-integrity test, which treats relative paths as
+                      /control children, can see them. */}
+                  <Route path="/portal/jobs/:jobId" element={<PortalJobDetail />} />
+                  <Route path="/portal/invoices" element={<PortalInvoices />} />
+                  <Route path="/portal/invoices/:invoiceId" element={<PortalInvoiceDetail />} />
+                </Route>
                 <Route path="/confirm" element={<QrConfirm />} />
                 <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
 
