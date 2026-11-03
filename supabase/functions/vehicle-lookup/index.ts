@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { checkStaff } from "../_shared/staffAuth.ts";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
 function jsonResponse(body: unknown, status = 200) {
@@ -15,23 +15,14 @@ serve(async (req) => {
   }
 
   try {
-    // ─── Auth ───
-    const authHeader = req.headers.get("Authorization") ?? "";
-    if (!authHeader.startsWith("Bearer ")) {
-      return jsonResponse({ success: false, error: "UNAUTHENTICATED" }, 401);
+    // ─── Staff only ───
+    // Billed DVLA API: only active staff (driver/admin/super_admin with a
+    // live profile) may call it. Customer-portal logins are refused — see
+    // _shared/staffGate.ts.
+    const denied = await checkStaff(req);
+    if (denied) {
+      return jsonResponse({ success: false, error: denied.error }, denied.status);
     }
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: authError } = await supabase.auth.getClaims(token);
-    if (authError || !claimsData?.claims?.sub) {
-      console.warn("vehicle-lookup auth failed", authError?.message ?? "missing sub claim");
-      return jsonResponse({ success: false, error: "UNAUTHENTICATED" }, 401);
-    }
-    // authenticated user is sufficient for DVLA lookup
 
     // ─── Input validation ───
     const body = await req.json();
