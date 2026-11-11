@@ -234,13 +234,28 @@ export async function linkJobToClient(
     // here must throw — silently resolving would leave the job
     // permanently unmatched to this client for invoicing with no error
     // ever surfaced (previously unchecked here entirely).
+    //
+    // client_id is the link itself (portal visibility, client reports). It
+    // was previously never written here: linking relied on a DB trigger that
+    // compared client company names against the contact-person field, so it
+    // usually didn't take. The trigger also checks the client is in the
+    // job's org.
     const { error: jobError } = await supabase
       .from("jobs")
       .update({
+        client_id: client.id,
         client_company: client.company || client.name,
         client_name: client.name,
         client_email: client.email,
       } as any)
+      .eq("id", jobId);
+    if (jobError) throw jobError;
+  } else {
+    // Explicit unlink. The auto-link trigger leaves a deliberately unlinked
+    // job alone, so this sticks even if the job's text still names a client.
+    const { error: jobError } = await supabase
+      .from("jobs")
+      .update({ client_id: null } as any)
       .eq("id", jobId);
     if (jobError) throw jobError;
   }

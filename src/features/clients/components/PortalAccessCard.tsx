@@ -5,6 +5,7 @@
  * this client's org and that every target is a portal login of THIS client.
  */
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Globe, Loader2, Mail, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -127,7 +128,10 @@ export function PortalAccessCard({
             <p className="text-xs text-muted-foreground">
               <span className="font-medium text-foreground">{data?.linked_jobs ?? 0}</span> job
               {data?.linked_jobs === 1 ? " is" : "s are"} linked to this client and will appear in their portal.
-              Jobs only appear once they're linked to this client record.
+              Jobs only appear once they're linked to this client record.{" "}
+              <Link to="/control/clients/link-jobs" className="text-primary underline-offset-2 hover:underline">
+                Link jobs
+              </Link>
             </p>
 
             {(data?.users.length ?? 0) > 0 && (

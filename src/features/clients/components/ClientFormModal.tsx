@@ -31,9 +31,16 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   client?: Client | null;
+  /** Prefills the company when creating. */
+  initialCompany?: string;
+  /**
+   * Inline use (job form, job-linking screen): called with the new client
+   * instead of navigating to its onboarding wizard.
+   */
+  onCreated?: (client: Client) => void;
 }
 
-export function ClientFormModal({ open, onOpenChange, client }: Props) {
+export function ClientFormModal({ open, onOpenChange, client, initialCompany, onCreated }: Props) {
   const isEdit = !!client;
   const navigate = useNavigate();
   const createMutation = useCreateClient();
@@ -94,7 +101,7 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
       }
     } else {
       setForm({
-        name: "", company: "", billing_email: "", client_type: "",
+        name: "", company: initialCompany ?? "", billing_email: "", client_type: "",
         email: "", phone: "", address: "", notes: "",
         rate_card_active: false, rate_per_mile: "", minimum_charge: "",
         agreed_price: "", waiting_rate_per_hour: "", rate_card_notes: "",
@@ -103,7 +110,7 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [client, open, canEditRateCard]);
+  }, [client, open, canEditRateCard, initialCompany]);
 
   const parseNum = (v: string): number | null => {
     const t = v.trim();
@@ -154,12 +161,13 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
 
     try {
       let savedClientId: string;
+      let createdClient: Client | null = null;
       if (isEdit && client) {
         await updateMutation.mutateAsync({ id: client.id, input: payload as any });
         savedClientId = client.id;
       } else {
-        const created = await createMutation.mutateAsync(payload as any);
-        savedClientId = (created as any)?.id;
+        createdClient = (await createMutation.mutateAsync(payload as any)) as Client;
+        savedClientId = createdClient?.id;
       }
 
       // Rate card lives in a separate admin-only table. Only attempt write
@@ -178,9 +186,11 @@ export function ClientFormModal({ open, onOpenChange, client }: Props) {
       toast({ title: isEdit ? "Client updated" : "Client created" });
       onOpenChange(false);
 
-      // After fresh creation, route to profile completion.
+      // After fresh creation, hand the client back to an inline caller, or
+      // route to profile completion.
       if (!isEdit && savedClientId) {
-        navigate(`/control/clients/${savedClientId}/complete?created=1`);
+        if (onCreated && createdClient) onCreated(createdClient);
+        else navigate(`/control/clients/${savedClientId}/complete?created=1`);
       }
     } catch (err: any) {
       toast({
