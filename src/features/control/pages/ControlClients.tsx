@@ -22,6 +22,7 @@ import { ClientFormModal } from "@/features/clients/components/ClientFormModal";
 import type { Client } from "@/lib/clientApi";
 import {
   Building2,
+  Link2,
   Plus,
   Search,
   Users,
@@ -211,16 +212,22 @@ export function ControlClients() {
         title="Clients"
         subtitle="Manage billing client profiles"
         actions={
-          <Button
-            size="sm"
-            onClick={() => {
-              setEditingClient(null);
-              setModalOpen(true);
-            }}
-          >
-            <Plus className="h-4 w-4 mr-1.5" />
-            New Client
-          </Button>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => navigate("/control/clients/link-jobs")}>
+              <Link2 className="h-4 w-4 mr-1.5" />
+              Link jobs
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                setEditingClient(null);
+                setModalOpen(true);
+              }}
+            >
+              <Plus className="h-4 w-4 mr-1.5" />
+              New Client
+            </Button>
+          </div>
         }
       />
 

@@ -31,10 +31,12 @@ import { logClientEvent } from "@/lib/logger";
 import { supabase } from "@/integrations/supabase/client";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ClientPickerCombobox } from "@/features/clients/components/ClientPickerCombobox";
+import { ClientFormModal } from "@/features/clients/components/ClientFormModal";
+import { Checkbox } from "@/components/ui/checkbox";
 import { PricingSuggestionPanel } from "@/components/PricingSuggestionPanel";
 import { useAuth } from "@/context/AuthContext";
 import { SectionCard, SectionHeader, AdvisoryNote, StatusPill } from "@/components/ui-kit";
-import { PoundSterling } from "lucide-react";
+import { PoundSterling, Plus } from "lucide-react";
 type ErrorMap = Record<string, string>;
 
 interface JobFormDraft {
@@ -76,8 +78,12 @@ export const JobForm = () => {
   const [driverPickerOpen, setDriverPickerOpen] = useState(false);
   const [driverSearch, setDriverSearch] = useState("");
 
-  // Client linking state
+  // Client linking state. New jobs must name their client (it's what puts
+  // them in the client's portal and invoice list) unless explicitly marked
+  // as a one-off.
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [oneOffJob, setOneOffJob] = useState(false);
+  const [newClientOpen, setNewClientOpen] = useState(false);
 
   // Admin-only pricing state (manual override + per-job rate overrides)
   const { isAdmin, isSuperAdmin } = useAuth();
@@ -497,6 +503,11 @@ export const JobForm = () => {
       if (!val) e[field] = msg;
     }
 
+    // Only for new jobs: older jobs without a client can still be edited.
+    if (!isEdit && !selectedClientId && !oneOffJob) {
+      e.client = "Choose the client for this job, or tick “One-off job”.";
+    }
+
     setErrors(e);
 
     if (Object.keys(e).length > 0) {
@@ -577,8 +588,12 @@ export const JobForm = () => {
     // permanently invisible under its correct client's "eligible to
     // invoice" list with no indication anything went wrong. Report it
     // distinctly from the main save outcome rather than swallowing it.
+    const previousClientId =
+      (existingJob as { client_id?: string | null } | undefined)?.client_id ?? null;
     const linkClientAndWarn = async (targetJobId: string) => {
-      if (!selectedClientId) return;
+      // Nothing chosen and nothing to clear. Clearing the picker on an
+      // existing linked job unlinks it (linkJobToClient with null).
+      if (!selectedClientId && !(isEdit && previousClientId)) return;
       try {
         const { linkJobToClient } = await import("@/lib/clientApi");
         await linkJobToClient(targetJobId, selectedClientId);
@@ -681,14 +696,56 @@ export const JobForm = () => {
             void handleSubmit();
           }}
         >
-          {/* CLIENT PROFILE (optional) */}
+          {/* CLIENT PROFILE — required for new jobs unless marked one-off */}
           <div className="space-y-3">
-            <h3 className="font-semibold text-lg">Client Profile</h3>
-            <p className="text-xs text-muted-foreground">Optional — link a billing client to this job.</p>
-            <ClientPickerCombobox
-              value={selectedClientId}
-              onSelect={(id) => setSelectedClientId(id)}
-            />
+            <h3 className="font-semibold text-lg">Client{!isEdit && " *"}</h3>
+            <p className="text-xs text-muted-foreground">
+              Links the job to the client's portal and their invoices.
+            </p>
+            <div className="flex items-center gap-2">
+              <ClientPickerCombobox
+                className="flex-1 min-w-0"
+                value={selectedClientId}
+                onSelect={(id) => {
+                  setSelectedClientId(id);
+                  if (id) {
+                    setOneOffJob(false);
+                    setErrors((prev) => {
+                      if (!prev.client) return prev;
+                      const { client: _cleared, ...rest } = prev;
+                      return rest;
+                    });
+                  }
+                }}
+              />
+              <Button type="button" variant="outline" size="sm" className="h-10 shrink-0" onClick={() => setNewClientOpen(true)}>
+                <Plus className="h-4 w-4 mr-1" /> New
+              </Button>
+            </div>
+            {!isEdit && !selectedClientId && (
+              <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                <Checkbox
+                  checked={oneOffJob}
+                  onCheckedChange={(v) => {
+                    setOneOffJob(v === true);
+                    if (v === true) {
+                      setErrors((prev) => {
+                        if (!prev.client) return prev;
+                        const { client: _cleared, ...rest } = prev;
+                        return rest;
+                      });
+                    }
+                  }}
+                />
+                One-off job — no client profile (won't appear in any client portal)
+              </label>
+            )}
+            {isEdit && !selectedClientId && (
+              <p className="text-xs text-warning">
+                Not linked to a client — this job won't appear in a client portal.
+              </p>
+            )}
+            <ErrorText field="client" />
           </div>
 
           {/* VEHICLE DETAILS */}
@@ -1506,6 +1563,22 @@ export const JobForm = () => {
             {isEdit ? "Update Job" : "Create Job"}
           </Button>
         </form>
+        {/* Outside the job <form>: React bubbles a portalled dialog's submit
+            event to its React ancestors, so inside it the client form's
+            submit would also submit the job. */}
+        <ClientFormModal
+          open={newClientOpen}
+          onOpenChange={setNewClientOpen}
+          onCreated={(c) => {
+            setSelectedClientId(c.id);
+            setOneOffJob(false);
+            setErrors((prev) => {
+              if (!prev.client) return prev;
+              const { client: _cleared, ...rest } = prev;
+              return rest;
+            });
+          }}
+        />
       </div>
       <BottomNav />
     </div>

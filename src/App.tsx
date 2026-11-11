@@ -100,6 +100,7 @@ const ControlFinance = lazyNamed(() => import("@/features/control/pages/ControlF
 const ControlProfitability = lazyNamed(() => import("@/features/control/pages/ControlProfitability"), "ControlProfitability");
 const ControlClients = lazyNamed(() => import("@/features/control/pages/ControlClients"), "ControlClients");
 const InvoicePrepScreen = lazyNamed(() => import("@/features/invoicing/pages/InvoicePrepScreen"), "InvoicePrepScreen");
+const LinkJobsToClients = lazy(() => import("@/features/clients/pages/LinkJobsToClients"));
 const ControlAdmin = lazyNamed(() => import("@/features/control/pages/ControlAdmin"), "ControlAdmin");
 const ControlSuperAdmin = lazyNamed(() => import("@/features/control/pages/ControlSuperAdmin"), "ControlSuperAdmin");
 const ExportsPage = lazyNamed(() => import("@/features/exports/pages/ExportsPage"), "ExportsPage");
@@ -382,6 +383,7 @@ const App = () => {
                   <Route path="finance" element={<ControlFinance />} />
                   <Route path="profitability" element={<ControlProfitability />} />
                   <Route path="clients" element={<ControlClients />} />
+                  <Route path="clients/link-jobs" element={<LinkJobsToClients />} />
                   <Route path="invoice-prep" element={<InvoicePrepScreen />} />
                   <Route path="admin" element={<ControlAdmin />} />
                   <Route path="exports" element={<ExportsPage />} />

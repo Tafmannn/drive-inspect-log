@@ -13,6 +13,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  */
 const mockInvoicesUpdate = vi.fn();
 const mockJobsUpdate = vi.fn();
+const mockJobsPayload = vi.fn();
 const mockClientSingle = vi.fn();
 
 // getClient() is called internally by linkJobToClient() within the same
@@ -26,7 +27,12 @@ vi.mock("@/integrations/supabase/client", () => ({
         return { update: () => ({ eq: (...a: unknown[]) => mockInvoicesUpdate(...a) }) };
       }
       if (table === "jobs") {
-        return { update: () => ({ eq: (...a: unknown[]) => mockJobsUpdate(...a) }) };
+        return {
+          update: (payload: unknown) => {
+            mockJobsPayload(payload);
+            return { eq: (...a: unknown[]) => mockJobsUpdate(...a) };
+          },
+        };
       }
       if (table === "clients") {
         return { select: () => ({ eq: () => ({ single: (...a: unknown[]) => mockClientSingle(...a) }) }) };
@@ -43,6 +49,7 @@ import { linkJobToClient } from "@/lib/clientApi";
 beforeEach(() => {
   mockInvoicesUpdate.mockReset().mockResolvedValue({ error: null });
   mockJobsUpdate.mockReset().mockResolvedValue({ error: null });
+  mockJobsPayload.mockReset();
   mockClientSingle.mockReset().mockResolvedValue({
     data: { id: "client-1", name: "Acme", company: "Acme Ltd", email: "a@acme.test" },
     error: null,
@@ -68,5 +75,40 @@ describe("linkJobToClient error propagation (DATA-003)", () => {
   it("resolves cleanly when both updates succeed", async () => {
     await expect(linkJobToClient("job-1", "client-1")).resolves.toBeUndefined();
     expect(mockJobsUpdate).toHaveBeenCalled();
+  });
+});
+
+describe("linkJobToClient writes the link itself", () => {
+  it("sets client_id along with the invoice-matching text fields", async () => {
+    await linkJobToClient("job-1", "client-1");
+    expect(mockJobsPayload).toHaveBeenCalledWith({
+      client_id: "client-1",
+      client_company: "Acme Ltd",
+      client_name: "Acme",
+      client_email: "a@acme.test",
+    });
+    expect(mockJobsUpdate).toHaveBeenCalledWith("id", "job-1");
+  });
+
+  it("falls back to the client's name when it has no company", async () => {
+    mockClientSingle.mockResolvedValue({
+      data: { id: "client-2", name: "Movex", company: null, email: null },
+      error: null,
+    });
+    await linkJobToClient("job-1", "client-2");
+    expect(mockJobsPayload).toHaveBeenCalledWith(
+      expect.objectContaining({ client_id: "client-2", client_company: "Movex" }),
+    );
+  });
+
+  it("unlinks with client_id null and leaves the text fields alone", async () => {
+    await linkJobToClient("job-1", null);
+    expect(mockClientSingle).not.toHaveBeenCalled();
+    expect(mockJobsPayload).toHaveBeenCalledWith({ client_id: null });
+  });
+
+  it("throws when the unlink update fails", async () => {
+    mockJobsUpdate.mockResolvedValue({ error: { code: "42501", message: "permission denied" } });
+    await expect(linkJobToClient("job-1", null)).rejects.toMatchObject({ code: "42501" });
   });
 });
