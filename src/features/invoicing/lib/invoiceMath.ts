@@ -236,7 +236,7 @@ export function buildInvoiceDraft(input: {
 
   jobs.forEach((job, i) => {
     const transport = round2(Number(job.total_price ?? 0));
-    const jobExpenses = (byJob.get(job.id) ?? []).sort(
+    const jobExpenses = [...(byJob.get(job.id) ?? [])].sort(
       (a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id),
     );
 

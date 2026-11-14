@@ -304,7 +304,7 @@ export function AccountsSection() {
               Include receipt files
             </label>
           </div>
-          <Button onClick={downloadPack} disabled={!ready || busy !== null}>
+          <Button onClick={() => void downloadPack()} disabled={!ready || busy !== null}>
             {busy === "pack" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Package className="mr-2 h-4 w-4" />}
             Download accounts pack
           </Button>

@@ -126,7 +126,8 @@ export function periodPresets(today: string): Period[] {
   const ty = taxYearOf(today);
   const prevTy = taxYearOf(iso(Number(ty.from.slice(0, 4)), 4, 5));
   const quarters = taxQuartersOf(today).filter((q) => q.from <= today);
-  return [monthOf(today), monthOf(today, -1), ...quarters.reverse(), ty, prevTy];
+  const newestFirst = [...quarters].reverse();
+  return [monthOf(today), monthOf(today, -1), ...newestFirst, ty, prevTy];
 }
 
 export function inPeriod(day: string | null | undefined, p: Pick<Period, "from" | "to">): boolean {
@@ -356,7 +357,7 @@ export function expenseRef(e: Pick<AccountExpense, "id">): string {
 }
 
 function safePart(v: string): string {
-  return v.replace(/[^a-zA-Z0-9.-]+/g, "-").replace(/^-+|-+$/g, "");
+  return v.replace(/[^a-zA-Z0-9.-]+/g, "-").replace(/^-+/, "").replace(/-+$/, "");
 }
 
 /** "2026-11-02_EXP-1A2B3C4D_Fuel_54.60" — same stem in Expenses.csv and the Receipts folder. */

@@ -31,7 +31,7 @@ export interface InvoicePackResult {
 }
 
 function safePart(value: string): string {
-  return value.replace(/[^a-zA-Z0-9.-]+/g, "-").replace(/^-+|-+$/g, "");
+  return value.replace(/[^a-zA-Z0-9.-]+/g, "-").replace(/^-+/, "").replace(/-+$/, "");
 }
 
 export function guessExtension(url: string, mime?: string): string {

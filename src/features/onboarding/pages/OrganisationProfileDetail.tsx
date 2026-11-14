@@ -155,10 +155,10 @@ export default function OrganisationProfileDetail() {
               id="org-vat-registered"
               checked={org?.vat_registered === true}
               disabled={savingVat}
-              onCheckedChange={setVatRegistered}
+              onCheckedChange={(next) => void setVatRegistered(next)}
             />
           </div>
-          {org?.vat_registered && !org?.vat_number && (
+          {org?.vat_registered === true && !org?.vat_number && (
             <p className="flex items-start gap-1.5 text-xs text-warning">
               <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
               VAT is on but no VAT number is saved. A VAT invoice must show it — add it under Edit organisation.

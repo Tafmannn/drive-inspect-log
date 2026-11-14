@@ -935,7 +935,7 @@ export function InvoicePrepScreen() {
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
                     variant="outline"
-                    onClick={handlePreviewPdf}
+                    onClick={() => void handlePreviewPdf()}
                     disabled={isPreviewing || expensesLoading}
                     className="gap-2"
                   >
@@ -947,7 +947,7 @@ export function InvoicePrepScreen() {
                     Preview PDF
                   </Button>
                   <Button
-                    onClick={handleCreateInvoice}
+                    onClick={() => void handleCreateInvoice()}
                     disabled={
                       createInvoice.isPending ||
                       selectedJobs.length === 0 ||

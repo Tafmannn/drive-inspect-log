@@ -48,12 +48,12 @@ import { buildInvoicePack, downloadBlob } from "../api/receiptExport";
 export type InvoiceActionKind = "pdf" | "pack" | "email" | "sent" | "paid" | "unpaid" | "cancel";
 
 export interface InvoiceActions {
-  downloadPdf: (inv: InvoiceRecord) => Promise<void>;
-  downloadPack: (inv: InvoiceRecord) => Promise<void>;
+  downloadPdf: (inv: InvoiceRecord) => void;
+  downloadPack: (inv: InvoiceRecord) => void;
   email: (inv: InvoiceRecord) => void;
-  markSent: (inv: InvoiceRecord) => Promise<void>;
+  markSent: (inv: InvoiceRecord) => void;
   recordPayment: (inv: InvoiceRecord) => void;
-  undoPayment: (inv: InvoiceRecord) => Promise<void>;
+  undoPayment: (inv: InvoiceRecord) => void;
   cancel: (inv: InvoiceRecord) => void;
 }
 
@@ -106,14 +106,15 @@ export function useInvoiceActions(
   };
 
   const actions: InvoiceActions = {
-    downloadPdf: (inv) =>
-      run(inv, "pdf", async () => {
+    downloadPdf: (inv) => {
+      void run(inv, "pdf", async () => {
         downloadBlob(await getInvoicePdf(inv, settings), invoicePdfFileName(inv.invoice_number));
         toast({ title: "Invoice PDF downloaded", description: inv.invoice_number });
-      }, "Download failed"),
+      }, "Download failed");
+    },
 
-    downloadPack: (inv) =>
-      run(inv, "pack", async () => {
+    downloadPack: (inv) => {
+      void run(inv, "pack", async () => {
         const pack = await buildInvoicePack(inv, settings);
         downloadBlob(pack.blob, pack.fileName);
         if (pack.failed.length > 0) {
@@ -128,12 +129,13 @@ export function useInvoiceActions(
             description: `PDF + ${pack.succeeded} receipt file${pack.succeeded === 1 ? "" : "s"}`,
           });
         }
-      }, "Pack download failed"),
+      }, "Pack download failed");
+    },
 
     email: (inv) => setEmailTarget(inv),
 
-    markSent: (inv) =>
-      run(inv, "sent", async () => {
+    markSent: (inv) => {
+      void run(inv, "sent", async () => {
         if (!settings) throw new Error("Organisation settings are still loading. Try again in a moment.");
         await markInvoiceSent(inv, settings.orgId, settings);
         refresh(inv.id);
@@ -141,7 +143,8 @@ export function useInvoiceActions(
           title: "Marked as sent",
           description: `${inv.invoice_number} is now issued and locked.`,
         });
-      }, "Could not mark as sent"),
+      }, "Could not mark as sent");
+    },
 
     recordPayment: (inv) => {
       setPaidAt(todayIso());
@@ -150,12 +153,13 @@ export function useInvoiceActions(
       setPayTarget(inv);
     },
 
-    undoPayment: (inv) =>
-      run(inv, "unpaid", async () => {
+    undoPayment: (inv) => {
+      void run(inv, "unpaid", async () => {
         await markInvoiceUnpaid(inv.id);
         refresh(inv.id);
         toast({ title: "Payment removed", description: `${inv.invoice_number} is back to sent.` });
-      }, "Could not undo the payment"),
+      }, "Could not undo the payment");
+    },
 
     cancel: (inv) => {
       setReason("");
@@ -279,7 +283,7 @@ export function useInvoiceActions(
             <Button variant="outline" onClick={() => setPayTarget(null)} disabled={paying}>
               Back
             </Button>
-            <Button onClick={confirmPayment} disabled={paying || !paidAt}>
+            <Button onClick={() => void confirmPayment()} disabled={paying || !paidAt}>
               {paying && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
               Record payment
             </Button>
@@ -314,7 +318,7 @@ export function useInvoiceActions(
             <Button variant="outline" onClick={() => setCancelTarget(null)} disabled={cancelling}>
               Keep invoice
             </Button>
-            <Button variant="destructive" onClick={confirmCancel} disabled={cancelling || !reason.trim()}>
+            <Button variant="destructive" onClick={() => void confirmCancel()} disabled={cancelling || !reason.trim()}>
               {cancelling && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
               {cancelIssued ? "Cancel and raise credit note" : "Cancel draft"}
             </Button>

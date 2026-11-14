@@ -22,11 +22,17 @@ export interface XlsxSheet {
 
 const XML_HEADER = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
 
+/** Characters XML 1.0 forbids outright (they would make Excel reject the file). */
+function isForbiddenXmlChar(code: number): boolean {
+  return code < 0x20 && code !== 0x09 && code !== 0x0a && code !== 0x0d;
+}
+
 export function xmlEscape(value: string): string {
-  return value
-    // Characters XML 1.0 forbids outright would make Excel reject the file.
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "")
+  let clean = "";
+  for (const ch of value) {
+    if (!isForbiddenXmlChar(ch.codePointAt(0) ?? 0)) clean += ch;
+  }
+  return clean
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
@@ -131,7 +137,11 @@ export async function buildXlsx(sheets: XlsxSheet[]): Promise<Blob> {
   const names = sheets.map((s) => {
     const base = sheetName(s.name);
     let name = base;
-    for (let n = 2; used.has(name.toLowerCase()); n++) name = `${base.slice(0, 28)} ${n}`;
+    let n = 2;
+    while (used.has(name.toLowerCase())) {
+      name = `${base.slice(0, 28)} ${n}`;
+      n += 1;
+    }
     used.add(name.toLowerCase());
     return name;
   });
