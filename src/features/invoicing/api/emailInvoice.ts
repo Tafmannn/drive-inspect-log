@@ -8,7 +8,7 @@
  * for the admin to retry rather than silently degrading.
  */
 import { supabase } from "@/integrations/supabase/client";
-import { generateInvoicePdf, type InvoiceData } from "@/lib/invoicePdf";
+import { generateInvoicePdf, invoicePdfFileName, type InvoiceData } from "@/lib/invoicePdf";
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days, matching the email copy
 
@@ -18,6 +18,11 @@ export interface EmailInvoiceInput {
   orgId: string;
   pdfData: InvoiceData;
   to: string;
+  /**
+   * Path of the PDF frozen when this invoice was issued. When set, that
+   * exact file is emailed and nothing is re-rendered or overwritten.
+   */
+  storedPdfPath?: string | null;
 }
 
 export async function emailInvoice({
@@ -26,17 +31,28 @@ export async function emailInvoice({
   orgId,
   pdfData,
   to,
-}: EmailInvoiceInput): Promise<{ recipient: string }> {
-  const blob = await generateInvoicePdf(pdfData);
+  storedPdfPath,
+}: EmailInvoiceInput): Promise<{ recipient: string; pdfPath: string }> {
+  let path = storedPdfPath || "";
+  if (!path) {
+    const blob = await generateInvoicePdf(pdfData);
+    path = `${orgId}/${invoicePdfFileName(invoiceNumber)}`;
 
-  const sanitizedNumber = invoiceNumber.replace(/[^a-zA-Z0-9_-]/g, "_");
-  const path = `${orgId}/AXENTRA_INV_${sanitizedNumber}.pdf`;
+    const { error: uploadError } = await supabase.storage
+      .from("invoice-pdfs")
+      .upload(path, blob, { contentType: "application/pdf", upsert: true });
+    if (uploadError) {
+      throw new Error(`Could not store the invoice PDF: ${uploadError.message}`);
+    }
 
-  const { error: uploadError } = await supabase.storage
-    .from("invoice-pdfs")
-    .upload(path, blob, { contentType: "application/pdf", upsert: true });
-  if (uploadError) {
-    throw new Error(`Could not store the invoice PDF: ${uploadError.message}`);
+    // Record the frozen copy before sending: the send stamps sent_at, which
+    // issues the invoice. Best-effort — a failure here must not block the
+    // email, and the copy is still in storage at its deterministic path.
+    try {
+      await supabase.from("invoices").update({ pdf_url: path }).eq("id", invoiceId);
+    } catch {
+      /* non-fatal */
+    }
   }
 
   const { data: signed, error: signError } = await supabase.storage
@@ -55,5 +71,5 @@ export async function emailInvoice({
     );
   }
 
-  return { recipient: to };
+  return { recipient: to, pdfPath: path };
 }

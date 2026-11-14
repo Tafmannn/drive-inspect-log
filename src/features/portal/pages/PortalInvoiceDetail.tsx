@@ -6,14 +6,18 @@ import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
 import { invoiceRecordToPdfData } from "@/features/invoicing/hooks/useInvoices";
 import { usePortalInvoice, type PortalInvoiceDetail } from "../api";
+import { PortalInvoiceBadge } from "../components/PortalInvoiceBadge";
+import { supabase } from "@/integrations/supabase/client";
 import { fmtDate, fmtGbp } from "../lib/format";
 
 /**
- * Same mapper the operator's own "Download PDF" uses, fed from the same
- * stored invoice row — so the client's copy is identical to what was sent.
+ * Fallback for invoices issued before PDFs were stored: the same mapper the
+ * operator's own "Download PDF" uses, fed from the same stored invoice row.
+ * (Invoices issued since are served as the exact stored file — see
+ * handleDownload — which also carries the receipt copies.)
  */
 function toPdfData(inv: PortalInvoiceDetail) {
-  return invoiceRecordToPdfData({
+  const base = invoiceRecordToPdfData({
     id: inv.id,
     invoice_number: inv.invoice_number,
     client_name: inv.client_name,
@@ -29,9 +33,33 @@ function toPdfData(inv: PortalInvoiceDetail) {
     vat_amount: inv.vat_amount,
     total: inv.total,
     notes: inv.notes,
-    status: null,
+    status: inv.status ?? null,
     created_at: inv.issue_date ?? inv.sent_at,
+    client_ref: inv.client_ref ?? null,
+    vat_registered: inv.vat_registered ?? null,
+    document_type: inv.document_type ?? null,
   });
+  return {
+    ...base,
+    business: {
+      name: inv.operator.legal_name || inv.operator.name,
+      address: inv.operator.registered_address,
+      companyNumber: inv.operator.company_number,
+      vatNumber: inv.vat_registered ? inv.operator.vat_number : null,
+    },
+  };
+}
+
+function saveBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  try {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    a.click();
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 export default function PortalInvoiceDetailPage() {
@@ -54,7 +82,15 @@ export default function PortalInvoiceDetailPage() {
   const handleDownload = async () => {
     setDownloading(true);
     try {
-      const { downloadInvoicePdf } = await import("@/lib/invoicePdf");
+      const { downloadInvoicePdf, invoicePdfFileName } = await import("@/lib/invoicePdf");
+      // The file frozen when the invoice was issued, when there is one.
+      if (inv.pdf_path) {
+        const { data, error: dlError } = await supabase.storage.from("invoice-pdfs").download(inv.pdf_path);
+        if (!dlError && data) {
+          saveBlob(data, invoicePdfFileName(inv.invoice_number));
+          return;
+        }
+      }
       await downloadInvoicePdf(toPdfData(inv));
     } catch {
       toast({ title: "Download failed", description: "Please try again.", variant: "destructive" });
@@ -63,8 +99,20 @@ export default function PortalInvoiceDetailPage() {
     }
   };
 
+  const isCredit = inv.document_type === "credit_note";
+
   return (
     <div className="space-y-4">
+      {inv.status === "cancelled" && (
+        <p className="rounded-md border border-border bg-muted/50 p-3 text-sm">
+          This invoice has been cancelled and is not payable. A credit note has been issued for it.
+        </p>
+      )}
+      {isCredit && inv.credits_invoice_number && (
+        <p className="rounded-md border border-border bg-muted/50 p-3 text-sm">
+          This credit note cancels invoice <span className="font-mono">{inv.credits_invoice_number}</span>.
+        </p>
+      )}
       <div className="flex items-center justify-between gap-2">
         <Button variant="ghost" size="sm" asChild>
           <Link to="/portal/invoices"><ArrowLeft className="w-4 h-4 mr-1" /> All invoices</Link>
@@ -79,12 +127,18 @@ export default function PortalInvoiceDetailPage() {
         <CardContent className="p-4 sm:p-6 space-y-5">
           <div className="flex flex-col sm:flex-row sm:justify-between gap-3">
             <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Invoice</p>
-              <h1 className="text-xl font-semibold font-mono">{inv.invoice_number}</h1>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                {isCredit ? "Credit note" : "Invoice"}
+              </p>
+              <h1 className="text-xl font-semibold font-mono flex flex-wrap items-center gap-2">
+                {inv.invoice_number}
+                <PortalInvoiceBadge invoice={inv} />
+              </h1>
               <p className="text-sm text-muted-foreground">
                 Issued {fmtDate(inv.issue_date)}{inv.due_date ? ` · Due ${fmtDate(inv.due_date)}` : ""}
               </p>
-              {inv.payment_terms && <p className="text-xs text-muted-foreground">Terms: {inv.payment_terms}</p>}
+              {inv.payment_terms && !isCredit && <p className="text-xs text-muted-foreground">Terms: {inv.payment_terms}</p>}
+              {inv.client_ref && <p className="text-xs text-muted-foreground">Your ref: {inv.client_ref}</p>}
             </div>
             <div className="sm:text-right text-sm">
               <p className="font-medium">{inv.operator.legal_name || inv.operator.name}</p>
@@ -135,10 +189,12 @@ export default function PortalInvoiceDetailPage() {
 
           <dl className="ml-auto w-full sm:w-64 space-y-1 text-sm">
             <div className="flex justify-between"><dt className="text-muted-foreground">Subtotal</dt><dd className="tabular-nums">{fmtGbp(inv.subtotal)}</dd></div>
-            <div className="flex justify-between">
-              <dt className="text-muted-foreground">VAT{inv.vat_rate != null ? ` (${inv.vat_rate}%)` : ""}</dt>
-              <dd className="tabular-nums">{fmtGbp(inv.vat_amount)}</dd>
-            </div>
+            {inv.vat_registered !== false && (
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground">VAT{inv.vat_rate != null ? ` (${inv.vat_rate}%)` : ""}</dt>
+                <dd className="tabular-nums">{fmtGbp(inv.vat_amount)}</dd>
+              </div>
+            )}
             <div className="flex justify-between border-t border-border pt-1 font-semibold">
               <dt>Total</dt><dd className="tabular-nums">{fmtGbp(inv.total)}</dd>
             </div>

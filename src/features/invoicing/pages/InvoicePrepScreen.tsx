@@ -1,14 +1,16 @@
 /**
- * Control Centre — Invoice Preparation (Read-Only Preview)
+ * Control Centre — Invoice Preparation
  *
  * Flow:
  *   1. Select a client profile
- *   2. View eligible completed/uninvoiced jobs for that client
- *   3. Checkbox multi-select jobs
- *   4. Preview subtotal, VAT, total, receipt count
- *   5. Validation warnings for issues
+ *   2. Tick that client's completed, un-invoiced jobs
+ *   3. Tick which of those jobs' expenses to recharge (fuel is pre-ticked)
+ *   4. Review the invoice — one line per job (transport + its expenses) —
+ *      add the client's PO, preview the PDF, and create it
+ *   5. Download, email, mark as sent / paid, or cancel any invoice
  *
- * Does NOT create invoice records — read-only preview only.
+ * VAT follows the business-level switch (organisations.vat_registered):
+ * while it is off, no VAT is charged and none appears on the invoice.
  */
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
@@ -21,6 +23,7 @@ import { KpiStrip, type KpiItem } from "../../control/components/shared/KpiStrip
 import { FilterBar } from "../../control/components/shared/FilterBar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
@@ -39,26 +42,34 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ClientPickerCombobox } from "@/features/clients/components/ClientPickerCombobox";
-import {
-  useEligibleJobs,
-  computePreviewTotals,
-  type EligibleJob,
-} from "../hooks/useInvoicePrepData";
+import { useEligibleJobs, type EligibleJob } from "../hooks/useInvoicePrepData";
 import { useCreateInvoice } from "../hooks/useCreateInvoice";
-import { useInvoices, invoiceRecordToPdfData } from "../hooks/useInvoices";
-import { emailInvoice } from "../api/emailInvoice";
-import { PodEmailConfirmDialog } from "@/components/PodEmailConfirmDialog";
+import { useInvoices, type InvoiceRecord } from "../hooks/useInvoices";
+import { useBillableExpenses, useOrgInvoiceSettings } from "../hooks/useInvoiceSettings";
+import { useInvoiceActions } from "../hooks/useInvoiceActions";
+import { ExpensePicker } from "../components/ExpensePicker";
+import { InvoiceList, InvoiceStatusBadge } from "../components/InvoiceList";
+import { DEFAULT_RECHARGE_CATEGORIES } from "../api/billableExpenses";
+import { loadReceiptImage } from "../api/receiptImages";
+import { receiptCaption, receiptFileRef } from "../api/invoiceDocument";
+import { downloadBlob } from "../api/receiptExport";
+import {
+  buildInvoiceDraft,
+  DEFAULT_VAT_RATE,
+  dueDateFor,
+  jobRef,
+  jobsHeaderSubtitle,
+  paymentTermsLabel,
+  type InvoiceDraft,
+} from "../lib/invoiceMath";
 import type { Client } from "@/lib/clientApi";
-import { getOrgId } from "@/lib/orgHelper";
 import { WarningCallout, RoleScope } from "@/components/ui-kit";
 import { useClients } from "@/hooks/useClients";
-import { useAuth } from "@/context/AuthContext";
 import { useEvidenceOverrides } from "@/hooks/useEvidenceOverrides";
 import { toast } from "@/hooks/use-toast";
 import {
   FileText,
   Receipt,
-  AlertTriangle,
   CalendarIcon,
   PoundSterling,
   Hash,
@@ -69,17 +80,10 @@ import {
   Send,
   Download,
   Package,
-  FileWarning,
   Mail,
+  Eye,
 } from "lucide-react";
-import {
-  discoverReceipts,
-  buildReceiptsZip,
-  buildInvoicePack,
-  downloadBlob,
-  type ReceiptDiscoveryResult,
-} from "../api/receiptExport";
-import { generateInvoicePdf, downloadInvoicePdf, type InvoiceData } from "@/lib/invoicePdf";
+import { generateInvoicePdf, type InvoiceData, type ReceiptImage } from "@/lib/invoicePdf";
 import { cn } from "@/lib/utils";
 
 function fmtGbp(n: number): string {
@@ -93,6 +97,53 @@ function shortDate(iso: string | null): string {
     month: "short",
     year: "2-digit",
   });
+}
+
+function todayIso(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+/** The invoice row exactly as createMultiJobInvoice wrote it, without a refetch. */
+function draftToRecord(args: {
+  invoiceId: string;
+  invoiceNumber: string;
+  orgId: string;
+  client: Client;
+  clientRef: string;
+  issueDate: string;
+  dueDate: string | null;
+  paymentTerms: string | null;
+  vatRegistered: boolean;
+  draft: InvoiceDraft;
+}): InvoiceRecord {
+  const { client, draft } = args;
+  return {
+    id: args.invoiceId,
+    org_id: args.orgId,
+    client_id: client.id,
+    invoice_number: args.invoiceNumber,
+    client_name: client.name,
+    client_company: client.company ?? null,
+    client_email: client.billing_email || client.email || null,
+    client_address: client.billing_address || client.address || null,
+    client_ref: args.clientRef || null,
+    issue_date: args.issueDate,
+    due_date: args.dueDate,
+    payment_terms: args.paymentTerms,
+    line_items: draft.lineItems,
+    subtotal: draft.subtotal,
+    expenses_total: draft.expensesTotal,
+    vat_registered: args.vatRegistered,
+    vat_rate: draft.vatRate,
+    vat_amount: draft.vatAmount,
+    total: draft.total,
+    notes: null,
+    status: "draft",
+    document_type: "invoice",
+    created_at: new Date().toISOString(),
+  };
 }
 
 export function InvoicePrepScreen() {
@@ -111,44 +162,25 @@ export function InvoicePrepScreen() {
   // Job selection
   const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
 
-  // VAT rate
-  const [vatRate, setVatRate] = useState(20);
+  // Business-level invoice settings: the VAT switch + footer identity.
+  const { data: settings, isLoading: settingsLoading } = useOrgInvoiceSettings();
+  const vatRegistered = settings?.vatRegistered === true;
+  // Only used while VAT registered.
+  const [vatRate, setVatRate] = useState(DEFAULT_VAT_RATE);
 
-  // Auth & invoice creation
-  const { user } = useAuth();
+  // Client's PO / reference for this invoice
+  const [clientRef, setClientRef] = useState("");
+
   const createInvoice = useCreateInvoice();
-  // Full snapshot of what was just invoiced. Job selection is cleared after
-  // creation (the jobs stop being eligible), so the download buttons must
-  // work from this snapshot, not from the live selection.
-  const [createdInvoice, setCreatedInvoice] = useState<{
-    invoiceId: string;
-    invoiceNumber: string;
-    client: Client;
-    jobs: EligibleJob[];
-    vatRate: number;
-    total: number;
-  } | null>(null);
-  const createdInvoiceNumber = createdInvoice?.invoiceNumber ?? null;
-  const [isDownloadingInvoicePdf, setIsDownloadingInvoicePdf] = useState(false);
+  // The invoice that was just created. Job selection is cleared after
+  // creation (the jobs stop being eligible), so the success card works from
+  // this record — replaced by the live list row once that has refreshed.
+  const [createdInvoice, setCreatedInvoice] = useState<InvoiceRecord | null>(null);
+  const [isPreviewing, setIsPreviewing] = useState(false);
 
-  // Previously created invoices (re-downloadable at any time)
-  const { data: recentInvoices, isLoading: invoicesLoading } = useInvoices();
-  const [downloadingInvoiceId, setDownloadingInvoiceId] = useState<string | null>(null);
-
-  // Email-invoice confirm dialog target (from success card or list row)
-  const [invoiceEmailTarget, setInvoiceEmailTarget] = useState<{
-    invoiceId: string;
-    invoiceNumber: string;
-    pdfData: InvoiceData;
-    defaultEmail: string;
-  } | null>(null);
-  const [sendingInvoiceEmail, setSendingInvoiceEmail] = useState(false);
-
-  // Receipt export state
-  const [receiptDiscovery, setReceiptDiscovery] = useState<ReceiptDiscoveryResult | null>(null);
-  const [isDiscovering, setIsDiscovering] = useState(false);
-  const [isDownloadingZip, setIsDownloadingZip] = useState(false);
-  const [isDownloadingPack, setIsDownloadingPack] = useState(false);
+  // Every invoice + credit note (re-downloadable at any time)
+  const { data: recentInvoices, isLoading: invoicesLoading } = useInvoices(50);
+  const { actions, isBusy, dialogs } = useInvoiceActions(settings);
 
   // Fetch eligible jobs
   const { data: eligibleJobs, isLoading } = useEligibleJobs(selectedClient, {
@@ -156,19 +188,52 @@ export function InvoicePrepScreen() {
     dateTo: dateTo?.toISOString(),
   });
 
-  const jobs = eligibleJobs ?? [];
+  const jobs = useMemo(() => eligibleJobs ?? [], [eligibleJobs]);
 
-  // Selected jobs for preview
   const selectedJobs = useMemo(
     () => jobs.filter((j) => selectedJobIds.has(j.id)),
     [jobs, selectedJobIds]
   );
+  const selectedJobIdList = useMemo(() => selectedJobs.map((j) => j.id), [selectedJobs]);
 
-  // Compute totals
-  const preview = useMemo(
-    () => computePreviewTotals(selectedJobs, vatRate),
-    [selectedJobs, vatRate]
+  // Expenses that can be recharged for the selected jobs. Fuel is ticked by
+  // default; an explicit tick/untick by the admin always wins.
+  const { data: billableExpenses, isLoading: expensesLoading } = useBillableExpenses(selectedJobIdList);
+  const [expenseOverrides, setExpenseOverrides] = useState<Map<string, boolean>>(new Map());
+  const expenses = useMemo(() => billableExpenses ?? [], [billableExpenses]);
+  const selectedExpenseIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const e of expenses) {
+      const picked = expenseOverrides.get(e.id) ?? DEFAULT_RECHARGE_CATEGORIES.includes(e.category);
+      if (picked) ids.add(e.id);
+    }
+    return ids;
+  }, [expenses, expenseOverrides]);
+  const selectedExpenses = useMemo(
+    () => expenses.filter((e) => selectedExpenseIds.has(e.id)),
+    [expenses, selectedExpenseIds]
   );
+  const setExpensesSelected = (ids: string[], selected: boolean) =>
+    setExpenseOverrides((prev) => {
+      const next = new Map(prev);
+      ids.forEach((id) => next.set(id, selected));
+      return next;
+    });
+
+  // The invoice as it will be created
+  const draft = useMemo(
+    () => buildInvoiceDraft({ jobs: selectedJobs, expenses: selectedExpenses, vatRegistered, vatRate }),
+    [selectedJobs, selectedExpenses, vatRegistered, vatRate]
+  );
+
+  const warnings = useMemo(() => {
+    const list: string[] = [];
+    const noPrice = selectedJobs.filter((j) => !j.total_price || j.total_price <= 0).length;
+    if (noPrice > 0) list.push(`${noPrice} job(s) have no price set — total may be inaccurate.`);
+    return list;
+  }, [selectedJobs]);
+
+  const poMissing = !!selectedClient?.po_required && !clientRef.trim();
 
   // Admin override (UI-only): allow selecting jobs that are not invoice-ready.
   // Acknowledgements are scoped to this Invoice Prep screen and persist for
@@ -207,39 +272,20 @@ export function InvoicePrepScreen() {
   const handleClientChange = (id: string | null) => {
     setSelectedClientId(id);
     setSelectedJobIds(new Set());
+    setExpenseOverrides(new Map());
+    setClientRef("");
     setCreatedInvoice(null);
   };
 
-  const buildInvoicePdfData = (
-    invoiceNumber: string,
-    client: Client,
-    invoiceJobs: EligibleJob[],
-    rate: number
-  ): InvoiceData => ({
-    invoiceNumber,
-    issueDate: new Date().toISOString(),
-    clientName: client.name,
-    clientCompany: client.company || undefined,
-    clientEmail: client.email || undefined,
-    clientAddress: client.address || undefined,
-    vatRate: rate,
-    lineItems: invoiceJobs.map((j) => ({
-      description: "Vehicle transport - " + j.vehicle_reg + " (" + j.vehicle_make + " " + j.vehicle_model + ")",
-      quantity: 1,
-      unitPrice: j.total_price ?? 0,
-    })),
-  });
-
   // Create invoice handler
   const handleCreateInvoice = async () => {
-    if (!selectedClient || selectedJobs.length === 0) return;
-    // Resolve org_id from the authoritative source (app_metadata / user_profiles),
-    // never self-writable user_metadata.
-    let orgId: string;
-    try {
-      orgId = await getOrgId();
-    } catch {
-      toast({ title: "Error", description: "Unable to determine organisation.", variant: "destructive" });
+    if (!selectedClient || selectedJobs.length === 0 || !settings) return;
+    if (poMissing) {
+      toast({
+        title: "PO / reference required",
+        description: `${selectedClient.company || selectedClient.name} needs a PO or reference on every invoice.`,
+        variant: "destructive",
+      });
       return;
     }
 
@@ -247,286 +293,151 @@ export function InvoicePrepScreen() {
       const result = await createInvoice.mutateAsync({
         client: selectedClient,
         jobs: selectedJobs,
+        expenses: selectedExpenses,
+        vatRegistered,
         vatRate,
-        orgId,
+        // org_id comes from the authoritative source (app_metadata /
+        // user_profiles) via useOrgInvoiceSettings, never user_metadata.
+        orgId: settings.orgId,
+        clientRef,
       });
-      setCreatedInvoice({
-        invoiceId: result.invoiceId,
-        invoiceNumber: result.invoiceNumber,
-        client: selectedClient,
-        jobs: selectedJobs,
-        vatRate,
-        total: preview.total,
-      });
+      setCreatedInvoice(
+        draftToRecord({
+          invoiceId: result.invoiceId,
+          invoiceNumber: result.invoiceNumber,
+          orgId: settings.orgId,
+          client: selectedClient,
+          clientRef: clientRef.trim(),
+          issueDate: result.issueDate,
+          dueDate: result.dueDate,
+          paymentTerms: result.paymentTerms,
+          vatRegistered,
+          draft: result.draft,
+        })
+      );
       setSelectedJobIds(new Set());
+      setExpenseOverrides(new Map());
+      setClientRef("");
+      const expenseCount = result.draft.expenseLines.length;
       toast({
         title: "Invoice Created",
-        description: `${result.invoiceNumber} — ${result.jobCount} job${result.jobCount !== 1 ? "s" : ""} invoiced.`,
+        description:
+          `${result.invoiceNumber} — ${result.jobCount} job${result.jobCount !== 1 ? "s" : ""}` +
+          (expenseCount ? ` + ${expenseCount} expense${expenseCount !== 1 ? "s" : ""}` : "") +
+          " invoiced.",
       });
-    } catch (err: any) {
+    } catch (err) {
       toast({
         title: "Invoice Creation Failed",
-        description: err.message || "Something went wrong.",
+        description: err instanceof Error && err.message ? err.message : "Something went wrong.",
         variant: "destructive",
       });
     }
   };
 
-  // Download the just-created invoice as a PDF (from the creation snapshot)
-  const handleDownloadCreatedInvoice = async () => {
-    if (!createdInvoice) return;
-    setIsDownloadingInvoicePdf(true);
-    try {
-      await downloadInvoicePdf(
-        buildInvoicePdfData(
-          createdInvoice.invoiceNumber,
-          createdInvoice.client,
-          createdInvoice.jobs,
-          createdInvoice.vatRate
-        )
-      );
-      toast({ title: "Invoice PDF Downloaded", description: createdInvoice.invoiceNumber });
-    } catch (err: any) {
-      toast({ title: "Download Failed", description: err.message || "Unknown error", variant: "destructive" });
-    } finally {
-      setIsDownloadingInvoicePdf(false);
-    }
-  };
-
-  // Download the just-created invoice as a full pack (PDF + receipts)
-  const handleDownloadCreatedPack = async () => {
-    if (!createdInvoice) return;
-    setIsDownloadingPack(true);
-    try {
-      const pdfBlob = await generateInvoicePdf(
-        buildInvoicePdfData(
-          createdInvoice.invoiceNumber,
-          createdInvoice.client,
-          createdInvoice.jobs,
-          createdInvoice.vatRate
-        )
-      );
-      const discovery = await discoverReceipts(createdInvoice.jobs);
-      const { blob, succeeded, failed } = await buildInvoicePack(
-        pdfBlob,
-        createdInvoice.invoiceNumber,
-        discovery.files
-      );
-      downloadBlob(blob, "invoice_pack_" + createdInvoice.invoiceNumber + ".zip");
-      const desc = "PDF + " + succeeded + " receipt(s)";
-      if (failed.length > 0) {
-        toast({
-          title: "Pack Downloaded (" + failed.length + " receipts failed)",
-          description: desc,
-          variant: "destructive",
-        });
-      } else {
-        toast({ title: "Invoice Pack Downloaded", description: desc });
-      }
-    } catch (err: any) {
-      toast({ title: "Pack Download Failed", description: err.message || "Unknown error", variant: "destructive" });
-    } finally {
-      setIsDownloadingPack(false);
-    }
-  };
-
-  // Download any previously created invoice, rebuilt from its stored row
-  const handleDownloadStoredInvoice = async (invoiceId: string) => {
-    const record = recentInvoices?.find((i) => i.id === invoiceId);
-    if (!record) return;
-    setDownloadingInvoiceId(invoiceId);
-    try {
-      await downloadInvoicePdf(invoiceRecordToPdfData(record));
-      toast({ title: "Invoice PDF Downloaded", description: record.invoice_number });
-    } catch (err: any) {
-      toast({ title: "Download Failed", description: err.message || "Unknown error", variant: "destructive" });
-    } finally {
-      setDownloadingInvoiceId(null);
-    }
-  };
-
-  // Open the email confirm dialog for the just-created invoice
-  const handleEmailCreatedInvoice = () => {
-    if (!createdInvoice) return;
-    setInvoiceEmailTarget({
-      invoiceId: createdInvoice.invoiceId,
-      invoiceNumber: createdInvoice.invoiceNumber,
-      pdfData: buildInvoicePdfData(
-        createdInvoice.invoiceNumber,
-        createdInvoice.client,
-        createdInvoice.jobs,
-        createdInvoice.vatRate
-      ),
-      defaultEmail: createdInvoice.client.email || "",
-    });
-  };
-
-  // Open the email confirm dialog for a stored invoice (list row)
-  const handleEmailStoredInvoice = (invoiceId: string) => {
-    const record = recentInvoices?.find((i) => i.id === invoiceId);
-    if (!record) return;
-    setInvoiceEmailTarget({
-      invoiceId: record.id,
-      invoiceNumber: record.invoice_number,
-      pdfData: invoiceRecordToPdfData(record),
-      defaultEmail: record.client_email || "",
-    });
-  };
-
-  // Actually send, once the recipient is confirmed in the dialog
-  const handleConfirmedInvoiceEmail = async (confirmedEmail: string) => {
-    if (!invoiceEmailTarget) return;
-    setSendingInvoiceEmail(true);
-    try {
-      const orgId = await getOrgId();
-      const { recipient } = await emailInvoice({
-        invoiceId: invoiceEmailTarget.invoiceId,
-        invoiceNumber: invoiceEmailTarget.invoiceNumber,
-        orgId,
-        pdfData: invoiceEmailTarget.pdfData,
-        to: confirmedEmail,
-      });
-      setInvoiceEmailTarget(null);
-      toast({
-        title: "Invoice emailed",
-        description: `${invoiceEmailTarget.invoiceNumber} sent to ${recipient}.`,
-      });
-    } catch (err: any) {
-      toast({
-        title: "Invoice Email Failed",
-        description: err.message || "Something went wrong.",
-        variant: "destructive",
-      });
-    } finally {
-      setSendingInvoiceEmail(false);
-    }
-  };
-
-  // Discover receipts when jobs are selected
-  const handleDiscoverReceipts = async () => {
-    if (selectedJobs.length === 0) return;
-    setIsDiscovering(true);
-    try {
-      const result = await discoverReceipts(selectedJobs);
-      setReceiptDiscovery(result);
-    } catch {
-      toast({ title: "Error", description: "Failed to discover receipts.", variant: "destructive" });
-    } finally {
-      setIsDiscovering(false);
-    }
-  };
-
-  // Download receipts ZIP
-  const handleDownloadReceipts = async () => {
-    if (!receiptDiscovery || receiptDiscovery.files.length === 0) return;
-    setIsDownloadingZip(true);
-    try {
-      const { blob, succeeded, failed } = await buildReceiptsZip(receiptDiscovery.files);
-      if (succeeded === 0) {
-        toast({ title: "No Receipts Downloaded", description: "All files failed to download.", variant: "destructive" });
-        return;
-      }
-      const zipName = "receipts_" + (createdInvoiceNumber || "selected_jobs") + ".zip";
-      downloadBlob(blob, zipName);
-      if (failed.length > 0) {
-        toast({
-          title: succeeded + " downloaded, " + failed.length + " failed",
-          description: failed.slice(0, 3).join(", "),
-          variant: "destructive",
-        });
-      } else {
-        toast({ title: "Receipts Downloaded", description: succeeded + " file(s) in ZIP." });
-      }
-    } catch (err: any) {
-      toast({ title: "Download Failed", description: err.message || "Unknown error", variant: "destructive" });
-    } finally {
-      setIsDownloadingZip(false);
-    }
-  };
-
-  // Download full invoice pack (PDF + receipts)
-  const handleDownloadPack = async () => {
+  // Preview the invoice PDF (with receipt copies) before creating anything.
+  const handlePreviewPdf = async () => {
     if (!selectedClient || selectedJobs.length === 0) return;
-    setIsDownloadingPack(true);
+    setIsPreviewing(true);
     try {
-      // Generate the invoice PDF
-      const invoiceData: InvoiceData = {
-        invoiceNumber: createdInvoiceNumber || "PREVIEW",
-        issueDate: new Date().toISOString(),
+      const issueDate = todayIso();
+      const jobRefs = new Map(selectedJobs.map((j) => [j.id, jobRef(j)]));
+      const receipts: ReceiptImage[] = [];
+      for (const line of draft.expenseLines) {
+        const files = line.receipts.length ? line.receipts : [null];
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          receipts.push({
+            ref: receiptFileRef(line.ref, i),
+            caption: receiptCaption(line, jobRefs.get(line.job_id) ?? ""),
+            image: file ? await loadReceiptImage(file) : null,
+          });
+        }
+      }
+      const data: InvoiceData = {
+        invoiceNumber: "PREVIEW",
+        issueDate,
+        dueDate: dueDateFor(issueDate, selectedClient.payment_terms) ?? undefined,
+        paymentTerms: paymentTermsLabel(selectedClient.payment_terms),
         clientName: selectedClient.name,
         clientCompany: selectedClient.company || undefined,
-        clientEmail: selectedClient.email || undefined,
-        clientAddress: selectedClient.address || undefined,
-        vatRate,
-        lineItems: selectedJobs.map((j) => ({
-          description: "Vehicle transport - " + j.vehicle_reg + " (" + j.vehicle_make + " " + j.vehicle_model + ")",
+        clientEmail: selectedClient.billing_email || selectedClient.email || undefined,
+        clientAddress: selectedClient.billing_address || selectedClient.address || undefined,
+        clientRef: clientRef.trim() || undefined,
+        vatRegistered,
+        vatRate: draft.vatRate,
+        compactFooter: true,
+        headerSubtitle: jobsHeaderSubtitle(
+          draft.lineItems.map((l) => l.job_date),
+          draft.lineItems.length
+        ),
+        business: settings?.business,
+        lineItems: draft.lineItems.map((l) => ({
+          description: l.description,
           quantity: 1,
-          unitPrice: j.total_price ?? 0,
+          unitPrice: l.amount,
+          ...(l.detail ? { detail: l.detail, expenseAmount: l.expense_amount } : {}),
         })),
+        expenseSchedule: draft.expenseLines.map((l) => ({
+          ref: l.ref,
+          date: l.expense_date,
+          jobRef: jobRefs.get(l.job_id) ?? "-",
+          vehicleReg: selectedJobs.find((j) => j.id === l.job_id)?.vehicle_reg,
+          category: l.category,
+          supplier: l.supplier ?? undefined,
+          net: l.amount_charged,
+          vat: l.amount_vat,
+          gross: l.amount_gross,
+        })),
+        receipts,
+        receiptsPerPage: 6,
       };
-      const pdfBlob = await generateInvoicePdf(invoiceData);
-
-      // Discover receipts if not already done
-      const discovery = receiptDiscovery || await discoverReceipts(selectedJobs);
-      if (!receiptDiscovery) setReceiptDiscovery(discovery);
-
-      const { blob, succeeded, failed } = await buildInvoicePack(
-        pdfBlob,
-        createdInvoiceNumber || "PREVIEW",
-        discovery.files
-      );
-
-      const packName = "invoice_pack_" + (createdInvoiceNumber || "preview") + ".zip";
-      downloadBlob(blob, packName);
-
-      const desc = "PDF + " + succeeded + " receipt(s)";
-      if (failed.length > 0) {
-        toast({
-          title: "Pack Downloaded (" + failed.length + " receipts failed)",
-          description: desc + ". Failed: " + failed.slice(0, 2).join(", "),
-          variant: "destructive",
-        });
-      } else {
-        toast({ title: "Invoice Pack Downloaded", description: desc });
-      }
-    } catch (err: any) {
-      toast({ title: "Pack Download Failed", description: err.message || "Unknown error", variant: "destructive" });
+      downloadBlob(await generateInvoicePdf(data), "invoice_PREVIEW.pdf");
+    } catch (err) {
+      toast({
+        title: "Preview Failed",
+        description: err instanceof Error && err.message ? err.message : "Unknown error",
+        variant: "destructive",
+      });
     } finally {
-      setIsDownloadingPack(false);
+      setIsPreviewing(false);
     }
   };
+
+  // The success card follows the live row once the list has it (so its
+  // status and actions stay correct after emailing / marking as sent).
+  const createdRecord = createdInvoice
+    ? recentInvoices?.find((i) => i.id === createdInvoice.id) ?? createdInvoice
+    : null;
 
   // KPIs
   const kpis: KpiItem[] = [
     {
       label: "Selected Jobs",
-      value: preview.jobCount,
+      value: selectedJobs.length,
       icon: Truck,
-      variant: preview.jobCount > 0 ? "info" : "default",
+      variant: selectedJobs.length > 0 ? "info" : "default",
     },
     {
-      label: "Subtotal",
-      value: fmtGbp(preview.subtotal),
+      label: "Transport",
+      value: fmtGbp(draft.transportTotal),
       icon: PoundSterling,
       variant: "default",
     },
     {
-      label: `VAT (${vatRate}%)`,
-      value: fmtGbp(preview.vatAmount),
-      icon: Hash,
-      variant: "default",
+      label: "Expenses",
+      value: fmtGbp(draft.expensesTotal),
+      icon: Receipt,
+      variant: draft.expensesTotal > 0 ? "info" : "default",
     },
+    ...(vatRegistered
+      ? [{ label: `VAT (${draft.vatRate}%)`, value: fmtGbp(draft.vatAmount), icon: Hash, variant: "default" as const }]
+      : []),
     {
       label: "Total",
-      value: fmtGbp(preview.total),
+      value: fmtGbp(draft.total),
       icon: PoundSterling,
-      variant: preview.total > 0 ? "success" : "default",
-    },
-    {
-      label: "Receipts",
-      value: preview.receiptCount,
-      icon: Receipt,
-      variant: preview.receiptCount > 0 ? "info" : "default",
+      variant: draft.total > 0 ? "success" : "default",
     },
   ];
 
@@ -534,7 +445,7 @@ export function InvoicePrepScreen() {
     <ControlShell>
       <ControlHeader
         title="Invoice Preparation"
-        subtitle="Select a client and review eligible jobs for invoicing"
+        subtitle="Select a client, tick jobs and expenses, and raise one invoice"
       />
 
       {/* Step 1: Client selection */}
@@ -780,30 +691,34 @@ export function InvoicePrepScreen() {
         </>
       )}
 
+
       {/* Created-invoice success card — independent of job selection, which
           is cleared on creation. This is where the invoice gets downloaded. */}
-      {createdInvoice && (
+      {createdRecord && (
         <div className="p-4 rounded-lg border border-success/30 bg-success/5 space-y-3">
           <div className="flex items-center gap-2.5">
             <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
             <div>
-              <p className="text-sm text-foreground font-semibold">
-                Invoice {createdInvoice.invoiceNumber} created
+              <p className="flex flex-wrap items-center gap-2 text-sm text-foreground font-semibold">
+                Invoice {createdRecord.invoice_number} created
+                <InvoiceStatusBadge invoice={createdRecord} />
               </p>
               <p className="text-xs text-muted-foreground">
-                {createdInvoice.client.name} · {createdInvoice.jobs.length} job
-                {createdInvoice.jobs.length !== 1 ? "s" : ""} · {fmtGbp(createdInvoice.total)}
+                {createdRecord.client_company || createdRecord.client_name} ·{" "}
+                {fmtGbp(Number(createdRecord.total ?? 0))}
+                {createdRecord.status === "draft" &&
+                  " · Email it, or mark it as sent once you have delivered it — that locks the invoice."}
               </p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button
-              onClick={handleDownloadCreatedInvoice}
-              disabled={isDownloadingInvoicePdf}
+              onClick={() => actions.downloadPdf(createdRecord)}
+              disabled={isBusy(createdRecord)}
               size="sm"
               className="gap-1.5"
             >
-              {isDownloadingInvoicePdf ? (
+              {isBusy(createdRecord, "pdf") ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Download className="h-4 w-4" />
@@ -813,37 +728,70 @@ export function InvoicePrepScreen() {
             <Button
               variant="outline"
               size="sm"
-              onClick={handleDownloadCreatedPack}
-              disabled={isDownloadingPack}
+              onClick={() => actions.downloadPack(createdRecord)}
+              disabled={isBusy(createdRecord)}
               className="gap-1.5"
             >
-              {isDownloadingPack ? (
+              {isBusy(createdRecord, "pack") ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Package className="h-4 w-4" />
               )}
-              Download Pack (PDF + Receipts)
+              Download Pack (PDF + Receipt Files)
             </Button>
             <Button
               variant="outline"
               size="sm"
-              onClick={handleEmailCreatedInvoice}
+              onClick={() => actions.email(createdRecord)}
+              disabled={isBusy(createdRecord)}
               className="gap-1.5"
             >
               <Mail className="h-4 w-4" />
               Email Invoice
             </Button>
+            {createdRecord.status === "draft" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => actions.markSent(createdRecord)}
+                disabled={isBusy(createdRecord)}
+                className="gap-1.5"
+              >
+                {isBusy(createdRecord, "sent") ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+                Mark as Sent
+              </Button>
+            )}
           </div>
         </div>
       )}
 
-      {/* Step 3: Preview totals */}
       {selectedJobs.length > 0 && (
         <>
+          {/* Step 3: Rechargeable expenses */}
+          <ControlSection
+            title="3. Rechargeable Expenses"
+            description="Tick the expenses to bill on this invoice. Only ticked expenses and their receipts are included."
+            flush
+          >
+            <ExpensePicker
+              jobs={selectedJobs}
+              expenses={expenses}
+              selectedIds={selectedExpenseIds}
+              vatRegistered={vatRegistered}
+              isLoading={expensesLoading}
+              onToggle={(id, selected) => setExpensesSelected([id], selected)}
+              onSetMany={setExpensesSelected}
+            />
+          </ControlSection>
+
           {/* Warnings */}
-          {preview.warnings.length > 0 && (
+          {warnings.length > 0 && (
             <div className="space-y-1.5">
-              {preview.warnings.map((w, i) => (
+              {warnings.map((w, i) => (
                 <WarningCallout key={i} severity="warning">
                   {w}
                 </WarningCallout>
@@ -851,48 +799,47 @@ export function InvoicePrepScreen() {
             </div>
           )}
 
-          <KpiStrip items={kpis} className="grid-cols-2 lg:grid-cols-5" />
+          <KpiStrip items={kpis} className={vatRegistered ? "grid-cols-2 lg:grid-cols-5" : "grid-cols-2 lg:grid-cols-4"} />
 
-          <ControlSection title="3. Invoice Preview" description="Read-only summary of selected jobs">
+          {/* Step 4: Invoice preview */}
+          <ControlSection title="4. Invoice Preview" description="One line per job: transport plus its ticked expenses">
             <div className="space-y-3">
-              {/* Line items */}
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider">
-                        Description
+                        Job / Description
                       </TableHead>
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-right">
-                        Amount
+                        Transport
+                      </TableHead>
+                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-right">
+                        Expenses
+                      </TableHead>
+                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-right">
+                        Total
                       </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {selectedJobs.map((j) => (
-                      <TableRow key={j.id}>
+                    {draft.lineItems.map((line) => (
+                      <TableRow key={line.job_id}>
                         <TableCell>
-                          <div>
-                            <span className="text-sm text-foreground font-medium">
-                              Vehicle transport — {j.vehicle_reg}
-                            </span>
-                            <span className="text-xs text-muted-foreground ml-2">
-                              ({j.vehicle_make} {j.vehicle_model})
-                            </span>
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-0.5">
-                            Job {j.external_job_number || j.id.slice(0, 8)}
-                            {j.distance_miles
-                              ? ` · ${j.distance_miles} miles`
-                              : ""}
-                            {j.completed_at
-                              ? ` · Completed ${shortDate(j.completed_at)}`
-                              : ""}
-                          </div>
+                          <span className="text-sm text-foreground font-medium">{line.description}</span>
+                          {line.detail && (
+                            <div className="text-xs text-muted-foreground mt-0.5">{line.detail}</div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right text-sm tabular-nums">
+                          {line.amount ? fmtGbp(line.amount) : "—"}
+                        </TableCell>
+                        <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
+                          {line.expense_amount ? fmtGbp(line.expense_amount) : "—"}
                         </TableCell>
                         <TableCell className="text-right">
                           <span className="text-sm font-semibold tabular-nums">
-                            {j.total_price ? fmtGbp(j.total_price) : "—"}
+                            {fmtGbp(line.amount + (line.expense_amount ?? 0))}
                           </span>
                         </TableCell>
                       </TableRow>
@@ -903,274 +850,142 @@ export function InvoicePrepScreen() {
 
               <Separator />
 
-              {/* Totals */}
-              <div className="space-y-2 max-w-xs ml-auto">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span className="font-semibold tabular-nums">{fmtGbp(preview.subtotal)}</span>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                {/* Client reference */}
+                <div className="w-full max-w-xs space-y-1.5">
+                  <Label htmlFor="invoice-client-ref" className="text-xs">
+                    Client PO / reference{selectedClient?.po_required ? " (required)" : " (optional)"}
+                  </Label>
+                  <Input
+                    id="invoice-client-ref"
+                    value={clientRef}
+                    onChange={(e) => setClientRef(e.target.value)}
+                    placeholder="e.g. PO-4500123"
+                    maxLength={60}
+                    aria-invalid={poMissing}
+                    className={cn("h-8 text-sm", poMissing && "border-destructive")}
+                  />
+                  {poMissing && (
+                    <p className="text-xs text-destructive">
+                      This client needs a PO or reference on every invoice.
+                    </p>
+                  )}
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground flex items-center gap-1.5">
-                    VAT
-                    <Input
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={vatRate}
-                      onChange={(e) => setVatRate(Math.max(0, Number(e.target.value)))}
-                      className="w-16 h-6 text-xs text-center inline-block"
-                    />
-                    <span className="text-xs">%</span>
-                  </span>
-                  <span className="font-semibold tabular-nums">{fmtGbp(preview.vatAmount)}</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between text-base font-bold">
-                  <span>Total</span>
-                  <span className="text-primary tabular-nums">{fmtGbp(preview.total)}</span>
+
+                {/* Totals */}
+                <div className="space-y-2 w-full max-w-xs sm:ml-auto">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Transport</span>
+                    <span className="tabular-nums">{fmtGbp(draft.transportTotal)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Rechargeable expenses</span>
+                    <span className="tabular-nums">{fmtGbp(draft.expensesTotal)}</span>
+                  </div>
+                  {vatRegistered ? (
+                    <>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Subtotal</span>
+                        <span className="font-semibold tabular-nums">{fmtGbp(draft.subtotal)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground flex items-center gap-1.5">
+                          <label htmlFor="invoice-vat-rate">VAT</label>
+                          <Input
+                            id="invoice-vat-rate"
+                            type="number"
+                            min={0}
+                            max={100}
+                            value={vatRate}
+                            onChange={(e) => setVatRate(Math.min(100, Math.max(0, Number(e.target.value))))}
+                            className="w-16 h-6 text-xs text-center inline-block"
+                          />
+                          <span className="text-xs">%</span>
+                        </span>
+                        <span className="font-semibold tabular-nums">{fmtGbp(draft.vatAmount)}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      {settingsLoading
+                        ? "Checking VAT status…"
+                        : "Not VAT registered — no VAT is charged. Turn this on in the organisation profile when you register."}
+                    </p>
+                  )}
+                  <Separator />
+                  <div className="flex justify-between text-base font-bold">
+                    <span>{vatRegistered ? "Total" : "Total due"}</span>
+                    <span className="text-primary tabular-nums">{fmtGbp(draft.total)}</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Info strip + Create button */}
-              <div className="flex items-center justify-between pt-2">
+              {/* Info strip + actions */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
                 <div className="flex items-center gap-4 text-xs text-muted-foreground">
                   <div className="flex items-center gap-1">
                     <FileText className="h-3.5 w-3.5" />
-                    {preview.jobCount} job{preview.jobCount !== 1 ? "s" : ""}
+                    {selectedJobs.length} job{selectedJobs.length !== 1 ? "s" : ""}
                   </div>
                   <div className="flex items-center gap-1">
                     <Receipt className="h-3.5 w-3.5" />
-                    {preview.receiptCount} receipt{preview.receiptCount !== 1 ? "s" : ""}
+                    {draft.expenseLines.length} expense{draft.expenseLines.length !== 1 ? "s" : ""}
                   </div>
                 </div>
-                <Button
-                  onClick={handleCreateInvoice}
-                  disabled={createInvoice.isPending || preview.jobCount === 0}
-                  className="gap-2"
-                >
-                  {createInvoice.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4" />
-                  )}
-                  Create Invoice
-                </Button>
-              </div>
-
-              {/* Receipt Export Section */}
-              <Separator />
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="text-sm font-semibold text-foreground">Receipt Export</h4>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Download expense receipts attached to selected jobs
-                    </p>
-                  </div>
+                <div className="flex flex-wrap items-center gap-2">
                   <Button
                     variant="outline"
-                    size="sm"
-                    onClick={handleDiscoverReceipts}
-                    disabled={isDiscovering || selectedJobs.length === 0}
-                    className="gap-1.5 text-xs"
+                    onClick={handlePreviewPdf}
+                    disabled={isPreviewing || expensesLoading}
+                    className="gap-2"
                   >
-                    {isDiscovering ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    {isPreviewing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <Receipt className="h-3.5 w-3.5" />
+                      <Eye className="h-4 w-4" />
                     )}
-                    Scan Receipts
+                    Preview PDF
+                  </Button>
+                  <Button
+                    onClick={handleCreateInvoice}
+                    disabled={
+                      createInvoice.isPending ||
+                      selectedJobs.length === 0 ||
+                      expensesLoading ||
+                      settingsLoading ||
+                      !settings
+                    }
+                    className="gap-2"
+                  >
+                    {createInvoice.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                    Create Invoice
                   </Button>
                 </div>
-
-                {receiptDiscovery && (
-                  <div className="space-y-2">
-                    {/* Receipt stats */}
-                    <div className="flex flex-wrap gap-3 text-xs">
-                      <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-muted/50 border border-border">
-                        <Receipt className="h-3.5 w-3.5 text-primary" />
-                        <span className="font-medium">{receiptDiscovery.totalCount}</span>
-                        <span className="text-muted-foreground">receipt{receiptDiscovery.totalCount !== 1 ? "s" : ""} found</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-muted/50 border border-border">
-                        <CheckCircle2 className="h-3.5 w-3.5 text-success" />
-                        <span className="font-medium">{receiptDiscovery.jobsWithReceipts}</span>
-                        <span className="text-muted-foreground">job{receiptDiscovery.jobsWithReceipts !== 1 ? "s" : ""} with receipts</span>
-                      </div>
-                      {receiptDiscovery.jobsMissing > 0 && (
-                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-warning/5 border border-warning/30">
-                          <FileWarning className="h-3.5 w-3.5 text-warning" />
-                          <span className="font-medium text-warning">{receiptDiscovery.jobsMissing}</span>
-                          <span className="text-warning">job{receiptDiscovery.jobsMissing !== 1 ? "s" : ""} without receipts</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Download buttons */}
-                    {receiptDiscovery.totalCount > 0 && (
-                      <div className="flex items-center gap-2 pt-1">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleDownloadReceipts}
-                          disabled={isDownloadingZip}
-                          className="gap-1.5 text-xs"
-                        >
-                          {isDownloadingZip ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Download className="h-3.5 w-3.5" />
-                          )}
-                          Download Receipts ZIP
-                        </Button>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={handleDownloadPack}
-                          disabled={isDownloadingPack}
-                          className="gap-1.5 text-xs"
-                        >
-                          {isDownloadingPack ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Package className="h-3.5 w-3.5" />
-                          )}
-                          Download Full Invoice Pack
-                        </Button>
-                      </div>
-                    )}
-
-                    {receiptDiscovery.totalCount === 0 && (
-                      <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/30 border border-border">
-                        <FileWarning className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <p className="text-xs text-muted-foreground">
-                          No receipt files found for the selected jobs.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
             </div>
           </ControlSection>
         </>
       )}
 
-      {/* Created invoices — download any invoice again at any time */}
+      {/* Every invoice and credit note, with status + actions */}
       <ControlSection
-        title="Created Invoices"
-        description="Download the PDF for any previously created invoice"
+        title="Invoices"
+        description="Download, email, record payment for, or cancel any invoice"
         flush
       >
-        {invoicesLoading ? (
-          <div className="p-6 text-center text-sm text-muted-foreground">
-            Loading invoices…
-          </div>
-        ) : !recentInvoices || recentInvoices.length === 0 ? (
-          <div className="p-6 text-center text-sm text-muted-foreground">
-            No invoices created yet.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-[11px] font-medium uppercase tracking-wider">
-                    Invoice
-                  </TableHead>
-                  <TableHead className="text-[11px] font-medium uppercase tracking-wider">
-                    Client
-                  </TableHead>
-                  <TableHead className="text-[11px] font-medium uppercase tracking-wider">
-                    Date
-                  </TableHead>
-                  <TableHead className="text-[11px] font-medium uppercase tracking-wider text-right">
-                    Total
-                  </TableHead>
-                  <TableHead className="text-[11px] font-medium uppercase tracking-wider text-right">
-                    PDF
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recentInvoices.map((inv) => (
-                  <TableRow key={inv.id}>
-                    <TableCell>
-                      <span className="text-sm font-medium text-foreground">
-                        {inv.invoice_number}
-                      </span>
-                      {inv.status && (
-                        <Badge variant="outline" className="ml-2 text-[9px] capitalize">
-                          {inv.status}
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-xs text-foreground">{inv.client_name}</span>
-                      {inv.client_company && (
-                        <span className="text-xs text-muted-foreground ml-1.5">
-                          {inv.client_company}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-xs text-muted-foreground">
-                        {shortDate(inv.issue_date || inv.created_at)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <span className="text-sm font-semibold tabular-nums text-foreground">
-                        {inv.total != null ? fmtGbp(Number(inv.total)) : "—"}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1.5">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDownloadStoredInvoice(inv.id)}
-                          disabled={downloadingInvoiceId === inv.id}
-                          className="gap-1.5 text-xs h-7"
-                          aria-label={`Download invoice ${inv.invoice_number}`}
-                        >
-                          {downloadingInvoiceId === inv.id ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Download className="h-3.5 w-3.5" />
-                          )}
-                          Download
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEmailStoredInvoice(inv.id)}
-                          className="gap-1.5 text-xs h-7"
-                          aria-label={`Email invoice ${inv.invoice_number}`}
-                        >
-                          <Mail className="h-3.5 w-3.5" />
-                          Email
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+        <InvoiceList
+          invoices={recentInvoices}
+          isLoading={invoicesLoading}
+          actions={actions}
+          isBusy={isBusy}
+        />
       </ControlSection>
 
-      {/* Last-chance recipient confirmation before an invoice email sends */}
-      <PodEmailConfirmDialog
-        open={!!invoiceEmailTarget}
-        onOpenChange={(open) => {
-          if (!open && !sendingInvoiceEmail) setInvoiceEmailTarget(null);
-        }}
-        defaultEmail={invoiceEmailTarget?.defaultEmail ?? ""}
-        documentLabel={`Invoice ${invoiceEmailTarget?.invoiceNumber ?? ""}`}
-        sending={sendingInvoiceEmail}
-        onConfirm={handleConfirmedInvoiceEmail}
-      />
+      {dialogs}
     </ControlShell>
   );
 }

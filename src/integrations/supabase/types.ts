@@ -205,6 +205,7 @@ export type Database = {
           org_id: string
           payment_terms: string | null
           phone: string | null
+          po_required: boolean
           rate_type: string | null
           rate_value: number | null
           signature_required: boolean
@@ -238,6 +239,7 @@ export type Database = {
           org_id: string
           payment_terms?: string | null
           phone?: string | null
+          po_required?: boolean
           rate_type?: string | null
           rate_value?: number | null
           signature_required?: boolean
@@ -271,6 +273,7 @@ export type Database = {
           org_id?: string
           payment_terms?: string | null
           phone?: string | null
+          po_required?: boolean
           rate_type?: string | null
           rate_value?: number | null
           signature_required?: boolean
@@ -822,9 +825,11 @@ export type Database = {
           label: string | null
           notes: string | null
           org_id: string
+          supplier: string | null
           time: string | null
           updated_at: string
           upload_status: string
+          vat_amount: number | null
         }
         Insert: {
           amount: number
@@ -840,9 +845,11 @@ export type Database = {
           label?: string | null
           notes?: string | null
           org_id: string
+          supplier?: string | null
           time?: string | null
           updated_at?: string
           upload_status?: string
+          vat_amount?: number | null
         }
         Update: {
           amount?: number
@@ -858,9 +865,11 @@ export type Database = {
           label?: string | null
           notes?: string | null
           org_id?: string
+          supplier?: string | null
           time?: string | null
           updated_at?: string
           upload_status?: string
+          vat_amount?: number | null
         }
         Relationships: [
           {
@@ -1020,6 +1029,79 @@ export type Database = {
           },
         ]
       }
+      invoice_expenses: {
+        Row: {
+          amount_charged: number
+          amount_gross: number
+          amount_vat: number
+          category: string
+          created_at: string
+          expense_date: string
+          expense_id: string | null
+          id: string
+          invoice_id: string
+          job_id: string | null
+          ref: string
+          sort_order: number
+          supplier: string | null
+          voided: boolean
+        }
+        Insert: {
+          amount_charged: number
+          amount_gross: number
+          amount_vat?: number
+          category: string
+          created_at?: string
+          expense_date: string
+          expense_id?: string | null
+          id?: string
+          invoice_id: string
+          job_id?: string | null
+          ref: string
+          sort_order?: number
+          supplier?: string | null
+          voided?: boolean
+        }
+        Update: {
+          amount_charged?: number
+          amount_gross?: number
+          amount_vat?: number
+          category?: string
+          created_at?: string
+          expense_date?: string
+          expense_id?: string | null
+          id?: string
+          invoice_id?: string
+          job_id?: string | null
+          ref?: string
+          sort_order?: number
+          supplier?: string | null
+          voided?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_expenses_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
+            referencedRelation: "expenses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_expenses_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_expenses_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_items: {
         Row: {
           amount: number
@@ -1031,6 +1113,7 @@ export type Database = {
           quantity: number
           sort_order: number
           unit_price: number
+          voided: boolean
         }
         Insert: {
           amount?: number
@@ -1042,6 +1125,7 @@ export type Database = {
           quantity?: number
           sort_order?: number
           unit_price?: number
+          voided?: boolean
         }
         Update: {
           amount?: number
@@ -1053,6 +1137,7 @@ export type Database = {
           quantity?: number
           sort_order?: number
           unit_price?: number
+          voided?: boolean
         }
         Relationships: [
           {
@@ -1096,13 +1181,19 @@ export type Database = {
       }
       invoices: {
         Row: {
+          cancel_reason: string | null
+          cancelled_at: string | null
           client_address: string | null
           client_company: string | null
           client_email: string | null
           client_id: string | null
           client_name: string
+          client_ref: string | null
           created_at: string
+          credits_invoice_id: string | null
+          document_type: string
           due_date: string | null
+          expenses_total: number
           id: string
           invoice_number: string
           issue_date: string
@@ -1110,23 +1201,34 @@ export type Database = {
           line_items: Json
           notes: string | null
           org_id: string
+          paid_at: string | null
+          payment_method: string | null
+          payment_reference: string | null
           payment_terms: string | null
           pdf_url: string | null
+          sent_at: string | null
           status: string
           subtotal: number
           total: number
           updated_at: string
           vat_amount: number | null
           vat_rate: number | null
+          vat_registered: boolean | null
         }
         Insert: {
+          cancel_reason?: string | null
+          cancelled_at?: string | null
           client_address?: string | null
           client_company?: string | null
           client_email?: string | null
           client_id?: string | null
           client_name: string
+          client_ref?: string | null
           created_at?: string
+          credits_invoice_id?: string | null
+          document_type?: string
           due_date?: string | null
+          expenses_total?: number
           id?: string
           invoice_number: string
           issue_date?: string
@@ -1134,23 +1236,34 @@ export type Database = {
           line_items?: Json
           notes?: string | null
           org_id: string
+          paid_at?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
           payment_terms?: string | null
           pdf_url?: string | null
+          sent_at?: string | null
           status?: string
           subtotal?: number
           total?: number
           updated_at?: string
           vat_amount?: number | null
           vat_rate?: number | null
+          vat_registered?: boolean | null
         }
         Update: {
+          cancel_reason?: string | null
+          cancelled_at?: string | null
           client_address?: string | null
           client_company?: string | null
           client_email?: string | null
           client_id?: string | null
           client_name?: string
+          client_ref?: string | null
           created_at?: string
+          credits_invoice_id?: string | null
+          document_type?: string
           due_date?: string | null
+          expenses_total?: number
           id?: string
           invoice_number?: string
           issue_date?: string
@@ -1158,14 +1271,19 @@ export type Database = {
           line_items?: Json
           notes?: string | null
           org_id?: string
+          paid_at?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
           payment_terms?: string | null
           pdf_url?: string | null
+          sent_at?: string | null
           status?: string
           subtotal?: number
           total?: number
           updated_at?: string
           vat_amount?: number | null
           vat_rate?: number | null
+          vat_registered?: boolean | null
         }
         Relationships: [
           {
@@ -1638,6 +1756,7 @@ export type Database = {
           trading_address: string | null
           updated_at: string
           vat_number: string | null
+          vat_registered: boolean
         }
         Insert: {
           billing_plan?: string | null
@@ -1659,6 +1778,7 @@ export type Database = {
           trading_address?: string | null
           updated_at?: string
           vat_number?: string | null
+          vat_registered?: boolean
         }
         Update: {
           billing_plan?: string | null
@@ -1680,6 +1800,7 @@ export type Database = {
           trading_address?: string | null
           updated_at?: string
           vat_number?: string | null
+          vat_registered?: boolean
         }
         Relationships: []
       }
@@ -2423,7 +2544,12 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      allocate_credit_note_number: { Args: { p_org_id: string }; Returns: string }
       allocate_invoice_number: { Args: { p_org_id: string }; Returns: string }
+      cancel_invoice: {
+        Args: { p_invoice_id: string; p_reason: string }
+        Returns: string | null
+      }
       archive_driver_profile: {
         Args: {
           p_reason?: string

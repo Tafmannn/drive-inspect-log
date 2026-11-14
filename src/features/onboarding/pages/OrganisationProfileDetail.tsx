@@ -9,9 +9,12 @@ import { BottomNav } from "@/components/BottomNav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Loader2, Pencil, FileText, Mail, Phone, Building2,
-  Palette, AlertTriangle,
+  Palette, AlertTriangle, Receipt,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { scoreOrg } from "../lib/completion";
@@ -24,6 +27,29 @@ export default function OrganisationProfileDetail() {
   const [loading, setLoading] = useState(true);
   const [org, setOrg] = useState<any | null>(null);
   const [docs, setDocs] = useState<any[]>([]);
+  const [savingVat, setSavingVat] = useState(false);
+  const queryClient = useQueryClient();
+
+  // The business-level VAT switch. Off = invoices carry no VAT at all.
+  const setVatRegistered = async (next: boolean) => {
+    setSavingVat(true);
+    try {
+      const { error } = await supabase.from("organisations").update({ vat_registered: next }).eq("id", orgId);
+      if (error) throw error;
+      setOrg((prev: any) => (prev ? { ...prev, vat_registered: next } : prev));
+      queryClient.invalidateQueries({ queryKey: ["invoicing", "org-settings"] });
+      toast({
+        title: next ? "VAT turned on" : "VAT turned off",
+        description: next
+          ? "New invoices will charge VAT. Invoices already created are not changed."
+          : "New invoices will not charge VAT. Invoices already created are not changed.",
+      });
+    } catch (e) {
+      toast({ title: "Could not change the VAT setting", description: String((e as Error).message ?? e), variant: "destructive" });
+    } finally {
+      setSavingVat(false);
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -113,6 +139,37 @@ export default function OrganisationProfileDetail() {
           <KeyVal label="VAT number" value={org?.vat_number} mono />
           <KeyVal label="Registered address" value={org?.registered_address} />
           <KeyVal label="Trading address" value={org?.trading_address} />
+        </SectionCard>
+
+        <SectionCard icon={<Receipt className="w-4 h-4" />} title="Invoicing & VAT">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <Label htmlFor="org-vat-registered" className="text-sm">VAT registered</Label>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {org?.vat_registered
+                  ? "Invoices charge VAT and show the VAT number. Expenses are recharged net of VAT."
+                  : "Invoices carry no VAT. Turn this on from the date your VAT registration takes effect."}
+              </p>
+            </div>
+            <Switch
+              id="org-vat-registered"
+              checked={org?.vat_registered === true}
+              disabled={savingVat}
+              onCheckedChange={setVatRegistered}
+            />
+          </div>
+          {org?.vat_registered && !org?.vat_number && (
+            <p className="flex items-start gap-1.5 text-xs text-warning">
+              <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+              VAT is on but no VAT number is saved. A VAT invoice must show it — add it under Edit organisation.
+            </p>
+          )}
+          {!org?.trading_address && !org?.registered_address && (
+            <p className="flex items-start gap-1.5 text-xs text-warning">
+              <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+              No business address is saved, so invoices cannot print one in their footer. Add it under Edit organisation.
+            </p>
+          )}
         </SectionCard>
 
         <SectionCard icon={<Mail className="w-4 h-4" />} title="Main contact">

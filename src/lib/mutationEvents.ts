@@ -98,6 +98,9 @@ const EVENT_INVALIDATIONS: Record<EventClass, QueryKey[]> = {
     // tiles (spend/receipt-coverage) register under their own key and were
     // silently never invalidated by this event.
     ["control-finance-kpis"],
+    // The invoice expense picker lists un-invoiced expenses for the selected
+    // jobs; an edited amount / new receipt must show there straight away.
+    ["invoicing", "billable-expenses"],
   ],
 
   onboarding_review_changed: [

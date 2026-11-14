@@ -57,6 +57,8 @@ export function ClientFormModal({ open, onOpenChange, client, initialCompany, on
     phone: "",
     address: "",
     notes: "",
+    payment_terms: "",
+    po_required: false,
     rate_card_active: false,
     rate_per_mile: "",
     minimum_charge: "",
@@ -78,6 +80,8 @@ export function ClientFormModal({ open, onOpenChange, client, initialCompany, on
         phone: client.phone ?? "",
         address: client.address ?? "",
         notes: client.notes ?? "",
+        payment_terms: client.payment_terms ?? "",
+        po_required: client.po_required === true,
       }));
       // Load rate card from admin-only table. Drivers will get null via RLS.
       if (canEditRateCard) {
@@ -103,6 +107,7 @@ export function ClientFormModal({ open, onOpenChange, client, initialCompany, on
       setForm({
         name: "", company: initialCompany ?? "", billing_email: "", client_type: "",
         email: "", phone: "", address: "", notes: "",
+        payment_terms: "", po_required: false,
         rate_card_active: false, rate_per_mile: "", minimum_charge: "",
         agreed_price: "", waiting_rate_per_hour: "", rate_card_notes: "",
       });
@@ -156,6 +161,8 @@ export function ClientFormModal({ open, onOpenChange, client, initialCompany, on
       phone: form.phone.trim() || null,
       address: form.address.trim() || null,
       notes: form.notes.trim() || null,
+      payment_terms: form.payment_terms || null,
+      po_required: form.po_required,
       is_active: true,
     };
 
@@ -247,6 +254,44 @@ export function ClientFormModal({ open, onOpenChange, client, initialCompany, on
                 <option value="private">Private</option>
                 <option value="other">Other</option>
               </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="client-payment-terms">Payment terms</Label>
+              <select
+                id="client-payment-terms"
+                value={form.payment_terms}
+                onChange={(e) => setForm((f) => ({ ...f, payment_terms: e.target.value }))}
+                className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">Not set</option>
+                <option value="Due on receipt">Due on receipt</option>
+                <option value="Net 7">7 days</option>
+                <option value="Net 14">14 days</option>
+                <option value="Net 30">30 days</option>
+                <option value="Net 60">60 days</option>
+                {form.payment_terms &&
+                  !["Due on receipt", "Net 7", "Net 14", "Net 30", "Net 60"].includes(form.payment_terms) && (
+                    <option value={form.payment_terms}>{form.payment_terms}</option>
+                  )}
+              </select>
+              <p className="mt-1 text-[11px] text-muted-foreground">Sets the due date on invoices.</p>
+            </div>
+            <div className="flex items-start gap-2 pt-6">
+              <input
+                id="client-po-required"
+                type="checkbox"
+                checked={form.po_required}
+                onChange={(e) => setForm((f) => ({ ...f, po_required: e.target.checked }))}
+                className="mt-1 h-4 w-4 rounded border-input"
+              />
+              <Label htmlFor="client-po-required" className="text-sm font-normal leading-snug">
+                PO required
+                <span className="block text-[11px] text-muted-foreground">
+                  Block invoices without a PO / reference.
+                </span>
+              </Label>
             </div>
           </div>
           <div>
