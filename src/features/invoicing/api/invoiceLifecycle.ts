@@ -53,15 +53,16 @@ export async function getInvoicePdf(
 }
 
 /**
- * Freeze the PDF for an invoice that is about to be issued and record its
- * path. No-op (returns the existing path) once a copy is stored.
+ * Render and store the PDF for an invoice that is about to be issued, and
+ * record its path. Always re-rendered: a draft may have an older copy in
+ * storage (from an email attempt that failed), and business details may
+ * have been completed since.
  */
-export async function ensureStoredInvoicePdf(
+export async function freezeInvoicePdf(
   record: InvoiceRecord,
   orgId: string,
   settings?: OrgInvoiceSettings | null,
 ): Promise<string> {
-  if (record.pdf_url) return record.pdf_url;
   const blob = await generateInvoiceDocumentPdf(record, settings);
   const path = await storeInvoicePdf(orgId, record.invoice_number, blob);
   const { error } = await supabase.from("invoices").update({ pdf_url: path }).eq("id", record.id);
@@ -76,7 +77,7 @@ export async function markInvoiceSent(
   settings?: OrgInvoiceSettings | null,
 ): Promise<void> {
   if (record.status !== "draft") throw new Error("Only a draft invoice can be marked as sent.");
-  await ensureStoredInvoicePdf(record, orgId, settings);
+  await freezeInvoicePdf(record, orgId, settings);
   const { error } = await supabase
     .from("invoices")
     .update({ status: "sent", sent_at: new Date().toISOString() })
