@@ -86,9 +86,19 @@ export interface PortalInvoiceSummary {
   vat_amount: number | null;
   total: number | null;
   sent_at: string;
+  /** 'sent' | 'paid' | 'cancelled'. Absent until the lifecycle migration is applied. */
+  status?: string | null;
+  /** 'invoice' | 'credit_note' */
+  document_type?: string | null;
+  paid_at?: string | null;
 }
 
 export interface PortalInvoiceDetail extends PortalInvoiceSummary {
+  client_ref?: string | null;
+  vat_registered?: boolean | null;
+  /** Storage path of the PDF frozen when the invoice was issued. */
+  pdf_path?: string | null;
+  credits_invoice_number?: string | null;
   payment_terms: string | null;
   client_name: string;
   client_company: string | null;

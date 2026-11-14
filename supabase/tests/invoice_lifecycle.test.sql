@@ -188,3 +188,60 @@ END $$;
 
 RESET ROLE;
 SELECT 'ALL INVOICE LIFECYCLE TESTS PASSED' AS result;
+
+-- =====================================================================
+-- 20261114140000_portal_invoice_status_and_pdf.sql
+-- =====================================================================
+-- fixtures: two portal users (one per client), an invoice-pdfs object each
+INSERT INTO clients (id, org_id, name) VALUES
+  ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000a1', 'Client Two');
+INSERT INTO auth.users (id) VALUES
+  ('00000000-0000-0000-0000-00000000c1c1'), ('00000000-0000-0000-0000-00000000c2c2');
+INSERT INTO user_profiles (auth_user_id, org_id, role, client_id) VALUES
+  ('00000000-0000-0000-0000-00000000c1c1', NULL, 'client', '00000000-0000-0000-0000-0000000000c1'),
+  ('00000000-0000-0000-0000-00000000c2c2', NULL, 'client', '00000000-0000-0000-0000-0000000000c2');
+INSERT INTO storage.buckets (id, name, public) VALUES ('invoice-pdfs', 'invoice-pdfs', false);
+INSERT INTO storage.objects (bucket_id, name) VALUES
+  ('invoice-pdfs', 'a1/AXENTRA_INV_AX26-2001.pdf'),   -- AX26-2001: client 1, sent then cancelled
+  ('invoice-pdfs', 'a1/AXENTRA_INV_AX26-2010.pdf'),   -- AX26-2010: client 1, still a draft
+  ('invoice-pdfs', 'a1/AXENTRA_INV_AX26-2011.pdf');   -- AX26-2011: client 2, sent
+INSERT INTO invoices (id, org_id, client_id, client_name, invoice_number, pdf_url, status) VALUES
+  ('00000000-0000-0000-0000-000000000f10', '00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000c1', 'Client A', 'AX26-2010', 'a1/AXENTRA_INV_AX26-2010.pdf', 'draft'),
+  ('00000000-0000-0000-0000-000000000f11', '00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000c2', 'Client Two', 'AX26-2011', 'a1/AXENTRA_INV_AX26-2011.pdf', 'draft');
+UPDATE invoices SET sent_at = now() WHERE id = '00000000-0000-0000-0000-000000000f11';
+GRANT SELECT ON storage.objects TO authenticated;
+
+-- ── 12. portal user sees own sent invoices with status + credit note ───
+SELECT pg_temp.act_as('00000000-0000-0000-0000-00000000c1c1');
+DO $$
+DECLARE v jsonb := portal_list_invoices(); d jsonb;
+BEGIN
+  ASSERT jsonb_array_length(v) = 2, 'client 1 sees the cancelled invoice and its credit note, not the draft: ' || v::text;
+  ASSERT (SELECT count(*) FROM jsonb_array_elements(v) e WHERE e->>'status' = 'cancelled' AND e->>'document_type' = 'invoice') = 1, 'cancelled invoice carries its status';
+  ASSERT (SELECT count(*) FROM jsonb_array_elements(v) e WHERE e->>'document_type' = 'credit_note') = 1, 'credit note is labelled';
+  d := portal_get_invoice('00000000-0000-0000-0000-000000000f01');
+  ASSERT d->>'status' = 'cancelled' AND d->>'pdf_path' = 'a1/AXENTRA_INV_AX26-2001.pdf' AND (d->>'vat_registered')::boolean = false, 'detail fields: ' || d::text;
+  d := portal_get_invoice((SELECT (e->>'id')::uuid FROM jsonb_array_elements(v) e WHERE e->>'document_type' = 'credit_note'));
+  ASSERT d->>'credits_invoice_number' = 'AX26-2001', 'credit note names the invoice it credits';
+END $$;
+SELECT pg_temp.expect_error($q$SELECT portal_get_invoice('00000000-0000-0000-0000-000000000f10')$q$, '%NOT_FOUND%', 'portal cannot open a draft');
+SELECT pg_temp.expect_error($q$SELECT portal_get_invoice('00000000-0000-0000-0000-000000000f11')$q$, '%NOT_FOUND%', 'portal cannot open another client''s invoice');
+
+-- ── 13. storage: only the PDF of the caller's own SENT invoice ─────────
+DO $$ BEGIN
+  ASSERT (SELECT array_agg(name ORDER BY name) FROM storage.objects) = ARRAY['a1/AXENTRA_INV_AX26-2001.pdf'],
+    'client 1 may read only its own sent invoice PDF, got: ' || COALESCE((SELECT string_agg(name, ', ') FROM storage.objects), '(none)');
+END $$;
+SELECT pg_temp.act_as('00000000-0000-0000-0000-00000000c2c2');
+DO $$ BEGIN
+  ASSERT (SELECT array_agg(name ORDER BY name) FROM storage.objects) = ARRAY['a1/AXENTRA_INV_AX26-2011.pdf'], 'client 2 may read only its own';
+END $$;
+-- a driver (no portal client) gets nothing from this policy
+SELECT pg_temp.act_as('00000000-0000-0000-0000-00000000dddd');
+DO $$ BEGIN
+  ASSERT (SELECT count(*) FROM storage.objects) = 0, 'non-portal users get no access via the portal policy';
+END $$;
+SELECT pg_temp.expect_error($q$SELECT portal_list_invoices()$q$, '%PORTAL_ACCESS_DENIED%', 'non-portal user cannot list portal invoices');
+
+RESET ROLE;
+SELECT 'ALL PORTAL INVOICE TESTS PASSED' AS result;
