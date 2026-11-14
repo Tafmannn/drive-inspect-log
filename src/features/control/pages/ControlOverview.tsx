@@ -3,8 +3,9 @@
  * Organisation-level dispatch summary and operational control surface.
  * Reuses Jobs dispatch helpers for semantic alignment.
  */
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { kickCustomerNotifications } from "@/lib/customerNotifyApi";
 import { ControlShell, ControlHeader, ControlSection } from "../components/shared/ControlShell";
 import { KpiStrip } from "../components/shared/KpiStrip";
 import { QuickActionsBar } from "../components/shared/QuickActionsBar";
@@ -183,6 +184,12 @@ function actionsCol(acts: RowActions): CompactColumn<DispatchBoardRow> {
 
 export function ControlOverview() {
   const navigate = useNavigate();
+
+  // Safety net for customer status emails: send anything still queued
+  // (e.g. a submit whose nudge was lost). Throttled inside the helper.
+  useEffect(() => {
+    kickCustomerNotifications();
+  }, []);
   const { data: kpis, isLoading: kpisLoading } = useAdminKpis();
   const { data: dispatch, isLoading: dispatchLoading } = useDispatchBoard();
   const { data: unassigned, isLoading: unassignedLoading } = useUnassignedQueue();

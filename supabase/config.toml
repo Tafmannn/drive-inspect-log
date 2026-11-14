@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.portal-access]
 verify_jwt = false
+
+[functions.notify-customers]
+verify_jwt = false

@@ -51,6 +51,7 @@ import {
 } from "./pendingUploads";
 import { logClientEvent } from "./logger";
 import { notifyPodSubmitted } from "./pushApi";
+import { kickCustomerNotifications } from "./customerNotifyApi";
 import { supabase } from "@/integrations/supabase/client";
 import type { InspectionType, Inspection, DamageItem } from "./types";
 
@@ -563,6 +564,9 @@ async function drainOne(entry: QueuedSubmission): Promise<void> {
   if (!inspectionId) {
     throw new Error("RPC returned no inspectionId");
   }
+
+  // Committed: the status change may have queued a customer email.
+  kickCustomerNotifications();
 
   // ── 3) Promote any staged photos for this session → ready ──
   const damageIdMap: Record<string, string> = {};
