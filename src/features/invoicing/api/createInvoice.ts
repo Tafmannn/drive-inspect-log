@@ -62,7 +62,7 @@ export interface CreateInvoiceResult {
  * produced duplicate numbers.
  */
 async function getNextInvoiceNumber(orgId: string): Promise<string> {
-  const { data, error } = await (supabase as any).rpc("allocate_invoice_number", {
+  const { data, error } = await supabase.rpc("allocate_invoice_number", {
     p_org_id: orgId,
   });
   if (error || !data) {

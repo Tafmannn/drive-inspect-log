@@ -21,6 +21,7 @@ import {
   type ExportFilters,
 } from "../api/exportQueries";
 import { exportJsonBackup } from "../api/jsonBackup";
+import { AccountsSection } from "@/features/accounts/components/AccountsSection";
 
 type ExportKind = "jobs" | "inspections" | "expenses" | "backup";
 
@@ -72,11 +73,14 @@ export function ExportsPage() {
         }
       />
 
+      {/* Accountant reports + Xero import files */}
+      <AccountsSection />
+
       {/* Date filters */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Filters</CardTitle>
-          <CardDescription>Optional. Leave blank for all-time exports.</CardDescription>
+          <CardTitle className="text-base">Raw data exports</CardTitle>
+          <CardDescription>Date filter for the CSV exports below. Optional — leave blank for all-time.</CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
