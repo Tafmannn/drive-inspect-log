@@ -46,6 +46,12 @@ export const ExpenseForm = () => {
   const [time, setTime] = useState("");
   const [label, setLabel] = useState("");
   const [notes, setNotes] = useState("");
+  // Optional accounting detail. Only sent when filled in (or when editing an
+  // expense that already carries them), so logging an expense never depends
+  // on these fields.
+  const [supplier, setSupplier] = useState("");
+  const [vatAmount, setVatAmount] = useState("");
+  const [hadExtras, setHadExtras] = useState(false);
   const [receiptFiles, setReceiptFiles] = useState<{ file: File; preview: string }[]>([]);
   const [existingReceipts, setExistingReceipts] = useState<ExistingReceipt[]>([]);
   const [saving, setSaving] = useState(false);
@@ -149,6 +155,9 @@ export const ExpenseForm = () => {
         setTime(expense.time || "");
         setLabel(expense.label || "");
         setNotes(expense.notes || "");
+        setSupplier(expense.supplier || "");
+        setVatAmount(expense.vat_amount != null ? String(expense.vat_amount) : "");
+        setHadExtras(expense.supplier != null || expense.vat_amount != null);
 
         // Hydrate job_id from the persisted record (critical for edit-from-global flow)
         if (expense.job_id) {
@@ -214,6 +223,7 @@ export const ExpenseForm = () => {
         if (result.amount && !amount) setAmount(String(result.amount));
         if (result.date && date === new Date().toISOString().slice(0, 10)) setDate(result.date);
         if (result.vendor && !label) setLabel(result.vendor);
+        if (result.vendor && !supplier) setSupplier(result.vendor);
       }
     } catch (err) {
       console.error("OCR failed", err);
@@ -260,6 +270,22 @@ export const ExpenseForm = () => {
       return;
     }
 
+    const vatNum = vatAmount.trim() === "" ? null : Number(vatAmount);
+    if (vatNum != null && (!Number.isFinite(vatNum) || vatNum < 0 || vatNum >= amt)) {
+      toast({
+        title: "Check the VAT amount",
+        description: "VAT on the receipt must be less than the total amount paid.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const supplierText = supplier.trim();
+    // Blank stays unsent on a new expense; on an edit a cleared value is saved as empty.
+    const extras = {
+      ...(supplierText || hadExtras ? { supplier: supplierText || null } : {}),
+      ...(vatNum != null || hadExtras ? { vat_amount: vatNum } : {}),
+    };
+
     setSaving(true);
     // Hoisted so the catch block below can tell whether the expense row
     // itself was created during THIS call (state updates from setCreatedExpenseId
@@ -275,6 +301,7 @@ export const ExpenseForm = () => {
           category,
           label: label || null,
           notes: notes || null,
+          ...extras,
         });
       } else {
         // Resume onto the already-created row if a prior submit created the
@@ -290,6 +317,7 @@ export const ExpenseForm = () => {
             category,
             label: label || null,
             notes: notes || null,
+            ...extras,
           });
           expenseIdToUse = created.id;
           expenseCreatedThisAttempt = true;
@@ -398,6 +426,17 @@ export const ExpenseForm = () => {
                 <div className="space-y-2">
                   <Label htmlFor="label">Label (optional)</Label>
                   <Input id="label" placeholder="e.g. Fuel in Leeds" value={label} onChange={(e) => setLabel(e.target.value)} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="supplier">Supplier (optional)</Label>
+                  <Input id="supplier" placeholder="e.g. Shell M1 J28" value={supplier} onChange={(e) => setSupplier(e.target.value)} maxLength={80} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="vat-amount">VAT on receipt (£, optional)</Label>
+                  <Input id="vat-amount" type="number" inputMode="decimal" step="0.01" min="0" value={vatAmount} onChange={(e) => setVatAmount(e.target.value)} />
                 </div>
               </div>
 

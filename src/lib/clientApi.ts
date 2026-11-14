@@ -14,6 +14,12 @@ export interface Client {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  // Billing profile (present on rows read with select("*")).
+  billing_email?: string | null;
+  billing_address?: string | null;
+  payment_terms?: string | null;
+  /** When true, an invoice for this client cannot be created without a PO / reference. */
+  po_required?: boolean;
 }
 
 /**

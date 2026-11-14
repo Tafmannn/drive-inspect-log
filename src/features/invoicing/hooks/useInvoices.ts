@@ -7,6 +7,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { InvoiceData, InvoiceLineItem } from "@/lib/invoicePdf";
+import { jobsHeaderSubtitle } from "../lib/invoiceMath";
 
 export interface InvoiceRecord {
   id: string;
@@ -26,7 +27,26 @@ export interface InvoiceRecord {
   notes: string | null;
   status: string | null;
   created_at: string;
+  // Present on rows read by the operator's invoice list; absent from the
+  // client-portal projection (which has its own SECURITY DEFINER reader).
+  org_id?: string;
+  client_id?: string | null;
+  client_ref?: string | null;
+  vat_registered?: boolean | null;
+  expenses_total?: number | null;
+  document_type?: string | null;
+  credits_invoice_id?: string | null;
+  sent_at?: string | null;
+  paid_at?: string | null;
+  payment_method?: string | null;
+  payment_reference?: string | null;
+  cancelled_at?: string | null;
+  cancel_reason?: string | null;
+  pdf_url?: string | null;
 }
+
+export const INVOICE_LIST_COLUMNS =
+  "id, org_id, client_id, invoice_number, client_name, client_company, client_email, client_address, issue_date, due_date, payment_terms, line_items, subtotal, vat_rate, vat_amount, total, notes, status, created_at, client_ref, vat_registered, expenses_total, document_type, credits_invoice_id, sent_at, paid_at, payment_method, payment_reference, cancelled_at, cancel_reason, pdf_url";
 
 export function useInvoices(limit = 25) {
   return useQuery({
@@ -36,9 +56,7 @@ export function useInvoices(limit = 25) {
     queryFn: async (): Promise<InvoiceRecord[]> => {
       const { data, error } = await supabase
         .from("invoices")
-        .select(
-          "id, invoice_number, client_name, client_company, client_email, client_address, issue_date, due_date, payment_terms, line_items, subtotal, vat_rate, vat_amount, total, notes, status, created_at"
-        )
+        .select(INVOICE_LIST_COLUMNS)
         .order("created_at", { ascending: false })
         .limit(limit);
       if (error) throw error;
@@ -48,10 +66,11 @@ export function useInvoices(limit = 25) {
 }
 
 /**
- * Normalise stored line_items to the PDF generator's shape. The two write
+ * Normalise stored line_items to the PDF generator's shape. The write
  * paths stored different JSON: the multi-job prep flow writes
- * {description, amount, quantity, sort_order}; the legacy single-job
- * generator writes {description, quantity, unitPrice}.
+ * {description, amount, quantity, sort_order} — plus, since rechargeable
+ * expenses, {detail, expense_amount, job_ref, job_date}; the legacy
+ * single-job generator writes {description, quantity, unitPrice}.
  */
 function normaliseLineItems(raw: unknown): InvoiceLineItem[] {
   if (!Array.isArray(raw)) return [];
@@ -61,14 +80,41 @@ function normaliseLineItems(raw: unknown): InvoiceLineItem[] {
       description: typeof item.description === "string" ? item.description : "Line item",
       quantity: Number(item.quantity ?? 1) || 1,
       unitPrice: Number(item.unitPrice ?? item.unit_price ?? item.amount ?? 0) || 0,
+      detail: typeof item.detail === "string" && item.detail ? item.detail : undefined,
+      expenseAmount: Number(item.expense_amount ?? 0) || 0,
       sortOrder: Number(item.sort_order ?? i),
     }));
   items.sort((a, b) => a.sortOrder - b.sortOrder);
-  return items.map(({ description, quantity, unitPrice }) => ({ description, quantity, unitPrice }));
+  return items.map(({ description, quantity, unitPrice, detail, expenseAmount }) => ({
+    description,
+    quantity,
+    unitPrice,
+    ...(detail ? { detail } : {}),
+    ...(expenseAmount ? { expenseAmount } : {}),
+  }));
 }
 
-/** Rebuild the PDF input from a stored invoice row. */
+/** Job days + count from the multi-job line_items shape; null for legacy rows. */
+function multiJobMeta(raw: unknown): { days: string[]; count: number } | null {
+  if (!Array.isArray(raw)) return null;
+  const jobs = raw.filter(
+    (item): item is Record<string, unknown> =>
+      !!item && typeof item === "object" && typeof (item as Record<string, unknown>).job_ref === "string",
+  );
+  if (!jobs.length) return null;
+  return {
+    count: jobs.length,
+    days: jobs.map((j) => (typeof j.job_date === "string" ? j.job_date : "")).filter(Boolean),
+  };
+}
+
+/**
+ * Rebuild the PDF input from a stored invoice row. Pure and synchronous:
+ * it yields page 1 exactly as issued. Receipt copies and the business
+ * footer need extra reads — see buildInvoiceDocument().
+ */
 export function invoiceRecordToPdfData(inv: InvoiceRecord): InvoiceData {
+  const meta = multiJobMeta(inv.line_items);
   return {
     invoiceNumber: inv.invoice_number,
     issueDate: inv.issue_date || inv.created_at,
@@ -81,5 +127,13 @@ export function invoiceRecordToPdfData(inv: InvoiceRecord): InvoiceData {
     vatRate: inv.vat_rate ?? 0,
     lineItems: normaliseLineItems(inv.line_items),
     notes: inv.notes || undefined,
+    ...(inv.client_ref ? { clientRef: inv.client_ref } : {}),
+    // null = an invoice from before the VAT switch existed: keep its
+    // original presentation (VAT line at whatever rate was stored).
+    ...(typeof inv.vat_registered === "boolean" ? { vatRegistered: inv.vat_registered } : {}),
+    ...(inv.document_type === "credit_note" ? { documentType: "credit_note" as const } : {}),
+    ...(meta
+      ? { compactFooter: true, headerSubtitle: jobsHeaderSubtitle(meta.days, meta.count) }
+      : {}),
   };
 }

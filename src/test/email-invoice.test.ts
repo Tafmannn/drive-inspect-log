@@ -4,14 +4,18 @@ import type { InvoiceData } from "@/lib/invoicePdf";
 
 // vi.mock factories are hoisted above const declarations, and emailInvoice.ts
 // imports the supabase client statically — the mock fns must be hoisted too.
-const { uploadMock, createSignedUrlMock, invokeMock } = vi.hoisted(() => ({
+const { uploadMock, createSignedUrlMock, invokeMock, updateMock, updateEqMock, generateMock } = vi.hoisted(() => ({
   uploadMock: vi.fn(),
   createSignedUrlMock: vi.fn(),
   invokeMock: vi.fn(),
+  updateMock: vi.fn(),
+  updateEqMock: vi.fn(),
+  generateMock: vi.fn(),
 }));
 
-vi.mock("@/lib/invoicePdf", () => ({
-  generateInvoicePdf: vi.fn().mockResolvedValue(new Blob(["pdf"], { type: "application/pdf" })),
+vi.mock("@/lib/invoicePdf", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/invoicePdf")>()),
+  generateInvoicePdf: generateMock,
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -23,6 +27,15 @@ vi.mock("@/integrations/supabase/client", () => ({
       }),
     },
     functions: { invoke: invokeMock },
+    from: (table: string) => {
+      if (table !== "invoices") throw new Error(`unexpected table ${table}`);
+      return {
+        update: (values: unknown) => {
+          updateMock(values);
+          return { eq: (...a: unknown[]) => updateEqMock(...a) };
+        },
+      };
+    },
   },
 }));
 
@@ -52,12 +65,18 @@ describe("emailInvoice", () => {
       error: null,
     });
     invokeMock.mockReset().mockResolvedValue({ data: { sent: true }, error: null });
+    updateMock.mockReset();
+    updateEqMock.mockReset().mockResolvedValue({ error: null });
+    generateMock.mockReset().mockResolvedValue(new Blob(["pdf"], { type: "application/pdf" }));
   });
 
   it("uploads to the org-scoped path and invokes send-invoice-email with the confirmed recipient", async () => {
     const result = await emailInvoice(input);
 
-    expect(result).toEqual({ recipient: "billing@client.com" });
+    expect(result).toEqual({
+      recipient: "billing@client.com",
+      pdfPath: "org-1/AXENTRA_INV_AX-INV-0042.pdf",
+    });
     expect(uploadMock).toHaveBeenCalledWith(
       "org-1/AXENTRA_INV_AX-INV-0042.pdf",
       expect.any(Blob),
@@ -70,6 +89,31 @@ describe("emailInvoice", () => {
         downloadUrl: "https://example.com/signed.pdf",
       },
     });
+  });
+
+  it("records the stored PDF path on the invoice before sending", async () => {
+    await emailInvoice(input);
+
+    expect(updateMock).toHaveBeenCalledWith({ pdf_url: "org-1/AXENTRA_INV_AX-INV-0042.pdf" });
+    expect(updateEqMock).toHaveBeenCalledWith("id", "inv-1");
+    expect(updateEqMock.mock.invocationCallOrder[0]).toBeLessThan(invokeMock.mock.invocationCallOrder[0]);
+  });
+
+  it("still sends when recording the stored PDF path fails", async () => {
+    updateEqMock.mockRejectedValue(new Error("network"));
+
+    await expect(emailInvoice(input)).resolves.toMatchObject({ recipient: "billing@client.com" });
+    expect(invokeMock).toHaveBeenCalled();
+  });
+
+  it("re-sends the PDF frozen at issue without re-rendering or overwriting it", async () => {
+    const result = await emailInvoice({ ...input, storedPdfPath: "org-1/AXENTRA_INV_AX-INV-0042.pdf" });
+
+    expect(generateMock).not.toHaveBeenCalled();
+    expect(uploadMock).not.toHaveBeenCalled();
+    expect(updateMock).not.toHaveBeenCalled();
+    expect(createSignedUrlMock).toHaveBeenCalledWith("org-1/AXENTRA_INV_AX-INV-0042.pdf", expect.any(Number));
+    expect(result.pdfPath).toBe("org-1/AXENTRA_INV_AX-INV-0042.pdf");
   });
 
   it("throws when the upload fails and never invokes the send function", async () => {

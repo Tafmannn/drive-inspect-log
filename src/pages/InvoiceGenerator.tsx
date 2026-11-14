@@ -18,6 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getOrgId } from "@/lib/orgHelper";
 import { downloadInvoicePdf, type InvoiceLineItem, type InvoiceData } from "@/lib/invoicePdf";
 import { findAlreadyInvoicedJobs } from "@/features/invoicing/api/createInvoice";
+import { useOrgInvoiceSettings } from "@/features/invoicing/hooks/useInvoiceSettings";
 import {
   Loader2, Plus, Trash2, FileDown, Receipt,
   Building2, User, Calendar, CreditCard
@@ -103,7 +104,7 @@ function LineItemRow({ item, onChange, onRemove, isOnly }: LineItemRowProps) {
   );
 }
 
-function InvoiceSummary({ items, vatRate }: { items: InvoiceLineItem[]; vatRate: number }) {
+function InvoiceSummary({ items, vatRate, vatRegistered }: { items: InvoiceLineItem[]; vatRate: number; vatRegistered: boolean }) {
   const subtotal = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
   const vatAmount = subtotal * (vatRate / 100);
   const total = subtotal + vatAmount;
@@ -112,9 +113,13 @@ function InvoiceSummary({ items, vatRate }: { items: InvoiceLineItem[]; vatRate:
       <div className="flex justify-between text-muted-foreground">
         <span>Subtotal</span><span>£{subtotal.toFixed(2)}</span>
       </div>
-      <div className="flex justify-between text-muted-foreground">
-        <span>VAT ({vatRate}%)</span><span>£{vatAmount.toFixed(2)}</span>
-      </div>
+      {vatRegistered ? (
+        <div className="flex justify-between text-muted-foreground">
+          <span>VAT ({vatRate}%)</span><span>£{vatAmount.toFixed(2)}</span>
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">Not VAT registered — no VAT charged.</p>
+      )}
       <Separator />
       <div className="flex justify-between font-bold text-base">
         <span>Total Due</span><span>£{total.toFixed(2)}</span>
@@ -139,7 +144,12 @@ export function InvoiceGenerator() {
   const [issueDate, setIssueDate] = useState(formatDate(new Date()));
   const [dueDate, setDueDate] = useState(formatDate(addDays(new Date(), 30)));
   const [paymentTerms, setPaymentTerms] = useState("Net 30");
-  const [vatRate, setVatRate] = useState(20);
+  // VAT follows the business-level switch (organisations.vat_registered):
+  // while it is off the rate is forced to 0 and no VAT line is shown.
+  const { data: invoiceSettings } = useOrgInvoiceSettings();
+  const vatRegistered = invoiceSettings?.vatRegistered === true;
+  const [chosenVatRate, setVatRate] = useState(20);
+  const vatRate = vatRegistered ? chosenVatRate : 0;
   const [clientName, setClientName] = useState("");
   const [clientCompany, setClientCompany] = useState("");
   const [clientEmail, setClientEmail] = useState("");
@@ -211,7 +221,8 @@ export function InvoiceGenerator() {
   const buildInvoiceData = (): InvoiceData => ({
     invoiceNumber, issueDate,
     dueDate: dueDate || undefined,
-    paymentTerms, vatRate, clientName,
+    paymentTerms, vatRate, vatRegistered, clientName,
+    business: invoiceSettings?.business,
     clientCompany: clientCompany || undefined,
     clientEmail: clientEmail || undefined,
     clientAddress: clientAddress || undefined,
@@ -281,6 +292,7 @@ export function InvoiceGenerator() {
         payment_terms: inv.paymentTerms || "Net 30",
         line_items: inv.lineItems as any,
         subtotal, vat_rate: vatRate, vat_amount: vat, total,
+        vat_registered: vatRegistered,
         notes: inv.notes || null,
         status: "draft",
       } as any);
@@ -349,14 +361,20 @@ export function InvoiceGenerator() {
               </div>
               <div>
                 <Label className="text-xs text-muted-foreground">VAT Rate</Label>
-                <Select value={String(vatRate)} onValueChange={v => setVatRate(Number(v))}>
-                  <SelectTrigger className="mt-1 min-h-[40px]"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0">0% (Zero-rated)</SelectItem>
-                    <SelectItem value="5">5% (Reduced)</SelectItem>
-                    <SelectItem value="20">20% (Standard)</SelectItem>
-                  </SelectContent>
-                </Select>
+                {vatRegistered ? (
+                  <Select value={String(vatRate)} onValueChange={v => setVatRate(Number(v))}>
+                    <SelectTrigger className="mt-1 min-h-[40px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">0% (Zero-rated)</SelectItem>
+                      <SelectItem value="5">5% (Reduced)</SelectItem>
+                      <SelectItem value="20">20% (Standard)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="mt-1 flex min-h-[40px] items-center rounded-md border border-input bg-muted/40 px-3 text-xs text-muted-foreground">
+                    Not VAT registered
+                  </p>
+                )}
               </div>
               <div>
                 <Label className="text-xs text-muted-foreground">Issue Date</Label>
@@ -437,7 +455,7 @@ export function InvoiceGenerator() {
                 <Plus className="w-4 h-4 mr-1.5" />Add Line Item
               </Button>
               <Separator />
-              <InvoiceSummary items={lineItems} vatRate={vatRate} />
+              <InvoiceSummary items={lineItems} vatRate={vatRate} vatRegistered={vatRegistered} />
             </CardContent>
           </Card>
 
