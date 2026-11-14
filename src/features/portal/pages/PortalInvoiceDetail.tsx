@@ -145,7 +145,9 @@ export default function PortalInvoiceDetailPage() {
               {inv.operator.registered_address && (
                 <p className="text-xs text-muted-foreground whitespace-pre-line">{inv.operator.registered_address}</p>
               )}
-              {inv.operator.vat_number && <p className="text-xs text-muted-foreground">VAT {inv.operator.vat_number}</p>}
+              {inv.operator.vat_number && inv.vat_registered !== false && (
+                <p className="text-xs text-muted-foreground">VAT {inv.operator.vat_number}</p>
+              )}
               {inv.operator.company_number && <p className="text-xs text-muted-foreground">Company {inv.operator.company_number}</p>}
             </div>
           </div>

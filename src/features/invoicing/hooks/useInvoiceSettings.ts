@@ -17,7 +17,7 @@ export function useOrgInvoiceSettings() {
 
 /** Expenses that can still be recharged for the given jobs. */
 export function useBillableExpenses(jobIds: string[]) {
-  const key = [...jobIds].sort();
+  const key = [...jobIds].sort((a, b) => a.localeCompare(b));
   return useQuery({
     // Under ["invoicing"] so creating or cancelling an invoice refreshes it.
     queryKey: ["invoicing", "billable-expenses", key],

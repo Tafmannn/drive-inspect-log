@@ -67,12 +67,12 @@ ALTER TABLE public.invoice_expenses
   ADD COLUMN IF NOT EXISTS voided boolean NOT NULL DEFAULT false;
 
 DROP INDEX IF EXISTS public.invoice_items_job_id_unique;
-CREATE UNIQUE INDEX invoice_items_job_id_unique
+CREATE UNIQUE INDEX IF NOT EXISTS invoice_items_job_id_unique
   ON public.invoice_items (job_id)
   WHERE job_id IS NOT NULL AND NOT voided;
 
 DROP INDEX IF EXISTS public.invoice_expenses_expense_id_unique;
-CREATE UNIQUE INDEX invoice_expenses_expense_id_unique
+CREATE UNIQUE INDEX IF NOT EXISTS invoice_expenses_expense_id_unique
   ON public.invoice_expenses (expense_id)
   WHERE expense_id IS NOT NULL AND NOT voided;
 

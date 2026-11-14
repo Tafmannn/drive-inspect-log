@@ -170,7 +170,8 @@ export async function buildAccountsPack(opts: AccountsPackOptions): Promise<Acco
 
   let receiptFiles = 0;
   for (const { e, file, i } of receiptJobs) {
-    const stem = expenseReceiptStem(e) + (i === 0 ? "" : String.fromCharCode(97 + Math.min(i, 25)));
+    // A second / third file for the same expense: "..._54.60_2", "..._54.60_3".
+    const stem = expenseReceiptStem(e) + (i === 0 ? "" : `_${i + 1}`);
     opts.onProgress?.(done, total, `Receipt ${stem}`);
     const blob = await fetchReceiptBlob(file);
     if (blob) {

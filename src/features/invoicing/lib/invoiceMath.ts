@@ -182,7 +182,9 @@ const MONTHS = ["January", "February", "March", "April", "May", "June", "July", 
 /** "7 jobs | 2 - 12 November 2026" / "1 job | 2 November 2026" / "3 jobs | 28 October - 4 November 2026". */
 export function jobsHeaderSubtitle(days: (string | null | undefined)[], jobCount: number): string {
   const count = `${jobCount} job${jobCount === 1 ? "" : "s"}`;
-  const sorted = days.filter((d): d is string => !!d && /^\d{4}-\d{2}-\d{2}/.test(d)).map((d) => d.slice(0, 10)).sort();
+  const sorted = days.filter((d): d is string => !!d && /^\d{4}-\d{2}-\d{2}/.test(d)).map((d) => d.slice(0, 10))
+    // ISO dates: plain string comparison is chronological order.
+    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
   if (!sorted.length) return count;
   const parse = (d: string) => ({ y: Number(d.slice(0, 4)), m: Number(d.slice(5, 7)) - 1, d: Number(d.slice(8, 10)) });
   const a = parse(sorted[0]);
