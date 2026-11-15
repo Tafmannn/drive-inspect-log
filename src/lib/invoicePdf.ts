@@ -30,7 +30,13 @@ const AXENTRA_BANK = {
   accountNumber: "24861835",
 } as const;
 
-const LOGO_URL = "/__l5e/assets-v1/f41614c9-47c3-4524-9979-18ec682de972/axentra-logo-dark.png";
+/**
+ * Logos tried in order. These are files in /public, so they are served by
+ * whatever hosts the app. (The invoice used to point at a Lovable-hosted
+ * asset path, "/__l5e/assets-v1/...", which only exists on Lovable's own
+ * hosting: anywhere else it 404'd and invoices were issued with no logo.)
+ */
+export const DEFAULT_LOGO_URLS = ["/axentra-logo-lockup.webp", "/axentra-logo.png"] as const;
 
 /* ------------------------------------------------------------------ */
 /*  Public types                                                       */
@@ -207,7 +213,6 @@ export async function loadImg(url: string): Promise<CachedImage | null> {
       r.readAsDataURL(blob);
     });
     if (!dataUrl) return null;
-    const format = dataUrl.startsWith("data:image/png") ? "PNG" as const : "JPEG" as const;
     const img = await new Promise<HTMLImageElement | null>((resolve) => {
       const el = new Image();
       el.crossOrigin = "anonymous";
@@ -215,10 +220,38 @@ export async function loadImg(url: string): Promise<CachedImage | null> {
       el.onerror = () => resolve(null);
       el.src = dataUrl;
     });
-    return { dataUrl, format, w: img?.width ?? 200, h: img?.height ?? 100 };
+    const w = img?.naturalWidth || img?.width || 200;
+    const h = img?.naturalHeight || img?.height || 100;
+
+    // jsPDF embeds only PNG and JPEG. Anything else (e.g. the WebP logo) is
+    // redrawn onto a canvas and re-encoded as PNG, which keeps transparency.
+    if (dataUrl.startsWith("data:image/png")) return { dataUrl, format: "PNG", w, h };
+    if (dataUrl.startsWith("data:image/jpeg") || dataUrl.startsWith("data:image/jpg")) {
+      return { dataUrl, format: "JPEG", w, h };
+    }
+    if (!img) return null;
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(img, 0, 0, w, h);
+    const png = canvas.toDataURL("image/png");
+    return png.startsWith("data:image/png") ? { dataUrl: png, format: "PNG", w, h } : null;
   } catch {
     return null;
   }
+}
+
+/** The first logo that loads: the caller's preference, then the built-in defaults. */
+export async function loadInvoiceLogo(preferred?: string): Promise<CachedImage | null> {
+  const candidates = [...(preferred ? [preferred] : []), ...DEFAULT_LOGO_URLS];
+  for (const url of candidates) {
+    const logo = await loadImg(url);
+    if (logo) return logo;
+  }
+  console.warn("[invoicePdf] no logo could be loaded; the invoice banner will have none", candidates);
+  return null;
 }
 
 /** Recolor near-black pixels to navy so the logo blends into the banner */
@@ -278,7 +311,7 @@ function drawHeaderBanner(
   const contentW = PAGE_W - MARGIN * 2;
   if (logo) {
     try {
-      const padY = 2;
+      const padY = 4;
       const maxLogoH = bannerH - padY * 2;
       const maxLogoW = contentW * 0.48; // ~45-48% of content width
       const scale = Math.min(maxLogoW / logo.w, maxLogoH / logo.h);
@@ -1201,8 +1234,7 @@ function drawFooters(doc: jsPDF, data: InvoiceData): void {
 
 export async function generateInvoicePdf(data: InvoiceData): Promise<Blob> {
   const doc = new jsPDF({ unit: "mm", format: "a4", compress: true });
-  const logoSrc = data.logoUrl || LOGO_URL;
-  let logo = await loadImg(logoSrc);
+  let logo = await loadInvoiceLogo(data.logoUrl);
   if (logo) logo = await recolorToNavy(logo);
 
   continuationHeader = (d) => drawContinuationHeader(d, data, "Invoice continued");
