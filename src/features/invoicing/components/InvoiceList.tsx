@@ -94,13 +94,13 @@ export function InvoiceList({ invoices, isLoading, actions, isBusy }: InvoiceLis
                     <span className="text-sm font-medium text-foreground">{inv.invoice_number}</span>
                     <InvoiceStatusBadge invoice={inv} />
                   </div>
-                  {inv.client_ref && (
+                  {!!inv.client_ref && (
                     <p className="mt-0.5 text-[11px] text-muted-foreground">PO {inv.client_ref}</p>
                   )}
-                  {status === "paid" && inv.paid_at && (
+                  {status === "paid" && !!inv.paid_at && (
                     <p className="mt-0.5 text-[11px] text-muted-foreground">Paid {fmtDmy(inv.paid_at)}</p>
                   )}
-                  {status === "cancelled" && inv.cancel_reason && (
+                  {status === "cancelled" && !!inv.cancel_reason && (
                     <p className="mt-0.5 max-w-[220px] truncate text-[11px] text-muted-foreground" title={inv.cancel_reason}>
                       {inv.cancel_reason}
                     </p>

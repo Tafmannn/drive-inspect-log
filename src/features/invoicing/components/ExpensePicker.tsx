@@ -137,7 +137,7 @@ export function ExpensePicker({
                       <label htmlFor={inputId} className="flex min-w-0 flex-1 cursor-pointer flex-wrap items-center gap-x-3 gap-y-0.5">
                         <span className="font-medium text-foreground">{e.category}</span>
                         <span className="text-xs text-muted-foreground">{fmtDmy(e.date)}</span>
-                        {(e.supplier || e.label) && (
+                        {!!(e.supplier || e.label) && (
                           <span className="truncate text-xs text-muted-foreground">{e.supplier || e.label}</span>
                         )}
                         {noReceipt ? (

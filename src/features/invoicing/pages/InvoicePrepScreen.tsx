@@ -694,7 +694,7 @@ export function InvoicePrepScreen() {
 
       {/* Created-invoice success card — independent of job selection, which
           is cleared on creation. This is where the invoice gets downloaded. */}
-      {createdRecord && (
+      {!!createdRecord && (
         <div className="p-4 rounded-lg border border-success/30 bg-success/5 space-y-3">
           <div className="flex items-center gap-2.5">
             <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
@@ -827,7 +827,7 @@ export function InvoicePrepScreen() {
                       <TableRow key={line.job_id}>
                         <TableCell>
                           <span className="text-sm text-foreground font-medium">{line.description}</span>
-                          {line.detail && (
+                          {!!line.detail && (
                             <div className="text-xs text-muted-foreground mt-0.5">{line.detail}</div>
                           )}
                         </TableCell>

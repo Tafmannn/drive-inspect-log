@@ -170,7 +170,7 @@ export function AccountsSection() {
       </CardHeader>
       <CardContent className="space-y-5">
         {/* VAT registration threshold */}
-        {vat && settings && !settings.vatRegistered && (
+        {!!vat && !!settings && !settings.vatRegistered && (
           <div
             className={cn(
               "rounded-lg border p-3 space-y-2",
@@ -295,20 +295,24 @@ export function AccountsSection() {
             </p>
           </div>
           <div className="flex flex-wrap gap-x-5 gap-y-2">
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox checked={includePdfs} onCheckedChange={(v) => setIncludePdfs(v === true)} />
-              Include invoice PDFs
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox checked={includeReceipts} onCheckedChange={(v) => setIncludeReceipts(v === true)} />
-              Include receipt files
-            </label>
+            <div className="flex items-center gap-2">
+              <Checkbox id="accounts-include-pdfs" checked={includePdfs} onCheckedChange={(v) => setIncludePdfs(v === true)} />
+              <Label htmlFor="accounts-include-pdfs" className="text-sm font-normal">
+                Include invoice PDFs
+              </Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox id="accounts-include-receipts" checked={includeReceipts} onCheckedChange={(v) => setIncludeReceipts(v === true)} />
+              <Label htmlFor="accounts-include-receipts" className="text-sm font-normal">
+                Include receipt files
+              </Label>
+            </div>
           </div>
           <Button onClick={() => void downloadPack()} disabled={!ready || busy !== null}>
             {busy === "pack" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Package className="mr-2 h-4 w-4" />}
             Download accounts pack
           </Button>
-          {busy === "pack" && progress && progress.total > 0 && (
+          {busy === "pack" && !!progress && progress.total > 0 && (
             <div className="space-y-1">
               <Progress value={(progress.done / progress.total) * 100} aria-label="Building the accounts pack" />
               <p className="text-[11px] text-muted-foreground">

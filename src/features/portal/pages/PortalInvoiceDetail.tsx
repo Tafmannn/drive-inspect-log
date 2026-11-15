@@ -108,7 +108,7 @@ export default function PortalInvoiceDetailPage() {
           This invoice has been cancelled and is not payable. A credit note has been issued for it.
         </p>
       )}
-      {isCredit && inv.credits_invoice_number && (
+      {isCredit && !!inv.credits_invoice_number && (
         <p className="rounded-md border border-border bg-muted/50 p-3 text-sm">
           This credit note cancels invoice <span className="font-mono">{inv.credits_invoice_number}</span>.
         </p>
@@ -137,15 +137,15 @@ export default function PortalInvoiceDetailPage() {
               <p className="text-sm text-muted-foreground">
                 Issued {fmtDate(inv.issue_date)}{inv.due_date ? ` · Due ${fmtDate(inv.due_date)}` : ""}
               </p>
-              {inv.payment_terms && !isCredit && <p className="text-xs text-muted-foreground">Terms: {inv.payment_terms}</p>}
-              {inv.client_ref && <p className="text-xs text-muted-foreground">Your ref: {inv.client_ref}</p>}
+              {!!inv.payment_terms && !isCredit && <p className="text-xs text-muted-foreground">Terms: {inv.payment_terms}</p>}
+              {!!inv.client_ref && <p className="text-xs text-muted-foreground">Your ref: {inv.client_ref}</p>}
             </div>
             <div className="sm:text-right text-sm">
               <p className="font-medium">{inv.operator.legal_name || inv.operator.name}</p>
               {inv.operator.registered_address && (
                 <p className="text-xs text-muted-foreground whitespace-pre-line">{inv.operator.registered_address}</p>
               )}
-              {inv.operator.vat_number && inv.vat_registered !== false && (
+              {!!inv.operator.vat_number && inv.vat_registered !== false && (
                 <p className="text-xs text-muted-foreground">VAT {inv.operator.vat_number}</p>
               )}
               {inv.operator.company_number && <p className="text-xs text-muted-foreground">Company {inv.operator.company_number}</p>}

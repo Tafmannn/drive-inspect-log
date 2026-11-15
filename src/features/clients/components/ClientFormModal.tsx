@@ -271,7 +271,7 @@ export function ClientFormModal({ open, onOpenChange, client, initialCompany, on
                 <option value="Net 14">14 days</option>
                 <option value="Net 30">30 days</option>
                 <option value="Net 60">60 days</option>
-                {form.payment_terms &&
+                {!!form.payment_terms &&
                   !["Due on receipt", "Net 7", "Net 14", "Net 30", "Net 60"].includes(form.payment_terms) && (
                     <option value={form.payment_terms}>{form.payment_terms}</option>
                   )}

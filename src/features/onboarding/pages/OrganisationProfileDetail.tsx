@@ -37,7 +37,7 @@ export default function OrganisationProfileDetail() {
       const { error } = await supabase.from("organisations").update({ vat_registered: next }).eq("id", orgId);
       if (error) throw error;
       setOrg((prev: any) => (prev ? { ...prev, vat_registered: next } : prev));
-      queryClient.invalidateQueries({ queryKey: ["invoicing", "org-settings"] });
+      void queryClient.invalidateQueries({ queryKey: ["invoicing", "org-settings"] });
       toast({
         title: next ? "VAT turned on" : "VAT turned off",
         description: next
