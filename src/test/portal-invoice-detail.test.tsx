@@ -44,7 +44,10 @@ function detail(over: Partial<PortalInvoiceDetail> = {}): PortalInvoiceDetail {
     client_address: "1 Yard Lane", notes: null, vat_rate: 0, job_ref: null, vehicle_reg: null,
     items: [{ description: "AX1042 | Leeds - Bristol - Expenses: Fuel £54.60 (R01)", quantity: 1, unit_price: 248.5, amount: 248.5 }],
     line_items: [{ description: "AX1042 | Leeds - Bristol", amount: 185, quantity: 1, sort_order: 0, job_ref: "AX1042", job_date: "2026-11-02", detail: "Expenses: Fuel £54.60 (R01)", expense_amount: 63.5 }],
-    operator: { name: "Axentra", legal_name: "T Example t/a Axentra", logo_url: null, registered_address: "1 Test Street", vat_number: "GB1", company_number: "123" },
+    operator: {
+      name: "Axentra", legal_name: "T Example t/a Axentra", logo_url: null, registered_address: "1 Test Street", vat_number: "GB1", company_number: "123",
+      bank_name: "Test Bank", bank_account_name: "Test Ltd", bank_sort_code: "12-34-56", bank_account_number: "12345678", late_payment_notice: true,
+    },
     client_ref: "PO-1", vat_registered: false, pdf_path: "org-1/AXENTRA_INV_AX26-1007.pdf", credits_invoice_number: null,
     ...over,
   };
@@ -137,8 +140,18 @@ describe("PortalInvoiceDetail", () => {
       compactFooter: true,
       // no VAT number is printed for a supplier that is not VAT registered
       business: { name: "T Example t/a Axentra", address: "1 Test Street", companyNumber: "123", vatNumber: null },
+      bank: { bankName: "Test Bank", accountName: "Test Ltd", sortCode: "12-34-56", accountNumber: "12345678" },
+      latePaymentNotice: true,
       lineItems: [{ description: "AX1042 | Leeds - Bristol", quantity: 1, unitPrice: 185, detail: "Expenses: Fuel £54.60 (R01)", expenseAmount: 63.5 }],
     });
+  });
+
+  it("leaves the late-payment sentence off when the supplier has switched it off", async () => {
+    h.invoice = detail({ pdf_path: null, operator: { ...detail().operator, late_payment_notice: false } });
+    renderDetail();
+    fireEvent.click(screen.getByRole("button", { name: /Download PDF/ }));
+    await waitFor(() => expect(h.rendered).toHaveLength(1));
+    expect(h.rendered[0]).not.toHaveProperty("latePaymentNotice");
   });
 
   it("falls back to rebuilding when the stored file cannot be read", async () => {

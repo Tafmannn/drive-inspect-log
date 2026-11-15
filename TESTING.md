@@ -208,3 +208,12 @@ See `docs/invoicing-and-accounts.md`.
 - [ ] Xero sales CSV imports into a Xero demo company as Tax Exclusive; totals match the invoices
 - [ ] Xero bills CSV imports as Tax Inclusive
 - [ ] VAT threshold bar shows the last-12-months figure (hidden once VAT registered)
+
+### Bank details and late-payment wording
+Needs migration `20261115100000`.
+- [ ] Organisations → organisation → "Invoicing & VAT": a warning shows while no bank details are saved
+- [ ] Add bank details: a bad sort code / account number is refused with a message; "123456" is saved as 12-34-56
+- [ ] A new invoice's payment box shows the saved details; clearing them removes the box
+- [ ] Late-payment wording on: the sentence appears under the payment box; off: it does not
+- [ ] A credit note shows neither the payment box nor the sentence
+- [ ] An invoice issued before the change still downloads exactly as it was sent

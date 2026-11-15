@@ -1737,11 +1737,16 @@ export type Database = {
       }
       organisations: {
         Row: {
+          bank_account_name: string | null
+          bank_account_number: string | null
+          bank_name: string | null
+          bank_sort_code: string | null
           billing_plan: string | null
           branding_name: string | null
           company_number: string | null
           created_at: string
           id: string
+          late_payment_notice: boolean
           legal_name: string | null
           logo_url: string | null
           main_contact_email: string | null
@@ -1759,11 +1764,16 @@ export type Database = {
           vat_registered: boolean
         }
         Insert: {
+          bank_account_name?: string | null
+          bank_account_number?: string | null
+          bank_name?: string | null
+          bank_sort_code?: string | null
           billing_plan?: string | null
           branding_name?: string | null
           company_number?: string | null
           created_at?: string
           id?: string
+          late_payment_notice?: boolean
           legal_name?: string | null
           logo_url?: string | null
           main_contact_email?: string | null
@@ -1781,11 +1791,16 @@ export type Database = {
           vat_registered?: boolean
         }
         Update: {
+          bank_account_name?: string | null
+          bank_account_number?: string | null
+          bank_name?: string | null
+          bank_sort_code?: string | null
           billing_plan?: string | null
           branding_name?: string | null
           company_number?: string | null
           created_at?: string
           id?: string
+          late_payment_notice?: boolean
           legal_name?: string | null
           logo_url?: string | null
           main_contact_email?: string | null
