@@ -88,19 +88,23 @@ CREATE POLICY "jobs_select_org" ON public.jobs
 
 DROP POLICY IF EXISTS "Org members can manage inspections" ON public.inspections;
 
+DROP POLICY IF EXISTS "inspections_select_scoped" ON public.inspections;
 CREATE POLICY "inspections_select_scoped" ON public.inspections
   FOR SELECT TO authenticated
   USING (
     is_super_admin()
     OR (org_id = user_org_id() AND (is_admin_or_super_admin() OR driver_can_read_job_evidence(job_id)))
   );
+DROP POLICY IF EXISTS "inspections_insert_org" ON public.inspections;
 CREATE POLICY "inspections_insert_org" ON public.inspections
   FOR INSERT TO authenticated
   WITH CHECK (is_super_admin() OR (org_id = user_org_id()));
+DROP POLICY IF EXISTS "inspections_update_org" ON public.inspections;
 CREATE POLICY "inspections_update_org" ON public.inspections
   FOR UPDATE TO authenticated
   USING (is_super_admin() OR (org_id = user_org_id()))
   WITH CHECK (is_super_admin() OR (org_id = user_org_id()));
+DROP POLICY IF EXISTS "inspections_delete_org" ON public.inspections;
 CREATE POLICY "inspections_delete_org" ON public.inspections
   FOR DELETE TO authenticated
   USING (is_super_admin() OR (org_id = user_org_id()));
@@ -109,19 +113,23 @@ CREATE POLICY "inspections_delete_org" ON public.inspections
 
 DROP POLICY IF EXISTS "Org members can manage damage_items" ON public.damage_items;
 
+DROP POLICY IF EXISTS "damage_items_select_scoped" ON public.damage_items;
 CREATE POLICY "damage_items_select_scoped" ON public.damage_items
   FOR SELECT TO authenticated
   USING (
     is_super_admin()
     OR (org_id = user_org_id() AND (is_admin_or_super_admin() OR driver_can_read_inspection_evidence(inspection_id)))
   );
+DROP POLICY IF EXISTS "damage_items_insert_org" ON public.damage_items;
 CREATE POLICY "damage_items_insert_org" ON public.damage_items
   FOR INSERT TO authenticated
   WITH CHECK (is_super_admin() OR (org_id = user_org_id()));
+DROP POLICY IF EXISTS "damage_items_update_org" ON public.damage_items;
 CREATE POLICY "damage_items_update_org" ON public.damage_items
   FOR UPDATE TO authenticated
   USING (is_super_admin() OR (org_id = user_org_id()))
   WITH CHECK (is_super_admin() OR (org_id = user_org_id()));
+DROP POLICY IF EXISTS "damage_items_delete_org" ON public.damage_items;
 CREATE POLICY "damage_items_delete_org" ON public.damage_items
   FOR DELETE TO authenticated
   USING (is_super_admin() OR (org_id = user_org_id()));
