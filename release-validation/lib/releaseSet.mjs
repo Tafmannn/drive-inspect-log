@@ -18,7 +18,10 @@
 // Bump RELEASE_SET_SINCE (inclusive, YYYYMMDD) forward whenever a batch of
 // migrations is confirmed applied to production and no longer needs
 // re-apply-safety/rollback scrutiny.
-export const RELEASE_SET_SINCE = "20260628";
+// Moved to 20261114: migrations before this date are confirmed applied to
+// production (41 of 42 matched by name, the remaining one by effect), so they
+// no longer need re-apply-safety/rollback scrutiny.
+export const RELEASE_SET_SINCE = "20261114";
 
 export function isInReleaseSet(filename) {
   const m = filename.match(/^(\d{8})/);

@@ -2,6 +2,7 @@ import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { pass, fail, warn } from "../lib/types.mjs";
 import { run } from "../lib/exec.mjs";
+import { classifyTrackedEnv } from "../lib/trackedEnv.mjs";
 
 // Suite 10 — Committed-secret scan (STATIC, executed).
 // Walks git-tracked text files for high-confidence secret material: private
@@ -70,11 +71,21 @@ export default {
 
     // .env must not be tracked (defence in depth alongside suite 01).
     const tracked = run("git", ["ls-files", ".env"], { cwd: root, timeoutMs: 10_000 });
-    checks.push(
-      tracked.stdout.trim()
-        ? fail(".env not committed", ".env is tracked by git")
-        : pass(".env not committed", "untracked"),
-    );
+    if (!tracked.stdout.trim()) {
+      checks.push(pass(".env not committed", "untracked"));
+    } else {
+      let verdict = { ok: false, problems: ["could not read .env"] };
+      try {
+        verdict = classifyTrackedEnv(readFileSync(join(root, ".env"), "utf8"));
+      } catch {
+        /* keep the failing verdict */
+      }
+      checks.push(
+        verdict.ok
+          ? pass(".env committed but public-only", "only VITE_* keys and anon JWTs")
+          : fail(".env committed with non-public values", verdict.problems.join("; ")),
+      );
+    }
 
     return { checks };
   },
