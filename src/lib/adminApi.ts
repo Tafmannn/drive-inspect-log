@@ -53,22 +53,8 @@ export async function createOrganisation(name: string): Promise<OrgRecord> {
   return result.org;
 }
 
-export async function createUser(email: string, role: string, orgId: string): Promise<string> {
-  const result = await userLifecycleAction({ _action: "create", email, role, org_id: orgId });
-  return result.user_id;
-}
-
-export async function setUserRole(userId: string, role: string): Promise<void> {
-  await userLifecycleAction({ _action: "set_role", user_id: userId, role });
-}
-
-export async function deactivateUser(userId: string): Promise<void> {
-  await userLifecycleAction({ _action: "suspend", user_id: userId });
-}
-
-export async function reactivateUser(userId: string): Promise<void> {
-  await userLifecycleAction({ _action: "reactivate", user_id: userId });
-}
+// User create / role / suspend / reactivate go through src/lib/userLifecycleApi.ts
+// (used by the shared user-management panel for admins and the super admin).
 
 export async function listAllUsers(): Promise<OrgUser[]> {
   const result = await userLifecycleAction({ _action: "list" });

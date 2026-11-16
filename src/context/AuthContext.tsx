@@ -9,6 +9,7 @@ import {
 } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User as SupaUser, Session } from "@supabase/supabase-js";
+import { roleSatisfies, rolesForProfileRole, type AppRole } from "@/lib/roleModel";
 
 /* ── Feature toggle ──────────────────────────────────────────────────
  * VITE_ENABLE_AUTH=false is ONLY honoured in development mode.
@@ -24,7 +25,7 @@ const AUTH_ENABLED =
 
 /* ── Public types ──────────────────────────────────────────────────── */
 
-export type AppRole = "DRIVER" | "ADMIN" | "SUPERADMIN" | "CLIENT";
+export type { AppRole };
 
 export interface AppUser {
   id: string;
@@ -52,9 +53,9 @@ interface AuthContextValue {
 
 /* ── Helpers ───────────────────────────────────────────────────────── */
 
+/** Role check with inheritance (SUPERADMIN ⊇ ADMIN ⊇ DRIVER); see lib/roleModel. */
 export function hasRoleCheck(user: AppUser, role: AppRole): boolean {
-  if (user.roles.includes("SUPERADMIN")) return true;
-  return user.roles.includes(role);
+  return roleSatisfies(user.roles, role);
 }
 
 export function isAdminDriverCheck(user: AppUser): boolean {
@@ -176,19 +177,11 @@ function RealAuthProvider({ children }: { children: ReactNode }) {
         if (data?.account_status) {
           user.accountStatus = data.account_status as AppUser["accountStatus"];
         }
-        if (data?.role === "client") {
-          // Customer-portal login: CLIENT only, never the baseline DRIVER role,
-          // so no driver/admin route or driver-only UI treats them as staff.
-          user.roles = ["CLIENT"];
-        } else if (data?.role) {
-          const dbRole =
-            data.role === "super_admin" ? "SUPERADMIN" : String(data.role).toUpperCase();
-          if (
-            ["DRIVER", "ADMIN", "SUPERADMIN"].includes(dbRole) &&
-            !user.roles.includes(dbRole as AppRole)
-          ) {
-            user.roles.push(dbRole as AppRole);
-          }
+        if (data?.role) {
+          // Expanded with inheritance: super_admin → SUPERADMIN+ADMIN+DRIVER,
+          // admin → ADMIN+DRIVER, client → CLIENT only (never staff roles),
+          // anything unknown → DRIVER (fail closed).
+          user.roles = rolesForProfileRole(data.role);
         }
       } catch {
         // Fail-closed: if DB lookup fails, the user keeps only the baseline DRIVER role.

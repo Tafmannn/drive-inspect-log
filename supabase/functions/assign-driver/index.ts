@@ -4,6 +4,7 @@ import {
   corsHeaders,
   jsonRes,
   rolesArrayFor,
+  inactiveAccountError,
 } from "../_shared/auth.ts";
 import { findAuthUserByEmail } from "../_shared/adminUsers.ts";
 
@@ -18,9 +19,9 @@ serve(async (req) => {
     if ("error" in authResult) return authResult.error;
     const { caller, admin } = authResult;
 
-    if (caller.accountStatus === "suspended") {
-      return jsonRes({ error: "ACCOUNT_SUSPENDED" }, 403);
-    }
+    // Only active accounts: pending (not yet activated) and suspended are refused.
+    const inactive = inactiveAccountError(caller.accountStatus);
+    if (inactive) return jsonRes({ error: inactive }, 403);
     if (!caller.isAdmin) {
       return jsonRes({ error: "ADMIN_OR_SUPER_ADMIN_ONLY" }, 403);
     }

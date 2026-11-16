@@ -13,7 +13,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { authenticateCaller, corsHeaders, jsonRes } from "../_shared/auth.ts";
+import { authenticateCaller, corsHeaders, inactiveAccountError, jsonRes } from "../_shared/auth.ts";
 import { findAuthUserByEmail } from "../_shared/adminUsers.ts";
 import { escapeHtml, renderActionEmailHtml, resolveRedirectUrl, sendBrandedEmail } from "../_shared/brandedEmail.ts";
 
@@ -75,7 +75,8 @@ serve(async (req) => {
     if ("error" in authResult) return authResult.error;
     const { caller, admin } = authResult;
 
-    if (caller.accountStatus === "suspended") return jsonRes({ error: "ACCOUNT_SUSPENDED" }, 403);
+    const inactive = inactiveAccountError(caller.accountStatus);
+    if (inactive) return jsonRes({ error: inactive }, 403);
     if (!caller.isAdmin) return jsonRes({ error: "ADMIN_OR_SUPER_ADMIN_ONLY" }, 403);
 
     const body = await req.json().catch(() => ({}));

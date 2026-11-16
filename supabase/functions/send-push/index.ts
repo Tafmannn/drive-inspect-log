@@ -20,7 +20,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import webpush from "npm:web-push@3.6.7";
-import { authenticateCaller, corsHeaders, jsonRes } from "../_shared/auth.ts";
+import { authenticateCaller, corsHeaders, inactiveAccountError, jsonRes } from "../_shared/auth.ts";
 
 interface SubRow {
   id: string;
@@ -40,9 +40,9 @@ serve(async (req) => {
     if ("error" in authResult) return authResult.error;
     const { caller, admin } = authResult;
 
-    if (caller.accountStatus === "suspended") {
-      return jsonRes({ error: "ACCOUNT_SUSPENDED" }, 403);
-    }
+    // Only active accounts: pending (not yet activated) and suspended are refused.
+    const inactive = inactiveAccountError(caller.accountStatus);
+    if (inactive) return jsonRes({ error: inactive }, 403);
 
     const body = await req.json().catch(() => null);
     const event = body?.event;

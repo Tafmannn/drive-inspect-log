@@ -10,6 +10,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { findAuthUserByEmail, listAllAuthUsers } from "../_shared/adminUsers.ts";
 import { isSensitivePermissionBlockedForNonSuperAdmin } from "../_shared/permissionEscalation.ts";
+import { inactiveAccountError } from "../_shared/profileAuthz.ts";
 import { renderActionEmailHtml, resolveRedirectUrl, sendBrandedEmail } from "../_shared/brandedEmail.ts";
 
 const corsHeaders = {
@@ -179,9 +180,9 @@ serve(async (req) => {
     };
     caller.user_metadata = {};
 
-    if (callerProfile?.account_status === "suspended") {
-      return json({ error: "ACCOUNT_SUSPENDED" }, 403);
-    }
+    // Only active accounts: pending (not yet activated) and suspended are refused.
+    const inactive = inactiveAccountError(String(callerProfile?.account_status ?? "active"));
+    if (inactive) return json({ error: inactive }, 403);
     if (!callerIsAdmin) {
       return json({ error: "ADMIN_OR_SUPER_ADMIN_ONLY" }, 403);
     }
@@ -509,6 +510,10 @@ serve(async (req) => {
       if (!callerIsSuper && current.org_id !== callerOrgId(caller)) {
         return json({ error: "ORG_SCOPE_VIOLATION" }, 403);
       }
+      // The owner can only be managed by a super admin, protected flag or not.
+      if (!callerIsSuper && current.role === "super_admin") {
+        return json({ error: "PROTECTED_ACCOUNT" }, 403);
+      }
       if (current.is_protected && !callerIsSuper) {
         return json({ error: "PROTECTED_ACCOUNT" }, 403);
       }
@@ -794,6 +799,10 @@ serve(async (req) => {
       if (!callerIsSuper && current.org_id !== callerOrgId(caller)) {
         return json({ error: "ORG_SCOPE_VIOLATION" }, 403);
       }
+      // The owner can only be managed by a super admin, protected flag or not.
+      if (!callerIsSuper && current.role === "super_admin") {
+        return json({ error: "PROTECTED_ACCOUNT" }, 403);
+      }
       if (current.is_protected && !callerIsSuper) {
         return json({ error: "PROTECTED_ACCOUNT" }, 403);
       }
@@ -908,6 +917,10 @@ serve(async (req) => {
       if (!callerIsSuper && current.org_id !== callerOrgId(caller)) {
         return json({ error: "ORG_SCOPE_VIOLATION" }, 403);
       }
+      // The owner can only be managed by a super admin, protected flag or not.
+      if (!callerIsSuper && current.role === "super_admin") {
+        return json({ error: "PROTECTED_ACCOUNT" }, 403);
+      }
       if (current.account_status === "active") {
         return json({ error: "ALREADY_ACTIVE" }, 400);
       }
@@ -979,6 +992,10 @@ serve(async (req) => {
       if (!callerIsSuper && current.org_id !== callerOrgId(caller)) {
         return json({ error: "ORG_SCOPE_VIOLATION" }, 403);
       }
+      // The owner can only be managed by a super admin, protected flag or not.
+      if (!callerIsSuper && current.role === "super_admin") {
+        return json({ error: "PROTECTED_ACCOUNT" }, 403);
+      }
       if (current.is_protected) return json({ error: "PROTECTED_ACCOUNT" }, 403);
       if (current.account_status !== "active") {
         return json({ error: "INVALID_TRANSITION" }, 400);
@@ -1021,6 +1038,10 @@ serve(async (req) => {
       if (!current) return json({ error: "NOT_FOUND" }, 404);
       if (!callerIsSuper && current.org_id !== callerOrgId(caller)) {
         return json({ error: "ORG_SCOPE_VIOLATION" }, 403);
+      }
+      // The owner can only be managed by a super admin, protected flag or not.
+      if (!callerIsSuper && current.role === "super_admin") {
+        return json({ error: "PROTECTED_ACCOUNT" }, 403);
       }
       if (current.account_status !== "suspended") {
         return json({ error: "INVALID_TRANSITION" }, 400);

@@ -8,14 +8,7 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: { functions: { invoke: (...a: unknown[]) => invoke(...a) } },
 }));
 
-import {
-  listAllUsers,
-  createUser,
-  setUserRole,
-  deactivateUser,
-  reactivateUser,
-  createOrganisation,
-} from "@/lib/adminApi";
+import { listAllUsers, createOrganisation } from "@/lib/adminApi";
 
 beforeEach(() => invoke.mockReset());
 
@@ -38,31 +31,6 @@ describe("adminApi Super Admin actions → user-lifecycle", () => {
     ]);
   });
 
-  it("createUser uses the 'create' action and returns the new user_id", async () => {
-    invoke.mockResolvedValue({ data: { success: true, user_id: "new1" }, error: null });
-    const id = await createUser("c@x.io", "admin", "o1");
-    expect(invoke).toHaveBeenCalledWith("user-lifecycle", {
-      body: { _action: "create", email: "c@x.io", role: "admin", org_id: "o1" },
-    });
-    expect(id).toBe("new1");
-  });
-
-  it("setUserRole uses the authoritative set_role action", async () => {
-    invoke.mockResolvedValue({ data: { success: true }, error: null });
-    await setUserRole("u9", "super_admin");
-    expect(invoke).toHaveBeenCalledWith("user-lifecycle", {
-      body: { _action: "set_role", user_id: "u9", role: "super_admin" },
-    });
-  });
-
-  it("deactivate/reactivate map to suspend/reactivate", async () => {
-    invoke.mockResolvedValue({ data: { success: true }, error: null });
-    await deactivateUser("u1");
-    expect(invoke).toHaveBeenLastCalledWith("user-lifecycle", { body: { _action: "suspend", user_id: "u1" } });
-    await reactivateUser("u1");
-    expect(invoke).toHaveBeenLastCalledWith("user-lifecycle", { body: { _action: "reactivate", user_id: "u1" } });
-  });
-
   it("createOrganisation uses the create_org action", async () => {
     invoke.mockResolvedValue({ data: { success: true, org: { id: "o2", name: "Acme", created_at: "t" } }, error: null });
     const org = await createOrganisation("Acme");
@@ -71,9 +39,7 @@ describe("adminApi Super Admin actions → user-lifecycle", () => {
   });
 
   it("surfaces edge-function error payloads", async () => {
-    invoke.mockResolvedValue({ data: { error: "CANNOT_ESCALATE_BEYOND_OWN_ROLE" }, error: null });
-    await expect(setUserRole("u1", "super_admin")).rejects.toThrow(
-      "CANNOT_ESCALATE_BEYOND_OWN_ROLE",
-    );
+    invoke.mockResolvedValue({ data: { error: "SUPER_ADMIN_ONLY" }, error: null });
+    await expect(createOrganisation("Acme")).rejects.toThrow("SUPER_ADMIN_ONLY");
   });
 });
