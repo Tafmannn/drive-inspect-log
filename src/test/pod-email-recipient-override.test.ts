@@ -106,3 +106,53 @@ describe("emailPodPdf recipient resolution", () => {
     expect(result).toEqual({ method: "resend", recipient: "onfile@example.com" });
   });
 });
+
+describe("emailPodPdf when the branded email can't be sent", () => {
+  beforeEach(() => {
+    invokeMock.mockReset();
+  });
+
+  it("returns the server's reason and does not share anything by itself", async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "share", { value: share, configurable: true });
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    const message = "This job's customer email is onfile@example.com. Send it there, or ask an admin to send it to a different address.";
+    invokeMock.mockResolvedValue({
+      data: null,
+      error: { message: "Edge Function returned a non-2xx status code", context: new Response(JSON.stringify({ error: "RECIPIENT_NOT_ON_FILE", message }), { status: 403 }) },
+    });
+
+    const result = await emailPodPdf(makeJob(), [], "someone-else@example.com");
+
+    expect(result.method).toBe("failed");
+    if (result.method !== "failed") throw new Error("unreachable");
+    expect(result.message).toBe(message);
+    expect(share).not.toHaveBeenCalled();
+    expect(open).not.toHaveBeenCalled();
+    open.mockRestore();
+  });
+
+  it("only shares when asked, with a tidy message and no 'Dear Customer'", async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "share", { value: share, configurable: true });
+    invokeMock.mockResolvedValue({ data: null, error: { message: "boom" } });
+
+    const result = await emailPodPdf(makeJob(), [], "x@example.com");
+    if (result.method !== "failed") throw new Error("expected failure");
+    expect(result.message).toBe("The email couldn't be sent. Please try again.");
+
+    await result.shareManually();
+    expect(share).toHaveBeenCalledTimes(1);
+    const arg = share.mock.calls[0][0] as { title: string; text: string };
+    expect(arg.title).toBe("Proof of Delivery – OV66BKY (AX0063)");
+    expect(arg.text).toContain("Proof of Delivery (PDF):\nhttps://example.com/signed.pdf");
+    expect(arg.text).toContain("Glasgow → Hart");
+    expect(arg.text).not.toContain("Dear Customer");
+  });
+
+  it("says why when the network call itself fails", async () => {
+    invokeMock.mockRejectedValue(new Error("offline"));
+    const result = await emailPodPdf(makeJob(), [], "x@example.com");
+    expect(result).toMatchObject({ method: "failed", message: expect.stringContaining("Couldn't reach the email service") });
+  });
+});

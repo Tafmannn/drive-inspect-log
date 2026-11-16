@@ -7,9 +7,13 @@ import { usePortalContext } from "../api";
 
 const HEX_COLOUR = /^#[0-9a-f]{6}$/i;
 
-/** Only an https image URL is used for the operator's logo; anything else falls back to Axentra's. */
+/**
+ * The operator's logo: an https image URL, or a path served by this app
+ * (e.g. "/email/axentra-logo-email.jpg"); anything else falls back to Axentra's.
+ */
 function safeLogo(url: string | null | undefined): string {
   if (!url) return "/axentra-logo.png";
+  if (url.startsWith("/") && !url.startsWith("//")) return url;
   try {
     return new URL(url).protocol === "https:" ? url : "/axentra-logo.png";
   } catch {

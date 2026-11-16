@@ -20,6 +20,7 @@ import {
   skipReasonFor,
   type StatusEvent,
 } from "../_shared/customerStatusEmail.ts";
+import { resolveLogoUrl } from "../_shared/podEmail.ts";
 
 const BATCH = 20;
 const MAX_ATTEMPTS = 5;
@@ -174,7 +175,7 @@ serve(async (req) => {
           operator: {
             name: (org?.branding_name || org?.name || "").trim(),
             primaryColour: org?.primary_colour,
-            logoUrl: org?.logo_url,
+            logoUrl: resolveLogoUrl(org?.logo_url, baseUrl),
             contactEmail: org?.main_contact_email,
             contactPhone: org?.main_contact_phone,
           },
