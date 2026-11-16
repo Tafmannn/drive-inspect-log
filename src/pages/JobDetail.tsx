@@ -41,7 +41,7 @@ import { QrDisplayModal } from "@/components/QrDisplayModal";
 import { useAuth } from "@/context/AuthContext";
 import { getStatusStyle } from "@/lib/statusConfig";
 import { logClientEvent } from "@/lib/logger";
-import { isJobLockedForDriver } from "@/lib/driverJobAccess";
+import { isJobLockedForDriver, lockedJobHeading } from "@/lib/driverJobAccess";
 import { DriverJobLocked } from "@/components/DriverJobLocked";
 import { useCanViewPod } from "@/hooks/useCanViewPod";
 
@@ -293,7 +293,7 @@ export const JobDetail = () => {
 
   // Completed (POD approved) jobs are record-only for drivers.
   if (isJobLockedForDriver(job.status, { isAdmin, isSuperAdmin })) {
-    return <DriverJobLocked title="Job Detail" />;
+    return <DriverJobLocked title="Job Detail" heading={lockedJobHeading(job.status)} />;
   }
 
   const jobRef = job.external_job_number || job.id.slice(0, 8);

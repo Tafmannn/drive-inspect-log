@@ -12,7 +12,7 @@ import { useNavigate } from "react-router-dom";
 export const DriverJobLocked = ({
   title,
   heading = "Job completed",
-  message = "This job has been signed off and is no longer available to view.",
+  message = "This job is closed and is no longer available to view.",
   backTo = "/jobs/completed",
   backLabel = "Back to Last 14 Days",
 }: {

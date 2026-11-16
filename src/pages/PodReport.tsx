@@ -43,7 +43,7 @@ import { getStatusStyle } from "@/lib/statusConfig";
 import { UKPlate } from "@/components/UKPlate";
 import { getChecklistItems } from "@/lib/inspectionFields";
 import { useAuth } from "@/context/AuthContext";
-import { isJobLockedForDriver } from "@/lib/driverJobAccess";
+import { isJobLockedForDriver, lockedJobHeading } from "@/lib/driverJobAccess";
 import { DriverJobLocked } from "@/components/DriverJobLocked";
 import { useCanViewPod } from "@/hooks/useCanViewPod";
 import type { Photo } from "@/lib/types";
@@ -455,7 +455,7 @@ export const PodReport = () => {
 
   // Completed (POD approved) jobs are record-only for drivers — no POD access.
   if (isJobLockedForDriver(job.status, { isAdmin, isSuperAdmin })) {
-    return <DriverJobLocked title="POD Report" />;
+    return <DriverJobLocked title="POD Report" heading={lockedJobHeading(job.status)} />;
   }
 
   // "View PODs" switched off in the user's profile.

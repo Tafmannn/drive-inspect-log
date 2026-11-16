@@ -99,7 +99,9 @@ describe("JobDetail — driver action layout", () => {
   });
 
   it("shows the blocked reason and no primary CTA for a blocked job", () => {
-    mockJob = makeJob({ status: "cancelled" });
+    // "draft" is blocked but not a closed status; cancelled/archived/completed
+    // show drivers the "Job closed" screen instead (see tests below).
+    mockJob = makeJob({ status: "draft" });
     renderDetail();
     expect(screen.getByText(/blocked — not actionable/i)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /start pickup/i })).toBeNull();
@@ -111,6 +113,13 @@ describe("JobDetail — driver action layout", () => {
     renderDetail();
     expect(screen.getByText("Job completed")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /view pod/i })).toBeNull();
+  });
+
+  it("shows 'Job closed' to drivers for an archived job", () => {
+    mockJob = makeJob({ status: "archived" });
+    renderDetail();
+    expect(screen.getByText("Job closed")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /start pickup/i })).toBeNull();
   });
 
   it("renders inspections as read-only status, not action buttons", () => {
