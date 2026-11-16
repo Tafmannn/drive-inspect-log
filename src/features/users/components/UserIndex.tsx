@@ -87,14 +87,14 @@ export function UserIndex({ onSelectUser, onCreateUser }: UserIndexProps) {
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
             placeholder="Search name or email…"
-            className="pl-8 h-8 text-xs"
+            className="pl-8 h-11 sm:h-8 text-xs"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
 
         <Select value={roleFilter} onValueChange={setRoleFilter}>
-          <SelectTrigger className="h-8 w-[100px] text-xs">
+          <SelectTrigger className="h-11 sm:h-8 w-[100px] text-xs">
             <SelectValue placeholder="Role" />
           </SelectTrigger>
           <SelectContent>
@@ -106,7 +106,7 @@ export function UserIndex({ onSelectUser, onCreateUser }: UserIndexProps) {
         </Select>
 
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="h-8 w-[110px] text-xs">
+          <SelectTrigger className="h-11 sm:h-8 w-[110px] text-xs">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -118,7 +118,7 @@ export function UserIndex({ onSelectUser, onCreateUser }: UserIndexProps) {
         </Select>
 
         <Select value={archiveFilter} onValueChange={setArchiveFilter}>
-          <SelectTrigger className="h-8 w-[100px] text-xs">
+          <SelectTrigger className="h-11 sm:h-8 w-[100px] text-xs">
             <SelectValue placeholder="Archive" />
           </SelectTrigger>
           <SelectContent>
@@ -130,7 +130,7 @@ export function UserIndex({ onSelectUser, onCreateUser }: UserIndexProps) {
 
         {isSuperAdmin && orgs.length > 0 && (
           <Select value={orgFilter} onValueChange={setOrgFilter}>
-            <SelectTrigger className="h-8 w-[130px] text-xs">
+            <SelectTrigger className="h-11 sm:h-8 w-[130px] text-xs">
               <SelectValue placeholder="Organisation" />
             </SelectTrigger>
             <SelectContent>
@@ -142,7 +142,7 @@ export function UserIndex({ onSelectUser, onCreateUser }: UserIndexProps) {
           </Select>
         )}
 
-        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => refetch()}>
+        <Button variant="outline" size="sm" className="h-11 sm:h-8 text-xs" onClick={() => refetch()}>
           <RefreshCw className="h-3 w-3 mr-1" /> Refresh
         </Button>
 
@@ -150,7 +150,7 @@ export function UserIndex({ onSelectUser, onCreateUser }: UserIndexProps) {
           <Button
             variant="outline"
             size="sm"
-            className="h-8 text-xs"
+            className="h-11 sm:h-8 text-xs"
             onClick={() => syncMutation.mutate()}
             disabled={syncMutation.isPending}
           >
@@ -159,7 +159,7 @@ export function UserIndex({ onSelectUser, onCreateUser }: UserIndexProps) {
           </Button>
         )}
 
-        <Button size="sm" className="h-8 text-xs" onClick={onCreateUser}>
+        <Button size="sm" className="h-11 sm:h-8 text-xs" onClick={onCreateUser}>
           <Plus className="h-3 w-3 mr-1" /> New User
         </Button>
       </div>

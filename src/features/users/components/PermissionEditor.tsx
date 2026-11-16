@@ -129,7 +129,7 @@ export function PermissionEditor({ userId, userRole }: PermissionEditorProps) {
                     onValueChange={(v) => handleChange(perm.key, v)}
                     disabled={setOverrideMutation.isPending}
                   >
-                    <SelectTrigger className="h-6 w-[90px] text-[10px]">
+                    <SelectTrigger className="h-11 sm:h-6 w-[90px] text-[10px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

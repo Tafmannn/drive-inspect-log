@@ -48,3 +48,17 @@ Note: there are 54 write policies now against 50 earlier the same day. The 4 new
 * **Edge functions after deploy:** each deploy compiled the full bundle (so imports and syntax are sound) and the new versions are active. Live calls from the sandbox aren't possible; no errors appeared in function logs after deploy (no traffic yet at check time).
 * **Tenant isolation across two populated orgs:** production has data in one org only. The probes confirm the org predicate is present, not cross-org behaviour.
 * **Persistence after refresh:** shown by the code path (mutations refresh the server-backed list and detail queries). Not observed in a browser.
+
+## Follow-up checks (2026-11-16, later)
+
+| Check | Result |
+|---|---|
+| Brightness check in real Chromium on three JPEGs | night 14 (flagged), dim garage 108 and daylight 198 (not flagged) |
+| Feature-switch writes, as each role, against production (rolled back) | super admin: 1 row written; admin and driver: rejected by RLS; no row persisted |
+| Break-glass SQL: lock the owner out (demoted, suspended, unprotected, banned), run steps 2–3 (rolled back) | restored to `super_admin / active / protected / not banned`; `is_super_admin()` true; real owner untouched |
+| Pending migration dry-run on production (rolled back): `user_org_id()` per role | same single org for admin, driver and super admin |
+| same: audit trigger | insert, update and delete each logged with old and new value; a no-change update not logged; admin write rejected |
+| same: simulated null-org super admin | `user_org_id()` NULL, still `is_super_admin()`; sees 73 jobs, 5 driver profiles, 6 clients, as before |
+| same: parity probes | 11-table read counts: Super ≥ Admin; 58/58 write policies evaluated, 0 where Admin > Super (58 now: PR #107 added invoice policies) |
+| After the dry run | no stray flag rows, no trigger or function created, `user_org_id()` unchanged, owner `super_admin / active` |
+

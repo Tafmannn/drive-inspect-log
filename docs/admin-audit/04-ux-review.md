@@ -14,9 +14,9 @@ All findings in this document come from reading the code plus component tests. *
 
 ## Screens
 
-* **User management** (now shared): the list has search, role, status, archive and (owner) org filters. The detail view has profile, role, account actions, driver profile and permissions. Controls are compact (`h-7`/`h-8`, `text-xs`); touch targets are below 44 px on mobile. Recommend `min-h-[44px]` on primary actions (R-05).
-* **Permission editor:** it was misleading (F-04) and now carries a notice. The per-row allow/deny/default selects have no "why" text. Keep it as-is until R-03 decides enforce-or-remove.
-* **Feature flags:** shown as "Planned". The flags exist only in SQL (`app_settings`, writable by the super admin only). A small owner-only toggle list would remove the need for SQL access (R-06).
+* **User management** (now shared): the list has search, role, status, archive and (owner) org filters. The detail view has profile, role, account actions, driver profile and permissions. Controls are compact (`text-xs`) and now 44 px high on mobile, compact from the `sm` breakpoint up (R-05, done).
+* **Permission editor:** it was misleading (F-04) and now carries a notice. The per-row allow/deny/default selects have no "why" text. Keep it as-is while R-03 enforces keys one at a time.
+* **Feature flags:** shown as "Planned". The flags exist only in SQL (`app_settings`, writable by the super admin only). Now an owner-only Feature switches card in Settings (R-06, done).
 * **Feedback:** user-management mutations share a single toast pattern (success and error) and refresh the user list. Driver wizard saves show an error toast with the database message and refresh local state. Neither path fails silently.
 
 ## Accessibility (spot checks)

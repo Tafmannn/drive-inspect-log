@@ -130,7 +130,7 @@ export function UserDetailEditor({ userId, onBack }: UserDetailEditorProps) {
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={onBack} className="h-8 px-2">
+        <Button variant="ghost" size="sm" onClick={onBack} className="h-11 sm:h-8 px-2">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1 min-w-0">
@@ -163,26 +163,26 @@ export function UserDetailEditor({ userId, onBack }: UserDetailEditorProps) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <Label className="text-[11px]">First Name</Label>
-            <Input className="h-8 text-xs mt-1" value={form.first_name} onChange={(e) => setForm((f) => ({ ...f, first_name: e.target.value }))} disabled={!canEdit} />
+            <Input className="h-11 sm:h-8 text-xs mt-1" value={form.first_name} onChange={(e) => setForm((f) => ({ ...f, first_name: e.target.value }))} disabled={!canEdit} />
           </div>
           <div>
             <Label className="text-[11px]">Last Name</Label>
-            <Input className="h-8 text-xs mt-1" value={form.last_name} onChange={(e) => setForm((f) => ({ ...f, last_name: e.target.value }))} disabled={!canEdit} />
+            <Input className="h-11 sm:h-8 text-xs mt-1" value={form.last_name} onChange={(e) => setForm((f) => ({ ...f, last_name: e.target.value }))} disabled={!canEdit} />
           </div>
           <div>
             <Label className="text-[11px]">Display Name</Label>
-            <Input className="h-8 text-xs mt-1" value={form.display_name} onChange={(e) => setForm((f) => ({ ...f, display_name: e.target.value }))} disabled={!canEdit} />
+            <Input className="h-11 sm:h-8 text-xs mt-1" value={form.display_name} onChange={(e) => setForm((f) => ({ ...f, display_name: e.target.value }))} disabled={!canEdit} />
           </div>
           <div>
             <Label className="text-[11px]">Phone</Label>
-            <Input className="h-8 text-xs mt-1" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} disabled={!canEdit} />
+            <Input className="h-11 sm:h-8 text-xs mt-1" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} disabled={!canEdit} />
           </div>
         </div>
         <div>
           <Label className="text-[11px]">Internal Notes</Label>
           <Textarea className="text-xs mt-1 min-h-[60px]" value={form.internal_notes} onChange={(e) => setForm((f) => ({ ...f, internal_notes: e.target.value }))} disabled={!canEdit} />
         </div>
-        <Button size="sm" className="h-7 text-xs" onClick={handleSave} disabled={isMutating || !canEdit}>
+        <Button size="sm" className="h-11 sm:h-7 text-xs" onClick={handleSave} disabled={isMutating || !canEdit}>
           {updateMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Save className="h-3 w-3 mr-1" />}
           Save Identity
         </Button>
@@ -193,7 +193,7 @@ export function UserDetailEditor({ userId, onBack }: UserDetailEditorProps) {
         <h3 className="text-xs font-semibold text-foreground">Role</h3>
         <div className="flex items-center gap-2">
           <Select value={selectedRole} onValueChange={setSelectedRole} disabled={!canEdit}>
-            <SelectTrigger className="h-8 w-[140px] text-xs">
+            <SelectTrigger className="h-11 sm:h-8 w-[140px] text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -202,7 +202,7 @@ export function UserDetailEditor({ userId, onBack }: UserDetailEditorProps) {
               {isSuperAdmin && <SelectItem value="super_admin">Super Admin</SelectItem>}
             </SelectContent>
           </Select>
-          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleRoleChange} disabled={isMutating || selectedRole === user.role || !canEdit}>
+          <Button size="sm" variant="outline" className="h-11 sm:h-8 text-xs" onClick={handleRoleChange} disabled={isMutating || selectedRole === user.role || !canEdit}>
             Apply Role
           </Button>
         </div>
@@ -227,13 +227,13 @@ export function UserDetailEditor({ userId, onBack }: UserDetailEditorProps) {
               <ConfirmAction
                 title="Activate User"
                 description="This will allow the user to access the application."
-                trigger={<Button size="sm" className="h-7 text-xs" disabled={isMutating}><UserCheck className="h-3 w-3 mr-1" /> Activate</Button>}
+                trigger={<Button size="sm" className="h-11 sm:h-7 text-xs" disabled={isMutating}><UserCheck className="h-3 w-3 mr-1" /> Activate</Button>}
                 onConfirm={() => activateMutation.mutate(userId)}
               />
               <ConfirmAction
                 title="Resend Invite"
                 description="This will email the user a fresh link to set their password. Any previous invite link stops working."
-                trigger={<Button size="sm" variant="outline" className="h-7 text-xs" disabled={isMutating || resendInviteMutation.isPending}><Mail className="h-3 w-3 mr-1" /> Resend Invite</Button>}
+                trigger={<Button size="sm" variant="outline" className="h-11 sm:h-7 text-xs" disabled={isMutating || resendInviteMutation.isPending}><Mail className="h-3 w-3 mr-1" /> Resend Invite</Button>}
                 onConfirm={() => resendInviteMutation.mutate(userId)}
               />
             </>
@@ -246,7 +246,7 @@ export function UserDetailEditor({ userId, onBack }: UserDetailEditorProps) {
               inputLabel="Reason (optional)"
               inputValue={suspendReason}
               onInputChange={setSuspendReason}
-              trigger={<Button size="sm" variant="destructive" className="h-7 text-xs" disabled={isMutating}><ShieldOff className="h-3 w-3 mr-1" /> Suspend</Button>}
+              trigger={<Button size="sm" variant="destructive" className="h-11 sm:h-7 text-xs" disabled={isMutating}><ShieldOff className="h-3 w-3 mr-1" /> Suspend</Button>}
               onConfirm={() => { suspendMutation.mutate({ userId, reason: suspendReason || undefined }); setSuspendReason(""); }}
             />
           )}
@@ -255,7 +255,7 @@ export function UserDetailEditor({ userId, onBack }: UserDetailEditorProps) {
             <ConfirmAction
               title="Reactivate User"
               description="This will restore the user's access to the application."
-              trigger={<Button size="sm" variant="outline" className="h-7 text-xs" disabled={isMutating}><Shield className="h-3 w-3 mr-1" /> Reactivate</Button>}
+              trigger={<Button size="sm" variant="outline" className="h-11 sm:h-7 text-xs" disabled={isMutating}><Shield className="h-3 w-3 mr-1" /> Reactivate</Button>}
               onConfirm={() => reactivateMutation.mutate(userId)}
             />
           )}
@@ -277,28 +277,28 @@ export function UserDetailEditor({ userId, onBack }: UserDetailEditorProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label className="text-[11px]">Full Name</Label>
-              <Input className="h-8 text-xs mt-1" value={driverForm.full_name ?? ""} onChange={(e) => setDriverField("full_name", e.target.value)} disabled={!canEdit} />
+              <Input className="h-11 sm:h-8 text-xs mt-1" value={driverForm.full_name ?? ""} onChange={(e) => setDriverField("full_name", e.target.value)} disabled={!canEdit} />
             </div>
             <div>
               <Label className="text-[11px]">Phone</Label>
-              <Input className="h-8 text-xs mt-1" value={driverForm.phone ?? ""} onChange={(e) => setDriverField("phone", e.target.value)} disabled={!canEdit} />
+              <Input className="h-11 sm:h-8 text-xs mt-1" value={driverForm.phone ?? ""} onChange={(e) => setDriverField("phone", e.target.value)} disabled={!canEdit} />
             </div>
             <div>
               <Label className="text-[11px]">Licence Number</Label>
-              <Input className="h-8 text-xs mt-1" value={driverForm.licence_number ?? ""} onChange={(e) => setDriverField("licence_number", e.target.value)} disabled={!canEdit} />
+              <Input className="h-11 sm:h-8 text-xs mt-1" value={driverForm.licence_number ?? ""} onChange={(e) => setDriverField("licence_number", e.target.value)} disabled={!canEdit} />
             </div>
             <div>
               <Label className="text-[11px]">Licence Expiry</Label>
-              <Input type="date" className="h-8 text-xs mt-1" value={driverForm.licence_expiry ?? ""} onChange={(e) => setDriverField("licence_expiry", e.target.value)} disabled={!canEdit} />
+              <Input type="date" className="h-11 sm:h-8 text-xs mt-1" value={driverForm.licence_expiry ?? ""} onChange={(e) => setDriverField("licence_expiry", e.target.value)} disabled={!canEdit} />
             </div>
             <div>
               <Label className="text-[11px]">Date of Birth</Label>
-              <Input type="date" className="h-8 text-xs mt-1" value={driverForm.date_of_birth ?? ""} onChange={(e) => setDriverField("date_of_birth", e.target.value)} disabled={!canEdit} />
+              <Input type="date" className="h-11 sm:h-8 text-xs mt-1" value={driverForm.date_of_birth ?? ""} onChange={(e) => setDriverField("date_of_birth", e.target.value)} disabled={!canEdit} />
             </div>
             <div>
               <Label className="text-[11px]">Employment Type</Label>
               <Select value={driverForm.employment_type ?? "contractor"} onValueChange={(v) => setDriverField("employment_type", v)} disabled={!canEdit}>
-                <SelectTrigger className="h-8 text-xs mt-1">
+                <SelectTrigger className="h-11 sm:h-8 text-xs mt-1">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -310,7 +310,7 @@ export function UserDetailEditor({ userId, onBack }: UserDetailEditorProps) {
             </div>
             <div>
               <Label className="text-[11px]">Trade Plate Number</Label>
-              <Input className="h-8 text-xs mt-1" value={driverForm.trade_plate_number ?? ""} onChange={(e) => setDriverField("trade_plate_number", e.target.value)} disabled={!canEdit} />
+              <Input className="h-11 sm:h-8 text-xs mt-1" value={driverForm.trade_plate_number ?? ""} onChange={(e) => setDriverField("trade_plate_number", e.target.value)} disabled={!canEdit} />
             </div>
             <div>
               <Label className="text-[11px]">Active</Label>
@@ -324,19 +324,19 @@ export function UserDetailEditor({ userId, onBack }: UserDetailEditorProps) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label className="text-[11px]">Address Line 1</Label>
-                <Input className="h-8 text-xs mt-1" value={driverForm.address_line1 ?? ""} onChange={(e) => setDriverField("address_line1", e.target.value)} disabled={!canEdit} />
+                <Input className="h-11 sm:h-8 text-xs mt-1" value={driverForm.address_line1 ?? ""} onChange={(e) => setDriverField("address_line1", e.target.value)} disabled={!canEdit} />
               </div>
               <div>
                 <Label className="text-[11px]">Address Line 2</Label>
-                <Input className="h-8 text-xs mt-1" value={driverForm.address_line2 ?? ""} onChange={(e) => setDriverField("address_line2", e.target.value)} disabled={!canEdit} />
+                <Input className="h-11 sm:h-8 text-xs mt-1" value={driverForm.address_line2 ?? ""} onChange={(e) => setDriverField("address_line2", e.target.value)} disabled={!canEdit} />
               </div>
               <div>
                 <Label className="text-[11px]">City</Label>
-                <Input className="h-8 text-xs mt-1" value={driverForm.city ?? ""} onChange={(e) => setDriverField("city", e.target.value)} disabled={!canEdit} />
+                <Input className="h-11 sm:h-8 text-xs mt-1" value={driverForm.city ?? ""} onChange={(e) => setDriverField("city", e.target.value)} disabled={!canEdit} />
               </div>
               <div>
                 <Label className="text-[11px]">Postcode</Label>
-                <Input className="h-8 text-xs mt-1" value={driverForm.postcode ?? ""} onChange={(e) => setDriverField("postcode", e.target.value)} disabled={!canEdit} />
+                <Input className="h-11 sm:h-8 text-xs mt-1" value={driverForm.postcode ?? ""} onChange={(e) => setDriverField("postcode", e.target.value)} disabled={!canEdit} />
               </div>
             </div>
           </div>
@@ -347,11 +347,11 @@ export function UserDetailEditor({ userId, onBack }: UserDetailEditorProps) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label className="text-[11px]">Name</Label>
-                <Input className="h-8 text-xs mt-1" value={driverForm.emergency_contact_name ?? ""} onChange={(e) => setDriverField("emergency_contact_name", e.target.value)} disabled={!canEdit} />
+                <Input className="h-11 sm:h-8 text-xs mt-1" value={driverForm.emergency_contact_name ?? ""} onChange={(e) => setDriverField("emergency_contact_name", e.target.value)} disabled={!canEdit} />
               </div>
               <div>
                 <Label className="text-[11px]">Phone</Label>
-                <Input className="h-8 text-xs mt-1" value={driverForm.emergency_contact_phone ?? ""} onChange={(e) => setDriverField("emergency_contact_phone", e.target.value)} disabled={!canEdit} />
+                <Input className="h-11 sm:h-8 text-xs mt-1" value={driverForm.emergency_contact_phone ?? ""} onChange={(e) => setDriverField("emergency_contact_phone", e.target.value)} disabled={!canEdit} />
               </div>
             </div>
           </div>
@@ -362,7 +362,7 @@ export function UserDetailEditor({ userId, onBack }: UserDetailEditorProps) {
             <Textarea className="text-xs mt-1 min-h-[50px]" value={driverForm.notes ?? ""} onChange={(e) => setDriverField("notes", e.target.value)} disabled={!canEdit} />
           </div>
 
-          <Button size="sm" className="h-7 text-xs" onClick={handleDriverSave} disabled={isMutating || !canEdit}>
+          <Button size="sm" className="h-11 sm:h-7 text-xs" onClick={handleDriverSave} disabled={isMutating || !canEdit}>
             {updateDriverMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Save className="h-3 w-3 mr-1" />}
             Save Driver Profile
           </Button>
@@ -376,7 +376,7 @@ export function UserDetailEditor({ userId, onBack }: UserDetailEditorProps) {
                 inputLabel="Reason"
                 inputValue={archiveReason}
                 onInputChange={setArchiveReason}
-                trigger={<Button size="sm" variant="outline" className="h-7 text-xs text-destructive" disabled={isMutating}><Archive className="h-3 w-3 mr-1" /> Archive Driver</Button>}
+                trigger={<Button size="sm" variant="outline" className="h-11 sm:h-7 text-xs text-destructive" disabled={isMutating}><Archive className="h-3 w-3 mr-1" /> Archive Driver</Button>}
                 onConfirm={() => { archiveMutation.mutate({ userId, reason: archiveReason || undefined }); setArchiveReason(""); }}
               />
             ) : (
@@ -397,7 +397,7 @@ export function UserDetailEditor({ userId, onBack }: UserDetailEditorProps) {
                   inputLabel="Note (optional)"
                   inputValue={restoreNote}
                   onInputChange={setRestoreNote}
-                  trigger={<Button size="sm" variant="outline" className="h-7 text-xs" disabled={isMutating}><RotateCcw className="h-3 w-3 mr-1" /> Restore Driver</Button>}
+                  trigger={<Button size="sm" variant="outline" className="h-11 sm:h-7 text-xs" disabled={isMutating}><RotateCcw className="h-3 w-3 mr-1" /> Restore Driver</Button>}
                   onConfirm={() => { restoreMutation.mutate({ userId, reactivate: restoreReactivate, note: restoreNote || undefined }); setRestoreNote(""); }}
                 />
               </div>
@@ -431,8 +431,8 @@ function ConfirmAction({ title, description, trigger, onConfirm }: {
           <AlertDialogDescription className="text-xs">{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel className="h-8 text-xs">Cancel</AlertDialogCancel>
-          <AlertDialogAction className="h-8 text-xs" onClick={onConfirm}>Confirm</AlertDialogAction>
+          <AlertDialogCancel className="h-11 sm:h-8 text-xs">Cancel</AlertDialogCancel>
+          <AlertDialogAction className="h-11 sm:h-8 text-xs" onClick={onConfirm}>Confirm</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -452,11 +452,11 @@ function ConfirmActionWithInput({ title, description, inputLabel, inputValue, on
         </AlertDialogHeader>
         <div className="py-2">
           <Label className="text-[11px]">{inputLabel}</Label>
-          <Input className="h-8 text-xs mt-1" value={inputValue} onChange={(e) => onInputChange(e.target.value)} />
+          <Input className="h-11 sm:h-8 text-xs mt-1" value={inputValue} onChange={(e) => onInputChange(e.target.value)} />
         </div>
         <AlertDialogFooter>
-          <AlertDialogCancel className="h-8 text-xs">Cancel</AlertDialogCancel>
-          <AlertDialogAction className="h-8 text-xs" onClick={onConfirm}>Confirm</AlertDialogAction>
+          <AlertDialogCancel className="h-11 sm:h-8 text-xs">Cancel</AlertDialogCancel>
+          <AlertDialogAction className="h-11 sm:h-8 text-xs" onClick={onConfirm}>Confirm</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

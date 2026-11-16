@@ -105,3 +105,56 @@ export async function prepareCapturedPhoto(file: File): Promise<File> {
     return detached;
   }
 }
+
+// ── Low-light check ─────────────────────────────────────────────────────────
+//
+// Night-time photos without flash come out nearly black and are useless as
+// evidence (a delivery set on AX0070 was). We measure average brightness at
+// capture so the driver can retake while still at the vehicle. This only
+// warns: it never blocks, since a dark interior or fuel gauge can be genuine.
+
+/** Mean brightness (0–255) below which a photo is flagged as too dark. */
+export const TOO_DARK_MEAN = 45;
+const SAMPLE_SIZE = 32;
+
+/** Mean luma (Rec. 601) of RGBA pixel data, 0–255. Empty data reads as 0. */
+export function meanLuma(rgba: ArrayLike<number>): number {
+  const pixels = Math.floor(rgba.length / 4);
+  if (pixels === 0) return 0;
+  let sum = 0;
+  for (let i = 0; i < pixels; i++) {
+    const o = i * 4;
+    sum += 0.299 * rgba[o] + 0.587 * rgba[o + 1] + 0.114 * rgba[o + 2];
+  }
+  return sum / pixels;
+}
+
+export function isTooDark(mean: number): boolean {
+  return mean < TOO_DARK_MEAN;
+}
+
+/**
+ * Average brightness of a photo, or null when it can't be measured (no canvas,
+ * undecodable image). Callers must treat null as "fine" — never block a photo.
+ */
+export async function measurePhotoBrightness(file: Blob): Promise<number | null> {
+  try {
+    const img = await decode(file);
+    if (!img) return null;
+    const canvas = document.createElement("canvas");
+    canvas.width = SAMPLE_SIZE;
+    canvas.height = SAMPLE_SIZE;
+    try {
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+      ctx.drawImage(img, 0, 0, SAMPLE_SIZE, SAMPLE_SIZE);
+      return meanLuma(ctx.getImageData(0, 0, SAMPLE_SIZE, SAMPLE_SIZE).data);
+    } finally {
+      canvas.width = 0;
+      canvas.height = 0;
+      img.src = "";
+    }
+  } catch {
+    return null;
+  }
+}

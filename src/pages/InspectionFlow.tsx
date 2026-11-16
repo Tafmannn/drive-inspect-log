@@ -12,7 +12,7 @@ import { VehicleDamageModal } from "@/components/VehicleDamageModal";
 import { PhotoLabelModal } from "@/components/PhotoLabelModal";
 import { SignaturePad, type SignaturePadRef } from "@/components/SignaturePad";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { prepareCapturedPhoto } from "@/lib/capturedPhoto";
+import { isTooDark, measurePhotoBrightness, prepareCapturedPhoto } from "@/lib/capturedPhoto";
 import { clearActiveInspection, markActiveInspection } from "@/lib/activeInspection";
 import {
   ChevronLeft,
@@ -179,6 +179,8 @@ export const InspectionFlow = () => {
   const [retryingStaging, setRetryingStaging] = useState(false);
 
   const [formState, setFormState] = useState<InspectionFormState>(INITIAL_INSPECTION_FORM);
+  // Standard-photo keys whose latest capture measured as too dark (UI hint only).
+  const [darkPhotoKeys, setDarkPhotoKeys] = useState<Set<string>>(() => new Set());
 
   const totalSteps = getTotalSteps(type);
 
@@ -499,6 +501,25 @@ export const InspectionFlow = () => {
     }));
     // A retake: free the previous preview's memory.
     if (replacedUrl && replacedUrl.startsWith("blob:")) URL.revokeObjectURL(replacedUrl);
+    // Low-light check: tell the driver now, while still at the vehicle. Warns
+    // only; the photo is kept and submit is never blocked.
+    void measurePhotoBrightness(safe).then((mean) => {
+      const dark = mean !== null && isTooDark(mean);
+      setDarkPhotoKeys((prev) => {
+        if (prev.has(photoKey) === dark) return prev;
+        const next = new Set(prev);
+        if (dark) next.add(photoKey);
+        else next.delete(photoKey);
+        return next;
+      });
+      if (dark) {
+        toast({
+          title: "That photo is very dark",
+          description: "Turn on the flash or move into better light, then tap Retake.",
+          variant: "destructive",
+        });
+      }
+    });
     // Persist the File blob so the photo survives an exit/reopen of the
     // app. Best-effort — the in-memory File is still authoritative for
     // the current session.
@@ -1442,11 +1463,21 @@ export const InspectionFlow = () => {
             <div key={pt.key} className="space-y-2">
               <Label className="text-sm font-medium">{pt.label}</Label>
               {formState.standardPhotoUrls[pt.key] ? (
-                <img
-                  src={formState.standardPhotoUrls[pt.key]}
-                  alt={pt.label}
-                  className="w-full h-24 object-cover rounded border"
-                />
+                <div className="relative">
+                  <img
+                    src={formState.standardPhotoUrls[pt.key]}
+                    alt={pt.label}
+                    className="w-full h-24 object-cover rounded border"
+                  />
+                  {darkPhotoKeys.has(pt.key) && (
+                    <span
+                      role="status"
+                      className="absolute inset-x-0 bottom-0 rounded-b bg-amber-500 px-1 py-0.5 text-center text-[11px] font-medium text-black"
+                    >
+                      Too dark — retake
+                    </span>
+                  )}
+                </div>
               ) : (
                 <div className="w-full h-24 bg-muted rounded border flex items-center justify-center">
                   <Camera className="h-6 w-6 text-muted-foreground" />

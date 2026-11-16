@@ -9,7 +9,7 @@
 | F-05 | P1 | Fixed and deployed | Admin edge functions accepted pending (and, for invoices, any-status) callers |
 | F-06 | P2 | Fixed and deployed | Owner protection relied only on the `is_protected` flag |
 | F-07 | P3 | Fixed | Misleading labels: "Organisation Settings" opened the admin dashboard; owner Settings said auth source was `app_metadata.role` |
-| F-08 | P3 | Risk, documented | `user_org_id()` falls back to the oldest org for a super admin with no org |
+| F-08 | P3 | Fix prepared and dry-run; awaiting approval | `user_org_id()` falls back to the oldest org for a super admin with no org |
 | F-09 | P2 | Roadmap (product decision) | Paired mobile (`/admin`) and desktop (`/control`) screens with different features |
 
 ## F-01: Reported defect (Driver Settings: Admin can, Super Admin can't)
@@ -82,7 +82,7 @@
 
 * **Problem:** for a super admin with `org_id IS NULL`, the function returns the oldest organisation, so org-scoped writes would silently target it.
 * **Current state:** the owner's profile has an org set, so this is inactive.
-* **Recommendation:** return NULL instead and rely on the policies' explicit `is_super_admin()` branch. Re-run the RLS probe first.
+* **Fix:** return the profile's own org or NULL; policies keep their explicit `is_super_admin()` branch. Prepared in `docs/admin-audit/pending/20261117000000_org_fallback_and_settings_audit.sql` and dry-run on production (rolled back): a simulated null-org super admin still sees all 73 jobs, 5 driver profiles and 6 clients; nothing changes for existing accounts. Awaiting approval.
 
 ## F-09: Paired admin screens (not plain duplicates)
 

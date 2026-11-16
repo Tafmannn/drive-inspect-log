@@ -137,7 +137,7 @@ export function CreateUserModal({ open, onOpenChange }: CreateUserModalProps) {
             <div>
               <Label className="text-[11px]">First Name *</Label>
               <Input
-                className="h-9 mt-1"
+                className="h-11 sm:h-9 mt-1"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 autoFocus
@@ -146,7 +146,7 @@ export function CreateUserModal({ open, onOpenChange }: CreateUserModalProps) {
             <div>
               <Label className="text-[11px]">Last Name *</Label>
               <Input
-                className="h-9 mt-1"
+                className="h-11 sm:h-9 mt-1"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
               />
@@ -156,7 +156,7 @@ export function CreateUserModal({ open, onOpenChange }: CreateUserModalProps) {
           <div>
             <Label className="text-[11px]">Email *</Label>
             <Input
-              className="h-9 mt-1"
+              className="h-11 sm:h-9 mt-1"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -168,7 +168,7 @@ export function CreateUserModal({ open, onOpenChange }: CreateUserModalProps) {
               Mobile {role === "driver" ? "*" : <span className="text-muted-foreground">(optional)</span>}
             </Label>
             <Input
-              className="h-9 mt-1"
+              className="h-11 sm:h-9 mt-1"
               type="tel"
               inputMode="tel"
               value={mobile}
@@ -183,7 +183,7 @@ export function CreateUserModal({ open, onOpenChange }: CreateUserModalProps) {
             <select
               value={role}
               onChange={(e) => setRole(e.target.value)}
-              className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+              className="mt-1 h-11 sm:h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
             >
               <option value="driver">Driver</option>
               <option value="admin">Admin</option>
@@ -197,7 +197,7 @@ export function CreateUserModal({ open, onOpenChange }: CreateUserModalProps) {
               <select
                 value={orgId}
                 onChange={(e) => setOrgId(e.target.value)}
-                className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                className="mt-1 h-11 sm:h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
               >
                 <option value="">Select organisation…</option>
                 {(orgs ?? []).map((o) => (
@@ -212,7 +212,7 @@ export function CreateUserModal({ open, onOpenChange }: CreateUserModalProps) {
               type="button"
               variant="outline"
               size="sm"
-              className="h-9"
+              className="h-11 sm:h-9"
               onClick={() => onOpenChange(false)}
             >
               Cancel
@@ -220,7 +220,7 @@ export function CreateUserModal({ open, onOpenChange }: CreateUserModalProps) {
             <Button
               type="submit"
               size="sm"
-              className="h-9"
+              className="h-11 sm:h-9"
               disabled={createMutation.isPending}
             >
               {createMutation.isPending && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
