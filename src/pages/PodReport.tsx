@@ -43,6 +43,8 @@ import { getStatusStyle } from "@/lib/statusConfig";
 import { UKPlate } from "@/components/UKPlate";
 import { getChecklistItems } from "@/lib/inspectionFields";
 import { useAuth } from "@/context/AuthContext";
+import { isJobLockedForDriver } from "@/lib/driverJobAccess";
+import { DriverJobLocked } from "@/components/DriverJobLocked";
 import type { Photo } from "@/lib/types";
 import { canonicalisePhotos } from "@/lib/photoDedupe";
 import { evaluateEvidenceHealth } from "@/lib/evidenceHealth";
@@ -447,6 +449,11 @@ export const PodReport = () => {
         <DetailSkeleton sections={3} />
       </div>
     );
+  }
+
+  // Completed (POD approved) jobs are record-only for drivers — no POD access.
+  if (isJobLockedForDriver(job.status, { isAdmin, isSuperAdmin })) {
+    return <DriverJobLocked title="POD Report" />;
   }
 
   const ref = job.external_job_number || job.id.slice(0, 8).toUpperCase();
