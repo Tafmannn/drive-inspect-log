@@ -13,7 +13,7 @@ describe("isInReleaseSet", () => {
   });
 
   it("includes migrations well after the cutoff", () => {
-    expect(isInReleaseSet("20260713150000_submit_inspection_assigned_driver_only.sql")).toBe(true);
+    expect(isInReleaseSet("20261201150000_example_after_cutoff.sql")).toBe(true);
   });
 
   it("excludes migrations before the cutoff", () => {
