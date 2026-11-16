@@ -12,9 +12,12 @@
 --   * Drivers: inspections, photos, damage_items, evidence_items only for
 --     their own jobs that are NOT completed (i.e. no POD once approved).
 --
--- Write policies are left exactly as they were; only read access narrows.
+-- Write policies keep their existing expressions; only read access narrows.
 -- The FOR ALL policies on inspections/damage_items are split so the write
--- side keeps its existing expression.
+-- side keeps its existing expression. Those policies were TO public; they are
+-- recreated TO authenticated (anon never matched them, since user_org_id() is
+-- NULL without a session, and the new helpers are only granted to
+-- authenticated).
 
 -- ── Helpers (SECURITY DEFINER to avoid RLS recursion through jobs) ──────────
 
@@ -86,20 +89,20 @@ CREATE POLICY "jobs_select_org" ON public.jobs
 DROP POLICY IF EXISTS "Org members can manage inspections" ON public.inspections;
 
 CREATE POLICY "inspections_select_scoped" ON public.inspections
-  FOR SELECT TO public
+  FOR SELECT TO authenticated
   USING (
     is_super_admin()
     OR (org_id = user_org_id() AND (is_admin_or_super_admin() OR driver_can_read_job_evidence(job_id)))
   );
 CREATE POLICY "inspections_insert_org" ON public.inspections
-  FOR INSERT TO public
+  FOR INSERT TO authenticated
   WITH CHECK (is_super_admin() OR (org_id = user_org_id()));
 CREATE POLICY "inspections_update_org" ON public.inspections
-  FOR UPDATE TO public
+  FOR UPDATE TO authenticated
   USING (is_super_admin() OR (org_id = user_org_id()))
   WITH CHECK (is_super_admin() OR (org_id = user_org_id()));
 CREATE POLICY "inspections_delete_org" ON public.inspections
-  FOR DELETE TO public
+  FOR DELETE TO authenticated
   USING (is_super_admin() OR (org_id = user_org_id()));
 
 -- ── damage_items ────────────────────────────────────────────────────────────
@@ -107,20 +110,20 @@ CREATE POLICY "inspections_delete_org" ON public.inspections
 DROP POLICY IF EXISTS "Org members can manage damage_items" ON public.damage_items;
 
 CREATE POLICY "damage_items_select_scoped" ON public.damage_items
-  FOR SELECT TO public
+  FOR SELECT TO authenticated
   USING (
     is_super_admin()
     OR (org_id = user_org_id() AND (is_admin_or_super_admin() OR driver_can_read_inspection_evidence(inspection_id)))
   );
 CREATE POLICY "damage_items_insert_org" ON public.damage_items
-  FOR INSERT TO public
+  FOR INSERT TO authenticated
   WITH CHECK (is_super_admin() OR (org_id = user_org_id()));
 CREATE POLICY "damage_items_update_org" ON public.damage_items
-  FOR UPDATE TO public
+  FOR UPDATE TO authenticated
   USING (is_super_admin() OR (org_id = user_org_id()))
   WITH CHECK (is_super_admin() OR (org_id = user_org_id()));
 CREATE POLICY "damage_items_delete_org" ON public.damage_items
-  FOR DELETE TO public
+  FOR DELETE TO authenticated
   USING (is_super_admin() OR (org_id = user_org_id()));
 
 -- ── photos ──────────────────────────────────────────────────────────────────
