@@ -39,6 +39,7 @@ import { FUEL_PERCENT_TO_LABEL } from "@/lib/types";
 import { evaluatePodReadiness } from "@/lib/podReadiness";
 import { EvidenceHealthBanner, RoleScope } from "@/components/ui-kit";
 import { toast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import { getStatusStyle } from "@/lib/statusConfig";
 import { UKPlate } from "@/components/UKPlate";
 import { getChecklistItems } from "@/lib/inspectionFields";
@@ -414,18 +415,27 @@ export const PodReport = () => {
         billable_on_pod: (e as any).billable_on_pod ?? true,
       }));
       const result = await emailPodPdf(job, billable, confirmedEmail);
-      setEmailConfirmOpen(false);
 
       if (result.method === "resend") {
+        setEmailConfirmOpen(false);
         toast({
           title: "POD emailed",
-          description: `Sent directly to ${result.recipient}.`,
+          description: `Sent to ${result.recipient}.`,
         });
-      } else if (!navigator.share) {
+      } else {
+        // Never fall back silently: say why the branded email didn't go,
+        // and only share a plain-text version if the user chooses to. The
+        // recipient dialog stays open so the address can be corrected.
         toast({
-          title: "PDF downloaded — attach it to your email",
-          description:
-            "Your email app should have opened with a pre-filled message. Attach the downloaded PDF before sending.",
+          title: "POD email not sent",
+          description: result.message,
+          variant: "destructive",
+          duration: 15000,
+          action: (
+            <ToastAction altText="Share the POD links manually instead" onClick={() => void result.shareManually()}>
+              Share manually
+            </ToastAction>
+          ),
         });
       }
     } catch (e: unknown) {

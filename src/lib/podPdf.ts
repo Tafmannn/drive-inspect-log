@@ -1419,8 +1419,12 @@ export async function sharePodPdf(
 
 export type EmailPodResult =
   | { method: "resend"; recipient: string }
-  | { method: "share" }
-  | { method: "mailto" };
+  /**
+   * The branded email was NOT sent. `message` says why, in plain words.
+   * Nothing has been shared: `shareManually()` opens the device share sheet
+   * (or the mail app) with a plain-text version only if the user chooses to.
+   */
+  | { method: "failed"; message: string; shareManually: () => Promise<void> };
 
 export async function emailPodPdf(
   job: JobWithRelations,
@@ -1439,9 +1443,9 @@ export async function emailPodPdf(
     : new Date().toISOString().slice(0, 10);
 
   const fileName = `AXENTRA_POD_${ref}_${sanitizedReg}_${dateStr}.pdf`;
-  const subject = `Axentra POD – ${ref} – ${job.vehicle_reg}`;
 
   let downloadLink = "";
+  let failureMessage = "The email couldn't be sent. Please try again.";
   const recipient = recipientOverride?.trim() || job.delivery_contact_email || job.pickup_contact_email;
 
   try {
@@ -1484,68 +1488,94 @@ export async function emailPodPdf(
     // navigator.share/mailto flow below on any failure — missing recipient,
     // RESEND_API_KEY not configured yet, network error, etc. — so the
     // feature never appears broken while that setup is pending.
-    if (recipient && downloadLink) {
+    if (!recipient) {
+      failureMessage = "There's no email address for this customer.";
+    } else if (!downloadLink) {
+      failureMessage = "The POD couldn't be uploaded, so there's no link to send. Check your connection and try again.";
+    } else {
       try {
+        // The server builds the whole email (branding, vehicle, route,
+        // delivery details) from the database; it only needs the job, the
+        // recipient and the signed links.
         const { data, error } = await supabase.functions.invoke("send-pod-email", {
           body: {
             to: recipient,
             jobId: job.id,
-            jobRef: ref,
-            vehicleReg: job.vehicle_reg,
-            pickupCity: job.pickup_city,
-            deliveryCity: job.delivery_city,
-            dateStr,
             downloadUrl: downloadLink,
             photosZipUrl: photosZipUrl ?? undefined,
           },
         });
         if (!error && data?.sent) {
-          return { method: "resend", recipient };
+          return { method: "resend", recipient: String(data.recipient ?? recipient) };
         }
-        debugLog("send-pod-email did not confirm sent — falling back", error || data);
+        failureMessage = await functionErrorMessage(error, data);
+        debugLog("send-pod-email did not send", error || data);
       } catch (error) {
-        debugLog("send-pod-email invoke failed — falling back", error);
+        failureMessage = "Couldn't reach the email service. Check your connection and try again.";
+        debugLog("send-pod-email invoke failed", error);
       }
     }
   } catch (error) {
+    failureMessage = "The POD couldn't be prepared for sending. Please try again.";
     debugLog("Supabase upload exception", error);
   }
 
+  // Plain-text version for a MANUAL share only (the user chose it after the
+  // branded email failed). Kept short: the links are long.
+  const routeLine = [clean(job.pickup_city, ""), clean(job.delivery_city, "")].filter(Boolean).join(" → ");
   const body = [
-    "Dear Customer,",
+    `Proof of Delivery – ${job.vehicle_reg} (${ref})`,
     "",
-    `Please find your Proof of Delivery for job ${ref} (${job.vehicle_reg}) at the link below.`,
+    "Hello,",
     "",
-    `Route: ${clean(job.pickup_city)} → ${clean(job.delivery_city)}`,
-    `Date: ${dateStr}`,
+    `Your vehicle ${job.vehicle_reg} has been delivered${routeLine ? ` (${routeLine})` : ""} on ${dateStr}.`,
     "",
-    downloadLink ? `Download POD: ${downloadLink}` : "(PDF link unavailable - attach manually if required)",
-    ...(photosZipUrl ? ["", `Download photos (optional): ${photosZipUrl}`] : []),
-    "",
-    "Link expires in 30 days.",
-    "",
-    "If you have any queries, please do not hesitate to contact us.",
+    ...(downloadLink ? ["Proof of Delivery (PDF):", downloadLink, ""] : []),
+    ...(photosZipUrl ? ["Vehicle photos (ZIP):", photosZipUrl, ""] : []),
+    "These links are valid for 30 days.",
     "",
     "Kind regards,",
     "Axentra Vehicle Logistics",
-    "info@axentravehicles.com",
   ].join("\n");
+  const shareSubject = `Proof of Delivery – ${job.vehicle_reg} (${ref})`;
 
-  if (navigator.share) {
-    try {
-      await navigator.share({ title: subject, text: body });
-      return { method: "share" };
-    } catch (error: unknown) {
-      if (error instanceof Error && error.name === "AbortError") return { method: "share" };
-      debugLog("navigator.share failed", error);
+  const shareManually = async (): Promise<void> => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: shareSubject, text: body });
+        return;
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name === "AbortError") return;
+        debugLog("navigator.share failed", error);
+      }
     }
-  }
+    const mailtoTo = recipient ? encodeURIComponent(recipient) : "";
+    window.open(
+      `mailto:${mailtoTo}?subject=${encodeURIComponent(shareSubject)}&body=${encodeURIComponent(body)}`,
+      "_blank",
+    );
+  };
 
-  // Pre-fill the confirmed recipient — previously left blank, forcing the
-  // admin to retype it in their mail app and reopening the exact mistake
-  // this confirmation step exists to prevent.
-  const mailtoTo = recipient ? encodeURIComponent(recipient) : "";
-  const mailto = `mailto:${mailtoTo}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  window.open(mailto, "_blank");
-  return { method: "mailto" };
+  return { method: "failed", message: failureMessage, shareManually };
+}
+
+/** The friendly message an edge function returned, or a sensible default. */
+async function functionErrorMessage(error: unknown, data: unknown): Promise<string> {
+  const fromBody = (b: unknown) =>
+    b && typeof b === "object" && typeof (b as { message?: unknown }).message === "string"
+      ? ((b as { message: string }).message)
+      : null;
+  const direct = fromBody(data);
+  if (direct) return direct;
+  try {
+    const ctx = (error as { context?: Response } | null)?.context;
+    if (ctx && typeof ctx.json === "function") {
+      const parsed = await ctx.json();
+      const msg = fromBody(parsed);
+      if (msg) return msg;
+    }
+  } catch {
+    /* fall through */
+  }
+  return "The email couldn't be sent. Please try again.";
 }

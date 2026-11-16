@@ -1,211 +1,211 @@
+// send-pod-email — emails a branded Proof of Delivery to the customer.
+//
+// What the email says comes from the database (job, delivery inspection,
+// organisation branding), never from the request: the request only names
+// the job, the recipient and the two signed download links, and those links
+// must be signed URLs from this project's own pod-pdfs / pod-photos storage.
+//
+// Recipient rules (see _shared/podEmail.ts decidePodRecipient):
+//   admins — any address (they confirm it in the app);
+//   drivers — an email on file for the job or its client, or, when nothing
+//   is on file, the address they enter, which is then saved to the job.
+// Every send is recorded in job_activity_log.
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { authenticateCaller, corsHeaders } from "../_shared/auth.ts";
+import { authenticateCaller, corsHeaders, jsonRes } from "../_shared/auth.ts";
+import { cleanRecipients } from "../_shared/customerStatusEmail.ts";
+import {
+  decidePodRecipient,
+  isOwnSignedStorageUrl,
+  renderPodEmail,
+  resolveLogoUrl,
+} from "../_shared/podEmail.ts";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+function fail(status: number, error: string, message: string): Response {
+  return jsonRes({ error, message }, status);
 }
 
-// Only http(s) links belong in the "Download POD" button. Reject anything else
-// (javascript:, data:, etc.) so a malformed/hostile downloadUrl can never become
-// a live link, and attribute-escape the value like every other interpolation.
-function safeHref(url: string): string | null {
+function appBaseUrl(req: Request): string | null {
+  const candidate = Deno.env.get("APP_URL") || req.headers.get("origin") || "";
   try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
-    return escapeHtml(url);
+    const u = new URL(candidate);
+    return u.protocol === "https:" ? u.origin : null;
   } catch {
     return null;
   }
 }
 
-function renderHtml(opts: {
-  jobRef: string;
-  vehicleReg: string;
-  pickupCity: string;
-  deliveryCity: string;
-  dateStr: string;
-  downloadHref: string;
-  photosHref: string | null;
-}): string {
-  const { jobRef, vehicleReg, pickupCity, deliveryCity, dateStr, downloadHref, photosHref } = opts;
-  const photosLink = photosHref
-    ? `<p style="margin:0 0 16px;text-align:center;">
-                  <a href="${photosHref}" style="color:#6b7280;font-size:13px;text-decoration:underline;">
-                    Download original photos (optional)
-                  </a>
-                </p>`
-    : "";
-  return `<!doctype html>
-<html>
-  <body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:24px 0;">
-      <tr>
-        <td align="center">
-          <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;">
-            <tr>
-              <td style="background:#111827;padding:20px 32px;">
-                <span style="color:#ffffff;font-size:18px;font-weight:bold;">Axentra Vehicle Logistics</span>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:32px;color:#1f2937;font-size:15px;line-height:1.6;">
-                <p style="margin:0 0 16px;">Dear Customer,</p>
-                <p style="margin:0 0 16px;">
-                  Please find your Proof of Delivery for job <strong>${escapeHtml(jobRef)}</strong>
-                  (${escapeHtml(vehicleReg)}) below.
-                </p>
-                <p style="margin:0 0 4px;"><strong>Route:</strong> ${escapeHtml(pickupCity)} &rarr; ${escapeHtml(deliveryCity)}</p>
-                <p style="margin:0 0 24px;"><strong>Date:</strong> ${escapeHtml(dateStr)}</p>
-                <p style="margin:0 0 24px;text-align:center;">
-                  <a href="${downloadHref}"
-                     style="background:#111827;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:bold;display:inline-block;">
-                    Download POD
-                  </a>
-                </p>
-                ${photosLink}
-                <p style="margin:0 0 16px;color:#6b7280;font-size:13px;">Link(s) expire in 30 days.</p>
-                <p style="margin:0 0 16px;">If you have any queries, please do not hesitate to contact us.</p>
-                <p style="margin:24px 0 0;">Kind regards,<br/>Axentra Vehicle Logistics<br/>info@axentravehicles.com</p>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>`;
+function place(city: string | null, postcode: string | null): string | null {
+  const s = [city, postcode].map((v) => (v ?? "").trim()).filter(Boolean).join(" ");
+  return s || null;
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    // ─── Auth: requires a real signed-in user with a resolvable org (this
-    // sends email — and reads job contact details — on the org's behalf,
-    // never a public/anon action). Same authoritative caller/org resolution
-    // as every other edge function, via _shared/auth.ts.
-    const authResult = await authenticateCaller(req);
-    if ("error" in authResult) return authResult.error;
-    const { caller, admin } = authResult;
+    const auth = await authenticateCaller(req);
+    if ("error" in auth) return auth.error;
+    const { caller, admin } = auth;
+    if (caller.accountStatus !== "active" || (!caller.isSuperAdmin && !caller.orgId)) {
+      return fail(403, "FORBIDDEN", "Your account can't send emails.");
+    }
 
     const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
     if (!RESEND_API_KEY) {
-      return new Response(
-        JSON.stringify({ error: "RESEND_API_KEY not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return fail(500, "EMAIL_NOT_CONFIGURED", "Email sending isn't set up yet.");
     }
     const fromAddress = Deno.env.get("POD_EMAIL_FROM") || "Axentra Vehicle Logistics <onboarding@resend.dev>";
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 
-    const body = await req.json();
-    const { to, jobId, jobRef, vehicleReg, pickupCity, deliveryCity, dateStr, downloadUrl, photosZipUrl } = body ?? {};
+    const body = await req.json().catch(() => null);
+    const { to, jobId, downloadUrl, photosZipUrl } = body ?? {};
 
-    if (!to || typeof to !== "string" || !EMAIL_RE.test(to)) {
-      return new Response(
-        JSON.stringify({ error: "Valid recipient 'to' email is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (typeof to !== "string" || !EMAIL_RE.test(to.trim())) {
+      return fail(400, "INVALID_RECIPIENT", "Enter a valid email address.");
     }
-    if (!jobId || typeof jobId !== "string") {
-      return new Response(
-        JSON.stringify({ error: "jobId is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    const recipient = to.trim().toLowerCase();
+    if (typeof jobId !== "string" || !jobId) return fail(400, "JOB_REQUIRED", "Missing job.");
+    if (!isOwnSignedStorageUrl(downloadUrl, supabaseUrl, "pod-pdfs")) {
+      return fail(400, "INVALID_POD_LINK", "The POD download link is invalid. Please try again.");
     }
-    const downloadHref = typeof downloadUrl === "string" ? safeHref(downloadUrl) : null;
-    if (!downloadHref) {
-      return new Response(
-        JSON.stringify({ error: "A valid http(s) downloadUrl is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-    // Optional — omit the link rather than fail the whole send if it's missing/invalid.
-    const photosHref = typeof photosZipUrl === "string" ? safeHref(photosZipUrl) : null;
+    // Optional: drop the photos link rather than fail if it isn't ours.
+    const photosUrl = isOwnSignedStorageUrl(photosZipUrl, supabaseUrl, "pod-photos") ? (photosZipUrl as string) : null;
 
-    // ─── Authorization: this sends on the org's behalf via a shared sending
-    // identity/reputation, so a caller must not be able to reach jobs outside
-    // their own org, or redirect delivery to an address that isn't actually
-    // on file for the job (an open relay via the org's Resend account).
     const { data: job } = await admin
       .from("jobs")
-      .select("org_id, pickup_contact_email, delivery_contact_email")
+      .select(
+        "id, org_id, client_id, external_job_number, vehicle_reg, vehicle_make, vehicle_model, pickup_city, pickup_postcode, delivery_city, delivery_postcode, delivery_contact_name, delivery_contact_email, pickup_contact_email, completed_at",
+      )
       .eq("id", jobId)
       .maybeSingle();
-
     if (!job || (!caller.isSuperAdmin && job.org_id !== caller.orgId)) {
-      return new Response(
-        JSON.stringify({ error: "FORBIDDEN" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      return fail(403, "FORBIDDEN", "You can't send a POD for this job.");
+    }
+
+    const { data: client } = job.client_id
+      ? await admin
+          .from("clients")
+          .select("name, company, trading_name, email, billing_email, contact_email, contact_name")
+          .eq("id", job.client_id)
+          .maybeSingle()
+      : { data: null };
+
+    const decision = decidePodRecipient({
+      isAdmin: caller.isAdmin || caller.isSuperAdmin,
+      to: recipient,
+      jobEmails: [job.delivery_contact_email, job.pickup_contact_email],
+      clientEmails: [client?.email, client?.billing_email, client?.contact_email],
+    });
+    if (!decision.allowed) {
+      return jsonRes(
+        {
+          error: "RECIPIENT_NOT_ON_FILE",
+          message:
+            `This job's customer email is ${decision.onFile.join(" or ")}. ` +
+            "Send it there, or ask an admin to send it to a different address.",
+          onFile: decision.onFile,
+        },
+        403,
       );
     }
 
-    // Admins/super-admins may amend the recipient in the UI's confirm dialog
-    // (PodEmailConfirmDialog), so their confirmed address is honoured as-is.
-    // Non-admin callers (drivers) remain pinned to the contact emails on
-    // file for the job — the original anti-open-relay rule.
-    if (!caller.isAdmin && !caller.isSuperAdmin) {
-      const onFileEmails = [job.pickup_contact_email, job.delivery_contact_email]
-        .filter((e): e is string => typeof e === "string" && e.length > 0)
-        .map((e) => e.toLowerCase());
-      if (!onFileEmails.includes(to.toLowerCase())) {
-        return new Response(
-          JSON.stringify({ error: "Recipient must be a contact email on file for this job" }),
-          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-    }
+    const [{ data: org }, { data: delivery }] = await Promise.all([
+      admin
+        .from("organisations")
+        .select("name, branding_name, logo_url, primary_colour, main_contact_email, main_contact_phone, trading_address")
+        .eq("id", job.org_id)
+        .maybeSingle(),
+      admin
+        .from("inspections")
+        .select("inspected_at, customer_name")
+        .eq("job_id", job.id)
+        .eq("type", "delivery")
+        .is("archived_at", null)
+        .order("inspected_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
 
-    const subject = `Axentra POD – ${jobRef ?? ""} – ${vehicleReg ?? ""}`.trim();
-    const html = renderHtml({
-      jobRef: String(jobRef ?? ""),
-      vehicleReg: String(vehicleReg ?? ""),
-      pickupCity: String(pickupCity ?? "Unknown"),
-      deliveryCity: String(deliveryCity ?? "Unknown"),
-      dateStr: String(dateStr ?? ""),
-      downloadHref,
-      photosHref,
+    const ref = (job.external_job_number ?? "").trim() || String(job.id).slice(0, 8).toUpperCase();
+    const operatorName = (org?.branding_name || org?.name || "").trim();
+    const email = renderPodEmail({
+      operator: {
+        name: operatorName,
+        logoUrl: resolveLogoUrl(org?.logo_url, appBaseUrl(req)),
+        primaryColour: org?.primary_colour,
+        contactEmail: org?.main_contact_email,
+        contactPhone: org?.main_contact_phone,
+        address: org?.trading_address,
+      },
+      recipientName:
+        (job.delivery_contact_email ?? "").trim().toLowerCase() === recipient
+          ? job.delivery_contact_name
+          : client?.contact_name || client?.trading_name || client?.company || null,
+      job: {
+        ref,
+        reg: job.vehicle_reg ?? "",
+        make: job.vehicle_make,
+        model: job.vehicle_model,
+        from: place(job.pickup_city, job.pickup_postcode),
+        to: place(job.delivery_city, job.delivery_postcode),
+      },
+      deliveredAt: delivery?.inspected_at ?? job.completed_at,
+      receivedBy: delivery?.customer_name,
+      podUrl: downloadUrl as string,
+      photosUrl,
     });
 
+    const replyTo = cleanRecipients([org?.main_contact_email])[0];
     const resendResp = await fetch("https://api.resend.com/emails", {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${RESEND_API_KEY}`,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         from: fromAddress,
-        to: [to],
-        subject,
-        html,
+        to: [recipient],
+        subject: email.subject,
+        html: email.html,
+        text: email.text,
+        ...(replyTo ? { reply_to: replyTo } : {}),
       }),
     });
-
     const resendData = await resendResp.json().catch(() => ({}));
-
     if (!resendResp.ok) {
-      return new Response(
-        JSON.stringify({ error: "EMAIL_SEND_FAILED", detail: resendData }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      console.error("send-pod-email: Resend rejected", resendResp.status, JSON.stringify(resendData).slice(0, 500));
+      return jsonRes(
+        {
+          error: "EMAIL_SEND_FAILED",
+          message: "The email service didn't accept the message. Please try again in a moment.",
+        },
+        502,
       );
     }
 
-    return new Response(
-      JSON.stringify({ sent: true, id: resendData?.id ?? null }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    // Record it; save a driver/admin-entered address when the job had none.
+    // Best-effort: the email has already gone.
+    try {
+      if (decision.saveToJob) {
+        await admin
+          .from("jobs")
+          .update({ delivery_contact_email: recipient })
+          .eq("id", job.id)
+          .or('delivery_contact_email.is.null,delivery_contact_email.eq.""');
+      }
+      await admin.from("job_activity_log").insert({
+        job_id: job.id,
+        org_id: job.org_id,
+        action: "pod_emailed",
+        notes: `POD emailed to ${recipient} by ${caller.email || caller.id}${decision.saveToJob ? " (address saved to job)" : ""}`,
+      });
+    } catch (e) {
+      console.error("send-pod-email: post-send bookkeeping failed", e instanceof Error ? e.message : e);
+    }
+
+    return jsonRes({ sent: true, id: resendData?.id ?? null, recipient });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    return new Response(
-      JSON.stringify({ error: msg }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    console.error("send-pod-email error:", e instanceof Error ? e.message : e);
+    return fail(500, "INTERNAL", "Something went wrong sending the email. Please try again.");
   }
 });
