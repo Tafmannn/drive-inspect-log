@@ -106,6 +106,13 @@ describe("JobDetail — driver action layout", () => {
     expect(screen.queryByRole("button", { name: /view pod/i })).toBeNull();
   });
 
+  it("shows the locked screen to drivers for a completed job", () => {
+    mockJob = makeJob({ status: "completed", has_pickup_inspection: true, has_delivery_inspection: true });
+    renderDetail();
+    expect(screen.getByText("Job completed")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /view pod/i })).toBeNull();
+  });
+
   it("renders inspections as read-only status, not action buttons", () => {
     renderDetail();
     // Two "Pending" status pills (pickup + delivery), no Start/Override in the section.
