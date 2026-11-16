@@ -11,7 +11,9 @@ import { VehicleDiagram } from "@/components/VehicleDiagram";
 import { VehicleDamageModal } from "@/components/VehicleDamageModal";
 import { PhotoLabelModal } from "@/components/PhotoLabelModal";
 import { SignaturePad, type SignaturePadRef } from "@/components/SignaturePad";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { prepareCapturedPhoto } from "@/lib/capturedPhoto";
+import { clearActiveInspection, markActiveInspection } from "@/lib/activeInspection";
 import {
   ChevronLeft,
   ChevronRight,
@@ -226,6 +228,21 @@ export const InspectionFlow = () => {
     return () => clearTimeout(timer);
   }, [formState, currentStep, dk]);
 
+  // ─── INTERRUPTION MARKER ───
+  // While this screen is open, remember it so that if Android closes the
+  // app (e.g. while the camera is open) the app reopens here rather than on
+  // the home screen. A normal exit unmounts and clears it; a killed page
+  // never unmounts, which is how start-up knows it was interrupted. Refreshed
+  // on every form change so a long inspection never looks stale.
+  const location = useLocation();
+  const inspectionPath = location.pathname;
+  useEffect(() => {
+    markActiveInspection(inspectionPath, user?.id ?? null);
+  }, [inspectionPath, formState, currentStep, user?.id]);
+  useEffect(() => () => clearActiveInspection(inspectionPath), [inspectionPath]);
+  const resumedAfterRestart =
+    (location.state as { resumeAfterRestart?: boolean } | null)?.resumeAfterRestart === true;
+
   // ─── DRAFT RESTORE: check on mount (once) ───
   // Guard against false triggers from screen rotation / orientation change:
   // If the draft was saved <10 seconds ago, it's a remount, not a genuine interruption.
@@ -243,8 +260,10 @@ export const InspectionFlow = () => {
         const savedAge = draft.savedAt
           ? Date.now() - new Date(draft.savedAt).getTime()
           : Infinity;
-        if (savedAge < 10_000) {
-          // Silent restore — rotation or brief remount, not a genuine interruption
+        if (savedAge < 10_000 || resumedAfterRestart) {
+          // Silent restore — rotation or brief remount, or the app was
+          // reopened after Android closed it mid-inspection (we already
+          // brought the driver straight back here).
           const { _currentStep, ...fields } = draft.data;
           setFormState(prev => ({ ...prev, ...fields }));
           if (typeof _currentStep === "number" && _currentStep >= 1 && _currentStep <= totalSteps) {
@@ -466,16 +485,20 @@ export const InspectionFlow = () => {
     // cached (non-zero) while the bytes read as empty, surfacing later as a
     // "File is empty" upload failure. Copying into an ArrayBuffer-backed File
     // now (while the bytes are still readable) pins them in memory.
-    const buf = await file.arrayBuffer();
-    const safe = new File([buf], file.name || "photo.jpg", {
-      type: file.type || "image/jpeg",
-    });
+    //
+    // It is also downscaled to the upload size now (prepareCapturedPhoto):
+    // holding every photo at full camera resolution until submit is what
+    // let Android run out of memory and close the app around the 6th photo.
+    const safe = await prepareCapturedPhoto(file);
     const url = URL.createObjectURL(safe);
+    const replacedUrl = formState.standardPhotoUrls[photoKey];
     setFormState((prev) => ({
       ...prev,
       standardPhotos: { ...prev.standardPhotos, [photoKey]: safe },
       standardPhotoUrls: { ...prev.standardPhotoUrls, [photoKey]: url },
     }));
+    // A retake: free the previous preview's memory.
+    if (replacedUrl && replacedUrl.startsWith("blob:")) URL.revokeObjectURL(replacedUrl);
     // Persist the File blob so the photo survives an exit/reopen of the
     // app. Best-effort — the in-memory File is still authoritative for
     // the current session.
@@ -1486,13 +1509,16 @@ export const InspectionFlow = () => {
               id="additional-photo-input"
               onChange={(e) => {
                 const f = e.target.files?.[0];
-                if (f) {
-                  // Show label modal after capture
-                  setPendingPhotoFile(f);
-                  setPendingPhotoPreview(URL.createObjectURL(f));
-                  setShowPhotoLabelModal(true);
-                }
                 e.target.value = "";
+                if (f) {
+                  // Downscale first (see handlePhotoCapture), then show the
+                  // label modal with the smaller copy.
+                  void prepareCapturedPhoto(f).then((prepared) => {
+                    setPendingPhotoFile(prepared);
+                    setPendingPhotoPreview(URL.createObjectURL(prepared));
+                    setShowPhotoLabelModal(true);
+                  });
+                }
               }}
             />
             <Label htmlFor="additional-photo-input" className="cursor-pointer w-full">
