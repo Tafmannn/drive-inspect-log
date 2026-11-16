@@ -111,7 +111,9 @@ export async function authenticateCaller(
  * Authorize access to a storage object by resolving its owning org from the DB.
  * All GCS/signature object paths are of the form `jobs/<jobId>/...`, so the org
  * is resolved via the jobs table and compared to the caller's org. Fails closed
- * for non-super-admins when the path has no resolvable job/org.
+ * for non-super-admins when the path has no resolvable job/org. Non-admin
+ * callers (drivers) are further limited to jobs assigned to them that are not
+ * yet completed.
  */
 export async function callerCanAccessPath(
   admin: SupabaseClient,
@@ -126,9 +128,20 @@ export async function callerCanAccessPath(
 
   const { data: job } = await admin
     .from("jobs")
-    .select("org_id")
+    .select("org_id, driver_id, status")
     .eq("id", jobId)
     .maybeSingle();
 
-  return !!job && job.org_id === caller.orgId;
+  if (!job || job.org_id !== caller.orgId) return false;
+  if (caller.isAdmin) return true;
+
+  // Drivers: only their own jobs, and never once the job is completed
+  // (POD approved). Mirrors the driver_can_read_job_evidence() RLS rule.
+  if (job.status === "completed" || !job.driver_id) return false;
+  const { data: driver } = await admin
+    .from("driver_profiles")
+    .select("id")
+    .eq("user_id", caller.id)
+    .maybeSingle();
+  return !!driver && driver.id === job.driver_id;
 }
