@@ -5,13 +5,9 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  listAllUsers, createOrganisation, createUser, setUserRole,
-  deactivateUser, reactivateUser,
-  type OrgUser, type OrgRecord,
-} from "@/lib/adminApi";
+import { createOrganisation, type OrgRecord } from "@/lib/adminApi";
+import { UserManagementPanel } from "@/features/users/components/UserManagementPanel";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { ListRowsSkeleton } from "@/components/skeletons";
@@ -20,16 +16,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Loader2, Building2, UserPlus, Search, Eye, Power, PowerOff,
-  AlertCircle, RefreshCw, Shield, ScrollText, Settings,
+  Loader2, Building2, Search, Eye,
+  AlertCircle, RefreshCw, Shield, Settings,
   UserX, ChevronRight, Clock,
 } from "lucide-react";
 import { getStatusStyle } from "@/lib/statusConfig";
@@ -161,201 +156,14 @@ export function SuperAdminOrgs() {
 /* ─── Users ────────────────────────────────────────────────────── */
 
 export function SuperAdminUsers() {
-  const { user: currentUser } = useAuth();
-  const [users, setUsers] = useState<OrgUser[]>([]);
-  const [orgs, setOrgs] = useState<OrgRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState("all");
-  const [showCreate, setShowCreate] = useState(false);
-  const [newEmail, setNewEmail] = useState("");
-  const [newRole, setNewRole] = useState("driver");
-  const [newOrgId, setNewOrgId] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [pendingRoleChange, setPendingRoleChange] = useState<{ userId: string; email: string; fromRole: string; toRole: string } | null>(null);
-  const [confirmText, setConfirmText] = useState("");
-
-  const load = useCallback(async () => {
-    setLoading(true); setError(null);
-    try {
-      const [userData, orgData] = await Promise.all([listAllUsers(), supabase.from("organisations").select("*").order("name")]);
-      setUsers(userData); setOrgs(orgData.data ?? []);
-    } catch (e: any) { setError(e.message); } finally { setLoading(false); }
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  const handleCreate = async () => {
-    const trimmedEmail = newEmail.trim();
-    if (!trimmedEmail || !newOrgId) return;
-    // Validate before the round-trip — GoTrue rejects malformed addresses
-    // with an opaque error, so catch the obvious cases client-side.
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      toast({ title: "Please enter a valid email address", variant: "destructive" });
-      return;
-    }
-    setCreating(true);
-    try {
-      await createUser(trimmedEmail, newRole, newOrgId);
-      toast({ title: `User invited as ${newRole}` });
-      setNewEmail(""); setNewRole("driver"); setNewOrgId(""); setShowCreate(false); load();
-    } catch (e: any) { toast({ title: "Failed", description: e.message, variant: "destructive" }); } finally { setCreating(false); }
-  };
-
-  const requestRoleChange = (userId: string, newRole: string) => {
-    const user = users.find(u => u.id === userId);
-    if (!user || newRole === user.role) return;
-    setPendingRoleChange({ userId, email: user.email, fromRole: user.role, toRole: newRole });
-    setConfirmText("");
-  };
-
-  const executeRoleChange = async () => {
-    if (!pendingRoleChange) return;
-    if (pendingRoleChange.toRole === "super_admin" && confirmText !== "CONFIRM") return;
-    setActionLoading(pendingRoleChange.userId); setPendingRoleChange(null);
-    try {
-      await setUserRole(pendingRoleChange.userId, pendingRoleChange.toRole);
-      toast({ title: `Role updated to ${pendingRoleChange.toRole}` }); load();
-    } catch (e: any) { toast({ title: "Failed", description: e.message, variant: "destructive" }); } finally { setActionLoading(null); }
-  };
-
-  const handleToggleActive = async (userId: string, currentlyActive: boolean) => {
-    setActionLoading(userId);
-    try {
-      if (currentlyActive) { await deactivateUser(userId); toast({ title: "User deactivated" }); }
-      else { await reactivateUser(userId); toast({ title: "User reactivated" }); }
-      load();
-    } catch (e: any) {
-      const msg = /CANNOT_(MODIFY|SUSPEND)_SELF/.test(e.message ?? "") ? "You cannot deactivate your own account." : e.message;
-      toast({ title: "Failed", description: msg, variant: "destructive" });
-    } finally { setActionLoading(null); }
-  };
-
-  const filtered = users.filter(u => {
-    const matchSearch = !search || u.email?.toLowerCase().includes(search.toLowerCase());
-    const matchRole = roleFilter === "all" || u.role === roleFilter;
-    return matchSearch && matchRole;
-  });
-
+  // Same user management as admins get (profile, role, status, driver
+  // profile, permissions, archive/restore), with the super-admin extras
+  // switched on inside the shared components. This page used to be a reduced
+  // copy (role + active toggle only), which left the owner with fewer driver
+  // controls than an admin.
   return (
     <PageShell title="Users">
-      <div className="flex flex-wrap gap-2">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input placeholder="Search by email…" className="pl-9 min-h-[44px]" value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-        <Button className="min-h-[44px]" onClick={() => setShowCreate(true)}>
-          <UserPlus className="w-4 h-4 mr-1" /> Create
-        </Button>
-      </div>
-      <div className="flex gap-1 flex-wrap">
-        {["all", "driver", "admin", "super_admin"].map(r => (
-          <Button key={r} size="sm" variant={roleFilter === r ? "default" : "outline"} onClick={() => setRoleFilter(r)} className="min-h-[36px] capitalize text-xs">
-            {r === "all" ? "All" : r === "super_admin" ? "S.Admin" : r}
-          </Button>
-        ))}
-      </div>
-
-      {loading ? <LoadingSpinner /> : error ? <ErrorPanel message={error} onRetry={load} /> :
-        !filtered.length ? <EmptyState message="No users found." /> : (
-          <div className="rounded-xl border border-border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-xs">Email</TableHead>
-                  <TableHead className="text-xs">Role</TableHead>
-                  <TableHead className="text-xs">Org</TableHead>
-                  <TableHead className="text-xs">Status</TableHead>
-                  <TableHead className="text-xs">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map(u => {
-                  const isActive = u.is_active !== false;
-                  const orgName = orgs.find(o => o.id === u.org_id)?.name;
-                  return (
-                    <TableRow key={u.id} className={!isActive ? "opacity-50" : ""}>
-                      <TableCell className="text-sm">{u.email}</TableCell>
-                      <TableCell>
-                        <Select defaultValue={u.role} onValueChange={v => requestRoleChange(u.id, v)} disabled={actionLoading === u.id}>
-                          <SelectTrigger className="w-[110px] h-8 text-xs"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="driver">Driver</SelectItem>
-                            <SelectItem value="admin">Admin</SelectItem>
-                            <SelectItem value="super_admin">Super Admin</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{orgName ?? u.org_id?.slice(0, 8) ?? "—"}</TableCell>
-                      <TableCell><Badge variant={isActive ? "secondary" : "destructive"} className="text-xs">{isActive ? "Active" : "Inactive"}</Badge></TableCell>
-                      <TableCell>
-                        {u.id === currentUser?.id ? (
-                          <span className="text-[10px] text-muted-foreground px-2">You</span>
-                        ) : (
-                          <Button size="sm" variant="ghost" onClick={() => handleToggleActive(u.id, isActive)} disabled={actionLoading === u.id} className="min-h-[36px]">
-                            {actionLoading === u.id ? <Loader2 className="w-3 h-3 animate-spin" /> : isActive ? <PowerOff className="w-3 h-3" /> : <Power className="w-3 h-3" />}
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-
-      {/* Role change confirmation */}
-      <Dialog open={!!pendingRoleChange} onOpenChange={(open) => { if (!open) setPendingRoleChange(null); }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Confirm Role Change</DialogTitle>
-            <DialogDescription>
-              Changing <strong>{pendingRoleChange?.email}</strong> from <strong>{pendingRoleChange?.fromRole}</strong> to <strong>{pendingRoleChange?.toRole}</strong>.
-              {pendingRoleChange?.toRole === "super_admin" && (
-                <span className="block mt-2 text-destructive font-medium">⚠️ This grants God-mode access. Type CONFIRM to proceed.</span>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          {pendingRoleChange?.toRole === "super_admin" && (
-            <Input placeholder="Type CONFIRM" value={confirmText} onChange={e => setConfirmText(e.target.value)} className="min-h-[44px]" />
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPendingRoleChange(null)}>Cancel</Button>
-            <Button onClick={executeRoleChange} disabled={pendingRoleChange?.toRole === "super_admin" && confirmText !== "CONFIRM"} variant={pendingRoleChange?.toRole === "super_admin" ? "destructive" : "default"}>Confirm</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Create user dialog */}
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Create / Invite User</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div><Label>Email</Label><Input value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="user@example.com" className="mt-1 min-h-[44px]" /></div>
-            <div><Label>Role</Label>
-              <Select value={newRole} onValueChange={setNewRole}>
-                <SelectTrigger className="mt-1 min-h-[44px]"><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="driver">Driver</SelectItem><SelectItem value="admin">Admin</SelectItem><SelectItem value="super_admin">Super Admin</SelectItem></SelectContent>
-              </Select>
-            </div>
-            <div><Label>Organisation</Label>
-              <Select value={newOrgId} onValueChange={setNewOrgId}>
-                <SelectTrigger className="mt-1 min-h-[44px]"><SelectValue placeholder="Select org" /></SelectTrigger>
-                <SelectContent>{orgs.map(o => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
-            <Button onClick={handleCreate} disabled={creating || !newEmail.trim() || !newOrgId}>
-              {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : "Create"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <UserManagementPanel />
     </PageShell>
   );
 }
@@ -600,7 +408,7 @@ export function SuperAdminSettings() {
           <CardContent className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">Auth source</span>
-              <Badge variant="secondary" className="text-[10px]">app_metadata.role</Badge>
+              <Badge variant="secondary" className="text-[10px]">user_profiles.role</Badge>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">Roles</span>

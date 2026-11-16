@@ -86,6 +86,16 @@ export function PermissionEditor({ userId, userRole }: PermissionEditorProps) {
       <p className="text-[10px] text-muted-foreground">
         Role defaults for <span className="font-medium">{userRole}</span>. Override per-user below.
       </p>
+      {/* Overrides are stored and audited but not yet enforced: access is
+          currently decided by role (RLS + edge functions). Say so rather than
+          implying a deny takes effect. See docs/admin-audit/03-findings.md F-04. */}
+      <p
+        role="note"
+        className="text-[10px] rounded border border-amber-300 bg-amber-50 text-amber-900 px-2 py-1.5 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200"
+      >
+        Overrides are recorded for audit but don't change access yet. What a user can do is
+        currently set by their role. To restrict someone, change their role or suspend them.
+      </p>
 
       {categories.map((cat) => (
         <div key={cat} className="space-y-1.5">

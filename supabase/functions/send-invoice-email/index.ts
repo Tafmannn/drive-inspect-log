@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { authenticateCaller, corsHeaders } from "../_shared/auth.ts";
+import { authenticateCaller, corsHeaders, inactiveAccountError } from "../_shared/auth.ts";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -100,9 +100,11 @@ serve(async (req) => {
     // therefore pins recipients to on-file contacts, this function trusts
     // the org's admins to direct their own invoices — the confirm dialog in
     // the UI is the safeguard against typos.
-    if (!caller.isAdmin && !caller.isSuperAdmin) {
+    // Only active accounts: pending (not yet activated) and suspended are refused.
+    const inactive = inactiveAccountError(caller.accountStatus);
+    if (inactive || (!caller.isAdmin && !caller.isSuperAdmin)) {
       return new Response(
-        JSON.stringify({ error: "FORBIDDEN" }),
+        JSON.stringify({ error: inactive ?? "FORBIDDEN" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

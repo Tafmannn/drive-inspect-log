@@ -15,6 +15,7 @@ import {
 import { extractJobIdFromPath } from "./pathAuth.ts";
 import {
   callerAuthzFromProfile,
+  inactiveAccountError,
   rolesArrayFor,
   type AppRole,
 } from "./profileAuthz.ts";
@@ -34,7 +35,7 @@ export function jsonRes(body: unknown, status = 200): Response {
 
 // Re-exported from the pure module so existing importers keep working.
 export type { AppRole };
-export { rolesArrayFor };
+export { inactiveAccountError, rolesArrayFor };
 
 export interface Caller {
   id: string;

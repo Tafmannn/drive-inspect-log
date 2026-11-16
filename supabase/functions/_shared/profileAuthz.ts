@@ -47,3 +47,15 @@ export function rolesArrayFor(role: AppRole): string[] {
   if (role === "admin") return ["ADMIN", "DRIVER"];
   return ["DRIVER"];
 }
+
+/**
+ * Error code for a caller whose account may not act, or null when active.
+ * Only "active" accounts may use staff/admin functions: pending (invited, not
+ * yet activated) and suspended accounts are refused, matching the app's
+ * route guards. A missing profile reads as driver/active above, and driver
+ * callers are refused by each function's own role check.
+ */
+export function inactiveAccountError(accountStatus: string): "ACCOUNT_SUSPENDED" | "ACCOUNT_NOT_ACTIVE" | null {
+  if (accountStatus === "active") return null;
+  return accountStatus === "suspended" ? "ACCOUNT_SUSPENDED" : "ACCOUNT_NOT_ACTIVE";
+}

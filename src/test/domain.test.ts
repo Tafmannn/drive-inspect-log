@@ -80,7 +80,10 @@ describe("Multi-role system", () => {
   it("ADMIN has admin access", () => {
     const user = makeUser(["ADMIN"]);
     expect(hasRoleCheck(user, "ADMIN")).toBe(true);
-    expect(hasRoleCheck(user, "DRIVER")).toBe(false);
+    // Roles are hierarchical (SUPERADMIN ⊇ ADMIN ⊇ DRIVER), matching the
+    // server's rolesArrayFor("admin") = ["ADMIN", "DRIVER"].
+    expect(hasRoleCheck(user, "DRIVER")).toBe(true);
+    expect(hasRoleCheck(user, "SUPERADMIN")).toBe(false);
   });
 
   it("ADMIN+DRIVER hybrid has both roles", () => {
