@@ -66,3 +66,47 @@ describe("invoiceRecordToPdfData", () => {
     expect(data.vatRate).toBe(20);
   });
 });
+
+describe("invoiceRecordToPdfData — multi-job invoices with expenses", () => {
+  const multi: InvoiceRecord = {
+    ...base,
+    invoice_number: "AX26-1007",
+    client_ref: "PO-4500123",
+    vat_registered: false,
+    vat_rate: 0,
+    document_type: "invoice",
+    line_items: [
+      { description: "AX1043 | 03/11/2026 | XY69 ZZZ | Bristol BS34 - Cardiff CF11", amount: 95, quantity: 1, sort_order: 1, job_id: "j2", job_ref: "AX1043", job_date: "2026-11-03" },
+      { description: "AX1042 | 02/11/2026 | AB12 CDE | Leeds LS11 - Bristol BS34", amount: 185, quantity: 1, sort_order: 0, job_id: "j1", job_ref: "AX1042", job_date: "2026-11-02", detail: "Expenses: Fuel £54.60 (R01)", expense_amount: 54.6 },
+    ],
+  };
+
+  it("carries each job's expense line and amount through to the PDF rows", () => {
+    const data = invoiceRecordToPdfData(multi);
+    expect(data.lineItems).toEqual([
+      { description: "AX1042 | 02/11/2026 | AB12 CDE | Leeds LS11 - Bristol BS34", quantity: 1, unitPrice: 185, detail: "Expenses: Fuel £54.60 (R01)", expenseAmount: 54.6 },
+      { description: "AX1043 | 03/11/2026 | XY69 ZZZ | Bristol BS34 - Cardiff CF11", quantity: 1, unitPrice: 95 },
+    ]);
+  });
+
+  it("uses the compact layout with a job count + date range, PO and VAT status", () => {
+    const data = invoiceRecordToPdfData(multi);
+    expect(data.compactFooter).toBe(true);
+    expect(data.headerSubtitle).toBe("2 jobs | 2 - 3 November 2026");
+    expect(data.clientRef).toBe("PO-4500123");
+    expect(data.vatRegistered).toBe(false);
+    expect(data.documentType).toBeUndefined();
+  });
+
+  it("leaves a pre-switch invoice (vat_registered null) in its original presentation", () => {
+    const data = invoiceRecordToPdfData({ ...base, vat_registered: null, line_items: [{ description: "Job", amount: 100, quantity: 1, sort_order: 0 }] });
+    expect(data).not.toHaveProperty("vatRegistered");
+    expect(data).not.toHaveProperty("compactFooter");
+    expect(data).not.toHaveProperty("headerSubtitle");
+    expect(data.vatRate).toBe(20);
+  });
+
+  it("marks a credit note", () => {
+    expect(invoiceRecordToPdfData({ ...multi, document_type: "credit_note" }).documentType).toBe("credit_note");
+  });
+});

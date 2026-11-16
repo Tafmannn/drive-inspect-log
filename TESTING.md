@@ -159,3 +159,52 @@
 - [ ] Jobs CSV: all fields present, downloads correctly
 - [ ] Inspections CSV: linked to correct jobs
 - [ ] Expenses CSV: includes job references and receipt counts
+
+## Invoicing with expenses, VAT switch and lifecycle
+
+Needs migrations `20261114120000`, `20261114130000`, `20261114140000`.
+See `docs/invoicing-and-accounts.md`.
+
+### Create a multi-job invoice
+- [ ] Control → Invoice Prep → pick a client with ≥ 2 completed jobs that have expenses
+- [ ] Tick the jobs → "3. Rechargeable Expenses" appears; Fuel is pre-ticked, other categories are not
+- [ ] An expense with no receipt shows "No receipt"; ticking it shows the warning
+- [ ] A category chip ticks / clears every expense in that category
+- [ ] Preview shows one line per job: Transport, Expenses, Total; totals match
+- [ ] VAT off: no VAT line, "Total due", "Not VAT registered" note
+- [ ] "Preview PDF" downloads a PDF marked PREVIEW with the receipt pages
+- [ ] Create Invoice → success card; the jobs leave the eligible list; ticked expenses are no longer offered for those jobs
+- [ ] Client marked "PO required": Create is refused until a PO is entered
+
+### The PDF
+- [ ] Page 1: header "N jobs | date range", Your Ref / PO, job rows with the grey expense line, payment details beside the total
+- [ ] Receipt pages: 6 per page, each captioned R01… matching page 1
+- [ ] Footer on every page: business name + address, "Page x of y"
+- [ ] A single-job invoice from a POD ("Create Invoice") still looks as before, with no VAT line when VAT is off
+
+### Lifecycle
+- [ ] Draft → "Mark as sent": badge becomes Sent; re-download gives the same file
+- [ ] Email to client: recipient confirm → email arrives with a working link; badge becomes Sent
+- [ ] Sent → "Record payment" → Paid, with the date; "Undo payment" returns it to Sent
+- [ ] A sent invoice past its due date shows Overdue
+- [ ] Cancel a draft: reason required; badge Cancelled; its jobs are selectable again
+- [ ] Cancel a sent invoice: a credit note CNyy-000n appears; both stay listed; jobs + expenses selectable again
+- [ ] Download pack: ZIP with the PDF and a `receipts/` folder containing only that invoice's receipts
+
+### VAT switch (super admin)
+- [ ] Organisations → organisation → "VAT registered" toggle; warning while no VAT number / address is saved
+- [ ] VAT on: Invoice Prep shows the VAT rate and VAT line; PDF has Subtotal / VAT / Total and Schedule A
+- [ ] Invoices created before the toggle are unchanged
+
+### Client portal
+- [ ] Portal → Invoices: sent invoices only; Paid / Cancelled / Credit note badges
+- [ ] Download PDF returns the stored file including receipt pages
+- [ ] A draft invoice is not visible; another client's invoice cannot be opened
+
+### Accounts and Xero
+- [ ] Control → Exports → Accounts: figures load for "This month"; changing the period updates them
+- [ ] Draft invoices dated in the period are reported as not counted
+- [ ] Download accounts pack → ZIP opens; `Accounts_Summary.xlsx` opens in Excel with 6 tabs; `Expenses.csv` "Receipt file" names match files in `Receipts/`
+- [ ] Xero sales CSV imports into a Xero demo company as Tax Exclusive; totals match the invoices
+- [ ] Xero bills CSV imports as Tax Inclusive
+- [ ] VAT threshold bar shows the last-12-months figure (hidden once VAT registered)

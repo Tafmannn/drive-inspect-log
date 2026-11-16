@@ -42,6 +42,22 @@ export interface Expense {
   billable_on_pod: boolean;
   created_at: string;
   updated_at: string;
+  /** Who was paid (e.g. "Shell M1 J28"). */
+  supplier?: string | null;
+  /** VAT included in `amount`, as shown on the receipt. */
+  vat_amount?: number | null;
+}
+
+/**
+ * supplier / vat_amount are only sent when the caller actually supplies
+ * them, so the everyday "log an expense" path never depends on those
+ * columns being present.
+ */
+function expenseExtras(input: { supplier?: string | null; vat_amount?: number | null }) {
+  return {
+    ...(input.supplier !== undefined ? { supplier: input.supplier } : {}),
+    ...(input.vat_amount !== undefined ? { vat_amount: input.vat_amount } : {}),
+  };
 }
 
 interface ExpenseReceipt {
@@ -167,6 +183,8 @@ export async function createExpense(input: {
   label?: string | null;
   notes?: string | null;
   driver_id?: string | null;
+  supplier?: string | null;
+  vat_amount?: number | null;
 }): Promise<Expense> {
   const orgId = await getOrgId();
   const { data, error } = await supabase
@@ -182,6 +200,7 @@ export async function createExpense(input: {
       notes: input.notes ?? null,
       driver_id: input.driver_id ?? null,
       org_id: orgId,
+      ...expenseExtras(input),
     } as any)
     .select()
     .single();
@@ -198,6 +217,8 @@ export async function updateExpense(input: {
   category?: string;
   label?: string | null;
   notes?: string | null;
+  supplier?: string | null;
+  vat_amount?: number | null;
 }): Promise<Expense> {
   const { id, ...fields } = input;
   const { data, error } = await supabase

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { ChevronRight, FileText, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { usePortalInvoices } from "../api";
+import { PortalInvoiceBadge } from "../components/PortalInvoiceBadge";
 import { fmtDate, fmtGbp } from "../lib/format";
 
 export default function PortalInvoices() {
@@ -36,7 +37,10 @@ export default function PortalInvoices() {
               className="flex items-center justify-between gap-3 p-4 hover:bg-muted/50 focus:outline-none focus-visible:bg-muted/50"
             >
               <div className="min-w-0">
-                <p className="font-medium font-mono">{inv.invoice_number}</p>
+                <p className="font-medium font-mono flex flex-wrap items-center gap-2">
+                  {inv.invoice_number}
+                  <PortalInvoiceBadge invoice={inv} />
+                </p>
                 <p className="text-xs text-muted-foreground">
                   Issued {fmtDate(inv.issue_date)}{inv.due_date ? ` · Due ${fmtDate(inv.due_date)}` : ""}
                 </p>

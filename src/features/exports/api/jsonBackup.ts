@@ -26,6 +26,9 @@ export async function exportJsonBackup(): Promise<BackupResult> {
     invoicesRes,
     clientsRes,
     damageItemsRes,
+    invoiceItemsRes,
+    expenseReceiptsRes,
+    invoiceExpensesRes,
   ] = await Promise.all([
     supabase.from("jobs").select("*").limit(20000),
     supabase.from("inspections").select("*").limit(20000),
@@ -34,16 +37,24 @@ export async function exportJsonBackup(): Promise<BackupResult> {
     supabase.from("invoices").select("*").limit(10000),
     supabase.from("clients").select("*").limit(5000),
     supabase.from("damage_items").select("*").limit(20000),
+    // The invoice's lines and which expense/receipt backs each one: without
+    // these a restored invoice cannot be tied back to its jobs or receipts.
+    supabase.from("invoice_items").select("*").limit(50000),
+    supabase.from("expense_receipts").select("*").limit(50000),
+    supabase.from("invoice_expenses").select("*").limit(50000),
   ]);
 
-  const errors = [jobsRes, inspectionsRes, photosRes, expensesRes, invoicesRes, clientsRes, damageItemsRes]
+  const errors = [
+    jobsRes, inspectionsRes, photosRes, expensesRes, invoicesRes, clientsRes, damageItemsRes,
+    invoiceItemsRes, expenseReceiptsRes, invoiceExpensesRes,
+  ]
     .map((r) => r.error)
     .filter(Boolean);
   if (errors.length) throw new Error(errors.map((e) => e!.message).join("; "));
 
   const payload = {
     generatedAt: new Date().toISOString(),
-    schemaVersion: "1.0",
+    schemaVersion: "1.1",
     jobs: jobsRes.data ?? [],
     inspections: inspectionsRes.data ?? [],
     photos: photosRes.data ?? [],
@@ -51,6 +62,9 @@ export async function exportJsonBackup(): Promise<BackupResult> {
     invoices: invoicesRes.data ?? [],
     clients: clientsRes.data ?? [],
     damage_items: damageItemsRes.data ?? [],
+    invoice_items: invoiceItemsRes.data ?? [],
+    expense_receipts: expenseReceiptsRes.data ?? [],
+    invoice_expenses: invoiceExpensesRes.data ?? [],
   };
 
   const counts = {
@@ -61,6 +75,9 @@ export async function exportJsonBackup(): Promise<BackupResult> {
     invoices: payload.invoices.length,
     clients: payload.clients.length,
     damage_items: payload.damage_items.length,
+    invoice_items: payload.invoice_items.length,
+    expense_receipts: payload.expense_receipts.length,
+    invoice_expenses: payload.invoice_expenses.length,
   };
 
   downloadJson(payload, `axentra-backup-${new Date().toISOString().slice(0, 10)}.json`);

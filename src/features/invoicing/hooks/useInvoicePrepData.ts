@@ -8,7 +8,8 @@
  *      transitions the job to 'completed' via complete_job RPC.
  *   2. is_hidden = false
  *   3. not already linked to an invoice_items row
- *   4. client_company or client_name matches the selected client
+ *   4. linked to the selected client (client_id), or — for unlinked legacy
+ *      jobs only — client_company / client_name matches it
  *   5. Each row carries a readinessReason so the UI can render a clear badge.
  */
 import { useQuery } from "@tanstack/react-query";
@@ -37,6 +38,11 @@ export interface EligibleJob {
   client_email: string | null;
   client_phone: string | null;
   status: string;
+  // Route ends, for the "Leeds LS11 - Bristol BS34" part of the invoice line.
+  pickup_city?: string | null;
+  pickup_postcode?: string | null;
+  delivery_city?: string | null;
+  delivery_postcode?: string | null;
   // receipt count from expenses
   receiptCount?: number;
   // Stage 5 readiness — populated below.
@@ -66,7 +72,7 @@ export function useEligibleJobs(
       let query = supabase
         .from("jobs")
         .select(
-          "id, external_job_number, vehicle_reg, vehicle_make, vehicle_model, job_date, completed_at, total_price, distance_miles, client_id, client_company, client_name, client_email, client_phone, status"
+          "id, external_job_number, vehicle_reg, vehicle_make, vehicle_model, job_date, completed_at, total_price, distance_miles, client_id, client_company, client_name, client_email, client_phone, status, pickup_city, pickup_postcode, delivery_city, delivery_postcode"
         )
         .eq("is_hidden", false)
         .in("status", TERMINAL_STATUSES)
@@ -87,8 +93,11 @@ export function useEligibleJobs(
       if (error) throw error;
       if (!jobs?.length) return [];
 
-      // 2. Filter to jobs matching this client (by name or company)
+      // 2. Filter to this client's jobs. A linked job (client_id) belongs to
+      //    exactly that client, whatever its free-text name says; only an
+      //    unlinked legacy job falls back to matching by name or company.
       const clientJobs = (jobs as EligibleJob[]).filter((j) => {
+        if (j.client_id) return j.client_id === client.id;
         const jClient = (j.client_company || j.client_name || "").toLowerCase();
         const cName = client.name.toLowerCase();
         const cCompany = (client.company || "").toLowerCase();
@@ -140,56 +149,4 @@ export function useEligibleJobs(
     enabled: !!client,
     staleTime: 15_000,
   });
-}
-
-/** Compute invoice preview totals from selected jobs */
-export function computePreviewTotals(
-  jobs: EligibleJob[],
-  vatRate: number = 20
-): {
-  subtotal: number;
-  vatAmount: number;
-  total: number;
-  receiptCount: number;
-  jobCount: number;
-  warnings: string[];
-} {
-  const warnings: string[] = [];
-  let subtotal = 0;
-  let receiptCount = 0;
-
-  // Check for mixed clients
-  const clientNames = new Set<string>();
-  jobs.forEach((j) => {
-    const cn = (j.client_company || j.client_name || "Unknown").toLowerCase();
-    clientNames.add(cn);
-  });
-  if (clientNames.size > 1) {
-    warnings.push("Selected jobs have mixed client names — review before invoicing.");
-  }
-
-  // Check for missing prices
-  const noPriceJobs = jobs.filter((j) => !j.total_price || j.total_price <= 0);
-  if (noPriceJobs.length > 0) {
-    warnings.push(
-      `${noPriceJobs.length} job(s) have no price set — total may be inaccurate.`
-    );
-  }
-
-  jobs.forEach((j) => {
-    subtotal += j.total_price ?? 0;
-    receiptCount += j.receiptCount ?? 0;
-  });
-
-  const vatAmount = subtotal * (vatRate / 100);
-  const total = subtotal + vatAmount;
-
-  return {
-    subtotal,
-    vatAmount,
-    total,
-    receiptCount,
-    jobCount: jobs.length,
-    warnings,
-  };
 }
