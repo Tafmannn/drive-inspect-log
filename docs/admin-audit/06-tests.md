@@ -26,16 +26,25 @@ Each probe impersonates the real Admin and Super Admin accounts (`set_config('re
 | `role_permission_templates` | All 21 admin-allowed keys (of 27 in the catalogue) are allowed for super_admin |
 | Permission overrides | 25 rows, all on driver accounts, none on admin or super_admin |
 
+## Production release checks (2026-11-16)
+
+| Step | Check | Result |
+|---|---|---|
+| Edge functions | Deployed version, status and `verify_jwt` unchanged | user-lifecycle v57, assign-driver v78, get-org-users v77, send-push v3, send-invoice-email v3, portal-access v2: all ACTIVE, `verify_jwt` as before |
+| Migration: before | Per-role helper and permission results (admin, driver, super admin) | Recorded |
+| Migration: after | Same per-role results | Identical for all three roles |
+| Migration: after | Admin set to `suspended`, then `pending_activation` (rolled back) | Helpers false; `drivers.manage` false; visible driver_profiles 5 → 0, jobs 73 → 0 |
+| Migration: after | Account states after the rolled-back probe | Admin and super admin both still `active` |
+| Migration: after | 18-table read probe | Identical counts to before; Super ≥ Admin on every table |
+| Migration: after | Write-policy probe | 54/54 evaluated, 0 where Admin > Super |
+| Migration: after | Privileges and SECURITY DEFINER on the three functions | Unchanged |
+| Migration: after | Supabase security advisor | No new findings (existing: leaked-password protection off; expected SECURITY DEFINER helpers) |
+
+Note: there are 54 write policies now against 50 earlier the same day. The 4 new ones come from the driver read-scope rules (branch `claude/charming-johnson-pqznu8`, `20261116120000_driver_read_scope_own_jobs.sql`), applied directly in SQL at 21:13 UTC and not yet in the migration history or on main. All 54 pass the parity check.
+
 ## Not verified (limitations)
 
 * **Live UI as each role:** the sandbox can't sign in (Supabase is unreachable), so screens were covered by component tests only.
-* **Edge-function behaviour after deploy:** awaiting deploy approval.
-* **The RLS migration:** not applied. After approval, run these:
-  ```sql
-  -- expect: admin and super_admin both true while active
-  -- (impersonate each; read-only)
-  select public.is_admin_or_super_admin(), public.is_super_admin();
-  ```
-  Then re-run the 18-table read probe and the 50-policy write probe; both must still show Super ≥ Admin. Finally, on a disposable test admin set to `suspended`, confirm both helpers return false.
+* **Edge functions after deploy:** each deploy compiled the full bundle (so imports and syntax are sound) and the new versions are active. Live calls from the sandbox aren't possible; no errors appeared in function logs after deploy (no traffic yet at check time).
 * **Tenant isolation across two populated orgs:** production has data in one org only. The probes confirm the org predicate is present, not cross-org behaviour.
 * **Persistence after refresh:** shown by the code path (mutations refresh the server-backed list and detail queries). Not observed in a browser.

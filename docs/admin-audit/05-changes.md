@@ -1,8 +1,8 @@
 # 05 — Changes
 
-All changes are on branch `claude/vehicle-app-security-review-czk39t`. **Not merged, not deployed, no production database changes.**
+Developed on branch `claude/vehicle-app-security-review-czk39t`. Released on 2026-11-16 with approval, in this order: edge functions, then database, then app.
 
-## Frontend (takes effect on merge + deploy)
+## Frontend (released with the merge)
 
 | File | Change | Finding |
 |---|---|---|
@@ -15,7 +15,7 @@ All changes are on branch `claude/vehicle-app-security-review-czk39t`. **Not mer
 | `src/features/users/components/PermissionEditor.tsx` | Notice: overrides recorded, not enforced | F-04 |
 | `src/lib/adminApi.ts` | Removed dead duplicate user-action helpers | F-01 |
 
-## Edge functions (take effect only when deployed: **awaiting approval**)
+## Edge functions (deployed 2026-11-16)
 
 | Function | Change | Finding |
 |---|---|---|
@@ -24,11 +24,11 @@ All changes are on branch `claude/vehicle-app-security-review-czk39t`. **Not mer
 | `assign-driver`, `get-org-users`, `send-push`, `portal-access` | Active-only callers | F-05 |
 | `send-invoice-email` | Active-only callers (previously no status check) | F-05 |
 
-Deploy list (each with its `_shared` files): user-lifecycle, assign-driver, get-org-users, send-push, portal-access, send-invoice-email.
+Deployed with their full `_shared` files and unchanged `verify_jwt`: user-lifecycle v57, assign-driver v78, get-org-users v77 (`verify_jwt` false), send-push v3, send-invoice-email v3 (`verify_jwt` true), portal-access v2 (false).
 
-## Database: **awaiting approval**
+## Database (applied 2026-11-16)
 
-* `docs/admin-audit/pending/20261117120000_active_only_admin_helpers.sql`. Kept out of `supabase/migrations/` so nothing can apply it automatically. Once approved, move it there and apply. Verification probes are in 06-tests.md.
+* `supabase/migrations/20261116212409_active_only_admin_helpers.sql`: active-only `is_admin_or_super_admin()` and `is_super_admin()`; the super admin holds every permission in `user_has_permission()`. Function privileges and `SECURITY DEFINER` settings are unchanged.
 
 ## Tests added or updated
 

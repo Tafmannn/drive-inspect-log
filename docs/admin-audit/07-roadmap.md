@@ -2,9 +2,10 @@
 
 | ID | Pri | Item | Depends on | Size |
 |---|---|---|---|---|
-| A-1 | P0 | **Approve and apply** the active-only RLS helper migration (F-03), then run the 06-tests probes | approval | S |
-| A-2 | P1 | **Approve and deploy** the 6 edge functions (F-05, F-06) | approval | S |
-| A-3 | P1 | **Approve merge and deploy** of the frontend (F-01, F-02, F-04 notice, F-07) | approval | S |
+| A-1 | P0 | ~~Apply the active-only RLS helper migration (F-03)~~ **Done 2026-11-16** | — | — |
+| A-2 | P1 | ~~Deploy the 6 edge functions (F-05, F-06)~~ **Done 2026-11-16** | — | — |
+| A-3 | P1 | ~~Merge and deploy the frontend (F-01, F-02, F-04 notice, F-07)~~ **Done 2026-11-16** | — | — |
+| A-4 | P1 | Record the driver read-scope rules: they were applied directly to production and their migration lives only on `claude/charming-johnson-pqznu8`; merge it so the repo matches the database | that branch | S |
 | R-01 | P2 | Consolidate duplicate admin pages onto `/control`: redirect `/admin/jobs`, `/admin/pod-review`, `/admin/finance` and `/admin/drivers` once each `/control` page has parity; fold the owner console tiles into the Control **Platform** group | A-3 | M |
 | R-02 | P2 | `user_org_id()`: drop the "oldest org" fallback for a super admin without an org (F-08); re-run the RLS probes | approval | S |
 | R-03 | P1 | Permission overrides: decide **enforce** (check selected keys such as `drivers.manage`, `jobs.assign` and `reports.export` in RLS and edge functions via `current_user_has_permission`) or **remove** the editor. Recommendation: remove until a real need for per-user restrictions exists; roles plus suspension cover today's single-org use. | decision | M (enforce) / S (remove) |

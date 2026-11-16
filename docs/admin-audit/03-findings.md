@@ -2,12 +2,12 @@
 
 | ID | Severity | Status | Summary |
 |---|---|---|---|
-| F-01 | P1 | Fixed (frontend; deploy pending) | Super Admin console's user management was a reduced duplicate; owner could change fewer driver settings than an Admin |
+| F-01 | P1 | Fixed and released | Super Admin console's user management was a reduced duplicate; owner could change fewer driver settings than an Admin |
 | F-02 | P2 | Fixed | Super Admin's role list lacked ADMIN; `roles.includes("ADMIN")` checks (nav) excluded the owner |
-| F-03 | P0 | Migration prepared, awaiting approval | RLS role helpers ignore `account_status` |
+| F-03 | P0 | Fixed: migration applied and verified | RLS role helpers ignore `account_status` |
 | F-04 | P1 | Mitigated (honest UI); enforcement on roadmap | Per-user permission overrides are stored but never enforced |
-| F-05 | P1 | Fixed in code; deploy awaiting approval | Admin edge functions accepted pending (and, for invoices, any-status) callers |
-| F-06 | P2 | Fixed in code; deploy awaiting approval | Owner protection relied only on the `is_protected` flag |
+| F-05 | P1 | Fixed and deployed | Admin edge functions accepted pending (and, for invoices, any-status) callers |
+| F-06 | P2 | Fixed and deployed | Owner protection relied only on the `is_protected` flag |
 | F-07 | P3 | Fixed | Misleading labels: "Organisation Settings" opened the admin dashboard; owner Settings said auth source was `app_metadata.role` |
 | F-08 | P3 | Risk, documented | `user_org_id()` falls back to the oldest org for a super admin with no org |
 | F-09 | P2 | Roadmap | Three parallel admin shells with duplicate pages |
@@ -47,8 +47,8 @@
 * **Problem:** `is_admin_or_super_admin()` and `is_super_admin()` check only `role`. They back 67 policies, and 0 of those policies check `account_status`.
 * **Impact:** a suspended admin keeps admin data access via direct REST calls for the life of an already-issued access token (about an hour). Suspension bans the auth user, so refresh stops.
   * A `pending_activation` admin has admin RLS power from the moment they sign in.
-* **Fix prepared:** `docs/admin-audit/pending/20261117120000_active_only_admin_helpers.sql`. It requires `account_status = 'active'` in both helpers, and makes `user_has_permission()` grant the super admin everything.
-* **Approval:** production RLS change, awaiting approval.
+* **Fix:** `supabase/migrations/20261116212409_active_only_admin_helpers.sql`. It requires `account_status = 'active'` in both helpers, and makes `user_has_permission()` grant the super admin everything.
+* **Applied:** 2026-11-16 with approval; verification results are in 06-tests.md.
 * **Rollback:** re-create the helpers without the `account_status` predicate.
 
 ## F-04: Permission overrides are not enforced

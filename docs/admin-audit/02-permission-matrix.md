@@ -48,6 +48,6 @@ Legend:
 | Driver | admin routes / functions | route guards; EF `ADMIN_OR_SUPER_ADMIN_ONLY`; RLS | PASS |
 | Portal client | internal UI / staff functions | `PortalRoute`/`ProtectedRoute`; role expands to CLIENT only; `roleSatisfies(CLIENT, *)` false; staffGate | PASS |
 | Signed-out | edge functions | `authenticateCaller` → 401 | PASS (code); UNTESTED live |
-| Pending / suspended admin | edge functions | `inactiveAccountError` on all admin-gated functions | FAIL → fixed in code (F-05), **deploy awaiting approval** |
-| Suspended admin with a still-valid token | REST/RLS | helpers ignore `account_status` | **RISK (F-03), migration awaiting approval** |
+| Pending / suspended admin | edge functions | `inactiveAccountError` on all admin-gated functions | FAIL → fixed and deployed (F-05) |
+| Suspended admin with a still-valid token | REST/RLS | helpers ignore `account_status` | FAIL → fixed: migration applied; verified a suspended or pending admin sees 0 driver profiles and 0 jobs (F-03) |
 | Admin of org A | org B data | `org_id = user_org_id()` in RLS; EF org checks | PASS (RLS probe; one org of data in prod) |

@@ -1,4 +1,5 @@
--- AWAITING APPROVAL — not applied. Move to supabase/migrations/ once approved.
+-- Applied to production 2026-11-16 (version 20261116212409), verified with
+-- rollback-only probes: see docs/admin-audit/06-tests.md.
 --
 -- 1) RLS role helpers become status-aware. is_admin_or_super_admin() and
 --    is_super_admin() back 67 RLS policies but only looked at the role, so a
@@ -14,7 +15,9 @@
 --    the owner. Making it structural removes both failure modes.
 --
 -- Safe to re-run (CREATE OR REPLACE, same signatures, same SECURITY/search_path).
--- Rollback: re-create the previous bodies (see 03-findings.md, F-03).
+-- Rollback: re-create the previous bodies, i.e. drop the
+-- "and up.account_status = 'active'" predicate from both helpers and the
+-- super_admin line from user_has_permission (03-findings.md, F-03).
 
 create or replace function public.is_admin_or_super_admin()
 returns boolean

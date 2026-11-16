@@ -37,7 +37,7 @@ See 04-ux-review.md.
 * One operations UI (`/control`) used by Admin and Super Admin. Super Admin gets an extra **Platform** nav group; it never gets a separate, reduced copy of an operations screen.
 * Shared components carry the super-admin extras behind `isSuperAdmin`. For example, `UserManagementPanel` is now used by `/control/admin`, `/admin/users` and `/super-admin/users`.
 * Roles expand in one place (`roleModel.ts`, mirrored by `profileAuthz.rolesArrayFor`, with a parity test).
-* Enforcement is server-side: RLS helpers and edge functions both require an **active** account. The edge-function half is done on this branch; the RLS half is pending approval (F-03).
+* Enforcement is server-side: RLS helpers and edge functions both require an **active** account. Both halves are live in production (edge functions deployed and RLS migration `20261116212409` applied on 2026-11-16).
 * Capability contract: `ADMIN_CAPABILITIES ⊆ capabilitiesFor(super_admin)`, tested. Owner-only capabilities are listed separately.
 
 Option B (separate Operations and Platform workspaces) was rejected. The owner is the only super admin and runs operations day to day, so a workspace switch adds a step and invites the duplicate-screen drift that caused the reported defect.
