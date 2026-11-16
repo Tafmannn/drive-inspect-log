@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Camera, Plus, X } from "lucide-react";
+import { prepareCapturedPhoto } from "@/lib/capturedPhoto";
 
 interface VehicleDamageModalProps {
   isOpen: boolean;
@@ -150,7 +151,9 @@ export const VehicleDamageModal = ({ isOpen, onClose, onSubmit }: VehicleDamageM
                 id="damage-photo"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (file) setPhoto(file);
+                  // Downscale to upload size straight away so large camera
+                  // images don't pile up in memory (see lib/capturedPhoto).
+                  if (file) void prepareCapturedPhoto(file).then(setPhoto);
                 }}
               />
               <Label htmlFor="damage-photo" className="cursor-pointer">

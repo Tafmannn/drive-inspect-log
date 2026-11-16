@@ -20,6 +20,7 @@ import { JobDetail } from "./pages/JobDetail";
 import { CompletedJobs } from "./pages/CompletedJobs";
 import { PendingJobs } from "./pages/PendingJobs";
 import { InspectionFlow } from "./pages/InspectionFlow";
+import { ResumeInterruptedInspection } from "./components/ResumeInterruptedInspection";
 import { PendingUploads } from "./pages/PendingUploads";
 import { Expenses } from "./pages/Expenses";
 import { ExpenseForm } from "./pages/ExpenseForm";
@@ -292,6 +293,7 @@ const App = () => {
             <DevRoleBanner />
             <BrowserRouter>
               <ScrollToTop />
+              <ResumeInterruptedInspection />
               <OfflineBanner />
               <UpdatePrompt />
               <Suspense fallback={<PageLoader />}>
