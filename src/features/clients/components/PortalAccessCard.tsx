@@ -9,6 +9,8 @@ import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Globe, Loader2, Mail, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -169,6 +171,8 @@ export function PortalAccessCard({
               </ul>
             )}
 
+            <StatusEmailsSection clientId={clientId} hasPortalUsers={(data?.users ?? []).some((u) => u.account_status === "active")} />
+
             {!data?.client_active ? (
               <p className="text-xs text-muted-foreground">This client is archived — reactivate it to invite portal users.</p>
             ) : showInvite ? (
@@ -232,5 +236,116 @@ export function PortalAccessCard({
         </AlertDialogContent>
       </AlertDialog>
     </Card>
+  );
+}
+
+// ── Status emails ──────────────────────────────────────────────────────────
+// customer_notifications and clients.status_emails_enabled aren't in the
+// generated types yet, so these queries use the untyped client.
+const db = supabase as unknown as SupabaseClient;
+
+interface NotificationRow {
+  id: string;
+  event: "collected" | "delivered";
+  status: "pending" | "sending" | "sent" | "skipped" | "failed";
+  skip_reason: string | null;
+  recipients: string[];
+  created_at: string;
+  sent_at: string | null;
+  jobs: { vehicle_reg: string | null } | null;
+}
+
+const SKIP_LABEL: Record<string, string> = {
+  no_portal_users: "not sent — no active portal users",
+  disabled_for_client: "not sent — status emails were off",
+  superseded_by_delivery: "replaced by the delivery email",
+  client_archived: "not sent — client archived",
+  job_hidden: "not sent — job hidden",
+  job_cancelled: "not sent — job cancelled",
+  client_changed: "not sent — job moved to another client",
+  job_missing: "not sent — job removed",
+};
+
+function notificationLabel(n: NotificationRow): string {
+  if (n.status === "sent") return `sent to ${n.recipients.length} ${n.recipients.length === 1 ? "person" : "people"}`;
+  if (n.status === "skipped") return SKIP_LABEL[n.skip_reason ?? ""] ?? "not sent";
+  if (n.status === "failed") return "failed — will retry";
+  return "queued";
+}
+
+function StatusEmailsSection({ clientId, hasPortalUsers }: { clientId: string; hasPortalUsers: boolean }) {
+  const qc = useQueryClient();
+  const settingKey = ["client-status-emails", clientId];
+  const recentKey = ["client-status-emails-recent", clientId];
+
+  const setting = useQuery({
+    queryKey: settingKey,
+    queryFn: async () => {
+      const { data, error } = await db.from("clients").select("status_emails_enabled").eq("id", clientId).maybeSingle();
+      if (error) throw error;
+      return (data?.status_emails_enabled as boolean | undefined) ?? true;
+    },
+  });
+
+  const recent = useQuery({
+    queryKey: recentKey,
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("customer_notifications")
+        .select("id, event, status, skip_reason, recipients, created_at, sent_at, jobs(vehicle_reg)")
+        .eq("client_id", clientId)
+        .order("created_at", { ascending: false })
+        .limit(5);
+      if (error) throw error;
+      // jobs is many-to-one, so PostgREST returns an object, not an array.
+      return (data ?? []) as unknown as NotificationRow[];
+    },
+    staleTime: 30_000,
+  });
+
+  const toggle = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const { error } = await db.from("clients").update({ status_emails_enabled: enabled }).eq("id", clientId);
+      if (error) throw error;
+    },
+    onSuccess: (_d, enabled) => {
+      qc.setQueryData(settingKey, enabled);
+      toast({ title: enabled ? "Status emails on" : "Status emails off" });
+    },
+    onError: (e) => toast({ title: "Couldn't change status emails", description: (e as Error).message, variant: "destructive" }),
+  });
+
+  const enabled = setting.data ?? true;
+
+  return (
+    <div className="border-t border-border/60 pt-3 space-y-2">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium">Collection &amp; delivery emails</p>
+          <p className="text-xs text-muted-foreground">
+            Emails this client's portal users when a vehicle is collected and when it's delivered, with a link to the move.
+            {enabled && !hasPortalUsers && " Invite someone below to start receiving them."}
+          </p>
+        </div>
+        <Switch
+          checked={enabled}
+          disabled={setting.isLoading || toggle.isPending}
+          onCheckedChange={(v) => toggle.mutate(v)}
+          aria-label="Send collection and delivery emails"
+        />
+      </div>
+      {(recent.data?.length ?? 0) > 0 && (
+        <ul className="text-xs text-muted-foreground space-y-0.5">
+          {recent.data!.map((n) => (
+            <li key={n.id} className="truncate">
+              <span className="text-foreground font-medium">{n.event === "delivered" ? "Delivered" : "Collected"}</span>
+              {n.jobs?.vehicle_reg ? ` · ${n.jobs.vehicle_reg}` : ""} ·{" "}
+              {new Date(n.sent_at ?? n.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} ·{" "}
+              {notificationLabel(n)}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

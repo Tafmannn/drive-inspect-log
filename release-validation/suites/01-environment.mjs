@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { pass, fail, warn, notExecuted } from "../lib/types.mjs";
 import { run } from "../lib/exec.mjs";
 import { liveEnv } from "../lib/env.mjs";
+import { classifyTrackedEnv } from "../lib/trackedEnv.mjs";
 
 // Suite 01 — Environment & configuration hygiene (STATIC).
 // Confirms the toolchain, env template, and secret-hygiene preconditions the
@@ -62,11 +63,22 @@ export default {
       cwd: root,
       timeoutMs: 10_000,
     });
-    checks.push(
-      tracked.ok
-        ? fail(".env not tracked by git", ".env is committed — rotate keys & untrack")
-        : pass(".env not tracked by git", "untracked / gitignored"),
-    );
+    if (!tracked.ok) {
+      checks.push(pass(".env not tracked by git", "untracked / gitignored"));
+    } else {
+      // A tracked .env is acceptable only if it holds public client config.
+      let verdict = { ok: false, problems: ["could not read .env"] };
+      try {
+        verdict = classifyTrackedEnv(readFileSync(join(root, ".env"), "utf8"));
+      } catch {
+        /* keep the failing verdict */
+      }
+      checks.push(
+        verdict.ok
+          ? pass(".env tracked but public-only", "only VITE_* keys and anon JWTs")
+          : fail(".env holds non-public values", verdict.problems.join("; ")),
+      );
+    }
 
     // Report (do not fail on) whether a live environment is configured.
     const env = liveEnv();
