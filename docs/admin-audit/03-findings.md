@@ -10,7 +10,7 @@
 | F-06 | P2 | Fixed and deployed | Owner protection relied only on the `is_protected` flag |
 | F-07 | P3 | Fixed | Misleading labels: "Organisation Settings" opened the admin dashboard; owner Settings said auth source was `app_metadata.role` |
 | F-08 | P3 | Risk, documented | `user_org_id()` falls back to the oldest org for a super admin with no org |
-| F-09 | P2 | Roadmap | Three parallel admin shells with duplicate pages |
+| F-09 | P2 | Roadmap (product decision) | Paired mobile (`/admin`) and desktop (`/control`) screens with different features |
 
 ## F-01: Reported defect (Driver Settings: Admin can, Super Admin can't)
 
@@ -57,7 +57,7 @@
   * `user_has_permission` / `current_user_has_permission` are referenced by 0 RLS policies, 0 edge functions and 0 UI checks; their only caller is `can_actor_manage_permission`.
   * The Permissions editor lets admins "deny" keys, and 25 overrides exist (all on drivers, all redundant with the driver role), but none change access.
 * **Mitigation:** the editor now states that overrides are recorded but access is set by role.
-* **Proper fix (roadmap R-03):** either enforce selected keys server-side or remove the feature.
+* **Proper fix (roadmap R-03):** enforce selected keys. PR #107 starts this with `pod.view` for drivers.
 
 ## F-05: Edge functions accepted non-active callers
 
@@ -84,8 +84,13 @@
 * **Current state:** the owner's profile has an org set, so this is inactive.
 * **Recommendation:** return NULL instead and rely on the policies' explicit `is_super_admin()` branch. Re-run the RLS probe first.
 
-## F-09: Duplicate admin shells
+## F-09: Paired admin screens (not plain duplicates)
 
-* `/admin/*` and `/control/*` both provide jobs queue, POD review, finance, drivers and dashboard.
+* `/admin/*` (mobile card views) and `/control/*` (desktop table views) both cover jobs, POD review, finance and drivers.
+* Checked 2026-11-16, they are **not interchangeable**. Each `/admin` page has features its `/control` counterpart lacks:
+  * jobs: Attention and Missing-evidence filters, evidence acknowledgement with realtime updates, run order planning;
+  * drivers: performance scores and onboarding completion;
+  * POD review: collapsible queue sections and its own data hook.
+* Redirecting `/admin/*` to `/control/*` would therefore remove working features, so it was not done.
+* Admin/Super Admin parity is unaffected: both roles reach both versions. The risk is feature drift between the two copies (roadmap R-01).
 * `/super-admin/jobs` is a read-only jobs list.
-* Divergence between copies is how F-01 happened. See 04-ux-review.md and roadmap R-01.
