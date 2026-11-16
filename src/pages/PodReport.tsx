@@ -45,6 +45,7 @@ import { getChecklistItems } from "@/lib/inspectionFields";
 import { useAuth } from "@/context/AuthContext";
 import { isJobLockedForDriver } from "@/lib/driverJobAccess";
 import { DriverJobLocked } from "@/components/DriverJobLocked";
+import { useCanViewPod } from "@/hooks/useCanViewPod";
 import type { Photo } from "@/lib/types";
 import { canonicalisePhotos } from "@/lib/photoDedupe";
 import { evaluateEvidenceHealth } from "@/lib/evidenceHealth";
@@ -138,6 +139,7 @@ export const PodReport = () => {
   const { data: job, isLoading } = useJob(jobId ?? "");
   const { data: jobExpenses } = useJobExpenses(jobId ?? "");
   const { isAdmin, isSuperAdmin } = useAuth();
+  const canViewPod = useCanViewPod();
   const updateJob = useUpdateJob();
   const qc = useQueryClient();
 
@@ -454,6 +456,19 @@ export const PodReport = () => {
   // Completed (POD approved) jobs are record-only for drivers — no POD access.
   if (isJobLockedForDriver(job.status, { isAdmin, isSuperAdmin })) {
     return <DriverJobLocked title="POD Report" />;
+  }
+
+  // "View PODs" switched off in the user's profile.
+  if (!canViewPod) {
+    return (
+      <DriverJobLocked
+        title="POD Report"
+        heading="POD not available"
+        message="You don't have access to view PODs. Contact your admin if you need a copy."
+        backTo={`/jobs/${job.id}`}
+        backLabel="Back to job"
+      />
+    );
   }
 
   const ref = job.external_job_number || job.id.slice(0, 8).toUpperCase();

@@ -9,25 +9,37 @@ import { useNavigate } from "react-router-dom";
  * (direct link, history, bookmark). Completed jobs are record-only
  * for drivers.
  */
-export const DriverJobLocked = ({ title }: { title: string }) => {
+export const DriverJobLocked = ({
+  title,
+  heading = "Job completed",
+  message = "This job has been signed off and is no longer available to view.",
+  backTo = "/jobs/completed",
+  backLabel = "Back to Last 14 Days",
+}: {
+  title: string;
+  heading?: string;
+  message?: string;
+  backTo?: string;
+  backLabel?: string;
+}) => {
   const navigate = useNavigate();
   return (
     <div className="min-h-screen bg-background pb-20">
-      <AppHeader title={title} showBack onBack={() => navigate("/jobs/completed")} />
+      <AppHeader title={title} showBack onBack={() => navigate(backTo)} />
       <div className="p-4 flex flex-col items-center text-center gap-3 py-16">
         <Lock className="w-10 h-10 text-muted-foreground" />
         <div className="space-y-1">
-          <p className="text-sm font-medium text-foreground">Job completed</p>
+          <p className="text-sm font-medium text-foreground">{heading}</p>
           <p className="text-[13px] text-muted-foreground max-w-xs">
-            This job has been signed off and is no longer available to view.
+            {message}
           </p>
         </div>
         <Button
           variant="outline"
           className="min-h-[44px] rounded-lg mt-2"
-          onClick={() => navigate("/jobs/completed")}
+          onClick={() => navigate(backTo)}
         >
-          Back to Last 14 Days
+          {backLabel}
         </Button>
       </div>
       <BottomNav />

@@ -424,6 +424,18 @@ export function deriveJobSummary(
 
 // ── Batch: derive summaries from ranked jobs ────────────────────────
 
+/**
+ * When the user's "View PODs" permission is off, swap any CTA that would
+ * open the POD for a plain "View Job" link.
+ */
+export function withoutPodCta(summary: DriverJobSummary): DriverJobSummary {
+  if (!summary.primary_cta.route.endsWith("/pod")) return summary;
+  return {
+    ...summary,
+    primary_cta: { label: "View Job", route: `/jobs/${summary.job_id}` },
+  };
+}
+
 export function deriveJobSummaries(jobs: Job[]): DriverJobSummary[] {
   // Import ranking inline to avoid circular dependency
   // The caller should pass already-ranked jobs

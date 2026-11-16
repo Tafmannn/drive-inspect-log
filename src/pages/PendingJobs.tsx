@@ -8,6 +8,7 @@ import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useNavigate } from "react-router-dom";
 import { usePendingJobs } from "@/hooks/useJobs";
 import { useDriverGate } from "@/hooks/useDriverGate";
+import { useCanViewPod } from "@/hooks/useCanViewPod";
 import { Clock } from "lucide-react";
 
 export const PendingJobs = () => {
@@ -15,6 +16,7 @@ export const PendingJobs = () => {
   const { data: jobs, isLoading, isError, refetch } = usePendingJobs();
   const online = useOnlineStatus();
   const gate = useDriverGate();
+  const canViewPod = useCanViewPod();
 
   // Scope to driver's own jobs if driver-only
   const filteredJobs = (gate.isDriverOnly && gate.driverProfileId && jobs)
@@ -51,8 +53,8 @@ export const PendingJobs = () => {
             }}
             hasPickupInspection={job.has_pickup_inspection}
             hasDeliveryInspection={job.has_delivery_inspection}
-            ctaLabel="View POD"
-            onPrimaryAction={() => navigate(`/jobs/${job.id}/pod`)}
+            ctaLabel={canViewPod ? "View POD" : "View Job"}
+            onPrimaryAction={() => navigate(canViewPod ? `/jobs/${job.id}/pod` : `/jobs/${job.id}`)}
             onCardClick={() => navigate(`/jobs/${job.id}`)}
           />
         ))}

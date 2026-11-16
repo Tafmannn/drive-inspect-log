@@ -17,3 +17,17 @@ describe("isJobLockedForDriver", () => {
     expect(isJobLockedForDriver("completed", { isAdmin: false, isSuperAdmin: true })).toBe(false);
   });
 });
+
+import { withoutPodCta, type DriverJobSummary } from "@/lib/driverJobSummary";
+
+describe("withoutPodCta", () => {
+  const base = { job_id: "job-1" } as DriverJobSummary;
+  it("replaces a POD CTA with View Job", () => {
+    const s = { ...base, primary_cta: { label: "View POD", route: "/jobs/job-1/pod" } } as DriverJobSummary;
+    expect(withoutPodCta(s).primary_cta).toEqual({ label: "View Job", route: "/jobs/job-1" });
+  });
+  it("leaves non-POD CTAs alone", () => {
+    const s = { ...base, primary_cta: { label: "Start Pickup", route: "/inspection/job-1/pickup" } } as DriverJobSummary;
+    expect(withoutPodCta(s)).toBe(s);
+  });
+});

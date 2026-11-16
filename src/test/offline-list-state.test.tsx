@@ -19,6 +19,7 @@ vi.mock("@/hooks/useDriverGate", () => ({
 vi.mock("@/context/AuthContext", () => ({
   useAuth: () => ({ user: { id: "u1" }, isAdmin: false, isSuperAdmin: false }),
 }));
+vi.mock("@/hooks/useCanViewPod", () => ({ useCanViewPod: () => true }));
 vi.mock("@/components/PushOptIn", () => ({ PushOptIn: () => null }));
 vi.mock("@/components/DeviationPrompt", () => ({ DeviationPrompt: () => null }));
 
