@@ -36,3 +36,14 @@ Deployed with their full `_shared` files and unchanged `verify_jwt`: user-lifecy
 * Updated:
   * `domain.test.ts`: ADMIN now implies DRIVER, consistent with the server.
   * `admin-api-user-lifecycle.test.ts`: removed tests for deleted helpers.
+
+## Follow-up release (2026-11-16, later)
+
+| Change | Where |
+|---|---|
+| Low-light warning: each captured standard photo is measured; below mean brightness 45/255 the driver gets a toast and the tile shows "Too dark — retake". Warns only, never blocks. | `src/lib/capturedPhoto.ts`, `src/pages/InspectionFlow.tsx` |
+| User-management buttons, inputs and selects are 44 px on mobile, compact from `sm` up | `src/features/users/components/*` |
+| Owner **Feature switches** card (Super Admin → Settings): per-flag save with rollback on failure, confirmation for the two risky flags, "takes effect within 5 minutes" notice. Writes rely on the existing super-admin-only RLS. | `src/features/platform/FeatureFlagsCard.tsx`, `src/lib/featureFlags.ts` |
+| Break-glass recovery guide | `docs/admin-audit/08-break-glass.md` |
+| Prepared, **not applied**: oldest-org fallback fix and `app_settings` audit trigger | `docs/admin-audit/pending/20261117000000_org_fallback_and_settings_audit.sql` |
+

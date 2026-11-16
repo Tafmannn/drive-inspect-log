@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { CAPTURE_JPEG_QUALITY, CAPTURE_MAX_DIMENSION, fitWithin, prepareCapturedPhoto } from "@/lib/capturedPhoto";
+import {
+  CAPTURE_JPEG_QUALITY,
+  CAPTURE_MAX_DIMENSION,
+  fitWithin,
+  isTooDark,
+  meanLuma,
+  measurePhotoBrightness,
+  prepareCapturedPhoto,
+} from "@/lib/capturedPhoto";
 
 describe("fitWithin", () => {
   it("scales the long edge down to the upload size, keeping aspect ratio", () => {
@@ -106,5 +114,30 @@ describe("prepareCapturedPhoto", () => {
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(() => null);
     const out = await prepareCapturedPhoto(bigPhoto());
     expect(out.size).toBe(6_000_000);
+  });
+});
+
+describe("low-light check", () => {
+  const px = (r: number, g: number, b: number, n = 4) =>
+    new Uint8ClampedArray(Array.from({ length: n }, () => [r, g, b, 255]).flat());
+
+  it("meanLuma weights channels (Rec. 601) and handles empty data", () => {
+    expect(meanLuma(px(0, 0, 0))).toBe(0);
+    expect(meanLuma(px(255, 255, 255))).toBeCloseTo(255, 5);
+    expect(meanLuma(px(255, 0, 0))).toBeCloseTo(76.245, 3);
+    expect(meanLuma(px(0, 255, 0))).toBeCloseTo(149.685, 3);
+    expect(meanLuma(new Uint8ClampedArray(0))).toBe(0);
+  });
+
+  it("flags near-black photos but not ordinary indoor or daylight ones", () => {
+    expect(isTooDark(meanLuma(px(12, 14, 18)))).toBe(true); // night, no flash
+    expect(isTooDark(meanLuma(px(44, 44, 44)))).toBe(true);
+    expect(isTooDark(meanLuma(px(46, 46, 46)))).toBe(false); // threshold is 45
+    expect(isTooDark(meanLuma(px(90, 95, 100)))).toBe(false); // dim garage
+    expect(isTooDark(meanLuma(px(180, 190, 200)))).toBe(false); // daylight
+  });
+
+  it("measurePhotoBrightness reports null when the image can't be read (never blocks)", async () => {
+    expect(await measurePhotoBrightness(new Blob(["not an image"]))).toBeNull();
   });
 });

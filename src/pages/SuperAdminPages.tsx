@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { createOrganisation, type OrgRecord } from "@/lib/adminApi";
 import { UserManagementPanel } from "@/features/users/components/UserManagementPanel";
+import { FeatureFlagsCard } from "@/features/platform/FeatureFlagsCard";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { ListRowsSkeleton } from "@/components/skeletons";
@@ -429,24 +430,7 @@ export function SuperAdminSettings() {
           </CardContent>
         </Card>
 
-        {/* Feature Flags */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Settings className="w-4 h-4" /> Feature Flags
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Storage</span>
-              <Badge variant="secondary" className="text-[10px]">app_settings table</Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Management UI</span>
-              <Badge variant="outline" className="text-[10px]">Planned</Badge>
-            </div>
-          </CardContent>
-        </Card>
+        <FeatureFlagsCard />
 
         {/* Platform Controls */}
         <Card>
