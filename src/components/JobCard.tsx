@@ -47,6 +47,11 @@ export interface JobCardProps {
   onPrimaryAction?: () => void;
   /** Full-card tap */
   onCardClick?: () => void;
+  /**
+   * Record-only card: no tap-through, no CTA, no call/navigate buttons and
+   * no map links. Used for finished jobs shown to drivers.
+   */
+  readOnly?: boolean;
 }
 
 // ── Workflow derivation ──────────────────────────────────────────────
@@ -115,6 +120,7 @@ export const JobCard = ({
   ctaLabel,
   onPrimaryAction,
   onCardClick,
+  readOnly = false,
 }: JobCardProps) => {
   const statusStyle = getStatusStyle(status);
   const activeStep = deriveActiveStep(status);
@@ -130,8 +136,11 @@ export const JobCard = ({
 
   return (
     <Card
-      className="p-0 mb-3 border border-border overflow-hidden cursor-pointer active:bg-muted/50 transition-colors"
-      onClick={onCardClick}
+      className={`p-0 mb-3 border border-border overflow-hidden ${
+        readOnly ? "" : "cursor-pointer active:bg-muted/50 transition-colors"
+      }`}
+      onClick={readOnly ? undefined : onCardClick}
+      aria-disabled={readOnly || undefined}
     >
       {/* ── HEADER ── */}
       <div className="flex items-center justify-between px-4 pt-3 pb-2">
@@ -153,8 +162,8 @@ export const JobCard = ({
 
       {/* ── ROUTE ── */}
       <div className="px-4 pb-2 space-y-1.5">
-        <RouteRow label="Collect" address={route.pickupAddress} />
-        <RouteRow label="Deliver" address={route.deliveryAddress} />
+        <RouteRow label="Collect" address={route.pickupAddress} linked={!readOnly} />
+        <RouteRow label="Deliver" address={route.deliveryAddress} linked={!readOnly} />
       </div>
 
       {/* ── ALERT STRIP ── */}
@@ -204,6 +213,7 @@ export const JobCard = ({
       )}
 
       {/* ── ACTIONS ── */}
+      {readOnly ? <div className="pb-1" /> : (
       <div className="px-4 pb-3 flex items-center gap-2">
         {/* Primary */}
         <Button
@@ -250,13 +260,14 @@ export const JobCard = ({
           </Button>
         )}
       </div>
+      )}
     </Card>
   );
 };
 
 // ── Sub-components ───────────────────────────────────────────────────
 
-function RouteRow({ label, address }: { label: string; address: string }) {
+function RouteRow({ label, address, linked = true }: { label: string; address: string; linked?: boolean }) {
   return (
     <div className="flex items-start gap-2">
       <div className="flex items-center gap-1 shrink-0 w-[52px]">
@@ -265,6 +276,7 @@ function RouteRow({ label, address }: { label: string; address: string }) {
           {label}
         </span>
       </div>
+      {linked ? (
       <a
         href={mapsUrl(address)}
         target="_blank"
@@ -274,6 +286,9 @@ function RouteRow({ label, address }: { label: string; address: string }) {
       >
         {address}
       </a>
+      ) : (
+        <span className="text-xs text-foreground leading-snug min-w-0">{address}</span>
+      )}
     </div>
   );
 }

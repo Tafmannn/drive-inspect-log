@@ -19,7 +19,8 @@ import { OfflineListState } from "@/components/OfflineListState";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { DeviationPrompt } from "@/components/DeviationPrompt";
 import { rankJobs, type RankedJob } from "@/lib/executionRanking";
-import { deriveJobSummaries, type DriverJobSummary } from "@/lib/driverJobSummary";
+import { deriveJobSummaries, withoutPodCta, type DriverJobSummary } from "@/lib/driverJobSummary";
+import { useCanViewPod } from "@/hooks/useCanViewPod";
 import { logDeviation } from "@/lib/deviationApi";
 import { useAuth } from "@/context/AuthContext";
 import { RoleScope } from "@/components/ui-kit";
@@ -28,6 +29,7 @@ export const JobList = () => {
   const navigate = useNavigate();
   const { user, isAdmin, isSuperAdmin } = useAuth();
   const gate = useDriverGate();
+  const canViewPod = useCanViewPod();
   const { data: jobs, isLoading, isError, refetch } = useActiveJobs();
   const online = useOnlineStatus();
   const [deviation, setDeviation] = useState<{
@@ -44,7 +46,8 @@ export const JobList = () => {
       : jobs
     : [];
   const scoped = rankJobs(driverScoped).filter(j => j.execution_class !== "terminal");
-  const summaries = deriveJobSummaries(scoped);
+  const derived = deriveJobSummaries(scoped);
+  const summaries = canViewPod ? derived : derived.map(withoutPodCta);
 
   const isDriverOnly = gate.isDriverOnly;
 

@@ -13,6 +13,8 @@ vi.mock("@/hooks/useJobs", () => ({
 }));
 vi.mock("@/hooks/useExpenses", () => ({ useJobExpenses: () => ({ data: [] }) }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ isAdmin: false, isSuperAdmin: false }) }));
+const podPerm = { value: true };
+vi.mock("@/hooks/useCanViewPod", () => ({ useCanViewPod: () => podPerm.value }));
 vi.mock("@/hooks/useSafeBack", () => ({ useSafeBack: () => () => {} }));
 vi.mock("@/hooks/useEvidenceOverrides", () => ({
   useEvidenceOverrides: () => ({ acknowledgedCodes: [], acknowledge: vi.fn(), unacknowledge: vi.fn() }),
@@ -84,12 +86,40 @@ describe("JobDetail — driver action layout", () => {
     expect(screen.queryByRole("button", { name: /start pickup/i })).toBeNull();
   });
 
+  it("hides every POD button when the user's View PODs permission is off", () => {
+    podPerm.value = false;
+    try {
+      mockJob = makeJob({ status: "pod_ready", has_pickup_inspection: true, has_delivery_inspection: true });
+      renderDetail();
+      expect(screen.queryByRole("button", { name: /view pod/i })).toBeNull();
+      expect(screen.queryByRole("button", { name: /pod report/i })).toBeNull();
+    } finally {
+      podPerm.value = true;
+    }
+  });
+
   it("shows the blocked reason and no primary CTA for a blocked job", () => {
-    mockJob = makeJob({ status: "cancelled" });
+    // "draft" is blocked but not a closed status; cancelled/archived/completed
+    // show drivers the "Job closed" screen instead (see tests below).
+    mockJob = makeJob({ status: "draft" });
     renderDetail();
     expect(screen.getByText(/blocked — not actionable/i)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /start pickup/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /view pod/i })).toBeNull();
+  });
+
+  it("shows the locked screen to drivers for a completed job", () => {
+    mockJob = makeJob({ status: "completed", has_pickup_inspection: true, has_delivery_inspection: true });
+    renderDetail();
+    expect(screen.getByText("Job completed")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /view pod/i })).toBeNull();
+  });
+
+  it("shows 'Job closed' to drivers for an archived job", () => {
+    mockJob = makeJob({ status: "archived" });
+    renderDetail();
+    expect(screen.getByText("Job closed")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /start pickup/i })).toBeNull();
   });
 
   it("renders inspections as read-only status, not action buttons", () => {

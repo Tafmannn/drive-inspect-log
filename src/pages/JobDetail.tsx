@@ -41,6 +41,9 @@ import { QrDisplayModal } from "@/components/QrDisplayModal";
 import { useAuth } from "@/context/AuthContext";
 import { getStatusStyle } from "@/lib/statusConfig";
 import { logClientEvent } from "@/lib/logger";
+import { isJobLockedForDriver, lockedJobHeading } from "@/lib/driverJobAccess";
+import { DriverJobLocked } from "@/components/DriverJobLocked";
+import { useCanViewPod } from "@/hooks/useCanViewPod";
 
 import { PhotoViewer } from "@/components/PhotoViewer";
 import { resolveMediaUrlAsync } from "@/lib/mediaResolver";
@@ -129,6 +132,7 @@ export const JobDetail = () => {
   const deleteJob = useDeleteJob();
   const changeStatus = useAdminChangeStatus();
   const canAdmin = isAdmin || isSuperAdmin;
+  const canViewPod = useCanViewPod();
 
   const [qrConfirmations, setQrConfirmations] = useState<QrConfirmation[]>([]);
   const [generatingQr, setGeneratingQr] = useState(false);
@@ -287,6 +291,11 @@ export const JobDetail = () => {
     );
   }
 
+  // Completed (POD approved) jobs are record-only for drivers.
+  if (isJobLockedForDriver(job.status, { isAdmin, isSuperAdmin })) {
+    return <DriverJobLocked title="Job Detail" heading={lockedJobHeading(job.status)} />;
+  }
+
   const jobRef = job.external_job_number || job.id.slice(0, 8);
   const statusStyle = getStatusStyle(job.status);
   const pickupInspection = job.inspections.find((i) => i.type === "pickup");
@@ -301,6 +310,9 @@ export const JobDetail = () => {
   const execEval = evaluateExecutableState(job, driverSiblings);
   const isBlocked = execEval.state === "blocked";
   const isReviewOnly = execEval.state === "review_only";
+  // Hide any CTA that would open the POD when "View PODs" is off.
+  const primaryCtaOpensPod = isReviewOnly || primaryCta.route(job.id).endsWith("/pod");
+  const showPrimaryCta = !isBlocked && (canViewPod || !primaryCtaOpensPod);
 
   const pickupAddr = buildFullAddress([job.pickup_address_line1, job.pickup_address_line2, job.pickup_city, job.pickup_postcode]);
   const deliveryAddr = buildFullAddress([job.delivery_address_line1, job.delivery_address_line2, job.delivery_city, job.delivery_postcode]);
@@ -397,7 +409,7 @@ export const JobDetail = () => {
                   : `Next: ${primaryCta.label}`}
             </span>
           </div>
-          {!isBlocked && (
+          {showPrimaryCta && (
             <Button
               className="w-full min-h-[48px] rounded-lg text-base"
               variant={isReviewOnly ? "outline" : "default"}
@@ -495,7 +507,7 @@ export const JobDetail = () => {
               <Receipt className="h-4 w-4 mr-1.5" />
               Expenses{jobExpenses?.length ? ` (${jobExpenses.length})` : ""}
             </Button>
-            {(job.has_pickup_inspection || job.has_delivery_inspection) && (
+            {canViewPod && (job.has_pickup_inspection || job.has_delivery_inspection) && (
               <Button variant="outline" size="sm" className="flex-1 min-h-[44px] rounded-lg" onClick={() => navigate(withFrom(`/jobs/${job.id}/pod`, searchParams))}>
                 <FileText className="h-4 w-4 mr-1.5" /> POD Report
               </Button>

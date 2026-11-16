@@ -52,8 +52,11 @@ export const CompletedJobs = () => {
             hasPickupInspection={job.has_pickup_inspection}
             hasDeliveryInspection={job.has_delivery_inspection}
             ctaLabel="View POD"
-            onPrimaryAction={() => navigate(`/jobs/${job.id}/pod`)}
-            onCardClick={() => navigate(`/jobs/${job.id}`)}
+            // Drivers get a record-only highlight once the job is completed:
+            // no POD, no job detail, no navigation/call actions.
+            readOnly={gate.isDriverOnly}
+            onPrimaryAction={gate.isDriverOnly ? undefined : () => navigate(`/jobs/${job.id}/pod`)}
+            onCardClick={gate.isDriverOnly ? undefined : () => navigate(`/jobs/${job.id}`)}
           />
         ))}
       </div>
