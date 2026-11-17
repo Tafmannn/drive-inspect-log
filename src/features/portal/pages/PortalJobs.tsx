@@ -233,7 +233,7 @@ export default function PortalJobs() {
             <Input
               value={search}
               onChange={(e) => setParam("q", e.target.value || null)}
-              placeholder="Search registration, reference or town"
+              placeholder="Search reg, reference or town"
               aria-label="Search vehicle moves"
               className="pl-8"
             />

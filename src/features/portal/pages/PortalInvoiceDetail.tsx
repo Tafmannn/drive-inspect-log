@@ -1,14 +1,18 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Download, Loader2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, Clock, Download, Loader2, MessageSquare, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
 import { invoiceRecordToPdfData } from "@/features/invoicing/hooks/useInvoices";
-import { usePortalInvoice, type PortalInvoiceDetail } from "../api";
+import { usePortalContext, usePortalInvoice, usePortalJobs, type PortalInvoiceDetail } from "../api";
 import { PortalInvoiceBadge } from "../components/PortalInvoiceBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { fmtDate, fmtGbp } from "../lib/format";
+import { daysBetween, invoicePaymentLabel, invoicePaymentState, localDay } from "../lib/invoiceStatus";
+import { askAboutInvoiceMailto } from "../lib/contact";
+import { usePortalTitle } from "../lib/usePortalTitle";
+import { cn } from "@/lib/utils";
 
 /**
  * Fallback for invoices issued before PDFs were stored: the same mapper the
@@ -50,6 +54,11 @@ function toPdfData(inv: PortalInvoiceDetail) {
   };
 }
 
+function overdueDays(due: string | null): string {
+  const n = due ? daysBetween(due.slice(0, 10), localDay(new Date())) : 0;
+  return `${n} day${n === 1 ? "" : "s"}`;
+}
+
 function saveBlob(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
   try {
@@ -66,6 +75,9 @@ export default function PortalInvoiceDetailPage() {
   const { invoiceId } = useParams<{ invoiceId: string }>();
   const { data: inv, isLoading, error } = usePortalInvoice(invoiceId);
   const [downloading, setDownloading] = useState(false);
+  const { data: ctx } = usePortalContext();
+  const { data: jobs } = usePortalJobs();
+  usePortalTitle(inv?.invoice_number, "Invoices", ctx?.operator.name);
 
   if (isLoading) {
     return <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
@@ -100,6 +112,20 @@ export default function PortalInvoiceDetailPage() {
   };
 
   const isCredit = inv.document_type === "credit_note";
+  const payState = invoicePaymentState(inv);
+  const askHref = ctx ? askAboutInvoiceMailto(ctx, inv.invoice_number) : null;
+  // The move this invoice is for, when it names one the client can see.
+  const linkedJob = inv.job_ref ? (jobs ?? []).find((j) => j.job_ref === inv.job_ref) : undefined;
+  const banner =
+    payState === "paid"
+      ? { icon: CheckCircle2, tone: "border-success/30 bg-success/10 text-success", text: `Paid${inv.paid_at ? ` on ${fmtDate(inv.paid_at)}` : ""}. Thank you.` }
+      : payState === "overdue"
+        ? { icon: AlertTriangle, tone: "border-destructive/30 bg-destructive/10 text-destructive", text: `This invoice is ${overdueDays(inv.due_date)} overdue: ${fmtGbp(inv.total)} was due on ${fmtDate(inv.due_date)}.` }
+        : payState === "due_today"
+          ? { icon: Clock, tone: "border-warning/40 bg-warning/10 text-foreground", text: `${fmtGbp(inv.total)} is due today.` }
+          : payState === "due"
+            ? { icon: Clock, tone: "border-border bg-muted/50 text-foreground", text: `${fmtGbp(inv.total)} due by ${fmtDate(inv.due_date)} (${invoicePaymentLabel(inv).toLowerCase()}).` }
+            : null;
 
   return (
     <div className="space-y-4">
@@ -113,14 +139,31 @@ export default function PortalInvoiceDetailPage() {
           This credit note cancels invoice <span className="font-mono">{inv.credits_invoice_number}</span>.
         </p>
       )}
-      <div className="flex items-center justify-between gap-2">
+      {banner && (
+        <p className={cn("flex items-start gap-2 rounded-md border p-3 text-sm font-medium", banner.tone)}>
+          <banner.icon className="w-4 h-4 shrink-0 mt-0.5" /> {banner.text}
+        </p>
+      )}
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <Button variant="ghost" size="sm" asChild>
           <Link to="/portal/invoices"><ArrowLeft className="w-4 h-4 mr-1" /> All invoices</Link>
         </Button>
-        <Button size="sm" onClick={handleDownload} disabled={downloading}>
-          {downloading ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Download className="w-4 h-4 mr-1.5" />}
-          Download PDF
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {linkedJob && (
+            <Button variant="outline" size="sm" asChild>
+              <Link to={`/portal/jobs/${linkedJob.id}`}><Truck className="w-4 h-4 mr-1.5" /> View move</Link>
+            </Button>
+          )}
+          {askHref && (
+            <Button variant="outline" size="sm" asChild>
+              <a href={askHref}><MessageSquare className="w-4 h-4 mr-1.5" /> Ask about this invoice</a>
+            </Button>
+          )}
+          <Button size="sm" onClick={handleDownload} disabled={downloading}>
+            {downloading ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Download className="w-4 h-4 mr-1.5" />}
+            Download PDF
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -155,7 +198,9 @@ export default function PortalInvoiceDetailPage() {
           <div className="text-sm">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">Billed to</p>
             <p className="font-medium">{inv.client_company || inv.client_name}</p>
-            {inv.client_company && inv.client_name && <p className="text-muted-foreground">{inv.client_name}</p>}
+            {inv.client_company && inv.client_name && inv.client_name !== inv.client_company && (
+              <p className="text-muted-foreground">{inv.client_name}</p>
+            )}
             {inv.client_address && <p className="text-muted-foreground whitespace-pre-line">{inv.client_address}</p>}
             {(inv.job_ref || inv.vehicle_reg) && (
               <p className="text-xs text-muted-foreground mt-1">

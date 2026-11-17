@@ -30,10 +30,14 @@ export function fmtDay(day: string | null | undefined, today: Date = new Date())
   if (diff === 0) return "Today";
   if (diff === 1) return "Tomorrow";
   if (diff === -1) return "Yesterday";
-  return d.toLocaleDateString("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    ...(d.getFullYear() !== today.getFullYear() ? { year: "numeric" } : {}),
-  });
+  // Some engines add a comma after the weekday when the year is shown;
+  // strip it so every date reads the same ("Tue 5 Jan 2027").
+  return d
+    .toLocaleDateString("en-GB", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      ...(d.getFullYear() !== today.getFullYear() ? { year: "numeric" } : {}),
+    })
+    .replace(",", "");
 }

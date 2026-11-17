@@ -40,8 +40,9 @@ describe("progressIndex / isActiveStage", () => {
     expect(progressIndex("assigned")).toBe(0);
     expect(progressIndex("collecting")).toBe(1);
     expect(progressIndex("in_transit")).toBe(2);
-    expect(progressIndex("delivering")).toBe(2);
-    expect(progressIndex("delivered")).toBe(3);
+    // "Out for delivery" is its own step, past "In transit".
+    expect(progressIndex("delivering")).toBe(3);
+    expect(progressIndex("delivered")).toBe(4);
   });
 
   it("has no progress position for cancelled or problem jobs", () => {

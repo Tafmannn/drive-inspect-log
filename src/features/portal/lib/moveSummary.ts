@@ -13,6 +13,8 @@ export interface MoveSummary {
   durationMinutes: number | null;
   milesDriven: number | null;
   fuelChange: number | null;
+  fuelAtCollection: number | null;
+  fuelAtDelivery: number | null;
   receivedBy: string | null;
   collectionDamage: number;
   deliveryDamage: number;
@@ -67,6 +69,8 @@ export function moveSummary(inspections: PortalInspection[]): MoveSummary {
     durationMinutes,
     milesDriven,
     fuelChange,
+    fuelAtCollection: pickup?.fuel_level_percent ?? null,
+    fuelAtDelivery: delivery?.fuel_level_percent ?? null,
     receivedBy: delivery?.customer_name ?? null,
     collectionDamage,
     deliveryDamage,

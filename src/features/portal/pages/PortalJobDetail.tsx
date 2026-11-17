@@ -92,7 +92,7 @@ function DeliverySummary({ summary }: { summary: MoveSummary }) {
           {summary.fuelChange != null && (
             <Fact
               label="Fuel / charge"
-              value={summary.fuelChange === 0 ? "Unchanged" : `${summary.fuelChange > 0 ? "+" : "−"}${Math.abs(summary.fuelChange)}%`}
+              value={summary.fuelChange === 0 ? `Unchanged (${summary.fuelAtDelivery}%)` : `${summary.fuelAtCollection}% → ${summary.fuelAtDelivery}%`}
             />
           )}
         </div>
