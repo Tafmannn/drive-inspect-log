@@ -67,3 +67,16 @@ One `/control` screen per area replaces each mobile/desktop pair (F-09, R-01). N
 | Removed | `AdminJobsQueue.tsx`, `AdminPodReview.tsx`, `AdminFinance.tsx`, `AdminDrivers.tsx`, `usePodReviewData.ts`, `useAdminDrivers.ts` |
 
 Tests: `merged-admin-screens.test.tsx`, `merged-jobs-pod-pages.test.tsx`, `merged-finance-page.test.tsx`; `control-pages-linking` and `admin-drivers-search` updated.
+
+## Automatic customer emails turned off (2026-11-17)
+
+Owner's decision: customer emails (POD / POC) are sent by hand only, from the job's POD page ("Email POD", which confirms the recipient first).
+
+| Where | Change |
+|---|---|
+| Edge function `notify-customers` (deployed v3, `verify_jwt` unchanged: false) | Sends nothing; answers 410. Kept deployed because older installed app versions still call it. |
+| `src/lib/api.ts`, `src/lib/submitQueue.ts`, `ControlOverview.tsx` | No longer call the sender after inspections or on the overview; `customerNotifyApi.ts` removed |
+| `PortalAccessCard.tsx` | "Collection & delivery emails" switch removed; states that portal users are never emailed automatically |
+| `supabase/migrations/20261117100000_disable_automatic_customer_emails.sql` | Drops the queueing trigger, marks anything waiting as skipped, turns the per-client setting off. **Applied only with owner approval.** |
+
+Before the change: 5 of 6 clients had automatic emails on; none had been sent (the one queued email was skipped because the client had no portal users).

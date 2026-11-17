@@ -10,7 +10,6 @@ import type {
 } from './types';
 import { JOB_STATUS, ACTIVE_STATUSES, PENDING_STATUSES, ADMIN_ALLOWED_TRANSITIONS } from './statusConfig';
 import { logClientEvent } from './logger';
-import { kickCustomerNotifications } from './customerNotifyApi';
 import { getOrgId } from './orgHelper';
 
 // Statuses that re-open a completed/cancelled job. These go through the
@@ -357,10 +356,6 @@ export async function submitInspection(
     jobId,
     context: { inspectionType: type, newStatus: result.toStatus },
   });
-
-  // The status change may have queued a customer "collected"/"delivered"
-  // email (database trigger); prompt the sender. Fire-and-forget.
-  kickCustomerNotifications();
 
   return {
     inspectionId: result.inspectionId,
