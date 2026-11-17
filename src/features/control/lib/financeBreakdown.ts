@@ -75,3 +75,8 @@ export function capSlices(slices: CategorySlice[]): CategorySlice[] {
     },
   ];
 }
+
+/** Share of expenses with a receipt, as a whole percent (100 when there are none). */
+export function receiptCompliancePct(withReceipt: number, total: number): number {
+  return total > 0 ? Math.round((withReceipt / total) * 100) : 100;
+}

@@ -10,7 +10,7 @@
 | F-06 | P2 | Fixed and deployed | Owner protection relied only on the `is_protected` flag |
 | F-07 | P3 | Fixed | Misleading labels: "Organisation Settings" opened the admin dashboard; owner Settings said auth source was `app_metadata.role` |
 | F-08 | P3 | Fixed: migration applied and verified | `user_org_id()` fell back to the oldest org for a super admin with no org |
-| F-09 | P2 | Roadmap (product decision) | Paired mobile (`/admin`) and desktop (`/control`) screens with different features |
+| F-09 | P2 | Fixed (2026-11-17) | Paired mobile (`/admin`) and desktop (`/control`) screens with different features |
 
 ## F-01: Reported defect (Driver Settings: Admin can, Super Admin can't)
 
@@ -91,6 +91,14 @@
   * jobs: Attention and Missing-evidence filters, evidence acknowledgement with realtime updates, run order planning;
   * drivers: performance scores and onboarding completion;
   * POD review: collapsible queue sections and its own data hook.
-* Redirecting `/admin/*` to `/control/*` would therefore remove working features, so it was not done.
+* Redirecting `/admin/*` to `/control/*` would therefore have removed working features, so on 2026-11-16 it was not done.
 * Admin/Super Admin parity is unaffected: both roles reach both versions. The risk is feature drift between the two copies (roadmap R-01).
+* **Fixed 2026-11-17 (at the owner's request): merged, not redirected.** Each area now has one `/control` screen holding the union of both feature sets, with cards on phones and tablets (below 1024 px) and the table on desktop:
+  * **Jobs:** triage queues (needs attention, unassigned, missing evidence with "Mark resolved" + realtime, in progress, POD review, recently completed) as the default view; the server-filtered list views (unassigned, stale, active, POD review, completed, cancelled, all) with sort; run order; new job; six clickable KPIs.
+  * **POD review:** one hook now joins delivery signatures. The default view groups the queue by evidence (no delivery inspection / missing signatures / ready to confirm); flat views by evidence or status; Confirm, POD, Inspect, View on both layouts.
+  * **Finance:** expense cards and the receipt-compliance KPI added to the desktop page (breakdown charts, job links, export, new expense).
+  * **Drivers:** onboarding completion and 60-day performance/risk added to the desktop roster (workload, stale and name-match cues, licence and plate monitoring, call and jobs).
+* View, filter and search are in the URL, and detail pages get a `from=` link back to the same view.
+* `/admin/jobs`, `/admin/pod-review`, `/admin/finance` and `/admin/drivers` redirect, translating old filter names. `/control` routes use `ControlRoute`, which also checks account status, so the redirect only tightens access. Driver profile pages (`/admin/drivers/:id`) are unchanged.
+* Dashboard bucket links now point at the merged views; the "failed uploads" bucket pointed at a non-existent `/uploads` route and now opens `/pending-uploads`.
 * `/super-admin/jobs` is a read-only jobs list.

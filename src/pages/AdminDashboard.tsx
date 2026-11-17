@@ -76,7 +76,7 @@ function InterventionKpis() {
         icon={UserX}
         variant={(kpis?.unassigned ?? 0) > 0 ? "destructive" : "default"}
         loading={isLoading}
-        onClick={() => navigate("/admin/jobs?filter=unassigned")}
+        onClick={() => navigate("/control/jobs?view=unassigned")}
       />
       <KpiPill
         label="Stale"
@@ -84,7 +84,7 @@ function InterventionKpis() {
         icon={Clock}
         variant={(kpis?.stale ?? 0) > 0 ? "warning" : "default"}
         loading={isLoading}
-        onClick={() => navigate("/admin/jobs?filter=stale")}
+        onClick={() => navigate("/control/jobs?view=stale")}
       />
       <KpiPill
         label="POD Review"
@@ -92,7 +92,7 @@ function InterventionKpis() {
         icon={FileSearch}
         variant={(kpis?.podReview ?? 0) > 0 ? "warning" : "default"}
         loading={isLoading}
-        onClick={() => navigate("/admin/jobs?filter=review")}
+        onClick={() => navigate("/control/pod-review")}
       />
       <KpiPill
         label="Evidence"
@@ -100,7 +100,7 @@ function InterventionKpis() {
         icon={ImageOff}
         variant={(missingEvidence ?? 0) > 0 ? "destructive" : "default"}
         loading={evidenceLoading}
-        onClick={() => navigate("/admin/jobs?filter=evidence")}
+        onClick={() => navigate("/control/jobs?view=evidence")}
       />
     </div>
   );
@@ -618,7 +618,7 @@ function ManagementRoutes() {
   const { isSuperAdmin } = useAuth();
 
   const routes = [
-    { label: "Full Jobs Queue", icon: Truck, path: "/admin/jobs" },
+    { label: "Full Jobs Queue", icon: Truck, path: "/control/jobs" },
     { label: "Fleet & Drivers", icon: Users, path: "/control/drivers" },
     { label: "Driver Onboarding", icon: ClipboardCheck, path: "/admin/onboarding" },
     { label: "POD Closure", icon: ClipboardCheck, path: "/control/pod-review" },
@@ -697,7 +697,7 @@ export function AdminDashboardBody() {
           items={(queues?.needsAttention ?? []).filter(j => isJobStale(j))}
           loading={isLoading}
           emptyText="No stale jobs."
-          onViewAll={() => navigate("/admin/jobs?filter=stale")}
+          onViewAll={() => navigate("/control/jobs?view=stale")}
         />
         <QueuePreviewSection
           title="Awaiting Review"
@@ -705,7 +705,7 @@ export function AdminDashboardBody() {
           items={queues?.review ?? []}
           loading={isLoading}
           emptyText="No PODs pending."
-          onViewAll={() => navigate("/admin/jobs?filter=review")}
+          onViewAll={() => navigate("/control/pod-review")}
         />
       </div>
 

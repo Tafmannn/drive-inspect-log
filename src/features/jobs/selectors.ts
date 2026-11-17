@@ -78,7 +78,7 @@ export function isMissingEvidence(row: DispatchJob): boolean {
 }
 
 /**
- * Group jobs into the operational buckets used by AdminJobsQueue.
+ * Group jobs into the operational buckets used by the Jobs screen queues.
  * Pure — accepts any row that satisfies DispatchJob.
  *
  * `evidenceWindowMs`: only flag missing evidence on jobs updated within this window.

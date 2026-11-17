@@ -98,7 +98,10 @@ function KpiCard({
             {value ?? "—"}
           </p>
         )}
-        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider truncate">
+        <p
+          className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider leading-snug line-clamp-2 break-words"
+          title={label}
+        >
           {label}
         </p>
       </div>

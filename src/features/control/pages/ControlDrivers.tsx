@@ -1,24 +1,33 @@
 /**
- * Drivers Control Page — /control/drivers
- * Dispatch-support workload surface: identity, workload, risk cues, actions.
+ * Drivers — /control/drivers
+ * The one driver roster for admins and the owner, on every screen size.
+ * Merges the old mobile page (/admin/drivers: onboarding completion,
+ * 60-day performance and risk) with the desktop table (workload, stale and
+ * name-match cues, licence and plate monitoring, call and jobs actions).
+ * Cards below 1024px, a table above; filter and search live in the URL.
  */
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useMemo } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ControlShell, ControlHeader, ControlSection } from "../components/shared/ControlShell";
 import { KpiStrip } from "../components/shared/KpiStrip";
-import { CompactTable, type CompactColumn } from "../components/shared/CompactTable";
+import { ViewChips } from "../components/shared/ViewChips";
+import type { CompactColumn } from "../components/shared/CompactTable";
+import { ResponsiveList } from "../components/shared/ResponsiveList";
 import { StatusChip } from "../components/shared/StatusChip";
-import { FilterBar } from "../components/shared/FilterBar";
 import { UKPlate } from "@/components/UKPlate";
 import {
   useControlDrivers,
   useDriversKpis,
   isLicenceExpiringSoon,
   type DriverControlRow,
+  resolveDriverFilter,
   type DriverFilter,
 } from "../hooks/useControlDriversData";
 import { getStatusStyle } from "@/lib/statusConfig";
-import { humanAge } from "../pages/jobs/jobsUtils";
+import { useDriverPerformance } from "@/hooks/useDriverPerformance";
+import { scoreDriver, type CompletionResult } from "@/features/onboarding/lib/completion";
+import { CompletionBadge } from "@/features/onboarding/components/CompletionBadge";
+import { DriverCard, PerformanceCell } from "./drivers/DriverCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +35,20 @@ import {
   Search, Users, CheckCircle, AlertTriangle, Phone,
   Truck, ShieldAlert, Clock,
 } from "lucide-react";
+
+function completionFor(r: DriverControlRow): CompletionResult {
+  return scoreDriver({
+    full_name: r.full_name,
+    phone: r.phone,
+    licence_number: r.licence_number,
+    licence_expiry: r.licence_expiry,
+    right_to_work: r.right_to_work,
+    home_postcode: r.home_postcode,
+    payout_terms: r.payout_terms,
+    bank_captured: !!r.bank_captured,
+    trade_plate_number: r.trade_plate_number,
+  });
+}
 
 const FILTER_OPTIONS: { value: DriverFilter; label: string }[] = [
   { value: "all", label: "All" },
@@ -39,10 +62,35 @@ const FILTER_OPTIONS: { value: DriverFilter; label: string }[] = [
 
 export function ControlDrivers() {
   const navigate = useNavigate();
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<DriverFilter>("all");
-  const { data: drivers, isLoading, error } = useControlDrivers(search, filter);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const search = searchParams.get("search") ?? "";
+  const filter = resolveDriverFilter(searchParams.get("filter"));
+  const writeParams = useCallback(
+    (f: DriverFilter, term: string, replace = false) => {
+      const p = new URLSearchParams();
+      if (f !== "all") p.set("filter", f);
+      if (term.trim()) p.set("search", term);
+      setSearchParams(p, { replace });
+    },
+    [setSearchParams],
+  );
+  const setFilter = (f: DriverFilter) => writeParams(f, search);
+  const setSearch = (term: string) => writeParams(filter, term, true);
+
+  const { data: drivers, isLoading, error, refetch } = useControlDrivers(search, filter);
   const { data: kpis, isLoading: kpisLoading } = useDriversKpis();
+  const userIds = useMemo(() => (drivers ?? []).map((d) => d.user_id).filter(Boolean), [drivers]);
+  const { data: perfMap } = useDriverPerformance(userIds);
+  const completions = useMemo(() => {
+    const m = new Map<string, CompletionResult>();
+    for (const d of drivers ?? []) m.set(d.id, completionFor(d));
+    return m;
+  }, [drivers]);
+
+  const openProfile = (r: DriverControlRow) =>
+    navigate(`/admin/drivers/${r.user_id}?from=${encodeURIComponent("/control/drivers")}`);
+  const openJobs = (r: DriverControlRow) =>
+    navigate(`/control/jobs?view=all&search=${encodeURIComponent(r.display_name || r.full_name)}`);
 
   const kpiItems = [
     { label: "Total Drivers", value: kpis?.total, icon: Users, variant: "default" as const, loading: kpisLoading, onClick: () => setFilter("all") },
@@ -60,6 +108,9 @@ export function ControlDrivers() {
       render: (r) => (
         <div className="flex flex-col gap-0.5">
           <span className="text-xs font-semibold text-foreground">{r.display_name || r.full_name}</span>
+          {r.display_name && r.full_name && r.display_name !== r.full_name && (
+            <span className="text-[10px] text-muted-foreground">{r.full_name}</span>
+          )}
           <div className="flex items-center gap-1.5">
             <StatusChip
               label={r.is_active ? "Active" : "Inactive"}
@@ -67,7 +118,7 @@ export function ControlDrivers() {
               className="text-[9px] px-1.5 py-0"
             />
             {r.employment_type && (
-              <span className="text-[10px] text-muted-foreground capitalize">{r.employment_type}</span>
+              <span className="text-[10px] text-muted-foreground capitalize">{r.employment_type.replace(/_/g, " ")}</span>
             )}
           </div>
         </div>
@@ -118,6 +169,22 @@ export function ControlDrivers() {
           </div>
         );
       },
+    },
+    // ── ONBOARDING + PERFORMANCE BAND ──
+    {
+      key: "profile",
+      header: "Profile",
+      className: "w-[110px]",
+      render: (r) => {
+        const c = completions.get(r.id);
+        return c ? <CompletionBadge result={c} /> : null;
+      },
+    },
+    {
+      key: "performance",
+      header: "Last 60 days",
+      className: "w-[150px]",
+      render: (r) => <PerformanceCell perf={perfMap?.[r.user_id]} />,
     },
     // ── SECONDARY RISK / ADMIN BAND ──
     {
@@ -185,7 +252,7 @@ export function ControlDrivers() {
             variant="ghost"
             size="sm"
             className="h-6 text-[10px] px-2"
-            onClick={(e) => { e.stopPropagation(); navigate(`/control/jobs?search=${encodeURIComponent(r.display_name || r.full_name)}`); }}
+            onClick={(e) => { e.stopPropagation(); openJobs(r); }}
             title="View driver's jobs"
           >
             <Truck className="h-3 w-3 mr-0.5" /> Jobs
@@ -199,42 +266,29 @@ export function ControlDrivers() {
     <ControlShell>
       <ControlHeader
         title="Drivers"
-        subtitle="Fleet roster, workload visibility, and licence monitoring"
+        subtitle="Roster, workload, onboarding, performance and licence monitoring"
       />
 
-      {/* KPI Strip */}
-      <KpiStrip items={kpiItems} className="grid-cols-4" />
+      <KpiStrip items={kpiItems} className="grid-cols-2 lg:grid-cols-4" />
 
-      {/* Filter Bar */}
-      <FilterBar>
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+      <div className="rounded-lg border bg-card px-3 py-2.5 space-y-2 lg:space-y-0 lg:flex lg:flex-wrap lg:items-center lg:gap-2">
+        <div className="relative lg:flex-1 lg:min-w-[200px] lg:max-w-sm">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 lg:h-3.5 lg:w-3.5 text-muted-foreground" />
           <Input
-            placeholder="Search driver name, phone, plate…"
-            className="pl-8 h-8 text-xs"
+            placeholder="Search name, phone, plate, licence…"
+            className="pl-9 lg:pl-8 h-11 lg:h-8 text-sm lg:text-xs"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            aria-label="Search drivers"
           />
         </div>
-        <div className="flex flex-wrap items-center gap-1">
-          {FILTER_OPTIONS.map((opt) => (
-            <Button
-              key={opt.value}
-              variant={filter === opt.value ? "default" : "outline"}
-              size="sm"
-              className="h-7 text-[10px] px-2.5"
-              onClick={() => setFilter(opt.value)}
-            >
-              {opt.label}
-            </Button>
-          ))}
-        </div>
-      </FilterBar>
+        <ViewChips options={FILTER_OPTIONS} value={filter} onChange={setFilter} ariaLabel="Driver filters" />
+      </div>
 
-      {/* Error state */}
       {error && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 mb-4">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 flex items-center justify-between gap-2">
           <p className="text-xs text-destructive">Failed to load drivers: {error instanceof Error ? error.message : "Unknown error"}</p>
+          <Button variant="outline" size="sm" onClick={() => void refetch()}>Retry</Button>
         </div>
       )}
 
@@ -244,10 +298,20 @@ export function ControlDrivers() {
         description={`${drivers?.length ?? 0} driver${(drivers?.length ?? 0) !== 1 ? "s" : ""} matching current filters`}
         flush
       >
-        <CompactTable
+        <ResponsiveList<DriverControlRow>
+          rows={drivers ?? []}
           columns={columns}
-          data={drivers ?? []}
           loading={isLoading}
+          cardListClassName="lg:grid-cols-2"
+          renderCard={(r) => (
+            <DriverCard
+              driver={r}
+              perf={perfMap?.[r.user_id]}
+              completion={completions.get(r.id) ?? completionFor(r)}
+              onOpen={() => openProfile(r)}
+              onJobs={() => openJobs(r)}
+            />
+          )}
           emptyMessage={
             filter !== "all"
               ? `No drivers match the "${FILTER_OPTIONS.find((o) => o.value === filter)?.label}" filter.`
@@ -255,7 +319,7 @@ export function ControlDrivers() {
                 ? "No drivers match your search."
                 : "No drivers found."
           }
-          onRowClick={(r) => navigate(`/admin/drivers/${r.user_id}`)}
+          onRowClick={openProfile}
         />
       </ControlSection>
     </ControlShell>

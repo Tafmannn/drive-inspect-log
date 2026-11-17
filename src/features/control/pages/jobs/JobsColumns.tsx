@@ -7,9 +7,10 @@ import type { JobControlRow } from "../../hooks/useControlJobsData";
 import { UKPlate } from "@/components/UKPlate";
 import { Button } from "@/components/ui/button";
 import { getStatusStyle } from "@/lib/statusConfig";
+import { getWorkflowBrain } from "@/lib/workflowBrain";
 import {
-  Eye, UserPlus, ClipboardCheck, FileText, Receipt,
-  AlertTriangle, Clock,
+  Eye, UserPlus, ClipboardCheck, Receipt,
+  AlertTriangle, Clock, ShieldCheck,
 } from "lucide-react";
 import {
   humanAge, isJobStale, isUnassigned, canReviewPod, canAddExpense,
@@ -21,6 +22,10 @@ export interface JobsColumnActions {
   onAssign: (row: JobControlRow) => void;
   onReviewPod: (row: JobControlRow) => void;
   onAddExpense: (row: JobControlRow) => void;
+  /** When set (evidence queue), each row offers "Mark resolved". */
+  onResolveEvidence?: (row: JobControlRow) => void;
+  /** Row currently being resolved (disables its button). */
+  resolvingId?: string | null;
 }
 
 // ─── Column factory ──────────────────────────────────────────────────
@@ -100,6 +105,10 @@ export function buildJobColumns(actions: JobsColumnActions): CompactColumn<JobCo
       render: (r) => {
         const s = getStatusStyle(r.status);
         const stale = isJobStale(r);
+        // Same workflow-health signal the mobile card shows.
+        const brain = getWorkflowBrain({ job: r as never });
+        const blocker = brain.blockers[0] ?? null;
+        const risky = !!blocker || brain.riskLevel === "high" || brain.riskLevel === "medium";
         return (
           <div className="flex flex-col gap-0.5">
             <span
@@ -112,6 +121,14 @@ export function buildJobColumns(actions: JobsColumnActions): CompactColumn<JobCo
               <span className="inline-flex items-center gap-0.5 text-[10px] text-warning font-medium">
                 <Clock className="h-2.5 w-2.5" />
                 Stale
+              </span>
+            )}
+            {risky && (
+              <span
+                className={`text-[10px] font-medium ${blocker || brain.riskLevel === "high" ? "text-destructive" : "text-warning"}`}
+                title={blocker ?? brain.warnings[0] ?? undefined}
+              >
+                {blocker ? "Blocked" : brain.riskLevel === "high" ? "Action needed" : "Heads up"}
               </span>
             )}
           </div>
@@ -133,7 +150,7 @@ export function buildJobColumns(actions: JobsColumnActions): CompactColumn<JobCo
     {
       key: "actions",
       header: "",
-      className: "w-[200px] text-right",
+      className: "w-px whitespace-nowrap text-right",
       render: (r) => (
         <div className="flex items-center justify-end gap-1">
           <Button
@@ -166,7 +183,21 @@ export function buildJobColumns(actions: JobsColumnActions): CompactColumn<JobCo
             </Button>
           )}
 
-          {canAddExpense(r) && (
+          {actions.onResolveEvidence && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 text-[10px] px-2"
+              disabled={actions.resolvingId === r.id}
+              onClick={(e) => { e.stopPropagation(); actions.onResolveEvidence?.(r); }}
+            >
+              <ShieldCheck className="h-3 w-3 mr-0.5" />
+              {actions.resolvingId === r.id ? "Removing…" : "Mark resolved"}
+            </Button>
+          )}
+
+          {/* The evidence queue is for resolving evidence; Expense stays on every other view. */}
+          {!actions.onResolveEvidence && canAddExpense(r) && (
             <Button
               variant="ghost"
               size="sm"

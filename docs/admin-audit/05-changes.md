@@ -47,3 +47,23 @@ Deployed with their full `_shared` files and unchanged `verify_jwt`: user-lifecy
 | Break-glass recovery guide | `docs/admin-audit/08-break-glass.md` |
 | **Database, applied later the same day** (`20261116222659`): `user_org_id()` no longer falls back to the oldest org; every `app_settings` change by a signed-in user is written to `admin_audit_log`; the audit function can't be called directly | `supabase/migrations/20261116222659_org_fallback_and_settings_audit.sql` |
 
+## Merged admin screens (2026-11-17)
+
+One `/control` screen per area replaces each mobile/desktop pair (F-09, R-01). No database or edge-function change.
+
+| File | Change |
+|---|---|
+| `src/features/control/pages/ControlJobs.tsx` | Queues + list views, evidence acknowledgement, run order, URL-synced view and search |
+| `src/features/control/pages/jobs/jobsView.ts` (new) | Views, legacy `?filter=`/`?status=` translation, one jobs search rule |
+| `src/features/control/pages/jobs/JobsColumns.tsx`, `src/components/AdminJobCard.tsx` | Workflow-health cue in the table; "Mark resolved" and Expense actions |
+| `src/features/control/pages/ControlPodReview.tsx`, `pod/podView.ts`, `pod/PodReviewCard.tsx` (new) | Evidence groups, signature cues, union of actions |
+| `src/features/control/hooks/useClosureReview.ts` | Joins latest active delivery inspection signatures; `evidenceState`, `buildSignatureMap` |
+| `src/features/control/pages/ControlFinance.tsx`, `lib/financeBreakdown.ts` | Expense cards, receipt-compliance KPI, URL filters |
+| `src/features/control/pages/ControlDrivers.tsx`, `drivers/DriverCard.tsx` (new), `hooks/useControlDriversData.ts` | Onboarding completion, 60-day performance, driver cards, shared search |
+| `src/features/control/components/shared/ResponsiveList.tsx`, `ViewChips.tsx`, `hooks/useIsDesktop.ts` (new) | Cards below 1024 px, table above; scrollable view chips |
+| `src/features/control/components/shared/KpiStrip.tsx` | KPI labels wrap to two lines instead of being cut off on phones |
+| `src/features/control/LegacyAdminRedirects.tsx`, `legacyAdminTarget.ts` (new), `src/App.tsx` | `/admin/{jobs,pod-review,finance,drivers}` redirect |
+| `src/lib/operationsBuckets.ts`, `src/lib/workflowBrain.ts`, `src/pages/AdminDashboard.tsx`, Control pages, `exceptionEngine.ts`, `DriverProfileDetail.tsx` | Links point at the merged views; driver profile Back honours `from=` |
+| Removed | `AdminJobsQueue.tsx`, `AdminPodReview.tsx`, `AdminFinance.tsx`, `AdminDrivers.tsx`, `usePodReviewData.ts`, `useAdminDrivers.ts` |
+
+Tests: `merged-admin-screens.test.tsx`, `merged-jobs-pod-pages.test.tsx`, `merged-finance-page.test.tsx`; `control-pages-linking` and `admin-drivers-search` updated.

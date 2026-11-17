@@ -391,7 +391,7 @@ export function ControlCompliance() {
             variant="ghost"
             size="sm"
             className="h-7 text-xs"
-            onClick={() => navigate("/control/jobs?status=completed")}
+            onClick={() => navigate("/control/jobs?view=completed")}
           >
             Completed jobs <ChevronRight className="h-3.5 w-3.5" />
           </Button>

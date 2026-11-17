@@ -510,7 +510,7 @@ export interface BrainInput {
    * explicit "POD approved" column — admins approve by closing the job
    * (status → completed) or by adding a separate review record. Until
    * that column exists, callers can pass `podApproved: true` when they
-   * have first-hand knowledge (e.g. AdminPodReview just clicked
+   * have first-hand knowledge (e.g. the POD review screen just clicked
    * "Approve"). Defaults to: approved iff status === completed.
    */
   podApproved?: boolean;
@@ -724,7 +724,7 @@ export function getWorkflowBrain(input: BrainInput): WorkflowBrain {
     adminNextAction = {
       label: "Review POD",
       code: "review_pod",
-      route: `/admin/pod-review?jobId=${job.id}`,
+      route: `/jobs/${job.id}/pod`,
     };
   } else if (rawStatus === JOB_STATUS.COMPLETED) {
     if (invoiceReadiness.ready) {
@@ -746,7 +746,9 @@ export function getWorkflowBrain(input: BrainInput): WorkflowBrain {
     adminNextAction = {
       label: "Assign driver",
       code: "assign_driver",
-      route: `/admin/jobs?filter=unassigned&jobId=${job.id}`,
+      route: job.external_job_number
+        ? `/control/jobs?view=unassigned&search=${encodeURIComponent(job.external_job_number)}`
+        : "/control/jobs?view=unassigned",
     };
   }
 

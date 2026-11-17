@@ -1,24 +1,27 @@
 /**
- * POD Review Control Page — /control/pod-review
- * Focused closure workspace: review late-stage jobs, identify evidence gaps, resolve POD friction.
+ * POD Review — /control/pod-review
  *
- * ACTION MAPPINGS:
- *   - "View Job"          → /jobs/:id               (canonical job detail)
- *   - "Review POD"        → /jobs/:id/pod           (POD report page)
- *   - "Review Inspection" → /jobs/:id               (job detail shows inspection state)
- *   - "Add Expense"       → /expenses/new           (expense form)
+ * The one closure screen for admins and the owner, on every screen size.
+ * Merges the old mobile page (/admin/pod-review: evidence groups, signature
+ * checks) and the old desktop table (status filters, server KPIs, stale cue):
+ *   - "Review queue" (default) groups the queue by evidence: missing delivery
+ *     inspection, missing signatures, ready to confirm; recently completed
+ *     sits underneath, collapsed;
+ *   - flat views by evidence or status;
+ *   - Confirm completes the job through the validated server RPC;
+ *   - cards below 1024px, a table above; view and search live in the URL.
  *
- * NOTE: "Review POD" maps to the existing /jobs/:id/pod route which renders PodReport.
- * If a job has no POD yet, that page handles the empty state gracefully.
+ * ACTIONS: View → /jobs/:id · Review POD → /jobs/:id/pod ·
+ * Inspect → /inspection/:id/delivery · Confirm → completeJobRpc
  */
-import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { ControlShell, ControlHeader, ControlSection } from "../components/shared/ControlShell";
 import { KpiStrip } from "../components/shared/KpiStrip";
-import { CompactTable, type CompactColumn } from "../components/shared/CompactTable";
-import { StatusChip } from "../components/shared/StatusChip";
-import { FilterBar } from "../components/shared/FilterBar";
+import { ViewChips } from "../components/shared/ViewChips";
+import { ResponsiveList } from "../components/shared/ResponsiveList";
+import type { CompactColumn } from "../components/shared/CompactTable";
 import {
   useClosureReviewQueue,
   useClosureKpis,
@@ -26,94 +29,31 @@ import {
   type ClosureReviewRow,
   type ClosureStatusFilter,
 } from "../hooks/useClosureReview";
+import { POD_VIEWS, canConfirmReview, podViewQuery, podViewUrl, resolvePodView } from "./pod/podView";
+import { PodReviewCard, EvidenceCues, type PodReviewActions } from "./pod/PodReviewCard";
+import { humanAge } from "./jobs/jobsUtils";
 import { UKPlate } from "@/components/UKPlate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { getStatusStyle } from "@/lib/statusConfig";
-import { supabase } from "@/integrations/supabase/client";
 import { invalidateForEvent } from "@/lib/mutationEvents";
+import { useRefetchOnFocus } from "@/hooks/useRefetchOnFocus";
 import { toast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 import {
-  Search, ClipboardCheck, FileCheck, Truck, AlertTriangle,
-  Eye, FileText, ClipboardList, Receipt, Clock, CheckCircle, Loader2,
+  Search, ClipboardCheck, FileCheck, Truck, AlertTriangle, PenTool,
+  Eye, FileText, ClipboardList, CheckCircle, Loader2,
 } from "lucide-react";
 
-const STATUS_OPTIONS: { label: string; value: ClosureStatusFilter }[] = [
-  { label: "Review Queue", value: "all" },
-  { label: "POD Ready", value: "pod_ready" },
-  { label: "Delivery Complete", value: "delivery_complete" },
-  { label: "No Delivery Insp.", value: "missing_delivery_inspection" },
-  { label: "Recently Completed", value: "recently_completed" },
-];
+const REFETCH_KEYS = [["closure-review-queue"], ["closure-review-kpis"]];
 
-function humanAge(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(ms / 60000);
-  if (mins < 60) return `${mins}m`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h`;
-  return `${Math.floor(hrs / 24)}d`;
-}
-
-export function ControlPodReview() {
-  const navigate = useNavigate();
-  const qc = useQueryClient();
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<ClosureStatusFilter>("all");
-  const [confirming, setConfirming] = useState<string | null>(null);
-
-  const handleConfirmReview = async (jobId: string) => {
-    setConfirming(jobId);
-    try {
-      // Validated server-side completion — never write status directly.
-      const { completeJobRpc } = await import("@/lib/api");
-      await completeJobRpc(jobId, "Confirmed via Control POD review");
-      toast({ title: "Review confirmed — job completed" });
-      invalidateForEvent(qc, "pod_approved", [["job", jobId]]);
-    } catch (e: any) {
-      toast({ title: "Failed", description: e.message, variant: "destructive" });
-    } finally {
-      setConfirming(null);
-    }
-  };
-  const { data, isLoading } = useClosureReviewQueue();
-  const { data: kpis, isLoading: kpisLoading } = useClosureKpis();
-
-  // Row selection lives in a pure, tested helper so the "Review Queue" view
-  // stays in lock-step with the Review Queue KPI (see selectClosureRows).
-  const rows = useMemo(
-    () => selectClosureRows(data, statusFilter, search),
-    [data, statusFilter, search],
-  );
-
-  // ── KPI Strip ──
-  const kpiItems = [
-    { label: "Review Queue", value: kpis?.reviewQueue, icon: ClipboardCheck, variant: "warning" as const, loading: kpisLoading, onClick: () => setStatusFilter("all") },
-    { label: "POD Ready", value: kpis?.podReady, icon: FileCheck, variant: "info" as const, loading: kpisLoading, onClick: () => setStatusFilter("pod_ready") },
-    { label: "Delivery Complete", value: kpis?.deliveryComplete, icon: Truck, variant: "default" as const, loading: kpisLoading, onClick: () => setStatusFilter("delivery_complete") },
-    { label: "Completed (7d)", value: kpis?.completedRecent, icon: ClipboardList, variant: "success" as const, loading: kpisLoading, onClick: () => setStatusFilter("recently_completed") },
-    {
-      label: "No Delivery Insp.",
-      value: kpis?.missingDeliveryInspection,
-      icon: AlertTriangle,
-      variant: kpis?.missingDeliveryInspection ? "destructive" as const : "default" as const,
-      loading: kpisLoading,
-      onClick: () => setStatusFilter("missing_delivery_inspection"),
-    },
-  ];
-
-  // ── Table columns ──
-  const columns: CompactColumn<ClosureReviewRow>[] = [
+function buildColumns(a: PodReviewActions): CompactColumn<ClosureReviewRow>[] {
+  return [
     {
       key: "ref",
       header: "Ref",
       className: "w-[100px]",
-      render: (r) => (
-        <span className="text-xs font-semibold text-foreground">
-          {r.external_job_number || r.id.slice(0, 8)}
-        </span>
-      ),
+      render: (r) => <span className="text-xs font-semibold text-foreground">{r.external_job_number || r.id.slice(0, 8)}</span>,
     },
     {
       key: "vehicle",
@@ -123,9 +63,17 @@ export function ControlPodReview() {
         <div className="flex flex-col gap-0.5">
           <UKPlate reg={r.vehicle_reg} />
           <span className="text-[10px] text-muted-foreground truncate">
-            {r.vehicle_make} {r.vehicle_model}
+            {[r.vehicle_make, r.vehicle_model].filter(Boolean).join(" ")}
           </span>
         </div>
+      ),
+    },
+    {
+      key: "client",
+      header: "Client",
+      className: "w-[120px]",
+      render: (r) => (
+        <span className="text-xs text-foreground truncate block max-w-[120px]">{r.client_company || r.client_name || "—"}</span>
       ),
     },
     {
@@ -143,9 +91,7 @@ export function ControlPodReview() {
       key: "delivery",
       header: "Delivery",
       render: (r) => (
-        <span className="text-xs text-muted-foreground whitespace-nowrap">
-          {r.delivery_city ?? r.delivery_postcode}
-        </span>
+        <span className="text-xs text-muted-foreground whitespace-nowrap">{r.delivery_city || r.delivery_postcode}</span>
       ),
     },
     {
@@ -167,141 +113,223 @@ export function ControlPodReview() {
     {
       key: "evidence",
       header: "Evidence",
-      className: "w-[120px]",
-      render: (r) => {
-        // Derived signals — visually secondary
-        const cues: React.ReactNode[] = [];
-        if (r.missingDeliveryInspection) {
-          cues.push(
-            <StatusChip key="del" label="No delivery insp." variant="destructive" className="text-[9px] py-0" />
-          );
-        }
-        if (r.missingPickupInspection) {
-          cues.push(
-            <StatusChip key="pick" label="No pickup insp." variant="warning" className="text-[9px] py-0" />
-          );
-        }
-        if (r.isStale) {
-          cues.push(
-            <Badge key="stale" variant="outline" className="text-[9px] px-1.5 py-0 gap-0.5 text-muted-foreground border-border">
-              <Clock className="h-2.5 w-2.5" /> Stale
-            </Badge>
-          );
-        }
-        if (cues.length === 0) {
-          return <span className="text-[10px] text-muted-foreground">—</span>;
-        }
-        return <div className="flex flex-wrap gap-1">{cues}</div>;
-      },
+      className: "w-[170px]",
+      render: (r) => <EvidenceCues row={r} compact />,
     },
     {
       key: "age",
       header: "Age",
       className: "w-[55px] text-right",
-      render: (r) => (
-        <span className="text-[11px] text-muted-foreground">
-          {humanAge(r.completed_at ?? r.updated_at)}
-        </span>
-      ),
+      render: (r) => <span className="text-[11px] text-muted-foreground tabular-nums">{humanAge(r.completed_at ?? r.updated_at)}</span>,
     },
     {
       key: "actions",
       header: "",
-      className: "w-[220px] text-right",
+      className: "w-[230px] text-right",
       render: (r) => (
         <div className="flex items-center justify-end gap-1">
-          {["pod_ready", "delivery_complete"].includes(r.status) && (
+          {canConfirmReview(r) && (
             <Button
               variant="ghost"
               size="sm"
               className="h-6 text-[10px] px-2 text-primary"
-              disabled={confirming === r.id}
-              onClick={(e) => { e.stopPropagation(); handleConfirmReview(r.id); }}
+              disabled={a.confirmingId === r.id}
+              onClick={(e) => { e.stopPropagation(); a.onConfirm(r); }}
             >
-              {confirming === r.id ? <Loader2 className="h-3 w-3 animate-spin mr-0.5" /> : <CheckCircle className="h-3 w-3 mr-0.5" />} Confirm
+              {a.confirmingId === r.id ? <Loader2 className="h-3 w-3 animate-spin mr-0.5" /> : <CheckCircle className="h-3 w-3 mr-0.5" />} Confirm
             </Button>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 text-[10px] px-2"
-            onClick={(e) => { e.stopPropagation(); navigate(`/jobs/${r.id}/pod?from=/control/pod-review`); }}
-          >
+          <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={(e) => { e.stopPropagation(); a.onPod(r); }}>
             <FileText className="h-3 w-3 mr-0.5" /> POD
           </Button>
-          {!r.has_delivery_inspection && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 text-[10px] px-2 text-warning"
-              onClick={(e) => { e.stopPropagation(); navigate(`/inspection/${r.id}/delivery`); }}
-            >
+          {r.missingDeliveryInspection && (
+            <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2 text-warning" onClick={(e) => { e.stopPropagation(); a.onInspect(r); }}>
               <ClipboardList className="h-3 w-3 mr-0.5" /> Inspect
             </Button>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 text-[10px] px-2"
-            onClick={(e) => { e.stopPropagation(); navigate(`/jobs/${r.id}?from=/control/pod-review`); }}
-          >
+          <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={(e) => { e.stopPropagation(); a.onView(r); }}>
             <Eye className="h-3 w-3 mr-0.5" /> View
           </Button>
         </div>
       ),
     },
   ];
+}
+
+export function ControlPodReview() {
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const view = resolvePodView(searchParams);
+  const search = searchParams.get("search") ?? "";
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+
+  // Translate old ?filter= links into ?view= without a history entry.
+  useEffect(() => {
+    const canonical = podViewQuery(view, search);
+    if (canonical.toString() !== searchParams.toString()) setSearchParams(canonical, { replace: true });
+  }, [view, search, searchParams, setSearchParams]);
+
+  const setView = useCallback((v: ClosureStatusFilter) => setSearchParams(podViewQuery(v, search)), [search, setSearchParams]);
+  const setSearch = useCallback(
+    (term: string) => setSearchParams(podViewQuery(view, term), { replace: true }),
+    [view, setSearchParams],
+  );
+
+  const { data, isLoading, error, refetch } = useClosureReviewQueue();
+  const { data: kpis, isLoading: kpisLoading } = useClosureKpis();
+  useRefetchOnFocus(REFETCH_KEYS);
+
+  const from = encodeURIComponent(podViewUrl(view, search));
+
+  const onConfirm = useCallback(
+    async (row: ClosureReviewRow) => {
+      setConfirmingId(row.id);
+      try {
+        // Validated server-side completion — never write status directly.
+        const { completeJobRpc } = await import("@/lib/api");
+        await completeJobRpc(row.id, "Confirmed via POD review");
+        toast({ title: "Review confirmed — job completed" });
+        invalidateForEvent(qc, "pod_approved", [["job", row.id]]);
+      } catch (e) {
+        toast({ title: "Couldn't confirm", description: e instanceof Error ? e.message : "Please try again.", variant: "destructive" });
+      } finally {
+        setConfirmingId(null);
+      }
+    },
+    [qc],
+  );
+
+  const actions: PodReviewActions = useMemo(
+    () => ({
+      onView: (r) => navigate(`/jobs/${r.id}?from=${from}`),
+      onPod: (r) => navigate(`/jobs/${r.id}/pod?from=${from}`),
+      onInspect: (r) => navigate(`/inspection/${r.id}/delivery`),
+      onConfirm: (r) => void onConfirm(r),
+      confirmingId,
+    }),
+    [navigate, from, onConfirm, confirmingId],
+  );
+  const columns = useMemo(() => buildColumns(actions), [actions]);
+  const renderCard = useCallback((r: ClosureReviewRow) => <PodReviewCard row={r} actions={actions} />, [actions]);
+
+  const rowsFor = useCallback((f: ClosureStatusFilter) => selectClosureRows(data, f, search), [data, search]);
+  const missingSignatures = data?.queue.filter((r) => r.evidence === "missing_signatures").length;
+  const ready = data?.queue.filter((r) => r.evidence === "complete").length;
+
+  const kpiItems = [
+    { label: "Review queue", value: kpis?.reviewQueue, icon: ClipboardCheck, variant: "warning" as const, loading: kpisLoading, onClick: () => setView("all") },
+    { label: "Ready to confirm", value: ready, icon: CheckCircle, variant: "success" as const, loading: isLoading, onClick: () => setView("ready") },
+    { label: "Missing signatures", value: missingSignatures, icon: PenTool, variant: missingSignatures ? ("warning" as const) : ("default" as const), loading: isLoading, onClick: () => setView("missing_signatures") },
+    { label: "No delivery insp.", value: kpis?.missingDeliveryInspection, icon: AlertTriangle, variant: kpis?.missingDeliveryInspection ? ("destructive" as const) : ("default" as const), loading: kpisLoading, onClick: () => setView("missing_delivery_inspection") },
+    { label: "POD ready", value: kpis?.podReady, icon: FileCheck, variant: "info" as const, loading: kpisLoading, onClick: () => setView("pod_ready") },
+    { label: "Delivery complete", value: kpis?.deliveryComplete, icon: Truck, variant: "default" as const, loading: kpisLoading, onClick: () => setView("delivery_complete") },
+  ];
+
+  const viewLabel = POD_VIEWS.find((v) => v.value === view)?.label ?? "Review queue";
 
   return (
     <ControlShell>
-      <ControlHeader
-        title="POD Review"
-        subtitle="Closure workflow — review late-stage jobs, verify evidence, and resolve outstanding items"
-      />
+      <ControlHeader title="POD Review" subtitle="Check evidence, confirm deliveries and close jobs" />
 
-      <KpiStrip items={kpiItems} className="grid-cols-2 lg:grid-cols-5" />
+      <KpiStrip items={kpiItems} className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-6" />
 
-      <FilterBar>
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+      <div className="rounded-lg border bg-card px-3 py-2.5 space-y-2 lg:space-y-0 lg:flex lg:flex-wrap lg:items-center lg:gap-2">
+        <div className="relative lg:flex-1 lg:min-w-[200px] lg:max-w-sm">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 lg:h-3.5 lg:w-3.5 text-muted-foreground" />
           <Input
             placeholder="Search reg, driver, client, postcode…"
-            className="pl-8 h-8 text-xs"
+            className="pl-9 lg:pl-8 h-11 lg:h-8 text-sm lg:text-xs"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            aria-label="Search POD review"
           />
         </div>
-        {STATUS_OPTIONS.map((opt) => (
-          <Button
-            key={opt.value}
-            variant={statusFilter === opt.value ? "default" : "outline"}
-            size="sm"
-            className="text-xs h-8"
-            onClick={() => setStatusFilter(opt.value)}
-          >
-            {opt.label}
-          </Button>
-        ))}
-      </FilterBar>
+        <ViewChips options={POD_VIEWS} value={view} onChange={setView} ariaLabel="POD review views" />
+      </div>
 
-      {/* Active Review Queue */}
-      <ControlSection
-        title="Review Queue"
-        description={
-          statusFilter === "recently_completed"
-            ? `${rows.length} recently completed jobs`
-            : `${rows.length} items requiring review`
-        }
-        flush
-      >
-        <CompactTable
-          columns={columns}
-          data={rows}
-          loading={isLoading}
-          emptyMessage="No jobs in the closure review queue."
-          onRowClick={(row) => navigate(`/jobs/${row.id}?from=/control/pod-review`)}
-        />
-      </ControlSection>
+      {error ? (
+        <ControlSection>
+          <div className="py-6 text-center">
+            <p className="text-sm text-destructive mb-2">
+              Failed to load: {error instanceof Error ? error.message : "Unknown error"}
+            </p>
+            <Button variant="outline" size="sm" onClick={() => void refetch()}>Retry</Button>
+          </div>
+        </ControlSection>
+      ) : view === "all" ? (
+        <>
+          <Group title="Missing delivery inspection" icon={ClipboardList} iconClass="text-destructive"
+            rows={rowsFor("missing_delivery_inspection")} loading={isLoading}
+            emptyText="All closure jobs have a delivery inspection." columns={columns} onRowClick={actions.onView} renderCard={renderCard} />
+          <Group title="Missing signatures" icon={PenTool} iconClass="text-warning"
+            rows={rowsFor("missing_signatures")} loading={isLoading}
+            emptyText="All inspected jobs have both signatures." columns={columns} onRowClick={actions.onView} renderCard={renderCard} />
+          <Group title="Ready to confirm" icon={FileCheck} iconClass="text-primary"
+            rows={rowsFor("ready")} loading={isLoading}
+            emptyText="No jobs with complete evidence waiting." columns={columns} onRowClick={actions.onView} renderCard={renderCard} />
+          <Group title="Recently completed (7d)" icon={CheckCircle} iconClass="text-success"
+            rows={rowsFor("recently_completed")} loading={isLoading}
+            emptyText="No recently completed jobs." columns={columns} onRowClick={actions.onView} renderCard={renderCard} collapsible />
+        </>
+      ) : (
+        <ControlSection
+          title={viewLabel}
+          description={isLoading ? "Loading…" : `${rowsFor(view).length} jobs`}
+          flush
+        >
+          <ResponsiveList<ClosureReviewRow>
+            rows={rowsFor(view)}
+            columns={columns}
+            loading={isLoading}
+            emptyMessage="No jobs in this view."
+            onRowClick={actions.onView}
+            renderCard={renderCard}
+          />
+        </ControlSection>
+      )}
     </ControlShell>
+  );
+}
+
+function Group({
+  title, icon: Icon, iconClass, rows, loading, emptyText, columns, onRowClick, renderCard, collapsible,
+}: {
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  iconClass?: string;
+  rows: ClosureReviewRow[];
+  loading: boolean;
+  emptyText: string;
+  columns: CompactColumn<ClosureReviewRow>[];
+  onRowClick: (r: ClosureReviewRow) => void;
+  renderCard: (r: ClosureReviewRow) => React.ReactNode;
+  collapsible?: boolean;
+}) {
+  const [collapsed, setCollapsed] = useState(!!collapsible);
+  return (
+    <section className="rounded-lg border bg-card" aria-label={title}>
+      <button
+        type="button"
+        className={cn("flex items-center gap-2 w-full text-left px-4 py-3 min-h-[44px]", !collapsible && "cursor-default")}
+        onClick={() => collapsible && setCollapsed((c) => !c)}
+        aria-expanded={collapsible ? !collapsed : undefined}
+      >
+        <Icon className={cn("h-4 w-4", iconClass ?? "text-muted-foreground")} />
+        <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+        <span className="text-[11px] font-medium text-muted-foreground">({loading ? "…" : rows.length})</span>
+        {collapsible && <span className="text-[11px] text-muted-foreground ml-auto">{collapsed ? "Show" : "Hide"}</span>}
+      </button>
+      {!collapsed && (
+        <ResponsiveList<ClosureReviewRow>
+          rows={rows}
+          columns={columns}
+          loading={loading}
+          emptyMessage={emptyText}
+          onRowClick={onRowClick}
+          renderCard={renderCard}
+        />
+      )}
+    </section>
   );
 }

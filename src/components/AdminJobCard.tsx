@@ -15,9 +15,9 @@ import { UKPlate } from "@/components/UKPlate";
 import { StatusPill } from "@/components/ui-kit";
 import { getStatusStyle } from "@/lib/statusConfig";
 import { getWorkflowBrain } from "@/lib/workflowBrain";
-import { isJobStale, isUnassigned, canReviewPod } from "@/features/control/pages/jobs/jobsUtils";
+import { isJobStale, isUnassigned, canReviewPod, canAddExpense } from "@/features/control/pages/jobs/jobsUtils";
 import {
-  MapPin, UserPlus, Eye, ClipboardCheck, AlertTriangle, Clock, User,
+  MapPin, UserPlus, Eye, ClipboardCheck, AlertTriangle, Clock, User, Receipt,
 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -43,11 +43,15 @@ export interface AdminJobCardProps {
   onView: (job: AdminJobRow) => void;
   onAssign: (job: AdminJobRow) => void;
   onPod?: (job: AdminJobRow) => void;
+  /** Optional: add an expense against the job (shown when the job can take one). */
+  onExpense?: (job: AdminJobRow) => void;
+  /** Optional extra row under the actions, e.g. "Mark resolved" in the evidence queue. */
+  footer?: React.ReactNode;
 }
 
 // ── Component ────────────────────────────────────────────────────────
 
-export function AdminJobCard({ job, onView, onAssign, onPod }: AdminJobCardProps) {
+export function AdminJobCard({ job, onView, onAssign, onPod, onExpense, footer }: AdminJobCardProps) {
   const statusStyle = getStatusStyle(job.status);
   const stale = isJobStale(job);
   const unassigned = isUnassigned(job);
@@ -131,11 +135,11 @@ export function AdminJobCard({ job, onView, onAssign, onPod }: AdminJobCardProps
       )}
 
       {/* ── ACTIONS ── */}
-      <div className="px-3 pb-3 pt-1 flex items-center gap-2">
+      <div className="px-3 pb-3 pt-1 flex items-center gap-1.5">
         {/* Primary: View */}
         <Button
           size="sm"
-          className="flex-1 min-h-[40px] text-xs"
+          className="flex-1 min-w-0 min-h-[40px] px-2.5 text-xs"
           onClick={(e) => { e.stopPropagation(); onView(job); }}
         >
           <Eye className="h-3.5 w-3.5 mr-1" /> View
@@ -145,7 +149,7 @@ export function AdminJobCard({ job, onView, onAssign, onPod }: AdminJobCardProps
         <Button
           variant={unassigned ? "default" : "outline"}
           size="sm"
-          className={`min-h-[40px] text-xs ${unassigned ? "bg-warning hover:bg-warning/90 text-warning-foreground" : ""}`}
+          className={`min-h-[40px] px-2.5 text-xs ${unassigned ? "bg-warning hover:bg-warning/90 text-warning-foreground" : ""}`}
           onClick={(e) => { e.stopPropagation(); onAssign(job); }}
         >
           <UserPlus className="h-3.5 w-3.5 mr-1" />
@@ -157,13 +161,31 @@ export function AdminJobCard({ job, onView, onAssign, onPod }: AdminJobCardProps
           <Button
             variant="outline"
             size="sm"
-            className="min-h-[40px] text-xs"
+            className="min-h-[40px] px-2.5 text-xs"
             onClick={(e) => { e.stopPropagation(); onPod(job); }}
           >
             <ClipboardCheck className="h-3.5 w-3.5 mr-1" /> POD
           </Button>
         )}
+
+        {/* Secondary: Expense */}
+        {onExpense && canAddExpense(job) && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="min-h-[40px] min-w-[40px] px-2.5 text-xs"
+            aria-label="Add expense"
+            onClick={(e) => { e.stopPropagation(); onExpense(job); }}
+          >
+            <Receipt className="h-3.5 w-3.5" />
+          </Button>
+        )}
       </div>
+      {footer && (
+        <div className="px-3 pb-3 -mt-1" onClick={(e) => e.stopPropagation()}>
+          {footer}
+        </div>
+      )}
     </Card>
   );
 }

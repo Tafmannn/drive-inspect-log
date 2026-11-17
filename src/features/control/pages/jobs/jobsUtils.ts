@@ -2,7 +2,7 @@
  * Jobs dispatch utilities — thin re-exports of the shared selectors.
  *
  * Kept as a separate module for backwards compatibility with existing call
- * sites (AdminDashboard, AdminJobsQueue, etc). New code should import directly
+ * sites (AdminDashboard, the Jobs screen, etc). New code should import directly
  * from `@/features/jobs/selectors`.
  */
 import { PENDING_STATUSES, TERMINAL_STATUSES, ACTIVE_STATUSES } from "@/lib/statusConfig";

@@ -44,6 +44,7 @@ import { installSubmitQueueDrainer, drainSubmitQueue } from "@/lib/submitQueue";
 import { installEvidenceDrainTriggers, drainEvidenceQueue } from "@/lib/evidence/queueRuntime";
 import { Loader2 } from "lucide-react";
 import { ControlRoute } from "@/features/control/guards/ControlRoute";
+import { AdminJobsRedirect, LegacyAdminRedirect } from "@/features/control/LegacyAdminRedirects";
 import { PortalRoute } from "@/features/portal/components/PortalRoute";
 
 // ── Management surface: admin, super-admin, the Control Center, invoicing,
@@ -69,12 +70,8 @@ const JobMasterList = lazyNamed(() => import("./pages/JobMasterList"), "JobMaste
 const JobForm = lazyNamed(() => import("./pages/JobForm"), "JobForm");
 const PodReport = lazyNamed(() => import("./pages/PodReport"), "PodReport");
 const AdminDashboard = lazyNamed(() => import("./pages/AdminDashboard"), "AdminDashboard");
-const AdminJobsQueue = lazyNamed(() => import("./pages/AdminJobsQueue"), "AdminJobsQueue");
 const Timesheets = lazyNamed(() => import("./pages/Timesheets"), "Timesheets");
 const AdminUsers = lazyNamed(() => import("./pages/AdminUsers"), "AdminUsers");
-const AdminDrivers = lazyNamed(() => import("./pages/AdminDrivers"), "AdminDrivers");
-const AdminPodReview = lazyNamed(() => import("./pages/AdminPodReview"), "AdminPodReview");
-const AdminFinance = lazyNamed(() => import("./pages/AdminFinance"), "AdminFinance");
 const AdminOnboarding = lazyNamed(() => import("./pages/AdminOnboarding"), "AdminOnboarding");
 const SuperAdminDashboard = lazyNamed(() => import("./pages/SuperAdminDashboard"), "SuperAdminDashboard");
 const SuperAdminOrgs = lazyNamed(() => import("./pages/SuperAdminPages"), "SuperAdminOrgs");
@@ -338,13 +335,14 @@ const App = () => {
 
                 {/* ── Admin-only routes ── */}
                 <Route path="/admin" element={<ProtectedRoute><AdminRoute><AdminDashboard /></AdminRoute></ProtectedRoute>} />
-                <Route path="/admin/jobs" element={<ProtectedRoute><AdminRoute><AdminJobsQueue /></AdminRoute></ProtectedRoute>} />
+                {/* Merged into /control (works on every screen size); old links redirect. */}
+                <Route path="/admin/jobs" element={<AdminJobsRedirect />} />
                 <Route path="/admin/timesheets" element={<ProtectedRoute><AdminRoute><Timesheets /></AdminRoute></ProtectedRoute>} />
                 {/* /admin/sync-errors removed — Google Sheets sync retired */}
                 <Route path="/admin/users" element={<ProtectedRoute><AdminRoute><AdminUsers /></AdminRoute></ProtectedRoute>} />
-                <Route path="/admin/drivers" element={<ProtectedRoute><AdminRoute><AdminDrivers /></AdminRoute></ProtectedRoute>} />
-                <Route path="/admin/pod-review" element={<ProtectedRoute><AdminRoute><AdminPodReview /></AdminRoute></ProtectedRoute>} />
-                <Route path="/admin/finance" element={<ProtectedRoute><AdminRoute><AdminFinance /></AdminRoute></ProtectedRoute>} />
+                <Route path="/admin/drivers" element={<LegacyAdminRedirect area="drivers" />} />
+                <Route path="/admin/pod-review" element={<LegacyAdminRedirect area="pod-review" />} />
+                <Route path="/admin/finance" element={<LegacyAdminRedirect area="finance" />} />
                 <Route path="/admin/onboarding" element={<ProtectedRoute><AdminRoute><AdminOnboarding /></AdminRoute></ProtectedRoute>} />
                 <Route path="/admin/drivers/:userId" element={<ProtectedRoute><AdminRoute><DriverProfileDetail /></AdminRoute></ProtectedRoute>} />
                 <Route path="/admin/drivers/:userId/complete" element={<ProtectedRoute><AdminRoute><DriverOnboardingWizard /></AdminRoute></ProtectedRoute>} />

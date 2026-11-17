@@ -339,7 +339,7 @@ export function deriveComplianceExceptions(
       const userId = driverUserIdLookup?.get(d.related_id);
       // If we cannot resolve the auth user_id, fall back to the drivers list
       // rather than producing a route that yields a blank profile page.
-      route = userId ? `/admin/drivers/${userId}` : "/admin/drivers";
+      route = userId ? `/admin/drivers/${userId}` : "/control/drivers";
       actionLabel = "Open driver";
     } else if (d.related_type === "client") {
       route = `/control/clients/${d.related_id}`;
