@@ -62,3 +62,20 @@ Note: there are 54 write policies now against 50 earlier the same day. The 4 new
 | same: parity probes | 11-table read counts: Super ≥ Admin; 58/58 write policies evaluated, 0 where Admin > Super (58 now: PR #107 added invoice policies) |
 | After the dry run | no stray flag rows, no trigger or function created, `user_org_id()` unchanged, owner `super_admin / active` |
 
+## Applied and verified (2026-11-17, after the restart)
+
+Migration `20261116222659` is in the database. Checked on the live database, in a transaction that rolled back:
+
+| Check | Result |
+|---|---|
+| `user_org_id()` per role | the same single org for admin, driver and super admin |
+| Audit trail | owner's insert, update and delete each logged with their email; the no-change update was not |
+| Admin writing `app_settings` | rejected |
+| A signed-in user calling the audit function directly | refused (only the database owner and service role may run it) |
+| Read probe, 11 tables | Super ≥ Admin on every table |
+| Write policies | 58/58 evaluated, 0 where Admin > Super |
+| Security advisor | no new finding for these objects |
+| Stray test data | none (no `ZZ_` rows left in `app_settings`) |
+
+Another session's migration `20261116222904` (require an active actor and a valid permission for override management) was applied right after mine; all of the above passed with it in place.
+
