@@ -340,3 +340,35 @@ export function buildPodReportModel(
       .map((e) => ({ category: titleCase(text(e.category) ?? "Expense"), description: text(e.label) })),
   };
 }
+
+// ── Proof of Collection ──────────────────────────────────────────────────────
+
+/**
+ * The job as it stood at collection: only the pickup inspection, its damage
+ * items and its photos (including damage close-ups linked to it). Used to
+ * print a Proof of Collection, which must not show anything from delivery.
+ */
+export function collectionOnlyJob(job: JobWithRelations): JobWithRelations {
+  const pickup = job.inspections.find((i) => i.type === "pickup");
+  const damageItems = job.damage_items.filter((d) => !!pickup && d.inspection_id === pickup.id);
+  const damageIds = new Set(damageItems.map((d) => d.id));
+  const photos = job.photos.filter((p) => {
+    if (p.type.startsWith("pickup_")) return true;
+    if (p.type !== "damage_close_up" || !pickup) return false;
+    if (p.inspection_id) return p.inspection_id === pickup.id;
+    return !!p.damage_item_id && damageIds.has(p.damage_item_id);
+  });
+  return { ...job, inspections: pickup ? [pickup] : [], damage_items: damageItems, photos };
+}
+
+/** Adjust a model built from collectionOnlyJob() for a Proof of Collection. */
+export function toCollectionModel(model: PodReportModel): PodReportModel {
+  return {
+    ...model,
+    status: model.collection.done
+      ? { label: "Collected", tone: "info" }
+      : { label: "Awaiting collection", tone: "neutral" },
+    stats: model.stats.filter((s) => s.label !== "Delivered"),
+    expenses: [],
+  };
+}

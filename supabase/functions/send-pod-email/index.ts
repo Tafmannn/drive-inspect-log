@@ -1,4 +1,6 @@
-// send-pod-email — emails a branded Proof of Delivery to the customer.
+// send-pod-email — emails a branded Proof of Delivery to the customer, or,
+// with kind: "collection", a Proof of Collection. Always sent by hand from
+// the POD page after the sender confirms the recipient.
 //
 // What the email says comes from the database (job, delivery inspection,
 // organisation branding), never from the request: the request only names
@@ -62,6 +64,8 @@ serve(async (req) => {
 
     const body = await req.json().catch(() => null);
     const { to, jobId, downloadUrl, photosZipUrl } = body ?? {};
+    const isCollection = body?.kind === "collection";
+    const short = isCollection ? "Proof of Collection" : "POD";
 
     if (typeof to !== "string" || !EMAIL_RE.test(to.trim())) {
       return fail(400, "INVALID_RECIPIENT", "Enter a valid email address.");
@@ -69,20 +73,21 @@ serve(async (req) => {
     const recipient = to.trim().toLowerCase();
     if (typeof jobId !== "string" || !jobId) return fail(400, "JOB_REQUIRED", "Missing job.");
     if (!isOwnSignedStorageUrl(downloadUrl, supabaseUrl, "pod-pdfs")) {
-      return fail(400, "INVALID_POD_LINK", "The POD download link is invalid. Please try again.");
+      return fail(400, "INVALID_POD_LINK", `The ${short} download link is invalid. Please try again.`);
     }
     // Optional: drop the photos link rather than fail if it isn't ours.
-    const photosUrl = isOwnSignedStorageUrl(photosZipUrl, supabaseUrl, "pod-photos") ? (photosZipUrl as string) : null;
+    const photosUrl =
+      !isCollection && isOwnSignedStorageUrl(photosZipUrl, supabaseUrl, "pod-photos") ? (photosZipUrl as string) : null;
 
     const { data: job } = await admin
       .from("jobs")
       .select(
-        "id, org_id, client_id, external_job_number, vehicle_reg, vehicle_make, vehicle_model, pickup_city, pickup_postcode, delivery_city, delivery_postcode, delivery_contact_name, delivery_contact_email, pickup_contact_email, completed_at",
+        "id, org_id, client_id, external_job_number, vehicle_reg, vehicle_make, vehicle_model, pickup_city, pickup_postcode, delivery_city, delivery_postcode, delivery_contact_name, delivery_contact_email, pickup_contact_name, pickup_contact_email, completed_at",
       )
       .eq("id", jobId)
       .maybeSingle();
     if (!job || (!caller.isSuperAdmin && job.org_id !== caller.orgId)) {
-      return fail(403, "FORBIDDEN", "You can't send a POD for this job.");
+      return fail(403, "FORBIDDEN", `You can't send a ${short} for this job.`);
     }
 
     const { data: client } = job.client_id
@@ -96,7 +101,9 @@ serve(async (req) => {
     const decision = decidePodRecipient({
       isAdmin: caller.isAdmin || caller.isSuperAdmin,
       to: recipient,
-      jobEmails: [job.delivery_contact_email, job.pickup_contact_email],
+      jobEmails: isCollection
+        ? [job.pickup_contact_email, job.delivery_contact_email]
+        : [job.delivery_contact_email, job.pickup_contact_email],
       clientEmails: [client?.email, client?.billing_email, client?.contact_email],
     });
     if (!decision.allowed) {
@@ -112,7 +119,7 @@ serve(async (req) => {
       );
     }
 
-    const [{ data: org }, { data: delivery }] = await Promise.all([
+    const [{ data: org }, { data: stageInspection }] = await Promise.all([
       admin
         .from("organisations")
         .select("name, branding_name, logo_url, primary_colour, main_contact_email, main_contact_phone, trading_address")
@@ -122,16 +129,23 @@ serve(async (req) => {
         .from("inspections")
         .select("inspected_at, customer_name")
         .eq("job_id", job.id)
-        .eq("type", "delivery")
+        .eq("type", isCollection ? "pickup" : "delivery")
         .is("archived_at", null)
         .order("inspected_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
     ]);
 
+    if (isCollection && !stageInspection) {
+      return fail(409, "NOT_COLLECTED", "This vehicle hasn't been collected yet, so there's no Proof of Collection to send.");
+    }
+
     const ref = (job.external_job_number ?? "").trim() || String(job.id).slice(0, 8).toUpperCase();
     const operatorName = (org?.branding_name || org?.name || "").trim();
+    const contactEmail = isCollection ? job.pickup_contact_email : job.delivery_contact_email;
+    const contactName = isCollection ? job.pickup_contact_name : job.delivery_contact_name;
     const email = renderPodEmail({
+      kind: isCollection ? "collection" : "delivery",
       operator: {
         name: operatorName,
         logoUrl: resolveLogoUrl(org?.logo_url, appBaseUrl(req)),
@@ -141,8 +155,8 @@ serve(async (req) => {
         address: org?.trading_address,
       },
       recipientName:
-        (job.delivery_contact_email ?? "").trim().toLowerCase() === recipient
-          ? job.delivery_contact_name
+        (contactEmail ?? "").trim().toLowerCase() === recipient
+          ? contactName
           : client?.contact_name || client?.trading_name || client?.company || null,
       job: {
         ref,
@@ -152,8 +166,8 @@ serve(async (req) => {
         from: place(job.pickup_city, job.pickup_postcode),
         to: place(job.delivery_city, job.delivery_postcode),
       },
-      deliveredAt: delivery?.inspected_at ?? job.completed_at,
-      receivedBy: delivery?.customer_name,
+      deliveredAt: stageInspection?.inspected_at ?? (isCollection ? null : job.completed_at),
+      receivedBy: stageInspection?.customer_name,
       podUrl: downloadUrl as string,
       photosUrl,
     });
@@ -187,17 +201,18 @@ serve(async (req) => {
     // Best-effort: the email has already gone.
     try {
       if (decision.saveToJob) {
+        const column = isCollection ? "pickup_contact_email" : "delivery_contact_email";
         await admin
           .from("jobs")
-          .update({ delivery_contact_email: recipient })
+          .update({ [column]: recipient })
           .eq("id", job.id)
-          .or('delivery_contact_email.is.null,delivery_contact_email.eq.""');
+          .or(`${column}.is.null,${column}.eq.""`);
       }
       await admin.from("job_activity_log").insert({
         job_id: job.id,
         org_id: job.org_id,
-        action: "pod_emailed",
-        notes: `POD emailed to ${recipient} by ${caller.email || caller.id}${decision.saveToJob ? " (address saved to job)" : ""}`,
+        action: isCollection ? "poc_emailed" : "pod_emailed",
+        notes: `${short} emailed to ${recipient} by ${caller.email || caller.id}${decision.saveToJob ? " (address saved to job)" : ""}`,
       });
     } catch (e) {
       console.error("send-pod-email: post-send bookkeeping failed", e instanceof Error ? e.message : e);

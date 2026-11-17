@@ -34,7 +34,7 @@ import {
 } from "lucide-react";
 import { completeJobRpc } from "@/lib/api";
 import { openPodEmail, generatePodEmailBody } from "@/lib/podEmail";
-import { sharePodPdf, emailPodPdf } from "@/lib/podPdf";
+import { sharePodPdf, emailPodPdf, emailPocPdf } from "@/lib/podPdf";
 import { FUEL_PERCENT_TO_LABEL } from "@/lib/types";
 import { evaluatePodReadiness } from "@/lib/podReadiness";
 import { EvidenceHealthBanner, RoleScope } from "@/components/ui-kit";
@@ -152,6 +152,9 @@ export const PodReport = () => {
   const [downloadingPhotos, setDownloadingPhotos] = useState(false);
   const [confirmingReview, setConfirmingReview] = useState(false);
   const [emailConfirmOpen, setEmailConfirmOpen] = useState(false);
+  // Which document the recipient dialog is for: the POD, or a Proof of
+  // Collection (sent by hand once the vehicle has been collected).
+  const [emailKind, setEmailKind] = useState<"delivery" | "collection">("delivery");
   const [sendingEmail, setSendingEmail] = useState(false);
 
   // Note: actual gating uses podReadiness below — this only enables the
@@ -403,6 +406,13 @@ export const PodReport = () => {
   // in handleConfirmedEmailPdf once the recipient is confirmed/amended.
   const handleEmailPdf = () => {
     if (!job) return;
+    setEmailKind("delivery");
+    setEmailConfirmOpen(true);
+  };
+
+  const handleEmailPoc = () => {
+    if (!job) return;
+    setEmailKind("collection");
     setEmailConfirmOpen(true);
   };
 
@@ -410,6 +420,7 @@ export const PodReport = () => {
     if (!job) return;
 
     setSendingEmail(true);
+    const docLabel = emailKind === "collection" ? "Proof of Collection" : "POD";
     try {
       const billable = (jobExpenses ?? []).map((e) => ({
         id: e.id,
@@ -418,12 +429,15 @@ export const PodReport = () => {
         amount: Number(e.amount),
         billable_on_pod: (e as any).billable_on_pod ?? true,
       }));
-      const result = await emailPodPdf(job, billable, confirmedEmail);
+      const result =
+        emailKind === "collection"
+          ? await emailPocPdf(job, confirmedEmail)
+          : await emailPodPdf(job, billable, confirmedEmail);
 
       if (result.method === "resend") {
         setEmailConfirmOpen(false);
         toast({
-          title: "POD emailed",
+          title: `${docLabel} emailed`,
           description: `Sent to ${result.recipient}.`,
         });
       } else {
@@ -431,12 +445,12 @@ export const PodReport = () => {
         // and only share a plain-text version if the user chooses to. The
         // recipient dialog stays open so the address can be corrected.
         toast({
-          title: "POD email not sent",
+          title: `${docLabel} email not sent`,
           description: result.message,
           variant: "destructive",
           duration: 15000,
           action: (
-            <ToastAction altText="Share the POD links manually instead" onClick={() => void result.shareManually()}>
+            <ToastAction altText={`Share the ${docLabel} links manually instead`} onClick={() => void result.shareManually()}>
               Share manually
             </ToastAction>
           ),
@@ -564,7 +578,7 @@ export const PodReport = () => {
               disabled={pdfLoading}
             >
               {pdfLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-              Email
+              Email POD
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -573,6 +587,11 @@ export const PodReport = () => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                {job.inspections.some((i) => i.type === "pickup") && (
+                  <DropdownMenuItem onClick={handleEmailPoc} disabled={pdfLoading}>
+                    <Mail className="h-4 w-4 mr-2" /> Email Proof of Collection
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={handleSharePdf} disabled={pdfLoading}>
                   <FileDown className="h-4 w-4 mr-2" /> Download PDF
                 </DropdownMenuItem>
@@ -1057,8 +1076,12 @@ export const PodReport = () => {
       <PodEmailConfirmDialog
         open={emailConfirmOpen}
         onOpenChange={setEmailConfirmOpen}
-        defaultEmail={job.delivery_contact_email || job.pickup_contact_email || ""}
-        documentLabel={`Job ${ref}'s POD`}
+        defaultEmail={
+          emailKind === "collection"
+            ? job.pickup_contact_email || job.delivery_contact_email || ""
+            : job.delivery_contact_email || job.pickup_contact_email || ""
+        }
+        documentLabel={emailKind === "collection" ? `Job ${ref}'s Proof of Collection` : `Job ${ref}'s POD`}
         sending={sendingEmail}
         onConfirm={handleConfirmedEmailPdf}
       />

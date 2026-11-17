@@ -136,3 +136,22 @@ describe("decidePodRecipient", () => {
     });
   });
 });
+
+describe("renderPodEmail — Proof of Collection", () => {
+  it("is worded for a collection and links the collection PDF", () => {
+    const e = renderPodEmail({ ...base, kind: "collection", receivedBy: "Sam", photosUrl: null });
+    expect(e.subject).toBe("Proof of Collection – YD66 OWP (AX0070)");
+    expect(e.html).toContain("YD66 OWP has been collected");
+    expect(e.html).toContain("Download Proof of Collection (PDF)");
+    expect(e.html).toContain("Released by");
+    expect(e.html).toContain("Going to");
+    expect(e.html).not.toContain("Proof of Delivery");
+    expect(e.text).toContain("PROOF OF COLLECTION — YD66 OWP has been collected");
+  });
+
+  it("the delivery email is unchanged by default", () => {
+    const e = renderPodEmail(base);
+    expect(e.subject).toBe("Proof of Delivery – YD66 OWP (AX0070)");
+    expect(e.html).toContain("Received by");
+  });
+});

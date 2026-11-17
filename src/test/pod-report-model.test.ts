@@ -151,3 +151,34 @@ describe("formatters", () => {
     expect(formatUkPhone("  ")).toBeNull();
   });
 });
+
+describe("Proof of Collection", () => {
+  it("keeps only what was recorded at collection", async () => {
+    const { collectionOnlyJob, toCollectionModel } = await import("@/lib/podReportModel");
+    const job = makeJob({
+      damage_items: [
+        { id: "dp", inspection_id: "ip", area: "Front", item: "Wing", damage_types: ["Dent"], notes: null },
+        { id: "d1", inspection_id: "id", area: "Rear", item: "Bumper", damage_types: ["Scratch"], notes: null },
+      ],
+      photos: [
+        { id: "p1", type: "pickup_front", inspection_id: "ip", url: "u1" },
+        { id: "p2", type: "delivery_front", inspection_id: "id", url: "u2" },
+        { id: "p3", type: "damage_close_up", inspection_id: "ip", url: "u3" },
+        { id: "p4", type: "damage_close_up", inspection_id: "id", url: "u4" },
+        { id: "p5", type: "damage_close_up", inspection_id: null, damage_item_id: "dp", url: "u5" },
+      ],
+    });
+    const c = collectionOnlyJob(job);
+    expect(c.inspections.map((i) => i.type)).toEqual(["pickup"]);
+    expect(c.damage_items.map((d) => d.id)).toEqual(["dp"]);
+    expect(c.photos.map((p) => p.id)).toEqual(["p1", "p3", "p5"]);
+
+    const m = toCollectionModel(buildPodReportModel(c, noPhotos, [{ category: "fuel", label: "x" }]));
+    expect(m.status).toEqual({ label: "Collected", tone: "info" });
+    expect(m.stats.map((s) => s.label)).not.toContain("Delivered");
+    expect(m.delivery.done).toBe(false);
+    expect(m.signoffs.map((s) => s.stage)).toEqual(["Collection"]);
+    expect(m.damages.map((d) => d.stage)).toEqual(["Collection"]);
+    expect(m.expenses).toEqual([]);
+  });
+});

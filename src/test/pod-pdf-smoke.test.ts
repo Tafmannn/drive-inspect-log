@@ -136,4 +136,12 @@ describe("generatePodPdf (smoke)", () => {
     expect(blob).toBeInstanceOf(Blob);
     expect(blob.size).toBeGreaterThan(500);
   });
+
+  it("renders a Proof of Collection titled as such", async () => {
+    const blob = await generatePodPdf(makeJob(), [], null, "collection");
+    expect(blob.type).toBe("application/pdf");
+    const pdf = new TextDecoder("latin1").decode(await blob.arrayBuffer());
+    expect(pdf).toContain("Proof of Collection");
+    expect(pdf).not.toContain("Proof of Delivery");
+  });
 });

@@ -87,6 +87,8 @@ export function decidePodRecipient(opts: {
 // ── Email ───────────────────────────────────────────────────────────────────
 
 export interface PodEmailInput {
+  /** "collection" sends a Proof of Collection. Default: Proof of Delivery. */
+  kind?: "delivery" | "collection";
   operator: {
     name: string;
     logoUrl?: string | null;
@@ -104,7 +106,9 @@ export interface PodEmailInput {
     from?: string | null;
     to?: string | null;
   };
+  /** When the vehicle was delivered (or, for a collection, collected). */
   deliveredAt?: string | null;
+  /** Who received it (or, for a collection, released it). */
   receivedBy?: string | null;
   podUrl: string;
   photosUrl?: string | null;
@@ -135,24 +139,29 @@ export function renderPodEmail(input: PodEmailInput): RenderedPodEmail {
   const photosUrl = input.photosUrl ? safeHttpsUrl(input.photosUrl) : null;
   const podUrl = safeHttpsUrl(input.podUrl);
 
-  const subject = ref ? `Proof of Delivery – ${reg} (${ref})` : `Proof of Delivery – ${reg}`;
-  const lead =
-    "We've completed the delivery of your vehicle. Your signed Proof of Delivery, " +
-    "including the collection and delivery inspection reports, is ready to download.";
+  const isCollection = input.kind === "collection";
+  const docName = isCollection ? "Proof of Collection" : "Proof of Delivery";
+  const verb = isCollection ? "collected" : "delivered";
+  const subject = ref ? `${docName} – ${reg} (${ref})` : `${docName} – ${reg}`;
+  const lead = isCollection
+    ? "We've collected your vehicle. Your signed Proof of Collection, " +
+      "including the collection inspection report and photos, is ready to download."
+    : "We've completed the delivery of your vehicle. Your signed Proof of Delivery, " +
+      "including the collection and delivery inspection reports, is ready to download.";
 
   const rows: [string, string][] = [];
   if (ref) rows.push(["Reference", ref]);
   rows.push(["Vehicle", vehicle]);
   if (input.job.from) rows.push(["Collected from", input.job.from]);
-  if (input.job.to) rows.push(["Delivered to", input.job.to]);
-  if (delivered) rows.push(["Delivered", delivered]);
-  if (input.receivedBy?.trim()) rows.push(["Received by", input.receivedBy.trim()]);
+  if (input.job.to) rows.push([isCollection ? "Going to" : "Delivered to", input.job.to]);
+  if (delivered) rows.push([isCollection ? "Collected" : "Delivered", delivered]);
+  if (input.receivedBy?.trim()) rows.push([isCollection ? "Released by" : "Received by", input.receivedBy.trim()]);
 
   const contactLine = [phone && `call ${phone}`, "reply to this email"].filter(Boolean).join(" or ");
 
   // ── Plain text ──
   const text = [
-    `PROOF OF DELIVERY — ${reg} has been delivered`,
+    `${docName.toUpperCase()} — ${reg} has been ${verb}`,
     "",
     greeting,
     "",
@@ -160,11 +169,11 @@ export function renderPodEmail(input: PodEmailInput): RenderedPodEmail {
     "",
     ...rows.map(([k, v]) => `${k}: ${v}`),
     "",
-    ...(podUrl ? [`Download Proof of Delivery (PDF):`, podUrl, ""] : []),
+    ...(podUrl ? [`Download ${docName} (PDF):`, podUrl, ""] : []),
     ...(photosUrl ? [`Download vehicle photos (ZIP):`, photosUrl, ""] : []),
     "These links are valid for 30 days. Please save a copy for your records.",
     "",
-    `Questions about this delivery? Please ${contactLine}.`,
+    `Questions about this ${isCollection ? "collection" : "delivery"}? Please ${contactLine}.`,
     "",
     "Kind regards,",
     operator,
@@ -186,7 +195,7 @@ export function renderPodEmail(input: PodEmailInput): RenderedPodEmail {
 
   const podButton = podUrl
     ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px auto 12px;"><tr><td style="border-radius:8px;background:${brand};">
-         <a href="${escapeHtml(podUrl)}" style="display:inline-block;padding:14px 28px;color:#ffffff;font-size:15px;font-weight:bold;text-decoration:none;border-radius:8px;">Download Proof of Delivery (PDF)</a>
+         <a href="${escapeHtml(podUrl)}" style="display:inline-block;padding:14px 28px;color:#ffffff;font-size:15px;font-weight:bold;text-decoration:none;border-radius:8px;">Download ${docName} (PDF)</a>
        </td></tr></table>`
     : "";
   const photosLink = photosUrl
@@ -204,15 +213,15 @@ export function renderPodEmail(input: PodEmailInput): RenderedPodEmail {
     <title>${escapeHtml(subject)}</title>
   </head>
   <body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;-webkit-text-size-adjust:100%;">
-    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(`${reg} has been delivered. Your Proof of Delivery is ready to download.`)}</div>
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(`${reg} has been ${verb}. Your ${docName} is ready to download.`)}</div>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:24px 12px;">
       <tr><td align="center">
         <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
           <tr><td align="center" style="background:${HEADER_BG};padding:22px 24px;">${header}</td></tr>
           <tr><td style="height:4px;line-height:4px;font-size:0;background:${brand};">&nbsp;</td></tr>
           <tr><td style="padding:32px 32px 8px;color:#1f2937;font-size:15px;line-height:1.6;">
-            <p style="margin:0 0 6px;color:${brand};font-size:12px;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase;">Proof of Delivery</p>
-            <h1 style="margin:0 0 20px;color:#111827;font-size:24px;line-height:1.3;font-weight:bold;">${escapeHtml(reg)} has been delivered</h1>
+            <p style="margin:0 0 6px;color:${brand};font-size:12px;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase;">${docName}</p>
+            <h1 style="margin:0 0 20px;color:#111827;font-size:24px;line-height:1.3;font-weight:bold;">${escapeHtml(reg)} has been ${verb}</h1>
             <p style="margin:0 0 12px;">${escapeHtml(greeting)}</p>
             <p style="margin:0 0 24px;">${escapeHtml(lead)}</p>
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;border-collapse:separate;">
@@ -223,7 +232,7 @@ export function renderPodEmail(input: PodEmailInput): RenderedPodEmail {
             <p style="margin:16px 0 0;text-align:center;color:#6b7280;font-size:12px;">These links are valid for 30 days. Please save a copy for your records.</p>
           </td></tr>
           <tr><td style="padding:24px 32px 32px;color:#374151;font-size:14px;line-height:1.6;">
-            <p style="margin:0 0 16px;">Questions about this delivery? Please ${escapeHtml(contactLine)}.</p>
+            <p style="margin:0 0 16px;">Questions about this ${isCollection ? "collection" : "delivery"}? Please ${escapeHtml(contactLine)}.</p>
             <p style="margin:0;">Kind regards,<br><strong>${escapeHtml(operator)}</strong></p>
           </td></tr>
           <tr><td style="padding:18px 32px;background:#f9fafb;border-top:1px solid #eef0f3;color:#6b7280;font-size:12px;line-height:1.6;text-align:center;">
