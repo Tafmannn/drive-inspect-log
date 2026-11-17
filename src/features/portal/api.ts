@@ -138,11 +138,20 @@ export function usePortalContext() {
   });
 }
 
+/** How often live data re-checks while the page is open (moves in progress). */
+export const PORTAL_LIVE_REFRESH_MS = 60_000;
+
+const FINISHED_STATUSES = new Set(["delivery_complete", "pod_ready", "completed", "cancelled"]);
+
 export function usePortalJobs() {
   return useQuery({
     queryKey: ["portal", "jobs"],
     queryFn: () => rpc<PortalJobSummary[]>("portal_list_jobs"),
     staleTime: 30_000,
+    // Keep in-progress moves current without the client having to refresh.
+    refetchInterval: (query) =>
+      (query.state.data ?? []).some((j) => !FINISHED_STATUSES.has(j.status)) ? PORTAL_LIVE_REFRESH_MS : false,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -153,12 +162,19 @@ export function usePortalJob(jobId: string | undefined) {
     enabled: !!jobId,
     staleTime: 30_000,
     retry: false,
+    refetchInterval: (query) => {
+      const status = query.state.data?.job.status;
+      return status && !FINISHED_STATUSES.has(status) ? PORTAL_LIVE_REFRESH_MS : false;
+    },
+    refetchOnWindowFocus: true,
   });
 }
 
-export function usePortalEvidence(jobId: string | undefined, enabled: boolean) {
+export function usePortalEvidence(jobId: string | undefined, enabled: boolean, inspectionCount = 0) {
   return useQuery({
-    queryKey: ["portal", "evidence", jobId],
+    // Keyed on the number of reports so the delivery photos load as soon as
+    // the delivery report appears, instead of waiting out the cache.
+    queryKey: ["portal", "evidence", jobId, inspectionCount],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke("portal-evidence", { body: { jobId } });
       if (error) throw new Error(error.message);

@@ -4,6 +4,7 @@ import {
   PROGRESS_STEPS,
   STAGE_LABEL,
   progressIndex,
+  progressStepLabel,
   type PortalStage,
 } from "../lib/portalStatus";
 
@@ -32,31 +33,26 @@ export function StageBadge({ stage, className }: { stage: PortalStage; className
   );
 }
 
-const STEP_LABEL: Record<string, string> = {
-  booked: "Booked",
-  collecting: "Collected",
-  in_transit: "In transit",
-  delivered: "Delivered",
-};
-
 export function StageProgress({ stage }: { stage: PortalStage }) {
   const current = progressIndex(stage);
   if (current == null) return null;
   return (
-    <ol className="flex items-center gap-1" aria-label={`Progress: ${STAGE_LABEL[stage]}`}>
+    <ol className="grid grid-cols-5 gap-1" aria-label={`Progress: ${STAGE_LABEL[stage]}`}>
       {PROGRESS_STEPS.map((step, i) => {
-        const done = i <= current;
+        const state = i < current ? "done" : i === current ? "current" : "upcoming";
+        // The last step is "done", not "current", once the vehicle is delivered.
+        const shown = step === "delivered" && i === current ? "done" : state;
         return (
-          <li key={step} className="flex-1 min-w-0">
-            <div className={cn("h-1.5 rounded-full", done ? "bg-primary" : "bg-muted")} />
+          <li key={step} className="min-w-0" aria-current={state === "current" ? "step" : undefined}>
+            <div className={cn("h-1.5 rounded-full", i <= current ? "bg-primary" : "bg-muted")} />
             <p
               className={cn(
-                "mt-1 text-[10px] sm:text-xs truncate flex items-center gap-0.5",
-                done ? "text-foreground" : "text-muted-foreground",
+                "mt-1 text-[10px] sm:text-xs leading-tight flex items-start gap-0.5",
+                state === "current" ? "text-foreground font-medium" : state === "done" ? "text-foreground" : "text-muted-foreground",
               )}
             >
-              {done && i < current && <Check className="w-3 h-3 shrink-0" />}
-              {STEP_LABEL[step]}
+              {shown === "done" && <Check className="w-3 h-3 shrink-0 mt-px" />}
+              <span className="min-w-0 break-words">{progressStepLabel(step, shown)}</span>
             </p>
           </li>
         );
