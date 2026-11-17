@@ -45,5 +45,5 @@ Deployed with their full `_shared` files and unchanged `verify_jwt`: user-lifecy
 | User-management buttons, inputs and selects are 44 px on mobile, compact from `sm` up | `src/features/users/components/*` |
 | Owner **Feature switches** card (Super Admin → Settings): per-flag save with rollback on failure, confirmation for the two risky flags, "takes effect within 5 minutes" notice. Writes rely on the existing super-admin-only RLS. | `src/features/platform/FeatureFlagsCard.tsx`, `src/lib/featureFlags.ts` |
 | Break-glass recovery guide | `docs/admin-audit/08-break-glass.md` |
-| Prepared, **not applied**: oldest-org fallback fix and `app_settings` audit trigger | `docs/admin-audit/pending/20261117000000_org_fallback_and_settings_audit.sql` |
+| **Database, applied later the same day** (`20261116222659`): `user_org_id()` no longer falls back to the oldest org; every `app_settings` change by a signed-in user is written to `admin_audit_log`; the audit function can't be called directly | `supabase/migrations/20261116222659_org_fallback_and_settings_audit.sql` |
 

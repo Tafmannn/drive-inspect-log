@@ -1,5 +1,5 @@
--- AWAITING APPROVAL — not applied. Move to supabase/migrations/ when approved.
--- Roadmap R-02 + R-09 (docs/admin-audit/07-roadmap.md). Dry-run results: 06-tests.md.
+-- Applied to production 2026-11-16 (version 20261116222659) and verified: see
+-- docs/admin-audit/06-tests.md. Roadmap R-02 + R-09 (docs/admin-audit/07-roadmap.md).
 --
 -- 1) user_org_id() no longer guesses an organisation.
 --    Before: a super admin whose profile has no org was silently treated as a
