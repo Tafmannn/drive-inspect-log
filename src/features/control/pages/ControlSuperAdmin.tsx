@@ -54,7 +54,7 @@ export function ControlSuperAdmin() {
   const kpiItems = [
     { label: "Organisations", value: kpis?.totalOrgs, icon: Building2, variant: "default" as const, loading: kpisLoading, href: "/super-admin/orgs" },
     { label: "Total Users", value: kpis?.totalUsers, icon: Users, variant: "default" as const, loading: kpisLoading, href: "/super-admin/users" },
-    { label: "Active Jobs", value: kpis?.activeJobs, icon: Truck, variant: "info" as const, loading: kpisLoading, href: "/control/jobs?status=active" },
+    { label: "Active Jobs", value: kpis?.activeJobs, icon: Truck, variant: "info" as const, loading: kpisLoading, href: "/control/jobs?view=active" },
     { label: "Platform Exceptions", value: highSevCount, icon: AlertTriangle, variant: highSevCount > 0 ? "destructive" as const : "default" as const, loading: attentionLoading, href: "/super-admin/attention" },
     { label: "Audit Events Today", value: kpis?.auditEventsToday, icon: ScrollText, variant: "default" as const, loading: kpisLoading, href: "/super-admin/audit" },
   ];

@@ -16,7 +16,11 @@ import {
   staleThresholdIso,
 } from "@/features/jobs/selectors";
 import { listAcknowledgedEvidenceJobIds } from "@/lib/evidenceAckApi";
-import type { AdminJobRow } from "@/components/AdminJobCard";
+import type { JobControlRow } from "@/features/control/hooks/useControlJobsData";
+
+/** Queue rows share the list row shape, so either can feed the jobs table or card. */
+export type QueueJobRow = JobControlRow;
+type AdminJobRow = QueueJobRow;
 
 export interface AdminJobQueues {
   needsAttention: AdminJobRow[];
@@ -43,7 +47,7 @@ export function useAdminJobQueues() {
       const { data, error } = await supabase
         .from("jobs")
         .select(
-          "id, external_job_number, vehicle_reg, status, driver_id, driver_name, pickup_city, pickup_postcode, delivery_city, delivery_postcode, updated_at, has_pickup_inspection, has_delivery_inspection, driver_profiles(display_name, full_name)"
+          "id, external_job_number, vehicle_reg, vehicle_make, vehicle_model, status, driver_id, driver_name, pickup_city, pickup_postcode, delivery_city, delivery_postcode, job_date, updated_at, priority, completed_at, client_company, client_name, has_pickup_inspection, has_delivery_inspection, driver_profiles(display_name, full_name)"
         )
         .eq("is_hidden", false)
         .order("updated_at", { ascending: false })
@@ -53,18 +57,8 @@ export function useAdminJobQueues() {
 
       // Resolve driver names using the shared selector
       const rows: AdminJobRow[] = (data ?? []).map((r: any) => ({
-        id: r.id,
-        external_job_number: r.external_job_number,
-        vehicle_reg: r.vehicle_reg,
-        status: r.status,
-        pickup_city: r.pickup_city,
-        pickup_postcode: r.pickup_postcode,
-        delivery_city: r.delivery_city,
-        delivery_postcode: r.delivery_postcode,
-        updated_at: r.updated_at,
-        has_pickup_inspection: r.has_pickup_inspection,
-        has_delivery_inspection: r.has_delivery_inspection,
-        driver_id: r.driver_id,
+        ...r,
+        driver_profiles: undefined, // strip join artifact
         resolvedDriverName: resolveDriverName(r),
       }));
 

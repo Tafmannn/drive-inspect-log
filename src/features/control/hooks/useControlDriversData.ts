@@ -43,6 +43,12 @@ export interface DriverControlRow {
   trade_plate_number: string | null;
   employment_type: string | null;
   created_at: string;
+  // onboarding-completion inputs (scoreDriver)
+  licence_number: string | null;
+  right_to_work: string | null;
+  home_postcode: string | null;
+  payout_terms: string | null;
+  bank_captured: boolean | null;
   // derived workload
   activeJobCount: number;
   latestJobReg: string | null;
@@ -57,6 +63,17 @@ export interface DriverControlRow {
 
 export type DriverFilter = "all" | "active" | "inactive" | "with-workload" | "no-workload" | "licence-expiring" | "missing-plate";
 
+const DRIVER_FILTERS = new Set<string>(["all", "active", "inactive", "with-workload", "no-workload", "licence-expiring", "missing-plate"]);
+/** Old /admin/drivers filter names. */
+const LEGACY_DRIVER_FILTER: Record<string, DriverFilter> = { "with-jobs": "with-workload", "no-jobs": "no-workload" };
+
+/** `?filter=` → driver filter, accepting the old /admin/drivers names. */
+export function resolveDriverFilter(v: string | null): DriverFilter {
+  if (v && DRIVER_FILTERS.has(v)) return v as DriverFilter;
+  if (v && LEGACY_DRIVER_FILTER[v]) return LEGACY_DRIVER_FILTER[v];
+  return "all";
+}
+
 export function useControlDrivers(search: string, filter: DriverFilter = "all") {
   return useQuery({
     queryKey: ["control-drivers", search, filter],
@@ -64,7 +81,7 @@ export function useControlDrivers(search: string, filter: DriverFilter = "all") 
       // Fetch drivers
       const { data: drivers, error: dErr } = await supabase
         .from("driver_profiles")
-        .select("id, user_id, full_name, display_name, phone, is_active, licence_expiry, trade_plate_number, employment_type, created_at")
+        .select("id, user_id, full_name, display_name, phone, is_active, licence_expiry, trade_plate_number, employment_type, created_at, licence_number, right_to_work, home_postcode, payout_terms, bank_captured")
         .order("full_name", { ascending: true })
         .limit(200);
       if (dErr) throw dErr;
@@ -130,16 +147,7 @@ export function useControlDrivers(search: string, filter: DriverFilter = "all") 
       else if (filter === "licence-expiring") rows = rows.filter((r) => isLicenceExpiringSoon(r.licence_expiry));
       else if (filter === "missing-plate") rows = rows.filter((r) => r.missingTradePlate && r.is_active);
 
-      if (search.trim()) {
-        const s = search.toLowerCase();
-        rows = rows.filter(
-          (r) =>
-            r.full_name.toLowerCase().includes(s) ||
-            r.display_name?.toLowerCase().includes(s) ||
-            r.phone?.toLowerCase().includes(s) ||
-            r.trade_plate_number?.toLowerCase().includes(s)
-        );
-      }
+      if (search.trim()) rows = rows.filter((r) => matchesDriverSearch(r, search));
 
       return rows;
     },
@@ -175,6 +183,17 @@ export function useDriversKpis() {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────
+
+/** Driver search: name, display name, phone, trade plate, licence number, latest job reg. */
+export function matchesDriverSearch(
+  r: Pick<DriverControlRow, "full_name" | "display_name" | "phone" | "trade_plate_number" | "licence_number" | "latestJobReg">,
+  term: string,
+): boolean {
+  const q = term.trim().toLowerCase();
+  if (!q) return true;
+  return [r.full_name, r.display_name, r.phone, r.trade_plate_number, r.licence_number, r.latestJobReg]
+    .some((v) => !!v && String(v).toLowerCase().includes(q));
+}
 
 export function isLicenceExpiringSoon(dateStr: string | null): boolean {
   if (!dateStr) return false;

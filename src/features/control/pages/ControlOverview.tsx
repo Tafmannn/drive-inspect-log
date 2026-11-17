@@ -242,13 +242,13 @@ export function ControlOverview() {
   }, []);
 
   const kpiItems = [
-    { label: "Ready to Dispatch", value: kpis?.readyToDispatch, icon: Send, variant: "info" as const, loading: kpisLoading, href: "/control/jobs?status=active" },
-    { label: "In Transit", value: kpis?.inTransit, icon: Truck, variant: "warning" as const, loading: kpisLoading, href: "/control/jobs?status=active" },
+    { label: "Ready to Dispatch", value: kpis?.readyToDispatch, icon: Send, variant: "info" as const, loading: kpisLoading, href: "/control/jobs?view=active" },
+    { label: "In Transit", value: kpis?.inTransit, icon: Truck, variant: "warning" as const, loading: kpisLoading, href: "/control/jobs?view=active" },
     { label: "Exceptions", value: highSevCount, icon: AlertTriangle, variant: highSevCount > 0 ? "destructive" as const : "default" as const, loading: attentionLoading, onClick: scrollToAttention, ariaLabel: `Exceptions: ${highSevCount}. Jump to attention queue.` },
     { label: "POD Review", value: kpis?.podReview, icon: ClipboardCheck, variant: "default" as const, loading: kpisLoading, href: "/control/pod-review" },
-    { label: "Completed Today", value: kpis?.completedToday, icon: CheckCircle, variant: "success" as const, loading: kpisLoading, href: "/control/jobs?status=completed" },
-    { label: "Unassigned", value: kpis?.unassigned, icon: UserX, variant: kpis?.unassigned ? "warning" as const : "default" as const, loading: kpisLoading, href: "/control/jobs?status=unassigned" },
-    { label: "Stale (>24h)", value: kpis?.stale, icon: Clock, variant: kpis?.stale ? "warning" as const : "default" as const, loading: kpisLoading, href: "/control/jobs?status=stale" },
+    { label: "Completed Today", value: kpis?.completedToday, icon: CheckCircle, variant: "success" as const, loading: kpisLoading, href: "/control/jobs?view=completed" },
+    { label: "Unassigned", value: kpis?.unassigned, icon: UserX, variant: kpis?.unassigned ? "warning" as const : "default" as const, loading: kpisLoading, href: "/control/jobs?view=unassigned" },
+    { label: "Stale (>24h)", value: kpis?.stale, icon: Clock, variant: kpis?.stale ? "warning" as const : "default" as const, loading: kpisLoading, href: "/control/jobs?view=stale" },
   ];
 
   const quickActions = [
@@ -343,7 +343,7 @@ export function ControlOverview() {
           flush
           actions={
             <Button variant="ghost" size="sm" className="h-7 text-xs gap-1"
-              onClick={() => navigate("/control/jobs?status=unassigned")}>
+              onClick={() => navigate("/control/jobs?view=unassigned")}>
               View all <Eye className="h-3 w-3" />
             </Button>
           }
@@ -366,7 +366,7 @@ export function ControlOverview() {
         flush
         actions={
           <Button variant="ghost" size="sm" className="h-7 text-xs gap-1"
-            onClick={() => navigate("/control/jobs?status=active")}>
+            onClick={() => navigate("/control/jobs?view=active")}>
             View all <Eye className="h-3 w-3" />
           </Button>
         }

@@ -12,6 +12,7 @@ import { ACTIVE_STATUSES, PENDING_STATUSES, TERMINAL_STATUSES } from "@/lib/stat
 import { qk } from "@/lib/queryKeys";
 import { resolveDriverName, staleThresholdIso } from "@/features/jobs/selectors";
 import type { Job } from "@/lib/types";
+import { matchesJobSearch } from "../pages/jobs/jobsView";
 
 export type JobControlRow = Pick<
   Job,
@@ -29,7 +30,7 @@ export type JobControlRow = Pick<
 
 export interface JobsFilter {
   search: string;
-  status: "all" | "active" | "pod_review" | "completed" | "unassigned" | "stale";
+  status: "all" | "active" | "pod_review" | "completed" | "unassigned" | "stale" | "cancelled";
   sort?: "updated" | "date";
 }
 
@@ -54,6 +55,8 @@ export function useControlJobs(filter: JobsFilter) {
         query = query.in("status", TERMINAL_STATUSES as string[]);
       } else if (filter.status === "unassigned") {
         query = query.in("status", ACTIVE_STATUSES as string[]).is("driver_id", null).is("driver_name", null);
+      } else if (filter.status === "cancelled") {
+        query = query.eq("status", "cancelled");
       } else if (filter.status === "stale") {
         // Stale = active + not updated within threshold. Filter server-side as much as possible.
         query = query.in("status", ACTIVE_STATUSES as string[]).lt("updated_at", staleThresholdIso());
@@ -73,22 +76,9 @@ export function useControlJobs(filter: JobsFilter) {
         resolvedDriverName: resolveDriverName(r),
       }));
 
-      // Client-side search — search resolved name too
+      // Client-side search — same rule as every other jobs view.
       if (filter.search.trim()) {
-        const s = filter.search.toLowerCase();
-        rows = rows.filter(
-          (r) =>
-            r.vehicle_reg?.toLowerCase().includes(s) ||
-            r.external_job_number?.toLowerCase().includes(s) ||
-            r.client_company?.toLowerCase().includes(s) ||
-            r.client_name?.toLowerCase().includes(s) ||
-            r.resolvedDriverName?.toLowerCase().includes(s) ||
-            r.driver_name?.toLowerCase().includes(s) ||
-            r.pickup_postcode?.toLowerCase().includes(s) ||
-            r.delivery_postcode?.toLowerCase().includes(s) ||
-            r.pickup_city?.toLowerCase().includes(s) ||
-            r.delivery_city?.toLowerCase().includes(s)
-        );
+        rows = rows.filter((r) => matchesJobSearch(r, filter.search));
       }
 
       return rows;

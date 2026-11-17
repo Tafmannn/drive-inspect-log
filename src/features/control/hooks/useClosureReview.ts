@@ -34,9 +34,12 @@
  *   - isStale                   → updated_at older than STALE_HOURS threshold
  *   - These are UI annotations only; they do not change queue membership.
  *
+ *   - hasCustomerSignature / hasDriverSignature → from the latest active
+ *     (non-archived) delivery inspection's persisted signature URLs
+ *   - evidence                  → "missing_inspection" | "missing_signatures" | "complete"
+ *     (partitions the review queue; used by the grouped default view)
+ *
  * ── NOT DERIVED (would require data not currently available) ─────────
- *   - "proof complete"          → No composite evidence-verified flag exists
- *   - "signature validated"     → Requires inspection join, not done here
  *   - "review passed"           → No review workflow/state exists
  */
 
@@ -44,6 +47,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { JOB_STATUS } from "@/lib/statusConfig";
 import type { Job } from "@/lib/types";
+import { matchesJobSearch } from "../pages/jobs/jobsView";
 
 // ── Configuration ────────────────────────────────────────────────────
 
@@ -69,7 +73,7 @@ export type ClosureReviewRow = Pick<
   | "id" | "external_job_number" | "vehicle_reg" | "vehicle_make" | "vehicle_model"
   | "status" | "driver_name" | "delivery_city" | "delivery_postcode"
   | "updated_at" | "completed_at" | "has_pickup_inspection" | "has_delivery_inspection"
-  | "client_company" | "client_name" | "pickup_postcode"
+  | "client_company" | "client_name" | "pickup_postcode" | "pickup_city"
 > & {
   /** FK to driver_profiles if set */
   driver_id: string | null;
@@ -83,7 +87,15 @@ export type ClosureReviewRow = Pick<
   isStale: boolean;
   /** Which band this item belongs to */
   band: "review_queue" | "recently_completed";
+  /** Latest active delivery inspection has a customer signature */
+  hasCustomerSignature: boolean;
+  /** Latest active delivery inspection has a driver signature */
+  hasDriverSignature: boolean;
+  /** Evidence state: no delivery inspection, signatures missing, or complete */
+  evidence: EvidenceState;
 };
+
+export type EvidenceState = "missing_inspection" | "missing_signatures" | "complete";
 
 export interface ClosureKpis {
   reviewQueue: number;
@@ -98,7 +110,20 @@ export type ClosureStatusFilter =
   | "pod_ready"
   | "delivery_complete"
   | "missing_delivery_inspection"
+  | "missing_signatures"
+  | "ready"
   | "recently_completed";
+
+/** Evidence state for a closure-stage job (pure; tested). */
+export function evidenceState(row: {
+  has_delivery_inspection: boolean | null;
+  hasCustomerSignature: boolean;
+  hasDriverSignature: boolean;
+}): EvidenceState {
+  if (!row.has_delivery_inspection) return "missing_inspection";
+  if (!row.hasCustomerSignature || !row.hasDriverSignature) return "missing_signatures";
+  return "complete";
+}
 
 export interface ClosureReviewData {
   queue: ClosureReviewRow[];
@@ -132,23 +157,15 @@ export function selectClosureRows(
     rows = data.queue.filter(r => r.status === "delivery_complete");
   } else if (statusFilter === "missing_delivery_inspection") {
     rows = data.queue.filter(r => r.missingDeliveryInspection);
+  } else if (statusFilter === "missing_signatures") {
+    rows = data.queue.filter(r => r.evidence === "missing_signatures");
+  } else if (statusFilter === "ready") {
+    rows = data.queue.filter(r => r.evidence === "complete");
   } else {
     rows = data.queue;
   }
 
-  const s = search.trim().toLowerCase();
-  if (s) {
-    rows = rows.filter(
-      r =>
-        r.vehicle_reg?.toLowerCase().includes(s) ||
-        r.external_job_number?.toLowerCase().includes(s) ||
-        r.client_company?.toLowerCase().includes(s) ||
-        r.client_name?.toLowerCase().includes(s) ||
-        r.resolvedDriverName?.toLowerCase().includes(s) ||
-        r.delivery_postcode?.toLowerCase().includes(s) ||
-        r.delivery_city?.toLowerCase().includes(s),
-    );
-  }
+  if (search.trim()) rows = rows.filter(r => matchesJobSearch(r, search));
 
   return rows;
 }
@@ -157,23 +174,61 @@ const SELECT_FIELDS = [
   "id", "external_job_number", "vehicle_reg", "vehicle_make", "vehicle_model",
   "status", "driver_id", "driver_name", "delivery_city", "delivery_postcode",
   "updated_at", "completed_at", "has_pickup_inspection", "has_delivery_inspection",
-  "client_company", "client_name", "pickup_postcode",
+  "client_company", "client_name", "pickup_postcode", "pickup_city",
   "driver_profiles(display_name, full_name)",
 ].join(", ");
 
 // ── Derivation ───────────────────────────────────────────────────────
 
-function deriveRow(job: any, band: ClosureReviewRow["band"]): ClosureReviewRow {
+type SignatureMap = Record<string, { customer: boolean; driver: boolean }>;
+
+function hasPersistedSignature(url: string | null | undefined): boolean {
+  return typeof url === "string" && url.trim().length > 0;
+}
+
+/** Latest active delivery inspection per job → which signatures are on file. */
+export function buildSignatureMap(
+  inspections: Array<{
+    job_id: string;
+    customer_signature_url: string | null;
+    driver_signature_url: string | null;
+    inspected_at: string | null;
+    created_at: string | null;
+  }>,
+): SignatureMap {
+  const latest: Record<string, { customer: boolean; driver: boolean; ts: number }> = {};
+  for (const insp of inspections) {
+    const ts = Date.parse(insp.inspected_at ?? insp.created_at ?? "") || 0;
+    const existing = latest[insp.job_id];
+    if (!existing || ts >= existing.ts) {
+      latest[insp.job_id] = {
+        customer: hasPersistedSignature(insp.customer_signature_url),
+        driver: hasPersistedSignature(insp.driver_signature_url),
+        ts,
+      };
+    }
+  }
+  const out: SignatureMap = {};
+  for (const [id, v] of Object.entries(latest)) out[id] = { customer: v.customer, driver: v.driver };
+  return out;
+}
+
+function deriveRow(job: any, band: ClosureReviewRow["band"], sigs: SignatureMap = {}): ClosureReviewRow {
   const hoursInState = (Date.now() - new Date(job.updated_at).getTime()) / 3_600_000;
   const profile = job.driver_profiles;
   const resolvedDriverName = profile
     ? (profile.display_name || profile.full_name || job.driver_name)
     : (job.driver_name || null);
+  const hasCustomerSignature = sigs[job.id]?.customer ?? false;
+  const hasDriverSignature = sigs[job.id]?.driver ?? false;
   return {
     ...job,
     driver_profiles: undefined, // strip join artifact
     resolvedDriverName,
     band,
+    hasCustomerSignature,
+    hasDriverSignature,
+    evidence: evidenceState({ has_delivery_inspection: job.has_delivery_inspection, hasCustomerSignature, hasDriverSignature }),
     missingPickupInspection: !job.has_pickup_inspection,
     missingDeliveryInspection: !job.has_delivery_inspection,
     isStale: hoursInState > STALE_HOURS,
@@ -197,7 +252,7 @@ export function useClosureReviewQueue() {
           .eq("is_hidden", false)
           .in("status", CLOSURE_REVIEW_STATUSES as unknown as string[])
           .order("updated_at", { ascending: true }) // oldest first = most urgent
-          .limit(100),
+          .limit(150),
         supabase
           .from("jobs")
           .select(SELECT_FIELDS)
@@ -211,8 +266,27 @@ export function useClosureReviewQueue() {
       if (queueRes.error) throw queueRes.error;
       if (recentRes.error) throw recentRes.error;
 
-      const queueRows = (queueRes.data ?? []).map(j => deriveRow(j, "review_queue"));
-      const recentRows = (recentRes.data ?? []).map(j => deriveRow(j, "recently_completed"));
+      // Signature status from active delivery inspections. Archived inspections
+      // (from a run before a reopen) never count. A failed read is non-fatal:
+      // rows then show "missing signatures", which errs on the side of review.
+      const jobIds = [...(queueRes.data ?? []), ...(recentRes.data ?? [])].map((j) => (j as unknown as { id: string }).id);
+      let sigs: SignatureMap = {};
+      if (jobIds.length > 0) {
+        const { data: inspections, error: inspErr } = await supabase
+          .from("inspections")
+          .select("job_id, customer_signature_url, driver_signature_url, inspected_at, created_at, archived_at")
+          .eq("type", "delivery")
+          .in("job_id", jobIds)
+          .is("archived_at", null);
+        if (inspErr) {
+          console.warn("[useClosureReviewQueue] could not load delivery signatures", inspErr);
+        } else {
+          sigs = buildSignatureMap(inspections ?? []);
+        }
+      }
+
+      const queueRows = (queueRes.data ?? []).map(j => deriveRow(j, "review_queue", sigs));
+      const recentRows = (recentRes.data ?? []).map(j => deriveRow(j, "recently_completed", sigs));
 
       return { queue: queueRows, recentlyCompleted: recentRows };
     },

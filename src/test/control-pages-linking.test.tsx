@@ -20,6 +20,8 @@ vi.mock("@/features/control/hooks/useControlDriversData", async (orig) => {
             is_active: true, licence_expiry: null, trade_plate_number: "TP1", employment_type: null,
             created_at: "2026-01-01T00:00:00Z", activeJobCount: 0, latestJobReg: null,
             latestJobStatus: null, hasStaleJob: false, workloadLinkType: null,
+            licence_number: null, right_to_work: null, home_postcode: null, payout_terms: null, bank_captured: false,
+            missingPhone: true, missingTradePlate: false,
           },
         ],
         isLoading: false,
@@ -32,6 +34,17 @@ vi.mock("@/features/control/hooks/useControlDriversData", async (orig) => {
     }),
   };
 });
+
+vi.mock("@/hooks/useDriverPerformance", () => ({
+  useDriverPerformance: () => ({
+    data: {
+      "user-1": {
+        totalJobs: 4, completedJobs: 3, completionRate: 0.75, podRejectionCount: 1,
+        riskLevel: "medium", riskReasons: ["1 POD issue"],
+      },
+    },
+  }),
+}));
 
 vi.mock("@/features/control/hooks/useSuperAdminControlData", () => ({
   useSuperAdminKpis: () => ({ data: { totalOrgs: 3, totalUsers: 12, activeJobs: 7, auditEventsToday: 4 }, isLoading: false }),
@@ -84,10 +97,30 @@ describe("ControlDrivers linking", () => {
     expect(drivers.filter).toHaveBeenLastCalledWith("licence-expiring");
   });
 
-  it("roster rows open the driver profile", () => {
+  it("roster cards open the driver profile, with a way back", () => {
     renderAt("/control/drivers", <ControlDrivers />);
     fireEvent.click(screen.getByText("Sam Driver"));
-    expect(loc()).toBe("/admin/drivers/user-1");
+    expect(loc()).toBe("/admin/drivers/user-1?from=%2Fcontrol%2Fdrivers");
+  });
+
+  it("cards keep the mobile page's performance and onboarding details", () => {
+    renderAt("/control/drivers", <ControlDrivers />);
+    expect(screen.getByText("75%")).toBeInTheDocument();
+    expect(screen.getByText(/medium risk/i)).toBeInTheDocument();
+    expect(screen.getByText("POD issues")).toBeInTheDocument();
+  });
+
+  it("the filter lives in the URL and old /admin/drivers names are understood", () => {
+    renderAt("/control/drivers", <ControlDrivers />);
+    fireEvent.click(screen.getByRole("tab", { name: "Inactive" }));
+    expect(loc()).toBe("/control/drivers?filter=inactive");
+    expect(drivers.filter).toHaveBeenLastCalledWith("inactive");
+  });
+
+  it("Jobs on a card opens that driver's jobs", () => {
+    renderAt("/control/drivers", <ControlDrivers />);
+    fireEvent.click(screen.getByRole("button", { name: /^jobs$/i }));
+    expect(loc()).toBe("/control/jobs?view=all&search=Sam%20Driver");
   });
 });
 
@@ -97,7 +130,7 @@ describe("ControlSuperAdmin linking", () => {
     const hrefOf = (name: RegExp) => screen.getByRole("link", { name }).getAttribute("href");
     expect(hrefOf(/organisations/i)).toBe("/super-admin/orgs");
     expect(hrefOf(/total users/i)).toBe("/super-admin/users");
-    expect(hrefOf(/active jobs/i)).toBe("/control/jobs?status=active");
+    expect(hrefOf(/active jobs/i)).toBe("/control/jobs?view=active");
     expect(hrefOf(/platform exceptions/i)).toBe("/super-admin/attention");
     expect(hrefOf(/audit events/i)).toBe("/super-admin/audit");
   });

@@ -23,13 +23,10 @@ const ROUTE_LABELS: Record<string, string> = {
   "/profile": "Profile",
   // Admin
   "/admin": "Admin",
-  "/admin/jobs": "Jobs Queue",
   "/admin/timesheets": "Timesheets",
   "/admin/sync-errors": "Sync Errors",
   "/admin/users": "Users",
   "/admin/drivers": "Drivers",
-  "/admin/pod-review": "POD Review",
-  "/admin/finance": "Finance",
   // Super Admin
   "/super-admin": "Super Admin",
   "/super-admin/orgs": "Organisations",

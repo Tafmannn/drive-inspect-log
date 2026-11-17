@@ -6,7 +6,8 @@
  * onboarding wizard to resume editing.
  */
 import { useEffect, useState, useCallback } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { resolveBackTarget } from "@/lib/navigationUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
@@ -28,6 +29,8 @@ type DocRow = {
 
 export default function DriverProfileDetail() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const backTo = resolveBackTarget(searchParams, "/control/drivers");
   const { userId = "" } = useParams<{ userId: string }>();
 
   const [loading, setLoading] = useState(true);
@@ -73,14 +76,14 @@ export default function DriverProfileDetail() {
   if (!driver && !profile) {
     return (
       <div className="min-h-screen bg-background">
-        <AppHeader title="Driver Profile" showBack onBack={() => navigate("/admin/drivers")} />
+        <AppHeader title="Driver Profile" showBack onBack={() => navigate(backTo)} />
         <div className="p-6 max-w-lg lg:max-w-3xl mx-auto text-center space-y-3">
           <AlertTriangle className="w-8 h-8 mx-auto text-muted-foreground" />
           <h2 className="text-lg font-semibold">Driver not found</h2>
           <p className="text-sm text-muted-foreground">
             This driver may have been archived or the link is no longer valid.
           </p>
-          <Button variant="outline" onClick={() => navigate("/admin/drivers")}>
+          <Button variant="outline" onClick={() => navigate(backTo)}>
             Back to drivers
           </Button>
         </div>
@@ -94,7 +97,7 @@ export default function DriverProfileDetail() {
 
   return (
     <div className="min-h-screen bg-background pb-32">
-      <AppHeader title="Driver Profile" showBack onBack={() => navigate("/admin/drivers")} />
+      <AppHeader title="Driver Profile" showBack onBack={() => navigate(backTo)} />
 
       <div className="p-4 max-w-lg lg:max-w-3xl mx-auto space-y-4">
         {/* Identity card */}
