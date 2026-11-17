@@ -3,7 +3,13 @@ import type { JobWithRelations } from "./types";
 import { resolveImageUrlAsync } from "./gcsProxyUrl";
 import { canonicalisePhotos } from "./photoDedupe";
 import { PHOTO_TYPES_BY_INSPECTION } from "@/features/inspection/inspectionFormConfig";
-import { buildPodReportModel, formatPodDateTime, formatUkPhone } from "./podReportModel";
+import {
+  buildPodReportModel,
+  collectionOnlyJob,
+  formatPodDateTime,
+  formatUkPhone,
+  toCollectionModel,
+} from "./podReportModel";
 import { layoutPodPdf, type PdfImage, type PdfImageFormat, type PodOrgDetails } from "./podPdfLayout";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
@@ -563,12 +569,17 @@ async function loadPodOrgDetails(job: JobWithRelations): Promise<PodOrgDetails> 
   }
 }
 
+export type ReportKind = "delivery" | "collection";
+
 export async function generatePodPdf(
-  job: JobWithRelations,
+  fullJob: JobWithRelations,
   expenses?: PodExpense[],
-  photosZipUrl?: string | null
+  photosZipUrl?: string | null,
+  /** "collection" prints a Proof of Collection: pickup data only. */
+  kind: ReportKind = "delivery",
 ): Promise<Blob> {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const job = kind === "collection" ? collectionOnlyJob(fullJob) : fullJob;
 
   const pickup = job.inspections.find((i) => i.type === "pickup");
   const delivery = job.inspections.find((i) => i.type === "delivery");
@@ -582,8 +593,10 @@ export async function generatePodPdf(
     loadPodOrgDetails(job),
   ]);
 
-  const model = buildPodReportModel(job, photos, expenses ?? []);
+  const built = buildPodReportModel(job, photos, kind === "collection" ? [] : expenses ?? []);
+  const model = kind === "collection" ? toCollectionModel(built) : built;
   layoutPodPdf(doc, model, {
+    kind,
     logo,
     thumbs,
     signatures,
@@ -645,19 +658,42 @@ export async function emailPodPdf(
    *  catch a wrong/stale address before it's used to actually send. */
   recipientOverride?: string
 ): Promise<EmailPodResult> {
-  const photosZipUrl = await tryBuildAndUploadPhotosZip(job);
-  const blob = await generatePodPdf(job, expenses, photosZipUrl);
+  return emailReportPdf("delivery", job, expenses, recipientOverride);
+}
+
+/**
+ * Email a Proof of Collection (pickup inspection only) — sent by hand from
+ * the POD page, after the admin/driver confirms the recipient.
+ */
+export async function emailPocPdf(job: JobWithRelations, recipientOverride?: string): Promise<EmailPodResult> {
+  return emailReportPdf("collection", job, [], recipientOverride);
+}
+
+async function emailReportPdf(
+  kind: ReportKind,
+  job: JobWithRelations,
+  expenses: PodExpense[] | undefined,
+  recipientOverride: string | undefined,
+): Promise<EmailPodResult> {
+  const isCollection = kind === "collection";
+  const docName = isCollection ? "Proof of Collection" : "Proof of Delivery";
+  const short = isCollection ? "Proof of Collection" : "POD";
+  // The photo ZIP covers the whole job, so it is only offered with the POD.
+  const photosZipUrl = isCollection ? null : await tryBuildAndUploadPhotosZip(job);
+  const blob = await generatePodPdf(job, expenses, photosZipUrl, kind);
   const ref = job.external_job_number || job.id.slice(0, 8).toUpperCase();
   const sanitizedReg = clean(job.vehicle_reg, "UNKNOWN").replace(/\s+/g, "");
-  const dateStr = job.completed_at
-    ? new Date(job.completed_at).toISOString().slice(0, 10)
-    : new Date().toISOString().slice(0, 10);
+  const pickupAt = job.inspections.find((i) => i.type === "pickup")?.inspected_at ?? null;
+  const stamp = isCollection ? pickupAt : job.completed_at;
+  const dateStr = stamp ? new Date(stamp).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
 
-  const fileName = `AXENTRA_POD_${ref}_${sanitizedReg}_${dateStr}.pdf`;
+  const fileName = `AXENTRA_${isCollection ? "POC" : "POD"}_${ref}_${sanitizedReg}_${dateStr}.pdf`;
 
   let downloadLink = "";
   let failureMessage = "The email couldn't be sent. Please try again.";
-  const recipient = recipientOverride?.trim() || job.delivery_contact_email || job.pickup_contact_email;
+  const recipient = isCollection
+    ? recipientOverride?.trim() || job.pickup_contact_email || job.delivery_contact_email
+    : recipientOverride?.trim() || job.delivery_contact_email || job.pickup_contact_email;
 
   try {
     const { supabase } = await import("@/integrations/supabase/client");
@@ -702,7 +738,7 @@ export async function emailPodPdf(
     if (!recipient) {
       failureMessage = "There's no email address for this customer.";
     } else if (!downloadLink) {
-      failureMessage = "The POD couldn't be uploaded, so there's no link to send. Check your connection and try again.";
+      failureMessage = `The ${short} couldn't be uploaded, so there's no link to send. Check your connection and try again.`;
     } else {
       try {
         // The server builds the whole email (branding, vehicle, route,
@@ -714,6 +750,7 @@ export async function emailPodPdf(
             jobId: job.id,
             downloadUrl: downloadLink,
             photosZipUrl: photosZipUrl ?? undefined,
+            ...(isCollection ? { kind: "collection" } : {}),
           },
         });
         if (!error && data?.sent) {
@@ -727,7 +764,7 @@ export async function emailPodPdf(
       }
     }
   } catch (error) {
-    failureMessage = "The POD couldn't be prepared for sending. Please try again.";
+    failureMessage = `The ${short} couldn't be prepared for sending. Please try again.`;
     debugLog("Supabase upload exception", error);
   }
 
@@ -735,20 +772,20 @@ export async function emailPodPdf(
   // branded email failed). Kept short: the links are long.
   const routeLine = [clean(job.pickup_city, ""), clean(job.delivery_city, "")].filter(Boolean).join(" → ");
   const body = [
-    `Proof of Delivery – ${job.vehicle_reg} (${ref})`,
+    `${docName} – ${job.vehicle_reg} (${ref})`,
     "",
     "Hello,",
     "",
-    `Your vehicle ${job.vehicle_reg} has been delivered${routeLine ? ` (${routeLine})` : ""} on ${dateStr}.`,
+    `Your vehicle ${job.vehicle_reg} has been ${isCollection ? "collected" : "delivered"}${routeLine ? ` (${routeLine})` : ""} on ${dateStr}.`,
     "",
-    ...(downloadLink ? ["Proof of Delivery (PDF):", downloadLink, ""] : []),
+    ...(downloadLink ? [`${docName} (PDF):`, downloadLink, ""] : []),
     ...(photosZipUrl ? ["Vehicle photos (ZIP):", photosZipUrl, ""] : []),
     "These links are valid for 30 days.",
     "",
     "Kind regards,",
     "Axentra Vehicle Logistics",
   ].join("\n");
-  const shareSubject = `Proof of Delivery – ${job.vehicle_reg} (${ref})`;
+  const shareSubject = `${docName} – ${job.vehicle_reg} (${ref})`;
 
   const shareManually = async (): Promise<void> => {
     if (navigator.share) {

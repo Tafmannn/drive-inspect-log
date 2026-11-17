@@ -43,7 +43,7 @@ vi.mock("@/integrations/supabase/client", () => ({
   },
 }));
 
-import { emailPodPdf } from "@/lib/podPdf";
+import { emailPodPdf, emailPocPdf } from "@/lib/podPdf";
 
 function makeJob(overrides: Partial<JobWithRelations> = {}): JobWithRelations {
   return {
@@ -154,5 +154,47 @@ describe("emailPodPdf when the branded email can't be sent", () => {
     invokeMock.mockRejectedValue(new Error("offline"));
     const result = await emailPodPdf(makeJob(), [], "x@example.com");
     expect(result).toMatchObject({ method: "failed", message: expect.stringContaining("Couldn't reach the email service") });
+  });
+});
+
+describe("emailPocPdf (manual Proof of Collection)", () => {
+  beforeEach(() => {
+    invokeMock.mockReset();
+    uploadMock.mockClear();
+    invokeMock.mockResolvedValue({ data: { sent: true }, error: null });
+  });
+
+  const collected = () =>
+    makeJob({
+      status: "in_transit",
+      inspections: [
+        { id: "ip", type: "pickup", inspected_at: "2026-11-17T09:00:00Z", customer_name: "Sam" },
+      ] as unknown as JobWithRelations["inspections"],
+    });
+
+  it("defaults to the collection contact and asks the server for a collection email", async () => {
+    const result = await emailPocPdf(collected());
+    expect(result).toEqual({ method: "resend", recipient: "pickup-onfile@example.com" });
+    expect(invokeMock).toHaveBeenCalledWith(
+      "send-pod-email",
+      expect.objectContaining({
+        body: expect.objectContaining({ to: "pickup-onfile@example.com", kind: "collection" }),
+      }),
+    );
+  });
+
+  it("uploads a POC file, dated by the collection, and sends no photo ZIP", async () => {
+    await emailPocPdf(collected(), "confirmed@example.com");
+    const path = uploadMock.mock.calls.at(-1)?.[0] as string;
+    expect(path).toMatch(/AXENTRA_POC_AX0063_OV66BKY_2026-11-17\.pdf$/);
+    const body = invokeMock.mock.calls.at(-1)?.[1]?.body;
+    expect(body.photosZipUrl).toBeUndefined();
+    expect(body.to).toBe("confirmed@example.com");
+  });
+
+  it("the POD send does not carry the collection flag", async () => {
+    await emailPodPdf(makeJob(), []);
+    const body = invokeMock.mock.calls.at(-1)?.[1]?.body;
+    expect(body.kind).toBeUndefined();
   });
 });

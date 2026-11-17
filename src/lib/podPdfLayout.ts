@@ -48,6 +48,12 @@ export interface PodLayoutAssets {
   org: PodOrgDetails;
   /** Already formatted, e.g. "16 Nov 2026, 18:02". */
   generatedAt: string;
+  /** "collection" prints a Proof of Collection (default: Proof of Delivery). */
+  kind?: "delivery" | "collection";
+}
+
+function docTitle(assets: PodLayoutAssets): string {
+  return assets.kind === "collection" ? "PROOF OF COLLECTION" : "PROOF OF DELIVERY";
 }
 
 // ── Design tokens ────────────────────────────────────────────────────────────
@@ -233,12 +239,13 @@ function drawFirstHeader(doc: jsPDF, model: PodReportModel, assets: PodLayoutAss
   const rx = PAGE_W - M;
   font(doc, 16, "bold", C.white);
   // jsPDF's right-align ignores charSpace, so place letter-spaced text by hand.
-  const title = "PROOF OF DELIVERY";
+  const title = docTitle(assets);
   doc.text(title, rx - doc.getTextWidth(title) - 0.6 * (title.length - 1), 17.5, { charSpace: 0.6 });
   font(doc, 8.5, "normal", C.headerMuted);
   doc.text(`Reference  ${model.ref}`, rx, 24.5, { align: "right" });
-  const dated = model.stats.find((s) => s.label === "Delivered")?.value;
-  doc.text(dated && dated !== "—" ? `Delivered  ${dated}` : `Issued  ${assets.generatedAt}`, rx, 29.5, {
+  const stage = assets.kind === "collection" ? "Collected" : "Delivered";
+  const dated = model.stats.find((s) => s.label === stage)?.value;
+  doc.text(dated && dated !== "—" ? `${stage}  ${dated}` : `Issued  ${assets.generatedAt}`, rx, 29.5, {
     align: "right",
   });
 }
@@ -249,7 +256,7 @@ function drawContinuationHeader(doc: jsPDF, model: PodReportModel, assets: PodLa
   fill(doc, C.brand);
   doc.rect(0, CONT_HEADER_H, PAGE_W, BRAND_BAR_H, "F");
   font(doc, 7.5, "bold", C.white);
-  doc.text(`${assets.org.name.toUpperCase()}  ·  PROOF OF DELIVERY`, M, 7, { charSpace: 0.4 });
+  doc.text(`${assets.org.name.toUpperCase()}  ·  ${docTitle(assets)}`, M, 7, { charSpace: 0.4 });
   font(doc, 7.5, "normal", C.headerMuted);
   doc.text(`${model.ref}  ·  ${model.reg}`, PAGE_W - M, 7, { align: "right" });
 }
@@ -762,9 +769,10 @@ function placePhotoGroup(flow: Flow, doc: jsPDF, group: PodPhotoGroup, thumbs: M
 // ── Document ─────────────────────────────────────────────────────────────────
 
 export function layoutPodPdf(doc: jsPDF, model: PodReportModel, assets: PodLayoutAssets): void {
+  const docName = assets.kind === "collection" ? "Proof of Collection" : "Proof of Delivery";
   doc.setProperties({
-    title: `Proof of Delivery ${model.ref} – ${model.reg}`,
-    subject: `Proof of Delivery for ${model.reg}`,
+    title: `${docName} ${model.ref} – ${model.reg}`,
+    subject: `${docName} for ${model.reg}`,
     author: assets.org.name,
     creator: assets.org.name,
   });
