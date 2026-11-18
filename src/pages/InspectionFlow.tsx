@@ -5,6 +5,10 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+
+/** Whole-row tap target for inspection choices: ≥48px tall, selected state visible at a glance. */
+const CHOICE_TILE =
+  "flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium leading-tight transition-colors hover:bg-muted/50 has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/5 has-[[data-state=checked]]:text-primary has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { VehicleDiagram } from "@/components/VehicleDiagram";
@@ -1382,13 +1386,13 @@ export const InspectionFlow = () => {
           <RadioGroup
             value={formState.fuelLevel}
             onValueChange={(v) => updateField("fuelLevel", v)}
-            className="mt-2"
+            className="mt-2 grid-cols-3 sm:grid-cols-5"
           >
             {["Empty", "1/4", "1/2", "3/4", "Full"].map((level) => (
-              <div key={level} className="flex items-center space-x-2">
+              <Label key={level} htmlFor={`fuel-${level}`} className={CHOICE_TILE}>
                 <RadioGroupItem value={level} id={`fuel-${level}`} />
-                <Label htmlFor={`fuel-${level}`}>{level}</Label>
-              </div>
+                {level}
+              </Label>
             ))}
           </RadioGroup>
         </div>
@@ -1903,14 +1907,14 @@ export const InspectionFlow = () => {
           <RadioGroup
             value={formState.vehicleCondition}
             onValueChange={(v) => updateField("vehicleCondition", v)}
-            className="mt-2"
+            className="mt-2 grid-cols-2"
           >
             {["Clean", "Dirty", "Wet", "Snow Covered", "Iced Over"].map(
               (c) => (
-                <div key={c} className="flex items-center space-x-2">
-                  <RadioGroupItem value={c} id={`vc-${c}`} />
-                  <Label htmlFor={`vc-${c}`}>{c}</Label>
-                </div>
+                <Label key={c} htmlFor={`vc-${c}`} className={CHOICE_TILE}>
+                <RadioGroupItem value={c} id={`vc-${c}`} />
+                {c}
+              </Label>
               )
             )}
           </RadioGroup>
@@ -1921,14 +1925,14 @@ export const InspectionFlow = () => {
           <RadioGroup
             value={formState.lightCondition}
             onValueChange={(v) => updateField("lightCondition", v)}
-            className="mt-2"
+            className="mt-2 grid-cols-2"
           >
             {["Good", "Poor", "Dark", "Artificial", "Raining"].map(
               (l) => (
-                <div key={l} className="flex items-center space-x-2">
-                  <RadioGroupItem value={l} id={`lc-${l}`} />
-                  <Label htmlFor={`lc-${l}`}>{l}</Label>
-                </div>
+                <Label key={l} htmlFor={`lc-${l}`} className={CHOICE_TILE}>
+                <RadioGroupItem value={l} id={`lc-${l}`} />
+                {l}
+              </Label>
               )
             )}
           </RadioGroup>
@@ -1940,16 +1944,16 @@ export const InspectionFlow = () => {
             <RadioGroup
               value={formState.oilLevel}
               onValueChange={(v) => updateField("oilLevel", v)}
-              className="mt-2"
+              className="mt-2 grid-cols-2"
             >
-              <div className="flex items-center space-x-2">
+              <Label htmlFor="oil-ok" className={CHOICE_TILE}>
                 <RadioGroupItem value="Ok" id="oil-ok" />
-                <Label htmlFor="oil-ok">Ok</Label>
-              </div>
-              <div className="flex items-center space-x-2">
+                Ok
+              </Label>
+              <Label htmlFor="oil-issue" className={CHOICE_TILE}>
                 <RadioGroupItem value="Issue" id="oil-issue" />
-                <Label htmlFor="oil-issue">Issue</Label>
-              </div>
+                Issue
+              </Label>
             </RadioGroup>
           </div>
           <div>
@@ -1957,16 +1961,16 @@ export const InspectionFlow = () => {
             <RadioGroup
               value={formState.waterLevel}
               onValueChange={(v) => updateField("waterLevel", v)}
-              className="mt-2"
+              className="mt-2 grid-cols-2"
             >
-              <div className="flex items-center space-x-2">
+              <Label htmlFor="water-ok" className={CHOICE_TILE}>
                 <RadioGroupItem value="Ok" id="water-ok" />
-                <Label htmlFor="water-ok">Ok</Label>
-              </div>
-              <div className="flex items-center space-x-2">
+                Ok
+              </Label>
+              <Label htmlFor="water-issue" className={CHOICE_TILE}>
                 <RadioGroupItem value="Issue" id="water-issue" />
-                <Label htmlFor="water-issue">Issue</Label>
-              </div>
+                Issue
+              </Label>
             </RadioGroup>
           </div>
         </div>
@@ -2004,20 +2008,20 @@ export const InspectionFlow = () => {
               <RadioGroup
                 value={formState[field]}
                 onValueChange={(v) => updateField(field, v)}
-                className="mt-1 flex gap-4"
+                className="mt-1 grid-cols-3"
               >
-                <div className="flex items-center space-x-1">
-                  <RadioGroupItem value="Yes" id={`${field}-yes`} />
-                  <Label htmlFor={`${field}-yes`} className="text-sm">Yes</Label>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <RadioGroupItem value="No" id={`${field}-no`} />
-                  <Label htmlFor={`${field}-no`} className="text-sm">No</Label>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <RadioGroupItem value="N/A" id={`${field}-na`} />
-                  <Label htmlFor={`${field}-na`} className="text-sm">N/A</Label>
-                </div>
+                <Label htmlFor={`${field}-yes`} className={CHOICE_TILE}>
+                <RadioGroupItem value="Yes" id={`${field}-yes`} />
+                Yes
+              </Label>
+                <Label htmlFor={`${field}-no`} className={CHOICE_TILE}>
+                <RadioGroupItem value="No" id={`${field}-no`} />
+                No
+              </Label>
+                <Label htmlFor={`${field}-na`} className={CHOICE_TILE}>
+                <RadioGroupItem value="N/A" id={`${field}-na`} />
+                N/A
+              </Label>
               </RadioGroup>
             </div>
           ))}
@@ -2077,20 +2081,20 @@ export const InspectionFlow = () => {
               <RadioGroup
                 value={formState[field]}
                 onValueChange={(v) => updateField(field, v)}
-                className="mt-1 flex gap-4"
+                className="mt-1 grid-cols-3"
               >
-                <div className="flex items-center space-x-1">
-                  <RadioGroupItem value="Yes" id={`${field}-yes`} />
-                  <Label htmlFor={`${field}-yes`} className="text-sm">Yes</Label>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <RadioGroupItem value="No" id={`${field}-no`} />
-                  <Label htmlFor={`${field}-no`} className="text-sm">No</Label>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <RadioGroupItem value="N/A" id={`${field}-na`} />
-                  <Label htmlFor={`${field}-na`} className="text-sm">N/A</Label>
-                </div>
+                <Label htmlFor={`${field}-yes`} className={CHOICE_TILE}>
+                <RadioGroupItem value="Yes" id={`${field}-yes`} />
+                Yes
+              </Label>
+                <Label htmlFor={`${field}-no`} className={CHOICE_TILE}>
+                <RadioGroupItem value="No" id={`${field}-no`} />
+                No
+              </Label>
+                <Label htmlFor={`${field}-na`} className={CHOICE_TILE}>
+                <RadioGroupItem value="N/A" id={`${field}-na`} />
+                N/A
+              </Label>
               </RadioGroup>
             </div>
           ))}
@@ -2100,16 +2104,16 @@ export const InspectionFlow = () => {
             <RadioGroup
               value={formState.alloysOrTrims}
               onValueChange={(v) => updateField("alloysOrTrims", v)}
-              className="mt-1 flex gap-4"
+              className="mt-1 grid-cols-2"
             >
-              <div className="flex items-center space-x-1">
+              <Label htmlFor="aot-alloys" className={CHOICE_TILE}>
                 <RadioGroupItem value="Alloys" id="aot-alloys" />
-                <Label htmlFor="aot-alloys" className="text-sm">Alloys</Label>
-              </div>
-              <div className="flex items-center space-x-1">
+                Alloys
+              </Label>
+              <Label htmlFor="aot-trims" className={CHOICE_TILE}>
                 <RadioGroupItem value="Trims" id="aot-trims" />
-                <Label htmlFor="aot-trims" className="text-sm">Trims</Label>
-              </div>
+                Trims
+              </Label>
             </RadioGroup>
           </div>
 
@@ -2119,16 +2123,16 @@ export const InspectionFlow = () => {
               <RadioGroup
                 value={formState.alloysDamaged}
                 onValueChange={(v) => updateField("alloysDamaged", v)}
-                className="mt-1 flex gap-4"
+                className="mt-1 grid-cols-2"
               >
-                <div className="flex items-center space-x-1">
-                  <RadioGroupItem value="Yes" id="ad-yes" />
-                  <Label htmlFor="ad-yes" className="text-sm">Yes</Label>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <RadioGroupItem value="No" id="ad-no" />
-                  <Label htmlFor="ad-no" className="text-sm">No</Label>
-                </div>
+                <Label htmlFor="ad-yes" className={CHOICE_TILE}>
+                <RadioGroupItem value="Yes" id="ad-yes" />
+                Yes
+              </Label>
+                <Label htmlFor="ad-no" className={CHOICE_TILE}>
+                <RadioGroupItem value="No" id="ad-no" />
+                No
+              </Label>
               </RadioGroup>
             </div>
           )}
@@ -2139,16 +2143,16 @@ export const InspectionFlow = () => {
               <RadioGroup
                 value={formState.wheelTrimsDamaged}
                 onValueChange={(v) => updateField("wheelTrimsDamaged", v)}
-                className="mt-1 flex gap-4"
+                className="mt-1 grid-cols-2"
               >
-                <div className="flex items-center space-x-1">
-                  <RadioGroupItem value="Yes" id="wtd-yes" />
-                  <Label htmlFor="wtd-yes" className="text-sm">Yes</Label>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <RadioGroupItem value="No" id="wtd-no" />
-                  <Label htmlFor="wtd-no" className="text-sm">No</Label>
-                </div>
+                <Label htmlFor="wtd-yes" className={CHOICE_TILE}>
+                <RadioGroupItem value="Yes" id="wtd-yes" />
+                Yes
+              </Label>
+                <Label htmlFor="wtd-no" className={CHOICE_TILE}>
+                <RadioGroupItem value="No" id="wtd-no" />
+                No
+              </Label>
               </RadioGroup>
             </div>
           )}

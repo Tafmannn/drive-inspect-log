@@ -33,7 +33,7 @@ import { cn } from "@/lib/utils";
 import {
   UserX, Clock, FileSearch, ImageOff, ChevronRight,
   Zap, Eye, UserPlus, MapPin, AlertTriangle, User,
-  Truck, Users, ClipboardCheck, Receipt, ShieldAlert, Globe,
+  Truck, Users, ClipboardCheck, Receipt, ShieldAlert, Globe, CheckCircle2,
 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -266,7 +266,9 @@ function NeedsActionQueue() {
           <Zap className="h-3.5 w-3.5" /> Needs Action
         </h3>
         <div className="text-center py-6 rounded-lg border border-dashed border-border">
-          <p className="text-sm font-medium text-foreground">✅ All clear</p>
+          <p className="flex items-center justify-center gap-1.5 text-sm font-medium text-foreground">
+            <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" /> All clear
+          </p>
           <p className="text-[11px] text-muted-foreground mt-0.5">No interventions required.</p>
         </div>
       </section>
@@ -588,8 +590,8 @@ function OperationsBuckets() {
                 muted ? "border-border bg-card text-muted-foreground" : PRIORITY_STYLES[def.priority],
               )}
             >
-              <div className="flex items-center justify-between w-full">
-                <span className="text-[10px] font-bold uppercase tracking-wider truncate">
+              <div className="flex items-start justify-between gap-1 w-full">
+                <span className="text-[11px] font-semibold leading-snug line-clamp-2">
                   {def.label}
                 </span>
                 {isLoading ? (
@@ -600,7 +602,7 @@ function OperationsBuckets() {
                   </span>
                 )}
               </div>
-              <span className="text-[9px] text-muted-foreground line-clamp-2">
+              <span className="text-[11px] leading-snug text-muted-foreground line-clamp-2">
                 {def.reason}
               </span>
             </button>

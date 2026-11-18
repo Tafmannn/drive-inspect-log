@@ -81,6 +81,19 @@ export function useBreadcrumbs(): Crumb[] {
     const crumbs: Crumb[] = [];
     const segments = pathname.split("/").filter(Boolean);
 
+    // /inspection/:jobId/:type has no /inspection or /inspection/:jobId page;
+    // walking the URL would link to 404s and repeat "Inspection" twice.
+    // An inspection belongs to its job, so show the job trail instead.
+    if (segments[0] === "inspection" && segments.length === 3) {
+      const type = segments[2];
+      return [
+        { label: "Dashboard", path: "/" },
+        { label: "Jobs", path: "/jobs" },
+        { label: "Job", path: `/jobs/${segments[1]}` },
+        { label: `${type.charAt(0).toUpperCase()}${type.slice(1)} inspection` },
+      ];
+    }
+
     // Build cumulative paths
     let accumulated = "";
     for (let i = 0; i < segments.length; i++) {

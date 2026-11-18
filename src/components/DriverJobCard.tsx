@@ -38,6 +38,8 @@ export function mapsUrl(address: string): string {
 export function DriverJobCard({ summary, onPrimaryAction, onCardClick }: DriverJobCardProps) {
   const status = getStatusStyle(summary._raw.status);
   const initial = (summary.client_name || "?")[0].toUpperCase();
+  // Drivers match the car in front of them by make/model as much as by plate.
+  const vehicle = [summary._raw.vehicle_make, summary._raw.vehicle_model].filter(Boolean).join(" ");
 
   // ── Workflow brain (additive — never replaces existing CTA logic) ──
   // Computed from the same Job already in scope. Pure, no IO.
@@ -69,8 +71,9 @@ export function DriverJobCard({ summary, onPrimaryAction, onCardClick }: DriverJ
             <p className="text-sm font-semibold text-foreground truncate leading-tight">
               {summary.client_name}
             </p>
-            <p className="text-[10px] text-muted-foreground leading-tight">
+            <p className="text-xs text-muted-foreground leading-tight truncate">
               {summary.job_ref}
+              {vehicle && <> · <span className="text-foreground/80">{vehicle}</span></>}
             </p>
           </div>
         </div>

@@ -17,7 +17,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { invalidateForEvent } from "@/lib/mutationEvents";
 import { toast } from "@/hooks/use-toast";
-import { Check, Clock, Loader2, AlertTriangle } from "lucide-react";
+import { Check, CheckCircle2, Clock, Loader2, AlertTriangle } from "lucide-react";
 import type { AttentionException } from "../types/exceptionTypes";
 import { cn } from "@/lib/utils";
 
@@ -139,7 +139,8 @@ export function AttentionQueue({ exceptions, showOrg, loading, acknowledged = fa
     if (acknowledged) return null;
     return (
       <div className="text-center py-10">
-        <p className="text-lg font-semibold text-foreground">✅ All clear</p>
+        <CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-success" aria-hidden="true" />
+        <p className="text-lg font-semibold text-foreground">All clear</p>
         <p className="text-sm text-muted-foreground mt-1">No operational exceptions require attention.</p>
       </div>
     );

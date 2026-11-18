@@ -42,7 +42,7 @@ export const AppHeader = ({
           <img src="/axentra-logo.png" alt="Axentra" className="h-5 lg:h-8 w-auto brightness-0 invert" />
           <span className="text-sm lg:text-lg font-semibold text-white tracking-tight">Axentra Vehicles</span>
         </button>
-        <span className="text-[11px] lg:text-sm text-white/60 font-medium">{roleLabel}</span>
+        <span className="text-[11px] lg:text-sm text-white/85 font-medium">{roleLabel}</span>
       </div>
       {/* Breadcrumb trail */}
       <div className="px-4 lg:px-8 py-1.5 border-b border-border bg-muted/50">

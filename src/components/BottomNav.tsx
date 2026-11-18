@@ -30,7 +30,7 @@ export const BottomNav = () => {
   };
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 bg-card border-t border-border shadow-[0_-2px_8px_rgba(0,0,0,0.06)] flex justify-around py-2 z-50 safe-area-bottom">
+    <nav className="fixed bottom-0 inset-x-0 bg-card border-t border-border shadow-[0_-2px_8px_rgba(0,0,0,0.06)] flex justify-center py-2 z-50 safe-area-bottom">
       {tabs.map(({ icon: Icon, label, path }) => {
         const active = isActive(path);
         return (
@@ -38,11 +38,14 @@ export const BottomNav = () => {
             key={path}
             onClick={() => navigate(path)}
             className={cn(
-              "flex flex-col items-center gap-1 min-h-[44px] min-w-[44px] px-3 py-1 rounded-lg transition-colors",
+              // flex-1 + max width: even spacing on phones, but on a wide screen the
+              // tabs stay grouped instead of drifting ~360px apart.
+              "flex flex-1 max-w-[7.5rem] flex-col items-center gap-1 min-h-[44px] min-w-[44px] px-3 py-1 rounded-lg transition-colors",
               active ? "text-primary" : "text-muted-foreground"
             )}
             type="button"
             aria-label={label}
+            aria-current={active ? "page" : undefined}
           >
             <Icon className="w-6 h-6 stroke-[2]" />
             <span className="text-xs font-medium">{label}</span>

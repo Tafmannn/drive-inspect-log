@@ -1,7 +1,6 @@
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
-import { ChevronRight } from "lucide-react";
 
 /**
  * Compact tappable stat pill: icon, big value, small labelled footer with a
@@ -30,7 +29,7 @@ export function KpiPill({
     <button
       onClick={onClick}
       className={cn(
-        "flex flex-col items-center gap-0.5 rounded-lg border p-2.5 min-w-0 flex-1 transition-colors active:bg-muted/50",
+        "flex min-h-[4.5rem] flex-col items-center justify-center gap-0.5 rounded-lg border px-1.5 py-2.5 min-w-0 flex-1 transition-colors active:bg-muted/50",
         styles[variant],
       )}
     >
@@ -40,10 +39,11 @@ export function KpiPill({
       ) : (
         <AnimatedNumber value={value} className="text-base font-bold tabular-nums leading-tight" />
       )}
-      <span className="w-full flex items-center justify-center gap-0.5 min-w-0">
-        <span className="min-w-0 truncate text-[9px] font-semibold uppercase tracking-wider">{label}</span>
-        <ChevronRight className="h-2 w-2 shrink-0" />
-      </span>
+      {/* Sentence case at 11px: the old 9px uppercase + wide tracking
+          clipped every label on a 390px phone ("UNASSIG…"). The bordered
+          button with its press state is the tap affordance, so the chevron
+          that ate the remaining width is gone. */}
+      <span className="w-full min-w-0 truncate text-center text-[11px] font-medium leading-tight">{label}</span>
     </button>
   );
 }
