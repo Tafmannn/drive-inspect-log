@@ -22,4 +22,12 @@ describe("Axentra PDF banner logo", () => {
     const src = readFileSync("src/lib/podPdf.ts", "utf8");
     expect(src).toContain("/brand/axentra-logo-on-dark.png");
   });
+
+  it("the email logo is a transparent PNG sized for email, and the function uses it", () => {
+    const email = readFileSync("public/email/axentra-logo-email-dark.png");
+    expect(email[25]).toBe(6); // RGBA
+    expect(email.length).toBeLessThan(200_000);
+    const fn = readFileSync("supabase/functions/send-pod-email/index.ts", "utf8");
+    expect(fn).toContain("resolveEmailLogoUrl");
+  });
 });
