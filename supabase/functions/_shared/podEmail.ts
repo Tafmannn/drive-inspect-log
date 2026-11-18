@@ -29,6 +29,22 @@ export function resolveLogoUrl(logoUrl: string | null | undefined, appBaseUrl: s
   return safeHttpsUrl(v);
 }
 
+/**
+ * The logo for the dark navy email banner. The organisation's stored logo
+ * (/email/axentra-logo-email.jpg) has a black background baked in, which would
+ * show as a black box on navy, so for that default we use the transparent
+ * version served by the app. A different logo set on the organisation is
+ * used as given.
+ */
+export const EMAIL_LOGO_ON_NAVY = "/email/axentra-logo-email-dark.png";
+const LEGACY_DEFAULT_LOGO = "/email/axentra-logo-email.jpg";
+
+export function resolveEmailLogoUrl(logoUrl: string | null | undefined, appBaseUrl: string | null): string | null {
+  const v = (logoUrl ?? "").trim();
+  if (!v || v === LEGACY_DEFAULT_LOGO) return resolveLogoUrl(EMAIL_LOGO_ON_NAVY, appBaseUrl);
+  return resolveLogoUrl(v, appBaseUrl);
+}
+
 // ── Links ───────────────────────────────────────────────────────────────────
 
 /**
@@ -120,7 +136,9 @@ export interface RenderedPodEmail {
   text: string;
 }
 
-const HEADER_BG = "#060606"; // matches the logo artwork's background
+// Banner: very dark navy (a solid fallback for clients that ignore gradients).
+const HEADER_BG = "#08152E";
+const HEADER_GRADIENT = "linear-gradient(135deg,#040B1A 0%,#0C2148 100%)";
 
 export function renderPodEmail(input: PodEmailInput): RenderedPodEmail {
   const operator = (input.operator.name || "").trim() || "Your vehicle logistics provider";
@@ -190,8 +208,8 @@ export function renderPodEmail(input: PodEmailInput): RenderedPodEmail {
     .join("");
 
   const header = logo
-    ? `<img src="${escapeHtml(logo)}" width="160" alt="${escapeHtml(operator)}" style="display:block;width:160px;max-width:160px;height:auto;border:0;margin:0 auto;">`
-    : `<span style="color:#ffffff;font-size:20px;font-weight:bold;letter-spacing:0.5px;">${escapeHtml(operator)}</span>`;
+    ? `<img src="${escapeHtml(logo)}" width="176" alt="${escapeHtml(operator)}" style="display:block;width:176px;max-width:176px;height:auto;border:0;margin:0 auto;">`
+    : `<span style="color:#ffffff;font-size:22px;font-weight:bold;letter-spacing:4px;">${escapeHtml(operator.toUpperCase())}</span>`;
 
   const podButton = podUrl
     ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px auto 12px;"><tr><td style="border-radius:8px;background:${brand};">
@@ -217,8 +235,8 @@ export function renderPodEmail(input: PodEmailInput): RenderedPodEmail {
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:24px 12px;">
       <tr><td align="center">
         <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
-          <tr><td align="center" style="background:${HEADER_BG};padding:22px 24px;">${header}</td></tr>
-          <tr><td style="height:4px;line-height:4px;font-size:0;background:${brand};">&nbsp;</td></tr>
+          <tr><td align="center" bgcolor="${HEADER_BG}" style="background-color:${HEADER_BG};background-image:${HEADER_GRADIENT};padding:28px 24px 24px;">${header}</td></tr>
+          <tr><td bgcolor="${brand}" style="height:4px;line-height:4px;font-size:0;background-color:${brand};background-image:linear-gradient(90deg,${brand} 0%,#0C2148 100%);">&nbsp;</td></tr>
           <tr><td style="padding:32px 32px 8px;color:#1f2937;font-size:15px;line-height:1.6;">
             <p style="margin:0 0 6px;color:${brand};font-size:12px;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase;">${docName}</p>
             <h1 style="margin:0 0 20px;color:#111827;font-size:24px;line-height:1.3;font-weight:bold;">${escapeHtml(reg)} has been ${verb}</h1>

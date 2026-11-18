@@ -3,6 +3,7 @@ import {
   decidePodRecipient,
   isOwnSignedStorageUrl,
   renderPodEmail,
+  resolveEmailLogoUrl,
   resolveLogoUrl,
   type PodEmailInput,
 } from "../../supabase/functions/_shared/podEmail";
@@ -153,5 +154,37 @@ describe("renderPodEmail — Proof of Collection", () => {
     const e = renderPodEmail(base);
     expect(e.subject).toBe("Proof of Delivery – YD66 OWP (AX0070)");
     expect(e.html).toContain("Received by");
+  });
+});
+
+describe("POD/POC email banner", () => {
+  it("is very dark navy (not the old black) with the brand accent under it", () => {
+    for (const kind of ["delivery", "collection"] as const) {
+      const e = renderPodEmail({ ...base, kind });
+      expect(e.html).toContain("#08152E");
+      expect(e.html).toContain("linear-gradient(135deg,#040B1A 0%,#0C2148 100%)");
+      expect(e.html).not.toContain("#060606");
+      expect(e.html).toContain("background-color:#0052CC");
+    }
+  });
+
+  it("falls back to a letter-spaced wordmark when there is no logo", () => {
+    const e = renderPodEmail({ ...base, operator: { ...base.operator, logoUrl: null } });
+    expect(e.html).toContain("AXENTRA VEHICLES");
+  });
+});
+
+describe("resolveEmailLogoUrl", () => {
+  const app = "https://app.axentra.test";
+  it("uses the transparent navy-friendly logo for the stored default (black-background) one", () => {
+    expect(resolveEmailLogoUrl("/email/axentra-logo-email.jpg", app)).toBe(`${app}/email/axentra-logo-email-dark.png`);
+    expect(resolveEmailLogoUrl(null, app)).toBe(`${app}/email/axentra-logo-email-dark.png`);
+    expect(resolveEmailLogoUrl("  ", app)).toBe(`${app}/email/axentra-logo-email-dark.png`);
+  });
+  it("leaves a different organisation logo alone", () => {
+    expect(resolveEmailLogoUrl("https://cdn.example.com/own-logo.png", app)).toBe("https://cdn.example.com/own-logo.png");
+  });
+  it("is null when the app address is unknown (no broken relative link)", () => {
+    expect(resolveEmailLogoUrl("/email/axentra-logo-email.jpg", null)).toBeNull();
   });
 });
