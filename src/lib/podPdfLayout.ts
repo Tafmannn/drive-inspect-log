@@ -70,9 +70,15 @@ const C = {
   soft2: [241, 245, 249],
   brand: [0, 82, 204], // #0052CC
   brandSoft: [235, 242, 255],
-  black: [6, 6, 6], // matches the logo's background
   white: [255, 255, 255],
-  headerMuted: [161, 170, 186],
+  // Header palette: very dark navy with the logo's blue as the accent.
+  navyDeep: [4, 11, 26], //   #040B1A
+  navy: [8, 21, 46], //        #08152E
+  navyLift: [12, 33, 72], //   #0C2148
+  navyLine: [26, 52, 98], //   #1A3462
+  logoBlue: [20, 120, 212], // #1478D4 (the mark)
+  headerMuted: [143, 165, 201], // #8FA5C9
+  headerLabel: [96, 122, 168], //  #607AA8
   green: [21, 128, 61],
   greenSoft: [240, 253, 244],
   greenLine: [187, 247, 208],
@@ -86,9 +92,9 @@ const PAGE_W = 210;
 const PAGE_H = 297;
 const M = 16;
 const CW = PAGE_W - 2 * M;
-const FIRST_HEADER_H = 40;
-const CONT_HEADER_H = 11;
-const BRAND_BAR_H = 1.4;
+const FIRST_HEADER_H = 44;
+const CONT_HEADER_H = 12;
+const BRAND_BAR_H = 1.2;
 const CONTENT_TOP = CONT_HEADER_H + BRAND_BAR_H + 9;
 const CONTENT_BOTTOM = PAGE_H - 22;
 const SECTION_GAP = 8;
@@ -222,43 +228,89 @@ function drawHeading(doc: jsPDF, y: number, title: string, right: string | null)
 
 // ── Header & footer (drawn on every page once the page count is known) ──────
 
-function drawFirstHeader(doc: jsPDF, model: PodReportModel, assets: PodLayoutAssets): void {
-  fill(doc, C.black);
-  doc.rect(0, 0, PAGE_W, FIRST_HEADER_H, "F");
-  fill(doc, C.brand);
-  doc.rect(0, FIRST_HEADER_H, PAGE_W, BRAND_BAR_H, "F");
+function mix(a: RGB, b: RGB, t: number): RGB {
+  return [0, 1, 2].map((i) => Math.round(a[i] + (b[i] - a[i]) * t)) as unknown as RGB;
+}
 
-  const drewLogo = assets.logo ? drawImageContain(doc, assets.logo, M - 3, 5, 42, 30) : false;
+/**
+ * A left-to-right colour sweep drawn as overlapping 1 mm strips (smooth in
+ * every viewer, unlike PDF shading patterns which some print paths flatten).
+ */
+function sweep(doc: jsPDF, y: number, h: number, from: RGB, to: RGB): void {
+  const STEP = 1;
+  for (let x = 0; x < PAGE_W; x += STEP) {
+    fill(doc, mix(from, to, x / PAGE_W));
+    doc.rect(x, y, STEP + 0.6, h, "F");
+  }
+}
+
+/** Dark navy banner with the logo-blue accent rule under it. */
+function drawBanner(doc: jsPDF, height: number, accent: number): void {
+  sweep(doc, 0, height, C.navyDeep, C.navyLift);
+  // Hairline of lifted navy along the bottom edge, then the accent rule that
+  // fades from the logo blue into the navy.
+  stroke(doc, C.navyLine, 0.2);
+  doc.line(0, height - 0.1, PAGE_W, height - 0.1);
+  sweep(doc, height, accent, C.logoBlue, C.navyLift);
+}
+
+/** Letter-spaced text, right-aligned (jsPDF ignores charSpace when aligning). */
+function textRight(doc: jsPDF, str: string, rightX: number, y: number, charSpace: number): void {
+  doc.text(str, rightX - doc.getTextWidth(str) - charSpace * (str.length - 1), y, { charSpace });
+}
+
+function drawFirstHeader(doc: jsPDF, model: PodReportModel, assets: PodLayoutAssets): void {
+  drawBanner(doc, FIRST_HEADER_H, BRAND_BAR_H);
+
+  // Brand lockup (mark, wordmark, tagline) on the left, vertically centred.
+  const LOGO_H = 32;
+  const logoY = (FIRST_HEADER_H - LOGO_H) / 2;
+  const logoRatio = assets.logo?.width && assets.logo?.height ? assets.logo.width / assets.logo.height : 1.465;
+  const drewLogo = assets.logo ? drawImageContain(doc, assets.logo, M - 2, logoY, LOGO_H * logoRatio, LOGO_H) : false;
   if (!drewLogo) {
-    font(doc, 16, "bold", C.white);
-    doc.text(assets.org.name.toUpperCase(), M, 20, { charSpace: 0.8 });
-    font(doc, 7, "normal", C.headerMuted);
-    doc.text("VEHICLE LOGISTICS", M, 25.5, { charSpace: 0.8 });
+    // Text-only fallback when the logo image can't be loaded.
+    font(doc, 21, "bold", C.white);
+    doc.text("AXENTRA", M, FIRST_HEADER_H / 2 + 2.5, { charSpace: 2.2 });
+    font(doc, 6.5, "normal", C.headerMuted);
+    doc.text("PRECISION IN EVERY MOVE", M, FIRST_HEADER_H / 2 + 8, { charSpace: 1.1 });
   }
 
   const rx = PAGE_W - M;
-  font(doc, 16, "bold", C.white);
-  // jsPDF's right-align ignores charSpace, so place letter-spaced text by hand.
-  const title = docTitle(assets);
-  doc.text(title, rx - doc.getTextWidth(title) - 0.6 * (title.length - 1), 17.5, { charSpace: 0.6 });
-  font(doc, 8.5, "normal", C.headerMuted);
-  doc.text(`Reference  ${model.ref}`, rx, 24.5, { align: "right" });
+  font(doc, 6.8, "bold", C.headerLabel);
+  textRight(doc, "VEHICLE LOGISTICS", rx, 12.5, 1.4);
+
+  font(doc, 17, "bold", C.white);
+  textRight(doc, docTitle(assets), rx, 21.5, 0.9);
+
+  // Short logo-blue rule under the title.
+  fill(doc, C.logoBlue);
+  doc.rect(rx - 22, 25, 22, 0.6, "F");
+
   const stage = assets.kind === "collection" ? "Collected" : "Delivered";
   const dated = model.stats.find((s) => s.label === stage)?.value;
-  doc.text(dated && dated !== "—" ? `${stage}  ${dated}` : `Issued  ${assets.generatedAt}`, rx, 29.5, {
-    align: "right",
+  const rows: [string, string][] = [
+    ["REFERENCE", model.ref],
+    [dated && dated !== "—" ? stage.toUpperCase() : "ISSUED", dated && dated !== "—" ? dated : assets.generatedAt],
+  ];
+  rows.forEach(([label, value], i) => {
+    const y = 31.5 + i * 5;
+    font(doc, 8.5, "bold", C.white);
+    doc.text(value, rx, y, { align: "right" });
+    const vw = doc.getTextWidth(value);
+    font(doc, 6.3, "bold", C.headerLabel);
+    textRight(doc, label, rx - vw - 3, y, 0.9);
   });
 }
 
 function drawContinuationHeader(doc: jsPDF, model: PodReportModel, assets: PodLayoutAssets): void {
-  fill(doc, C.black);
-  doc.rect(0, 0, PAGE_W, CONT_HEADER_H, "F");
-  fill(doc, C.brand);
-  doc.rect(0, CONT_HEADER_H, PAGE_W, BRAND_BAR_H, "F");
-  font(doc, 7.5, "bold", C.white);
-  doc.text(`${assets.org.name.toUpperCase()}  ·  ${docTitle(assets)}`, M, 7, { charSpace: 0.4 });
-  font(doc, 7.5, "normal", C.headerMuted);
-  doc.text(`${model.ref}  ·  ${model.reg}`, PAGE_W - M, 7, { align: "right" });
+  drawBanner(doc, CONT_HEADER_H, 0.8);
+  font(doc, 8, "bold", C.white);
+  doc.text("AXENTRA", M, 7.6, { charSpace: 1.4 });
+  const w = doc.getTextWidth("AXENTRA") + 1.4 * 6;
+  font(doc, 6.8, "normal", C.headerMuted);
+  doc.text(`|   ${docTitle(assets)}`, M + w + 2.5, 7.6, { charSpace: 0.7 });
+  font(doc, 7.2, "normal", C.headerMuted);
+  doc.text(`${model.ref}  ·  ${model.reg}`, PAGE_W - M, 7.6, { align: "right" });
 }
 
 function drawFooter(doc: jsPDF, model: PodReportModel, assets: PodLayoutAssets, page: number, pages: number): void {

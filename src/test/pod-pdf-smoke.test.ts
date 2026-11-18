@@ -144,4 +144,13 @@ describe("generatePodPdf (smoke)", () => {
     expect(pdf).toContain("Proof of Collection");
     expect(pdf).not.toContain("Proof of Delivery");
   });
+
+  it("draws the Axentra navy banner (text wordmark when the logo image can't load)", async () => {
+    const blob = await generatePodPdf(makeJob(), [], null, "collection");
+    const pdf = new TextDecoder("latin1").decode(await blob.arrayBuffer());
+    expect(pdf).toContain("PRECISION IN EVERY MOVE");
+    expect(pdf).toContain("PROOF OF COLLECTION");
+    // Very dark navy (#08152E-ish), not the old flat black, fills the banner.
+    expect(pdf).toMatch(/0\.0\d+ 0\.0\d+ 0\.1\d* rg/);
+  });
 });
