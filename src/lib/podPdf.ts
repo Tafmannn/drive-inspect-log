@@ -299,8 +299,30 @@ async function buildPhotoThumbnailCache(
   return cache;
 }
 
+/**
+ * The Axentra lockup (mark, wordmark, tagline) as a transparent PNG made for
+ * the dark navy PDF banner. Transparency is kept so it sits cleanly on the
+ * banner's gradient. Null when it can't be loaded; the layout then draws a
+ * text wordmark instead.
+ */
 async function loadLogo(): Promise<CachedImage | null> {
-  return loadImage("/email/axentra-logo-email.jpg");
+  try {
+    const url = "/brand/axentra-logo-on-dark.png";
+    const resolved = (await resolveImageUrlAsync(url)) ?? url;
+    const dataUrl = await fetchImageAsDataUrl(resolved);
+    if (!dataUrl) return null;
+    const baseFormat = detectImageFormat(dataUrl);
+    if (!baseFormat) return null;
+    const kept = await compressImageDataUrl(dataUrl, {
+      maxWidth: 720,
+      maxHeight: 520,
+      preserveTransparency: true,
+    });
+    return kept ?? { dataUrl, format: baseFormat };
+  } catch (error) {
+    debugLog("Logo load failed", error);
+    return null;
+  }
 }
 
 /**
