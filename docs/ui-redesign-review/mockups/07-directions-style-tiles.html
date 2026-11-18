@@ -1,0 +1,67 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Axentra - three visual directions (style tiles)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E5E9F0;font:14px/1.5 Inter,system-ui,sans-serif;color:#0F1B2D}
+.bar{background:#111827;color:#E5E7EB;font-size:12px;padding:6px 16px}.bar b{color:#fff}
+.wrap{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;padding:20px;max-width:1500px;margin:auto}
+@media(max-width:1100px){.wrap{grid-template-columns:1fr}}
+.tile{border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:16px}
+.tile h2{margin:0;font-size:18px}.tile .tag{font-size:12px;opacity:.8}
+.sw{display:flex;gap:6px;flex-wrap:wrap}.sw i{display:block;width:54px;font-style:normal;font-size:10.5px;line-height:1.3}
+.sw i span{display:block;height:34px;border-radius:6px;border:1px solid rgba(0,0,0,.12);margin-bottom:3px}
+.kpi{display:flex;gap:10px;align-items:center;padding:12px 14px}
+.row{display:grid;grid-template-columns:90px 1fr auto;gap:10px;align-items:center;padding:0 12px}
+.badge{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:12px;padding:0 10px;height:24px;border-radius:999px;white-space:nowrap}
+.badge:before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
+.btn{display:inline-flex;align-items:center;height:36px;padding:0 14px;font-weight:600;font-size:13px;border:1px solid;cursor:default}
+small{font-size:12px}
+
+/* A - Refined Enterprise */
+.A{background:#F4F6F9;font-family:Inter,sans-serif}
+.A .card{background:#fff;border:1px solid #DCE2EA;border-radius:12px;box-shadow:0 1px 2px rgba(15,27,45,.06)}
+.A .btn{border-radius:8px}.A .p{background:#1E4FA8;border-color:#1E4FA8;color:#fff}.A .s{background:#fff;border-color:#7C8BA0;color:#0F1B2D}
+.A .row{height:52px;border-top:1px solid #DCE2EA}.A .h{font-size:28px;font-weight:650;letter-spacing:-.02em}
+/* B - Contemporary SaaS */
+.B{background:#F7F8FC;font-family:'Plus Jakarta Sans',sans-serif}
+.B .card{background:#fff;border:1px solid #E6E9F2;border-radius:16px;box-shadow:0 8px 24px rgba(30,41,80,.08)}
+.B .btn{border-radius:12px}.B .p{background:#2B59E8;border-color:#2B59E8;color:#fff}.B .s{background:#fff;border-color:#C9CFE0;color:#121826}
+.B .row{height:60px;border-top:1px solid #EEF0F6}.B .h{font-size:30px;font-weight:800;letter-spacing:-.03em}
+.B .hero{background:linear-gradient(135deg,#EEF2FF,#F7F8FC);border-radius:14px;padding:12px 14px;font-size:12.5px;color:#566074}
+/* C - Precision Operations */
+.C{background:#F2F4F7;font-family:'IBM Plex Sans',sans-serif;font-size:13px}
+.C .card{background:#fff;border:1px solid #CBD2DC;border-radius:4px}
+.C .btn{border-radius:4px;height:30px;font-size:12px}.C .p{background:#0B57D0;border-color:#0B57D0;color:#fff}.C .s{background:#fff;border-color:#8A94A6;color:#0B1220}
+.C .row{height:34px;border-top:1px solid #DDE2EA;font-size:12.5px}.C .h{font-size:24px;font-weight:600}.C .mono{font-family:'IBM Plex Mono',monospace;font-size:12px}
+</style></head><body>
+<div class="bar"><b>REVIEW PROTOTYPE</b> · Three candidate directions as style tiles · static HTML · <b>FICTIONAL SAMPLE DATA</b> · Concept A is the recommended direction (see 03-design-directions.md)</div>
+<div class="wrap">
+
+<section class="tile A"><div><h2>A — Refined Enterprise <span class="tag">(recommended)</span></h2><div class="tag">Inter · 12px radius · single soft shadow · 52px rows</div></div>
+ <div class="sw"><i><span style="background:#0B1C3F"></span>#0B1C3F</i><i><span style="background:#1E4FA8"></span>#1E4FA8</i><i><span style="background:#E8F0FB"></span>#E8F0FB</i><i><span style="background:#F4F6F9"></span>#F4F6F9</i><i><span style="background:#0F6B3A"></span>#0F6B3A</i><i><span style="background:#7A4A00"></span>#7A4A00</i><i><span style="background:#B42318"></span>#B42318</i></div>
+ <div class="card kpi"><div><small style="color:#435166;font-weight:600">Unassigned</small><div class="h" style="color:#B42318">4</div></div></div>
+ <div style="display:flex;gap:8px"><span class="btn p">New job</span><span class="btn s">Run order</span></div>
+ <div class="card"><div class="row" style="border-top:0;height:36px;background:#F8FAFC;font-size:12px;font-weight:600;color:#435166"><span>Ref</span><span>Route</span><span>Status</span></div>
+  <div class="row"><b>AX-10482</b><span>Leeds → Bristol</span><span class="badge" style="background:#FFF1D1;color:#7A4A00">In progress</span></div>
+  <div class="row"><b>AX-10485</b><span>Derby → Reading</span><span class="badge" style="background:#E3F4EA;color:#0F6B3A">Assigned</span></div></div>
+ <small>Quiet, legible, low-risk. Maps onto existing shadcn tokens. Tinted badges with dark text.</small></section>
+
+<section class="tile B"><div><h2>B — Contemporary SaaS</h2><div class="tag">Plus Jakarta Sans · 16px radius · layered shadow · 60px rows</div></div>
+ <div class="sw"><i><span style="background:#121826"></span>#121826</i><i><span style="background:#2B59E8"></span>#2B59E8</i><i><span style="background:#EEF2FF"></span>#EEF2FF</i><i><span style="background:#F7F8FC"></span>#F7F8FC</i><i><span style="background:#0B7A6E"></span>#0B7A6E</i><i><span style="background:#92400E"></span>#92400E</i><i><span style="background:#B42318"></span>#B42318</i></div>
+ <div class="hero">Gradient hero strip behind page headers</div>
+ <div class="card kpi"><div><small style="color:#566074;font-weight:600">Unassigned</small><div class="h" style="color:#B42318">4</div></div></div>
+ <div style="display:flex;gap:8px"><span class="btn p">New job</span><span class="btn s">Run order</span></div>
+ <div class="card"><div class="row" style="border-top:0;height:40px;font-size:12px;font-weight:700;color:#566074"><span>Ref</span><span>Route</span><span>Status</span></div>
+  <div class="row"><b>AX-10482</b><span>Leeds → Bristol</span><span class="badge" style="background:#FEF3C7;color:#92400E">In progress</span></div>
+  <div class="row"><b>AX-10485</b><span>Derby → Reading</span><span class="badge" style="background:#D1FAE5;color:#065F46">Assigned</span></div></div>
+ <small>More distinctive and spacious; heavier shadows/gradient add visual cost and lower row density.</small></section>
+
+<section class="tile C"><div><h2>C — Precision Operations</h2><div class="tag">IBM Plex Sans + Mono · 4px radius · borders, no shadow · 34px rows</div></div>
+ <div class="sw"><i><span style="background:#0B1220"></span>#0B1220</i><i><span style="background:#0B57D0"></span>#0B57D0</i><i><span style="background:#E7EEFB"></span>#E7EEFB</i><i><span style="background:#F2F4F7"></span>#F2F4F7</i><i><span style="background:#067647"></span>#067647</i><i><span style="background:#93370D"></span>#93370D</i><i><span style="background:#B42318"></span>#B42318</i></div>
+ <div class="card kpi"><div><small style="color:#4B5565;font-weight:600;text-transform:uppercase;letter-spacing:.04em">Unassigned</small><div class="h mono" style="color:#B42318">4</div></div></div>
+ <div style="display:flex;gap:8px"><span class="btn p">New job</span><span class="btn s">Run order</span></div>
+ <div class="card"><div class="row" style="border-top:0;height:28px;background:#F2F4F7;font-size:11.5px;font-weight:600;color:#4B5565"><span>REF</span><span>ROUTE</span><span>STATUS</span></div>
+  <div class="row"><span class="mono">AX-10482</span><span>Leeds → Bristol</span><span class="badge" style="background:#FEF0C7;color:#93370D;border-radius:4px">In progress</span></div>
+  <div class="row"><span class="mono">AX-10485</span><span>Derby → Reading</span><span class="badge" style="background:#DCFAE6;color:#067647;border-radius:4px">Assigned</span></div></div>
+ <small>Most information per screen; best for dispatchers; 12–12.5px body text is hard on phones and for drivers outdoors.</small></section>
+</div></body></html>

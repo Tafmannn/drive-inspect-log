@@ -1,0 +1,2637 @@
+[
+ {
+  "vp": "desktop",
+  "route": "/login",
+  "n": 6,
+  "small": {
+   "n": 1,
+   "bySize": {
+    "11px": 1
+   },
+   "samples": [
+    "11px \"Secure access powered by S\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Email address",
+    "ratio": 1.53,
+    "need": 4.5,
+    "fs": 12
+   },
+   {
+    "t": "Password",
+    "ratio": 1.53,
+    "need": 4.5,
+    "fs": 12
+   },
+   {
+    "t": "Remember me",
+    "ratio": 1.53,
+    "need": 4.5,
+    "fs": 12
+   },
+   {
+    "t": "Forgot password?",
+    "ratio": 1.01,
+    "need": 4.5,
+    "fs": 12
+   },
+   {
+    "t": "Sign in",
+    "ratio": 4.48,
+    "need": 4.5,
+    "fs": 15.2
+   },
+   {
+    "t": "Secure access powered by Supabas",
+    "ratio": 1.41,
+    "need": 4.5,
+    "fs": 11
+   }
+  ],
+  "dev": 0
+ },
+ {
+  "vp": "desktop",
+  "route": "/forgot-password",
+  "n": 5,
+  "small": {
+   "n": 1,
+   "bySize": {
+    "11px": 1
+   },
+   "samples": [
+    "11px \"We'll send you a recovery \""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Reset Password",
+    "ratio": 3.19,
+    "need": 4.5,
+    "fs": 22
+   },
+   {
+    "t": "We'll send you a recovery link",
+    "ratio": 1.12,
+    "need": 4.5,
+    "fs": 11
+   },
+   {
+    "t": "Email address",
+    "ratio": 1.53,
+    "need": 4.5,
+    "fs": 12
+   },
+   {
+    "t": "Send reset link",
+    "ratio": 4.48,
+    "need": 4.5,
+    "fs": 15.2
+   },
+   {
+    "t": "Back to sign in",
+    "ratio": 1.01,
+    "need": 4.5,
+    "fs": 12
+   }
+  ],
+  "dev": 0
+ },
+ {
+  "vp": "desktop",
+  "route": "/",
+  "n": 3,
+  "small": {
+   "n": 0,
+   "bySize": {},
+   "samples": []
+  },
+  "fail": [
+   {
+    "t": "Driver App",
+    "ratio": 3.43,
+    "need": 4.5,
+    "fs": 14
+   }
+  ],
+  "dev": 0
+ },
+ {
+  "vp": "desktop",
+  "route": "/jobs",
+  "n": 9,
+  "small": {
+   "n": 0,
+   "bySize": {},
+   "samples": []
+  },
+  "fail": [
+   {
+    "t": "Driver App",
+    "ratio": 3.43,
+    "need": 4.5,
+    "fs": 14
+   }
+  ],
+  "dev": 0
+ },
+ {
+  "vp": "desktop",
+  "route": "/pending-uploads",
+  "n": 10,
+  "small": {
+   "n": 0,
+   "bySize": {},
+   "samples": []
+  },
+  "fail": [
+   {
+    "t": "Driver App",
+    "ratio": 3.43,
+    "need": 4.5,
+    "fs": 14
+   }
+  ],
+  "dev": 0
+ },
+ {
+  "vp": "desktop",
+  "route": "/profile",
+  "n": 27,
+  "small": {
+   "n": 4,
+   "bySize": {
+    "10px": 1,
+    "9px": 3
+   },
+   "samples": [
+    "10px \"Upload\"",
+    "9px \"Active\"",
+    "9px \"Done 14d\"",
+    "9px \"Uploads\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Driver App",
+    "ratio": 3.43,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Dark",
+    "ratio": 4.4,
+    "need": 4.5,
+    "fs": 12
+   },
+   {
+    "t": "Auto",
+    "ratio": 4.4,
+    "need": 4.5,
+    "fs": 12
+   },
+   {
+    "t": "Sign Out",
+    "ratio": 3.6,
+    "need": 4.5,
+    "fs": 14
+   }
+  ],
+  "dev": 0
+ },
+ {
+  "vp": "desktop",
+  "route": "/expenses",
+  "n": 18,
+  "small": {
+   "n": 0,
+   "bySize": {},
+   "samples": []
+  },
+  "fail": [
+   {
+    "t": "Driver App",
+    "ratio": 3.43,
+    "need": 4.5,
+    "fs": 14
+   }
+  ],
+  "dev": 0
+ },
+ {
+  "vp": "desktop",
+  "route": "/ [admin]",
+  "n": 39,
+  "small": {
+   "n": 22,
+   "bySize": {
+    "9px": 13,
+    "10px": 9
+   },
+   "samples": [
+    "9px \"Unassigned\"",
+    "9px \"Stale\"",
+    "9px \"POD Review\"",
+    "9px \"Evidence\"",
+    "10px \"Today's active jobs\"",
+    "9px \"Jobs scheduled for today o\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Admin",
+    "ratio": 3.43,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Needs Action",
+    "ratio": 3.76,
+    "need": 4.5,
+    "fs": 12
+   }
+  ],
+  "dev": 1
+ },
+ {
+  "vp": "desktop",
+  "route": "/admin [admin]",
+  "n": 41,
+  "small": {
+   "n": 22,
+   "bySize": {
+    "9px": 13,
+    "10px": 9
+   },
+   "samples": [
+    "9px \"Unassigned\"",
+    "9px \"Stale\"",
+    "9px \"POD Review\"",
+    "9px \"Evidence\"",
+    "10px \"Today's active jobs\"",
+    "9px \"Jobs scheduled for today o\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Admin",
+    "ratio": 3.43,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Needs Action",
+    "ratio": 3.76,
+    "need": 4.5,
+    "fs": 12
+   }
+  ],
+  "dev": 1
+ },
+ {
+  "vp": "desktop",
+  "route": "/jobs/master [admin]",
+  "n": 13,
+  "small": {
+   "n": 0,
+   "bySize": {},
+   "samples": []
+  },
+  "fail": [
+   {
+    "t": "Admin",
+    "ratio": 3.43,
+    "need": 4.5,
+    "fs": 14
+   }
+  ],
+  "dev": 1
+ },
+ {
+  "vp": "desktop",
+  "route": "/jobs/new [admin]",
+  "n": 66,
+  "small": {
+   "n": 8,
+   "bySize": {
+    "10px": 8
+   },
+   "samples": [
+    "10px \"Pricing\"",
+    "10px \"Admin\"",
+    "10px \"Not set\"",
+    "10px \"Manually set the final job\"",
+    "10px \"Pricing\"",
+    "10px \"Admin\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Admin",
+    "ratio": 3.43,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Not set",
+    "ratio": 4.4,
+    "need": 4.5,
+    "fs": 10
+   }
+  ],
+  "dev": 1
+ },
+ {
+  "vp": "desktop",
+  "route": "/admin/users [admin]",
+  "n": 7,
+  "small": {
+   "n": 1,
+   "bySize": {
+    "11px": 1
+   },
+   "samples": [
+    "11px \"Loading…\""
+   ]
+  },
+  "fail": [],
+  "dev": 1
+ },
+ {
+  "vp": "desktop",
+  "route": "/admin/timesheets [admin]",
+  "n": 20,
+  "small": {
+   "n": 0,
+   "bySize": {},
+   "samples": []
+  },
+  "fail": [
+   {
+    "t": "Admin",
+    "ratio": 3.43,
+    "need": 4.5,
+    "fs": 14
+   }
+  ],
+  "dev": 1
+ },
+ {
+  "vp": "desktop",
+  "route": "/invoice/new [admin]",
+  "n": 43,
+  "small": {
+   "n": 0,
+   "bySize": {},
+   "samples": []
+  },
+  "fail": [
+   {
+    "t": "Failed to load",
+    "ratio": 3.6,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Error: TypeError: Failed to fetc",
+    "ratio": 3.16,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Admin",
+    "ratio": 3.43,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Dashboard",
+    "ratio": 4.4,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Invoice",
+    "ratio": 4.4,
+    "need": 4.5,
+    "fs": 14
+   }
+  ],
+  "dev": 1
+ },
+ {
+  "vp": "desktop",
+  "route": "/control [admin]",
+  "n": 52,
+  "small": {
+   "n": 20,
+   "bySize": {
+    "10px": 8,
+    "11px": 12
+   },
+   "samples": [
+    "10px \"Command Center\"",
+    "10px \"Overview\"",
+    "10px \"Operations\"",
+    "10px \"Fleet & Drivers\"",
+    "10px \"Compliance & Audit\"",
+    "10px \"Finance\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Command Center",
+    "ratio": 3.3,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Overview",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Operations",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Jobs",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "POD Review",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Fleet & Drivers",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Drivers",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Compliance & Audit",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Compliance",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Finance",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Finance",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Profitability",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Clients",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Invoice Prep",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Administration",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Admin",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Exports",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Back to App",
+    "ratio": 3.3,
+    "need": 4.5,
+    "fs": 12
+   },
+   {
+    "t": "⌘K",
+    "ratio": 2.32,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "All Clear",
+    "ratio": 2.98,
+    "need": 4.5,
+    "fs": 11
+   }
+  ],
+  "dev": 1
+ },
+ {
+  "vp": "desktop",
+  "route": "/control/jobs [admin]",
+  "n": 60,
+  "small": {
+   "n": 21,
+   "bySize": {
+    "10px": 8,
+    "11px": 13
+   },
+   "samples": [
+    "10px \"Command Center\"",
+    "10px \"Overview\"",
+    "10px \"Operations\"",
+    "10px \"Fleet & Drivers\"",
+    "10px \"Compliance & Audit\"",
+    "10px \"Finance\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Command Center",
+    "ratio": 3.3,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Overview",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Command Center",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Operations",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "POD Review",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Fleet & Drivers",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Drivers",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Compliance & Audit",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Compliance",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Finance",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Finance",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Profitability",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Clients",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Invoice Prep",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Administration",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Admin",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Exports",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Back to App",
+    "ratio": 3.3,
+    "need": 4.5,
+    "fs": 12
+   },
+   {
+    "t": "⌘K",
+    "ratio": 2.32,
+    "need": 4.5,
+    "fs": 10
+   }
+  ],
+  "dev": 1
+ },
+ {
+  "vp": "desktop",
+  "route": "/control/pod-review [admin]",
+  "n": 51,
+  "small": {
+   "n": 19,
+   "bySize": {
+    "10px": 8,
+    "11px": 11
+   },
+   "samples": [
+    "10px \"Command Center\"",
+    "10px \"Overview\"",
+    "10px \"Operations\"",
+    "10px \"Fleet & Drivers\"",
+    "10px \"Compliance & Audit\"",
+    "10px \"Finance\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Command Center",
+    "ratio": 3.3,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Overview",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Command Center",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Operations",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Jobs",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Fleet & Drivers",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Drivers",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Compliance & Audit",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Compliance",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Finance",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Finance",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Profitability",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Clients",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Invoice Prep",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Administration",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Admin",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Exports",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Back to App",
+    "ratio": 3.3,
+    "need": 4.5,
+    "fs": 12
+   },
+   {
+    "t": "⌘K",
+    "ratio": 2.32,
+    "need": 4.5,
+    "fs": 10
+   }
+  ],
+  "dev": 1
+ },
+ {
+  "vp": "desktop",
+  "route": "/control/drivers [admin]",
+  "n": 42,
+  "small": {
+   "n": 13,
+   "bySize": {
+    "10px": 8,
+    "11px": 5
+   },
+   "samples": [
+    "10px \"Command Center\"",
+    "10px \"Overview\"",
+    "10px \"Operations\"",
+    "10px \"Fleet & Drivers\"",
+    "10px \"Compliance & Audit\"",
+    "10px \"Finance\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Command Center",
+    "ratio": 3.3,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Overview",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Command Center",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Operations",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Jobs",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "POD Review",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Fleet & Drivers",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Compliance & Audit",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Compliance",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Finance",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Finance",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Profitability",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Clients",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Invoice Prep",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Administration",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Admin",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Exports",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Back to App",
+    "ratio": 3.3,
+    "need": 4.5,
+    "fs": 12
+   },
+   {
+    "t": "⌘K",
+    "ratio": 2.32,
+    "need": 4.5,
+    "fs": 10
+   }
+  ],
+  "dev": 1
+ },
+ {
+  "vp": "desktop",
+  "route": "/control/compliance [admin]",
+  "n": 52,
+  "small": {
+   "n": 17,
+   "bySize": {
+    "10px": 8,
+    "11px": 9
+   },
+   "samples": [
+    "10px \"Command Center\"",
+    "10px \"Overview\"",
+    "10px \"Operations\"",
+    "10px \"Fleet & Drivers\"",
+    "10px \"Compliance & Audit\"",
+    "10px \"Finance\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Command Center",
+    "ratio": 3.3,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Overview",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Command Center",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Operations",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Jobs",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "POD Review",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Fleet & Drivers",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Drivers",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Compliance & Audit",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Finance",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Finance",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Profitability",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Clients",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Invoice Prep",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Administration",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Admin",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Exports",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Back to App",
+    "ratio": 3.3,
+    "need": 4.5,
+    "fs": 12
+   },
+   {
+    "t": "⌘K",
+    "ratio": 2.32,
+    "need": 4.5,
+    "fs": 10
+   }
+  ],
+  "dev": 1
+ },
+ {
+  "vp": "desktop",
+  "route": "/control/finance [admin]",
+  "n": 42,
+  "small": {
+   "n": 15,
+   "bySize": {
+    "10px": 8,
+    "11px": 7
+   },
+   "samples": [
+    "10px \"Command Center\"",
+    "10px \"Overview\"",
+    "10px \"Operations\"",
+    "10px \"Fleet & Drivers\"",
+    "10px \"Compliance & Audit\"",
+    "10px \"Finance\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Command Center",
+    "ratio": 3.3,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Overview",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Command Center",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Operations",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Jobs",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "POD Review",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Fleet & Drivers",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Drivers",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Compliance & Audit",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Compliance",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Finance",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Profitability",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Clients",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Invoice Prep",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Administration",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Admin",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Exports",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Back to App",
+    "ratio": 3.3,
+    "need": 4.5,
+    "fs": 12
+   },
+   {
+    "t": "⌘K",
+    "ratio": 2.32,
+    "need": 4.5,
+    "fs": 10
+   }
+  ],
+  "dev": 1
+ },
+ {
+  "vp": "desktop",
+  "route": "/control/profitability [admin]",
+  "n": 40,
+  "small": {
+   "n": 14,
+   "bySize": {
+    "10px": 8,
+    "11px": 6
+   },
+   "samples": [
+    "10px \"Command Center\"",
+    "10px \"Overview\"",
+    "10px \"Operations\"",
+    "10px \"Fleet & Drivers\"",
+    "10px \"Compliance & Audit\"",
+    "10px \"Finance\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Command Center",
+    "ratio": 3.3,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Overview",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Command Center",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Operations",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Jobs",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "POD Review",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Fleet & Drivers",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Drivers",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Compliance & Audit",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Compliance",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Finance",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Finance",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Clients",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Invoice Prep",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Administration",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Admin",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Exports",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Back to App",
+    "ratio": 3.3,
+    "need": 4.5,
+    "fs": 12
+   },
+   {
+    "t": "⌘K",
+    "ratio": 2.32,
+    "need": 4.5,
+    "fs": 10
+   }
+  ],
+  "dev": 1
+ },
+ {
+  "vp": "desktop",
+  "route": "/control/clients [admin]",
+  "n": 35,
+  "small": {
+   "n": 11,
+   "bySize": {
+    "10px": 8,
+    "11px": 3
+   },
+   "samples": [
+    "10px \"Command Center\"",
+    "10px \"Overview\"",
+    "10px \"Operations\"",
+    "10px \"Fleet & Drivers\"",
+    "10px \"Compliance & Audit\"",
+    "10px \"Finance\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Command Center",
+    "ratio": 3.3,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Overview",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Command Center",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Operations",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Jobs",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "POD Review",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Fleet & Drivers",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Drivers",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Compliance & Audit",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Compliance",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Finance",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Finance",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Profitability",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Invoice Prep",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Administration",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Admin",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Exports",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Back to App",
+    "ratio": 3.3,
+    "need": 4.5,
+    "fs": 12
+   },
+   {
+    "t": "⌘K",
+    "ratio": 2.32,
+    "need": 4.5,
+    "fs": 10
+   }
+  ],
+  "dev": 1
+ },
+ {
+  "vp": "desktop",
+  "route": "/control/exports [admin]",
+  "n": 60,
+  "small": {
+   "n": 9,
+   "bySize": {
+    "10px": 8,
+    "11px": 1
+   },
+   "samples": [
+    "10px \"Command Center\"",
+    "10px \"Overview\"",
+    "10px \"Operations\"",
+    "10px \"Fleet & Drivers\"",
+    "10px \"Compliance & Audit\"",
+    "10px \"Finance\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Command Center",
+    "ratio": 3.3,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Overview",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Command Center",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Operations",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Jobs",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "POD Review",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Fleet & Drivers",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Drivers",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Compliance & Audit",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Compliance",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Finance",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Finance",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Profitability",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Clients",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Invoice Prep",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Administration",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Admin",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Back to App",
+    "ratio": 3.3,
+    "need": 4.5,
+    "fs": 12
+   },
+   {
+    "t": "⌘K",
+    "ratio": 2.32,
+    "need": 4.5,
+    "fs": 10
+   }
+  ],
+  "dev": 1
+ },
+ {
+  "vp": "desktop",
+  "route": "/super-admin [super]",
+  "n": 32,
+  "small": {
+   "n": 4,
+   "bySize": {
+    "10px": 4
+   },
+   "samples": [
+    "10px \"Organisations\"",
+    "10px \"Users\"",
+    "10px \"Active Jobs\"",
+    "10px \"Audit Today\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Super Admin",
+    "ratio": 3.43,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Active Jobs",
+    "ratio": 4.44,
+    "need": 4.5,
+    "fs": 10
+   }
+  ],
+  "dev": 1
+ },
+ {
+  "vp": "desktop",
+  "route": "/super-admin/settings [super]",
+  "n": 24,
+  "small": {
+   "n": 4,
+   "bySize": {
+    "10px": 4
+   },
+   "samples": [
+    "10px \"user_profiles.role\"",
+    "10px \"RLS via org_id\"",
+    "10px \"Not yet available\"",
+    "10px \"Not yet available\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Super Admin",
+    "ratio": 3.43,
+    "need": 4.5,
+    "fs": 14
+   }
+  ],
+  "dev": 1
+ },
+ {
+  "vp": "desktop",
+  "route": "/super-admin/attention [super]",
+  "n": 26,
+  "small": {
+   "n": 0,
+   "bySize": {},
+   "samples": []
+  },
+  "fail": [
+   {
+    "t": "Super Admin",
+    "ratio": 3.43,
+    "need": 4.5,
+    "fs": 14
+   }
+  ],
+  "dev": 1
+ },
+ {
+  "vp": "desktop",
+  "route": "/control/super-admin [super]",
+  "n": 51,
+  "small": {
+   "n": 18,
+   "bySize": {
+    "10px": 9,
+    "11px": 9
+   },
+   "samples": [
+    "10px \"Command Center\"",
+    "10px \"Overview\"",
+    "10px \"Operations\"",
+    "10px \"Fleet & Drivers\"",
+    "10px \"Compliance & Audit\"",
+    "10px \"Finance\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Command Center",
+    "ratio": 3.3,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Overview",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Command Center",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Operations",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Jobs",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "POD Review",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Fleet & Drivers",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Drivers",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Compliance & Audit",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Compliance",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Finance",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Finance",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Profitability",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Clients",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Invoice Prep",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Administration",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Admin",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Exports",
+    "ratio": 4.26,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Platform",
+    "ratio": 2.61,
+    "need": 4.5,
+    "fs": 10
+   },
+   {
+    "t": "Back to App",
+    "ratio": 3.3,
+    "need": 4.5,
+    "fs": 12
+   },
+   {
+    "t": "⌘K",
+    "ratio": 2.32,
+    "need": 4.5,
+    "fs": 10
+   }
+  ],
+  "dev": 1
+ },
+ {
+  "vp": "mobile",
+  "route": "/login",
+  "n": 6,
+  "small": {
+   "n": 1,
+   "bySize": {
+    "11px": 1
+   },
+   "samples": [
+    "11px \"Secure access powered by S\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Email address",
+    "ratio": 1.53,
+    "need": 4.5,
+    "fs": 12
+   },
+   {
+    "t": "Password",
+    "ratio": 1.53,
+    "need": 4.5,
+    "fs": 12
+   },
+   {
+    "t": "Remember me",
+    "ratio": 1.53,
+    "need": 4.5,
+    "fs": 12
+   },
+   {
+    "t": "Forgot password?",
+    "ratio": 1.01,
+    "need": 4.5,
+    "fs": 12
+   },
+   {
+    "t": "Sign in",
+    "ratio": 4.48,
+    "need": 4.5,
+    "fs": 15.2
+   },
+   {
+    "t": "Secure access powered by Supabas",
+    "ratio": 1.41,
+    "need": 4.5,
+    "fs": 11
+   }
+  ],
+  "dev": 0
+ },
+ {
+  "vp": "mobile",
+  "route": "/forgot-password",
+  "n": 5,
+  "small": {
+   "n": 1,
+   "bySize": {
+    "11px": 1
+   },
+   "samples": [
+    "11px \"We'll send you a recovery \""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Reset Password",
+    "ratio": 3.19,
+    "need": 4.5,
+    "fs": 22
+   },
+   {
+    "t": "We'll send you a recovery link",
+    "ratio": 1.12,
+    "need": 4.5,
+    "fs": 11
+   },
+   {
+    "t": "Email address",
+    "ratio": 1.53,
+    "need": 4.5,
+    "fs": 12
+   },
+   {
+    "t": "Send reset link",
+    "ratio": 4.48,
+    "need": 4.5,
+    "fs": 15.2
+   },
+   {
+    "t": "Back to sign in",
+    "ratio": 1.01,
+    "need": 4.5,
+    "fs": 12
+   }
+  ],
+  "dev": 0
+ },
+ {
+  "vp": "mobile",
+  "route": "/",
+  "n": 3,
+  "small": {
+   "n": 1,
+   "bySize": {
+    "11px": 1
+   },
+   "samples": [
+    "11px \"Driver App\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Driver App",
+    "ratio": 3.43,
+    "need": 4.5,
+    "fs": 11
+   }
+  ],
+  "dev": 0
+ },
+ {
+  "vp": "mobile",
+  "route": "/jobs",
+  "n": 9,
+  "small": {
+   "n": 1,
+   "bySize": {
+    "11px": 1
+   },
+   "samples": [
+    "11px \"Driver App\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Driver App",
+    "ratio": 3.43,
+    "need": 4.5,
+    "fs": 11
+   }
+  ],
+  "dev": 0
+ },
+ {
+  "vp": "mobile",
+  "route": "/pending-uploads",
+  "n": 10,
+  "small": {
+   "n": 1,
+   "bySize": {
+    "11px": 1
+   },
+   "samples": [
+    "11px \"Driver App\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Driver App",
+    "ratio": 3.43,
+    "need": 4.5,
+    "fs": 11
+   }
+  ],
+  "dev": 0
+ },
+ {
+  "vp": "mobile",
+  "route": "/profile",
+  "n": 27,
+  "small": {
+   "n": 5,
+   "bySize": {
+    "11px": 1,
+    "10px": 1,
+    "9px": 3
+   },
+   "samples": [
+    "11px \"Driver App\"",
+    "10px \"Upload\"",
+    "9px \"Active\"",
+    "9px \"Done 14d\"",
+    "9px \"Uploads\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Driver App",
+    "ratio": 3.43,
+    "need": 4.5,
+    "fs": 11
+   },
+   {
+    "t": "Dark",
+    "ratio": 4.4,
+    "need": 4.5,
+    "fs": 12
+   },
+   {
+    "t": "Auto",
+    "ratio": 4.4,
+    "need": 4.5,
+    "fs": 12
+   },
+   {
+    "t": "Sign Out",
+    "ratio": 3.6,
+    "need": 4.5,
+    "fs": 14
+   }
+  ],
+  "dev": 0
+ },
+ {
+  "vp": "mobile",
+  "route": "/expenses",
+  "n": 18,
+  "small": {
+   "n": 1,
+   "bySize": {
+    "11px": 1
+   },
+   "samples": [
+    "11px \"Driver App\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Driver App",
+    "ratio": 3.43,
+    "need": 4.5,
+    "fs": 11
+   }
+  ],
+  "dev": 0
+ },
+ {
+  "vp": "mobile",
+  "route": "/ [admin]",
+  "n": 39,
+  "small": {
+   "n": 23,
+   "bySize": {
+    "11px": 1,
+    "9px": 13,
+    "10px": 9
+   },
+   "samples": [
+    "11px \"Admin\"",
+    "9px \"Unassigned\"",
+    "9px \"Stale\"",
+    "9px \"POD Review\"",
+    "9px \"Evidence\"",
+    "10px \"Today's active jobs\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Admin",
+    "ratio": 3.43,
+    "need": 4.5,
+    "fs": 11
+   },
+   {
+    "t": "Needs Action",
+    "ratio": 3.76,
+    "need": 4.5,
+    "fs": 12
+   }
+  ],
+  "dev": 1
+ },
+ {
+  "vp": "mobile",
+  "route": "/admin [admin]",
+  "n": 41,
+  "small": {
+   "n": 23,
+   "bySize": {
+    "11px": 1,
+    "9px": 13,
+    "10px": 9
+   },
+   "samples": [
+    "11px \"Admin\"",
+    "9px \"Unassigned\"",
+    "9px \"Stale\"",
+    "9px \"POD Review\"",
+    "9px \"Evidence\"",
+    "10px \"Today's active jobs\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Admin",
+    "ratio": 3.43,
+    "need": 4.5,
+    "fs": 11
+   },
+   {
+    "t": "Needs Action",
+    "ratio": 3.76,
+    "need": 4.5,
+    "fs": 12
+   }
+  ],
+  "dev": 1
+ },
+ {
+  "vp": "mobile",
+  "route": "/jobs/master [admin]",
+  "n": 13,
+  "small": {
+   "n": 1,
+   "bySize": {
+    "11px": 1
+   },
+   "samples": [
+    "11px \"Admin\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Admin",
+    "ratio": 3.43,
+    "need": 4.5,
+    "fs": 11
+   }
+  ],
+  "dev": 1
+ },
+ {
+  "vp": "mobile",
+  "route": "/jobs/new [admin]",
+  "n": 66,
+  "small": {
+   "n": 9,
+   "bySize": {
+    "11px": 1,
+    "10px": 8
+   },
+   "samples": [
+    "11px \"Admin\"",
+    "10px \"Pricing\"",
+    "10px \"Admin\"",
+    "10px \"Not set\"",
+    "10px \"Manually set the final job\"",
+    "10px \"Pricing\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Admin",
+    "ratio": 3.43,
+    "need": 4.5,
+    "fs": 11
+   },
+   {
+    "t": "Not set",
+    "ratio": 4.4,
+    "need": 4.5,
+    "fs": 10
+   }
+  ],
+  "dev": 1
+ },
+ {
+  "vp": "mobile",
+  "route": "/admin/users [admin]",
+  "n": 7,
+  "small": {
+   "n": 1,
+   "bySize": {
+    "11px": 1
+   },
+   "samples": [
+    "11px \"Loading…\""
+   ]
+  },
+  "fail": [],
+  "dev": 1
+ },
+ {
+  "vp": "mobile",
+  "route": "/admin/timesheets [admin]",
+  "n": 20,
+  "small": {
+   "n": 1,
+   "bySize": {
+    "11px": 1
+   },
+   "samples": [
+    "11px \"Admin\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Admin",
+    "ratio": 3.43,
+    "need": 4.5,
+    "fs": 11
+   }
+  ],
+  "dev": 1
+ },
+ {
+  "vp": "mobile",
+  "route": "/invoice/new [admin]",
+  "n": 43,
+  "small": {
+   "n": 1,
+   "bySize": {
+    "11px": 1
+   },
+   "samples": [
+    "11px \"Admin\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Failed to load",
+    "ratio": 3.6,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Error: TypeError: Failed to fetc",
+    "ratio": 3.16,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Admin",
+    "ratio": 3.43,
+    "need": 4.5,
+    "fs": 11
+   },
+   {
+    "t": "Dashboard",
+    "ratio": 4.4,
+    "need": 4.5,
+    "fs": 14
+   },
+   {
+    "t": "Invoice",
+    "ratio": 4.4,
+    "need": 4.5,
+    "fs": 14
+   }
+  ],
+  "dev": 1
+ },
+ {
+  "vp": "mobile",
+  "route": "/control [admin]",
+  "n": 27,
+  "small": {
+   "n": 12,
+   "bySize": {
+    "11px": 12
+   },
+   "samples": [
+    "11px \"All Clear\"",
+    "11px \"Ready to Dispatch\"",
+    "11px \"In Transit\"",
+    "11px \"Exceptions\"",
+    "11px \"POD Review\"",
+    "11px \"Completed Today\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "All Clear",
+    "ratio": 2.98,
+    "need": 4.5,
+    "fs": 11
+   }
+  ],
+  "dev": 1
+ },
+ {
+  "vp": "mobile",
+  "route": "/control/jobs [admin]",
+  "n": 33,
+  "small": {
+   "n": 13,
+   "bySize": {
+    "11px": 13
+   },
+   "samples": [
+    "11px \"Unassigned\"",
+    "11px \"Stale (>24h)\"",
+    "11px \"Evidence gaps\"",
+    "11px \"POD Review\"",
+    "11px \"Active\"",
+    "11px \"Total jobs\""
+   ]
+  },
+  "fail": [],
+  "dev": 1
+ },
+ {
+  "vp": "mobile",
+  "route": "/control/pod-review [admin]",
+  "n": 25,
+  "small": {
+   "n": 11,
+   "bySize": {
+    "11px": 11
+   },
+   "samples": [
+    "11px \"Review queue\"",
+    "11px \"Ready to confirm\"",
+    "11px \"Missing signatures\"",
+    "11px \"No delivery insp.\"",
+    "11px \"POD ready\"",
+    "11px \"Delivery complete\""
+   ]
+  },
+  "fail": [],
+  "dev": 1
+ },
+ {
+  "vp": "mobile",
+  "route": "/control/drivers [admin]",
+  "n": 16,
+  "small": {
+   "n": 5,
+   "bySize": {
+    "11px": 5
+   },
+   "samples": [
+    "11px \"Total Drivers\"",
+    "11px \"Active\"",
+    "11px \"Licence Expiring (30d)\"",
+    "11px \"Missing Trade Plate\"",
+    "11px \"0 drivers matching current\""
+   ]
+  },
+  "fail": [],
+  "dev": 1
+ },
+ {
+  "vp": "mobile",
+  "route": "/control/compliance [admin]",
+  "n": 26,
+  "small": {
+   "n": 9,
+   "bySize": {
+    "11px": 9
+   },
+   "samples": [
+    "11px \"Inspections (12m)\"",
+    "11px \"Damage reports (12m)\"",
+    "11px \"Compliance alerts\"",
+    "11px \"Compliance rate (12m)\"",
+    "11px \"Expiring documents and inc\"",
+    "11px \"Per-entity rollup of expir\""
+   ]
+  },
+  "fail": [],
+  "dev": 1
+ },
+ {
+  "vp": "mobile",
+  "route": "/control/finance [admin]",
+  "n": 15,
+  "small": {
+   "n": 7,
+   "bySize": {
+    "11px": 7
+   },
+   "samples": [
+    "11px \"Total Expenses\"",
+    "11px \"Spend Today\"",
+    "11px \"Spend This Week\"",
+    "11px \"Receipt compliance\"",
+    "11px \"With Receipt\"",
+    "11px \"No Receipt\""
+   ]
+  },
+  "fail": [],
+  "dev": 1
+ },
+ {
+  "vp": "mobile",
+  "route": "/control/profitability [admin]",
+  "n": 14,
+  "small": {
+   "n": 6,
+   "bySize": {
+    "11px": 6
+   },
+   "samples": [
+    "11px \"Jobs\"",
+    "11px \"Revenue\"",
+    "11px \"Logged Cost\"",
+    "11px \"Net Margin\"",
+    "11px \"Incomplete Cost Data\"",
+    "11px \"0 completed jobs · * = cos\""
+   ]
+  },
+  "fail": [],
+  "dev": 1
+ },
+ {
+  "vp": "mobile",
+  "route": "/control/clients [admin]",
+  "n": 9,
+  "small": {
+   "n": 3,
+   "bySize": {
+    "11px": 3
+   },
+   "samples": [
+    "11px \"Total Clients\"",
+    "11px \"Active\"",
+    "11px \"Archived\""
+   ]
+  },
+  "fail": [],
+  "dev": 1
+ },
+ {
+  "vp": "mobile",
+  "route": "/control/exports [admin]",
+  "n": 34,
+  "small": {
+   "n": 1,
+   "bySize": {
+    "11px": 1
+   },
+   "samples": [
+    "11px \"Bills: if your bank feed i\""
+   ]
+  },
+  "fail": [],
+  "dev": 1
+ },
+ {
+  "vp": "mobile",
+  "route": "/super-admin [super]",
+  "n": 32,
+  "small": {
+   "n": 5,
+   "bySize": {
+    "11px": 1,
+    "10px": 4
+   },
+   "samples": [
+    "11px \"Super Admin\"",
+    "10px \"Organisations\"",
+    "10px \"Users\"",
+    "10px \"Active Jobs\"",
+    "10px \"Audit Today\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Super Admin",
+    "ratio": 3.43,
+    "need": 4.5,
+    "fs": 11
+   },
+   {
+    "t": "Active Jobs",
+    "ratio": 4.44,
+    "need": 4.5,
+    "fs": 10
+   }
+  ],
+  "dev": 1
+ },
+ {
+  "vp": "mobile",
+  "route": "/super-admin/settings [super]",
+  "n": 24,
+  "small": {
+   "n": 5,
+   "bySize": {
+    "11px": 1,
+    "10px": 4
+   },
+   "samples": [
+    "11px \"Super Admin\"",
+    "10px \"user_profiles.role\"",
+    "10px \"RLS via org_id\"",
+    "10px \"Not yet available\"",
+    "10px \"Not yet available\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Super Admin",
+    "ratio": 3.43,
+    "need": 4.5,
+    "fs": 11
+   }
+  ],
+  "dev": 1
+ },
+ {
+  "vp": "mobile",
+  "route": "/super-admin/attention [super]",
+  "n": 26,
+  "small": {
+   "n": 1,
+   "bySize": {
+    "11px": 1
+   },
+   "samples": [
+    "11px \"Super Admin\""
+   ]
+  },
+  "fail": [
+   {
+    "t": "Super Admin",
+    "ratio": 3.43,
+    "need": 4.5,
+    "fs": 11
+   }
+  ],
+  "dev": 1
+ },
+ {
+  "vp": "mobile",
+  "route": "/control/super-admin [super]",
+  "n": 23,
+  "small": {
+   "n": 9,
+   "bySize": {
+    "11px": 9
+   },
+   "samples": [
+    "11px \"Organisations\"",
+    "11px \"Total Users\"",
+    "11px \"Active Jobs\"",
+    "11px \"Platform Exceptions\"",
+    "11px \"Audit Events Today\"",
+    "11px \"0 active exceptions across\""
+   ]
+  },
+  "fail": [],
+  "dev": 1
+ }
+]

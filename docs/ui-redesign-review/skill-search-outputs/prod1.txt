@@ -1,0 +1,44 @@
+## UI Pro Max Search Results
+**Domain:** product | **Query:** logistics delivery fleet
+**Source:** products.csv | **Found:** 4 results
+
+### Result 1
+- **Product Type:** Logistics/Delivery
+- **Keywords:** delivery, logistics
+- **Primary Style Recommendation:** Minimalism & Swiss Style + Flat Design
+- **Secondary Styles:** Dark Mode (OLED) , Micro-interactions
+- **Landing Page Pattern:** Feature-Rich Showcase + Conversion
+- **Dashboard Style (if applicable):** Real-Time Monitoring + Route Analytics
+- **Color Palette Focus:** Blue (#2563EB) + Orange (tracking) + Green (delivered)
+- **rtl_level:** caveats
+
+### Result 2
+- **Product Type:** Autonomous Drone Fleet Manager
+- **Keywords:** drone, autonomous, fleet, aerial, logistics, robotics
+- **Primary Style Recommendation:** HUD / Sci-Fi FUI
+- **Secondary Styles:** Real-Time Monitoring , Spatial UI (VisionOS)
+- **Landing Page Pattern:** Real-Time Monitor
+- **Dashboard Style (if applicable):** Geographic + Real-Time
+- **Color Palette Focus:** Tactical Green #00FF00 + Alert Red + Map Dark
+- **rtl_level:** caveats
+
+### Result 3
+- **Product Type:** Food Delivery / On-Demand
+- **Keywords:** delivery, food, order, uber-eats, doordash, takeout, on-demand, courier
+- **Primary Style Recommendation:** Vibrant & Block-based + Motion-Driven
+- **Secondary Styles:** Glassmorphism , Flat Design
+- **Landing Page Pattern:** Hero-Centric Design + Feature-Rich
+- **Dashboard Style (if applicable):** Real-Time Monitoring + Map
+- **Color Palette Focus:** Appetizing warm (orange/red) + trust blue + map accent
+- **rtl_level:** partial
+
+### Result 4
+- **Product Type:** Digital Products/Downloads
+- **Keywords:** digital, downloads, products
+- **Primary Style Recommendation:** Vibrant & Block-based + Motion-Driven
+- **Secondary Styles:** Glassmorphism , Bento Box Grid
+- **Landing Page Pattern:** Feature-Rich Showcase + Conversion
+- **Dashboard Style (if applicable):** E-commerce Analytics
+- **Color Palette Focus:** Product category colors + Brand + Success green
+- **rtl_level:** full
+

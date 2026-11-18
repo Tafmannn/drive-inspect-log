@@ -1,0 +1,15 @@
+## UI Pro Max Search Results
+**Domain:** ux | **Query:** photo upload progress
+**Source:** ux-guidelines.csv | **Found:** 1 results
+
+### Result 1
+- **Category:** Feedback
+- **Issue:** Progress Indicators
+- **Platform:** All
+- **Description:** Show progress for multi-step processes
+- **Do:** Step indicators or progress bar
+- **Don't:** No indication of progress
+- **Code Example Good:** Step 2 of 4 indicator
+- **Code Example Bad:** No step information
+- **Severity:** Medium
+

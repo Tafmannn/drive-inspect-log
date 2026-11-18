@@ -1,0 +1,44 @@
+## UI Pro Max Search Results
+**Domain:** product | **Query:** inspection checklist field service
+**Source:** products.csv | **Found:** 4 results
+
+### Result 1
+- **Product Type:** Home Services (Plumber/Electrician)
+- **Keywords:** plumber, electrician, hvac, handyman, repair, maintenance, home, emergency, leak, wiring, inspection, licensed
+- **Primary Style Recommendation:** Flat Design + Accessible & Ethical
+- **Secondary Styles:** Minimalism & Swiss Style , Accessible & Ethical
+- **Landing Page Pattern:** Conversion-Optimized + Trust
+- **Dashboard Style (if applicable):** Service Analytics
+- **Color Palette Focus:** Trust Blue + Safety Orange + Professional grey
+- **rtl_level:** full
+
+### Result 2
+- **Product Type:** Grant / Funding Portal
+- **Keywords:** grant, funding, rfp, proposal, research-grant, foundation, fellowship, award, application-portal, funding-opportunity
+- **Primary Style Recommendation:** Accessible & Ethical + Minimalism & Swiss Style
+- **Secondary Styles:** Accessible & Ethical , Swiss Modernism 2.0
+- **Landing Page Pattern:** Opportunity Grid + Search
+- **Dashboard Style (if applicable):** Application Tracking Dashboard
+- **Color Palette Focus:** Institution navy + funding green + deadline red + neutral white
+- **rtl_level:** partial
+
+### Result 3
+- **Product Type:** Beauty/Spa/Wellness Service
+- **Keywords:** spa, beauty, salon, wellness, treatment, relaxation, massage, skincare, facial, aesthetic, self-care, pamper
+- **Primary Style Recommendation:** Soft UI Evolution + Neumorphism
+- **Secondary Styles:** Glassmorphism , Minimalism & Swiss Style
+- **Landing Page Pattern:** Hero-Centric Design + Social Proof
+- **Dashboard Style (if applicable):** User Behavior Analytics
+- **Color Palette Focus:** Soft pastels (Pink #FFB6C1 Sage #90EE90) + Cream + Gold accents
+- **rtl_level:** full
+
+### Result 4
+- **Product Type:** Grocery & Shopping List
+- **Keywords:** grocery, shopping, list, supermarket, checklist, pantry, meal-plan, buy
+- **Primary Style Recommendation:** Flat Design + Vibrant & Block-based
+- **Secondary Styles:** Claymorphism , Micro-interactions
+- **Landing Page Pattern:** Minimal & Direct + Demo
+- **Dashboard Style (if applicable):** N/A - List focused
+- **Color Palette Focus:** Fresh green + food-category colors + checkmark accent
+- **rtl_level:** full
+

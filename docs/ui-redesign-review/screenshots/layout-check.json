@@ -1,0 +1,1902 @@
+[
+ {
+  "page": "01-command-center",
+  "width": 320,
+  "vw": 320,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 5,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 23,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "01-command-center",
+  "width": 390,
+  "vw": 390,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 3,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 23,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "01-command-center",
+  "width": 768,
+  "vw": 768,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 23,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "01-command-center",
+  "width": 1024,
+  "vw": 1024,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 18,
+   "total": 38,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 4,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "01-command-center",
+  "width": 1440,
+  "vw": 1440,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 31,
+   "total": 38,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 4,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "01-command-center",
+  "width": 1920,
+  "vw": 1920,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 31,
+   "total": 38,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 4,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "02-jobs",
+  "width": 320,
+  "vw": 320,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 41,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "02-jobs",
+  "width": 390,
+  "vw": 390,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 41,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "02-jobs",
+  "width": 768,
+  "vw": 768,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 41,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "02-jobs",
+  "width": 1024,
+  "vw": 1024,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 35,
+   "total": 54,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 1,
+   "scroll": 1,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "02-jobs",
+  "width": 1440,
+  "vw": 1440,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 48,
+   "total": 54,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 1,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "02-jobs",
+  "width": 1920,
+  "vw": 1920,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 48,
+   "total": 54,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 1,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "02b-jobs-queues",
+  "width": 320,
+  "vw": 320,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 4,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 25,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "02b-jobs-queues",
+  "width": 390,
+  "vw": 390,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 1,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 25,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "02b-jobs-queues",
+  "width": 768,
+  "vw": 768,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 25,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "02b-jobs-queues",
+  "width": 1024,
+  "vw": 1024,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 19,
+   "total": 38,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "02b-jobs-queues",
+  "width": 1440,
+  "vw": 1440,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 32,
+   "total": 38,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "02b-jobs-queues",
+  "width": 1920,
+  "vw": 1920,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 32,
+   "total": 38,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "05-admin-dashboard",
+  "width": 320,
+  "vw": 320,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 6,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 28,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "05-admin-dashboard",
+  "width": 390,
+  "vw": 390,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 1,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 28,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "05-admin-dashboard",
+  "width": 768,
+  "vw": 768,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 28,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "05-admin-dashboard",
+  "width": 1024,
+  "vw": 1024,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 5,
+   "total": 41,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "05-admin-dashboard",
+  "width": 1440,
+  "vw": 1440,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 18,
+   "total": 41,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "05-admin-dashboard",
+  "width": 1920,
+  "vw": 1920,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 18,
+   "total": 41,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "06a-super-admin-control",
+  "width": 320,
+  "vw": 320,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 3,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 13,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "06a-super-admin-control",
+  "width": 390,
+  "vw": 390,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 2,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 13,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "06a-super-admin-control",
+  "width": 768,
+  "vw": 768,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 13,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "06a-super-admin-control",
+  "width": 1024,
+  "vw": 1024,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 8,
+   "total": 27,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "06a-super-admin-control",
+  "width": 1440,
+  "vw": 1440,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 22,
+   "total": 27,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "06a-super-admin-control",
+  "width": 1920,
+  "vw": 1920,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 22,
+   "total": 27,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "06b-super-admin-dashboard",
+  "width": 320,
+  "vw": 320,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 16,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "06b-super-admin-dashboard",
+  "width": 390,
+  "vw": 390,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 16,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "06b-super-admin-dashboard",
+  "width": 768,
+  "vw": 768,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 16,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "06b-super-admin-dashboard",
+  "width": 1024,
+  "vw": 1024,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 6,
+   "total": 30,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "06b-super-admin-dashboard",
+  "width": 1440,
+  "vw": 1440,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 20,
+   "total": 30,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "06b-super-admin-dashboard",
+  "width": 1920,
+  "vw": 1920,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 20,
+   "total": 30,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "06c-super-admin-settings",
+  "width": 320,
+  "vw": 320,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 5,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "06c-super-admin-settings",
+  "width": 390,
+  "vw": 390,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 5,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "06c-super-admin-settings",
+  "width": 768,
+  "vw": 768,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 5,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "06c-super-admin-settings",
+  "width": 1024,
+  "vw": 1024,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 3,
+   "total": 19,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "06c-super-admin-settings",
+  "width": 1440,
+  "vw": 1440,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 17,
+   "total": 19,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "06c-super-admin-settings",
+  "width": 1920,
+  "vw": 1920,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 17,
+   "total": 19,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "08-states",
+  "width": 320,
+  "vw": 320,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 23,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "08-states",
+  "width": 390,
+  "vw": 390,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 23,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "08-states",
+  "width": 768,
+  "vw": 768,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 23,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "08-states",
+  "width": 1024,
+  "vw": 1024,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 16,
+   "total": 36,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "08-states",
+  "width": 1440,
+  "vw": 1440,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 29,
+   "total": 36,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "08-states",
+  "width": 1920,
+  "vw": 1920,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 29,
+   "total": 36,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "09a-stress-jobs-large-table",
+  "width": 320,
+  "vw": 320,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 66,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "09a-stress-jobs-large-table",
+  "width": 390,
+  "vw": 390,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 66,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "09a-stress-jobs-large-table",
+  "width": 768,
+  "vw": 768,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 66,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "09a-stress-jobs-large-table",
+  "width": 1024,
+  "vw": 1024,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 26,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 204,
+   "total": 223,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 1,
+   "scroll": 1,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "09a-stress-jobs-large-table",
+  "width": 1440,
+  "vw": 1440,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 26,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 217,
+   "total": 223,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 1,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "09a-stress-jobs-large-table",
+  "width": 1920,
+  "vw": 1920,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 26,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 217,
+   "total": 223,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 1,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "09b-stress-dense-dashboard",
+  "width": 320,
+  "vw": 320,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 20,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 22,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "09b-stress-dense-dashboard",
+  "width": 390,
+  "vw": 390,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 16,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 22,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "09b-stress-dense-dashboard",
+  "width": 768,
+  "vw": 768,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 2,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 22,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "09b-stress-dense-dashboard",
+  "width": 1024,
+  "vw": 1024,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 8,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 24,
+   "total": 44,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 1,
+   "scroll": 1,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "09b-stress-dense-dashboard",
+  "width": 1440,
+  "vw": 1440,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 6,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 37,
+   "total": 44,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 1,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "09b-stress-dense-dashboard",
+  "width": 1920,
+  "vw": 1920,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 6,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 37,
+   "total": 44,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 1,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "09d-stress-form-validation",
+  "width": 320,
+  "vw": 320,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 13,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "09d-stress-form-validation",
+  "width": 390,
+  "vw": 390,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 13,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "09d-stress-form-validation",
+  "width": 768,
+  "vw": 768,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 13,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "09d-stress-form-validation",
+  "width": 1024,
+  "vw": 1024,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 4,
+   "total": 26,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "09d-stress-form-validation",
+  "width": 1440,
+  "vw": 1440,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 17,
+   "total": 26,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "09d-stress-form-validation",
+  "width": 1920,
+  "vw": 1920,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 17,
+   "total": 26,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "09e-stress-settings",
+  "width": 320,
+  "vw": 320,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 14,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "09e-stress-settings",
+  "width": 390,
+  "vw": 390,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 14,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "09e-stress-settings",
+  "width": 768,
+  "vw": 768,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 14,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "09e-stress-settings",
+  "width": 1024,
+  "vw": 1024,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 2,
+   "total": 28,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "09e-stress-settings",
+  "width": 1440,
+  "vw": 1440,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 16,
+   "total": 28,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "09e-stress-settings",
+  "width": 1920,
+  "vw": 1920,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 16,
+   "total": 28,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "03-job-detail-mobile",
+  "width": 390,
+  "vw": 1600,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 34,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "04-inspection-mobile",
+  "width": 390,
+  "vw": 1600,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 93,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "09c-stress-photos",
+  "width": 390,
+  "vw": 1600,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 0,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 5,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ },
+ {
+  "page": "09f-stress-mobile-content",
+  "width": 390,
+  "vw": 1600,
+  "docOverflow": false,
+  "overflowEls": [],
+  "truncated": 2,
+  "truncatedNoTitle": 0,
+  "small": {
+   "n": 0,
+   "samples": []
+  },
+  "tap": {
+   "lt24": 0,
+   "lt44": 0,
+   "total": 63,
+   "samples": [],
+   "s44": []
+  },
+  "tables": {
+   "n": 0,
+   "scroll": 0,
+   "actionsHidden": 0
+  }
+ }
+]

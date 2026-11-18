@@ -1,0 +1,2113 @@
+[
+ {
+  "page": "01-command-center",
+  "text": {
+   "n": 153,
+   "fail": [],
+   "disabled": 0,
+   "min": 5.5496958116037005,
+   "minSample": "Critical"
+  },
+  "nontext": [
+   {
+    "label": "outline button border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "btn",
+    "parent": "quick",
+    "txt": "New Job"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "btn",
+    "parent": "quick",
+    "txt": "View All Jobs"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "btn",
+    "parent": "quick",
+    "txt": "Drivers"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "btn",
+    "parent": "quick",
+    "txt": "Expenses"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn sm",
+    "parent": "card-h",
+    "txt": "Refresh"
+   }
+  ]
+ },
+ {
+  "page": "02-jobs",
+  "text": {
+   "n": 121,
+   "fail": [],
+   "disabled": 0,
+   "min": 5.736100584579226,
+   "minSample": "Command Center"
+  },
+  "nontext": [
+   {
+    "label": "input/select border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "input",
+    "parent": "search",
+    "txt": ""
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "btn",
+    "parent": "actions",
+    "txt": "Run order"
+   }
+  ]
+ },
+ {
+  "page": "02b-jobs-queues",
+  "text": {
+   "n": 88,
+   "fail": [],
+   "disabled": 0,
+   "min": 5.736100584579226,
+   "minSample": "Command Center"
+  },
+  "nontext": [
+   {
+    "label": "input/select border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "input",
+    "parent": "search",
+    "txt": ""
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "btn",
+    "parent": "actions",
+    "txt": "Run order"
+   }
+  ]
+ },
+ {
+  "page": "03-job-detail-mobile",
+  "text": {
+   "n": 123,
+   "fail": [],
+   "disabled": 2,
+   "min": 5.50451500730759,
+   "minSample": "Cancel"
+  },
+  "nontext": [
+   {
+    "label": "input/select border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "select input",
+    "parent": "pad",
+    "txt": "Change status…"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn sm",
+    "parent": "btns",
+    "txt": "Call"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn sm",
+    "parent": "btns",
+    "txt": "Navigate"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn sm",
+    "parent": "btns",
+    "txt": "Navigate"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn",
+    "parent": "",
+    "txt": "Collection QR"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn",
+    "parent": "",
+    "txt": "Delivery QR"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "btn",
+    "parent": "",
+    "txt": "Expenses"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "btn",
+    "parent": "",
+    "txt": "POD Report"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn sm",
+    "parent": "btns",
+    "txt": "Call"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn sm",
+    "parent": "btns",
+    "txt": "Navigate"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn sm",
+    "parent": "btns",
+    "txt": "Navigate"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn",
+    "parent": "",
+    "txt": "Collection QR"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn",
+    "parent": "",
+    "txt": "Delivery QR"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "btn",
+    "parent": "",
+    "txt": "Expenses"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "btn",
+    "parent": "",
+    "txt": "POD Report"
+   }
+  ]
+ },
+ {
+  "page": "04-inspection-mobile",
+  "text": {
+   "n": 232,
+   "fail": [],
+   "disabled": 1,
+   "min": 5.2982003356858955,
+   "minSample": "Tap the diagram to mark damage"
+  },
+  "nontext": [
+   {
+    "label": "input/select border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "input",
+    "parent": "field",
+    "txt": ""
+   },
+   {
+    "label": "input/select border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "input num",
+    "parent": "",
+    "txt": ""
+   },
+   {
+    "label": "input/select border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "input",
+    "parent": "field",
+    "txt": ""
+   },
+   {
+    "label": "input/select border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "input",
+    "parent": "field",
+    "txt": ""
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "btn lg",
+    "parent": "",
+    "txt": ""
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "btn lg",
+    "parent": "",
+    "txt": ""
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn lg",
+    "parent": "m-cta",
+    "txt": "Back"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn lg",
+    "parent": "m-cta",
+    "txt": "Back"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn lg",
+    "parent": "m-cta",
+    "txt": "Back"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn lg",
+    "parent": "m-cta",
+    "txt": "Back"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn lg",
+    "parent": "m-cta",
+    "txt": "Back"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c2",
+    "txt": "Dirty"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c2",
+    "txt": "Wet"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c2",
+    "txt": "Snow Covered"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c2",
+    "txt": "Iced Over"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c2",
+    "txt": "Poor"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c2",
+    "txt": "Dark"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c2",
+    "txt": "Artificial"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c2",
+    "txt": "Raining"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios ",
+    "txt": "Issue"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios ",
+    "txt": "Issue"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c3",
+    "txt": "No"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c3",
+    "txt": "N/A"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c3",
+    "txt": "No"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c3",
+    "txt": "N/A"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c3",
+    "txt": "No"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c3",
+    "txt": "N/A"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c3",
+    "txt": "No"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c3",
+    "txt": "N/A"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c3",
+    "txt": "No"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c3",
+    "txt": "N/A"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c3",
+    "txt": "No"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c3",
+    "txt": "N/A"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c3",
+    "txt": "No"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c3",
+    "txt": "N/A"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c3",
+    "txt": "No"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c3",
+    "txt": "N/A"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c3",
+    "txt": "No"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c3",
+    "txt": "N/A"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c3",
+    "txt": "No"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c3",
+    "txt": "N/A"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c2",
+    "txt": "Alloys"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c2",
+    "txt": "Trims"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c2",
+    "txt": "Yes"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c2",
+    "txt": "Yes"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c3",
+    "txt": "Yes"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c3",
+    "txt": "N/A"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c3",
+    "txt": "Yes"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c3",
+    "txt": "N/A"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c3",
+    "txt": "Yes"
+   },
+   {
+    "label": "radio card border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "radio",
+    "parent": "radios c3",
+    "txt": "N/A"
+   },
+   {
+    "label": "radio circle",
+    "ratio": 6.68,
+    "pass": true,
+    "cls": "",
+    "parent": "radio on",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 6.68,
+    "pass": true,
+    "cls": "",
+    "parent": "radio on",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 6.68,
+    "pass": true,
+    "cls": "",
+    "parent": "radio on",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 6.68,
+    "pass": true,
+    "cls": "",
+    "parent": "radio on",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 6.68,
+    "pass": true,
+    "cls": "",
+    "parent": "radio on",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 6.68,
+    "pass": true,
+    "cls": "",
+    "parent": "radio on",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 6.68,
+    "pass": true,
+    "cls": "",
+    "parent": "radio on",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 6.68,
+    "pass": true,
+    "cls": "",
+    "parent": "radio on",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 6.68,
+    "pass": true,
+    "cls": "",
+    "parent": "radio on",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 6.68,
+    "pass": true,
+    "cls": "",
+    "parent": "radio on",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 6.68,
+    "pass": true,
+    "cls": "",
+    "parent": "radio on",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 6.68,
+    "pass": true,
+    "cls": "",
+    "parent": "radio on",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 6.68,
+    "pass": true,
+    "cls": "",
+    "parent": "radio on",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 6.68,
+    "pass": true,
+    "cls": "",
+    "parent": "radio on",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 6.68,
+    "pass": true,
+    "cls": "",
+    "parent": "radio on",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 6.68,
+    "pass": true,
+    "cls": "",
+    "parent": "radio on",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 6.68,
+    "pass": true,
+    "cls": "",
+    "parent": "radio on",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 6.68,
+    "pass": true,
+    "cls": "",
+    "parent": "radio on",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 6.68,
+    "pass": true,
+    "cls": "",
+    "parent": "radio on",
+    "txt": ""
+   },
+   {
+    "label": "radio circle",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "radio",
+    "txt": ""
+   },
+   {
+    "label": "segmented border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "seg",
+    "parent": "field",
+    "txt": "Empty1/41/23/4Full"
+   },
+   {
+    "label": "empty photo slot border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "photo",
+    "parent": "photos",
+    "txt": "InteriorTap to captu"
+   },
+   {
+    "label": "empty photo slot border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "photo",
+    "parent": "photos",
+    "txt": "DashboardTap to capt"
+   },
+   {
+    "label": "empty photo slot border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "photo",
+    "parent": "photos",
+    "txt": "Fuel GaugeTap to cap"
+   },
+   {
+    "label": "empty photo slot border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "photo",
+    "parent": "photos",
+    "txt": "Additional photo"
+   }
+  ]
+ },
+ {
+  "page": "05-admin-dashboard",
+  "text": {
+   "n": 103,
+   "fail": [],
+   "disabled": 0,
+   "min": 5.5496958116037005,
+   "minSample": "Jobs blocked by evidence"
+  },
+  "nontext": []
+ },
+ {
+  "page": "06a-super-admin-control",
+  "text": {
+   "n": 79,
+   "fail": [],
+   "disabled": 0,
+   "min": 5.736100584579226,
+   "minSample": "Command Center"
+  },
+  "nontext": [
+   {
+    "label": "outline button border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "btn",
+    "parent": "quick",
+    "txt": "Create Org"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "btn",
+    "parent": "quick",
+    "txt": "Manage Users"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "btn",
+    "parent": "quick",
+    "txt": "Review Audit"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "btn",
+    "parent": "quick",
+    "txt": "Review Exceptions"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "btn",
+    "parent": "quick",
+    "txt": "Export Report"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn sm",
+    "parent": "card-h",
+    "txt": "Refresh"
+   }
+  ]
+ },
+ {
+  "page": "06b-super-admin-dashboard",
+  "text": {
+   "n": 68,
+   "fail": [],
+   "disabled": 0,
+   "min": 5.736100584579226,
+   "minSample": "Command Center"
+  },
+  "nontext": [
+   {
+    "label": "outline button border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "btn",
+    "parent": "quick",
+    "txt": "Create Organisation"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "btn",
+    "parent": "quick",
+    "txt": "Create User"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "btn",
+    "parent": "quick",
+    "txt": "Review Exceptions"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "btn",
+    "parent": "quick",
+    "txt": "Inspect Audit Log"
+   }
+  ]
+ },
+ {
+  "page": "06c-super-admin-settings",
+  "text": {
+   "n": 54,
+   "fail": [],
+   "disabled": 0,
+   "min": 5.736100584579226,
+   "minSample": "Command Center"
+  },
+  "nontext": [
+   {
+    "label": "switch track (off)",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "switch",
+    "parent": "kv",
+    "txt": ""
+   },
+   {
+    "label": "switch track (on)",
+    "ratio": 7.67,
+    "pass": true,
+    "cls": "switch on",
+    "parent": "kv",
+    "txt": ""
+   }
+  ]
+ },
+ {
+  "page": "08-states",
+  "text": {
+   "n": 95,
+   "fail": [],
+   "disabled": 2,
+   "min": 5.50451500730759,
+   "minSample": "Destructive"
+  },
+  "nontext": [
+   {
+    "label": "input/select border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "input",
+    "parent": "field",
+    "txt": ""
+   },
+   {
+    "label": "input/select border",
+    "ratio": 7.67,
+    "pass": true,
+    "cls": "input is-focus",
+    "parent": "field",
+    "txt": ""
+   },
+   {
+    "label": "input/select border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "select input",
+    "parent": "field",
+    "txt": "Select make"
+   },
+   {
+    "label": "input/select border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "input",
+    "parent": "field",
+    "txt": ""
+   },
+   {
+    "label": "input/select border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "select input",
+    "parent": "field",
+    "txt": "Select driver…"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn",
+    "parent": "",
+    "txt": "Secondary"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn is-hover",
+    "parent": "",
+    "txt": "Hover"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn is-focus",
+    "parent": "",
+    "txt": "Focus"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 4.84,
+    "pass": true,
+    "cls": "btn xs",
+    "parent": "",
+    "txt": "Retry"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn",
+    "parent": "mf",
+    "txt": "Cancel"
+   }
+  ]
+ },
+ {
+  "page": "09a-stress-jobs-large-table",
+  "text": {
+   "n": 579,
+   "fail": [],
+   "disabled": 0,
+   "min": 5.5496958116037005,
+   "minSample": "CANCELLED"
+  },
+  "nontext": [
+   {
+    "label": "input/select border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "input",
+    "parent": "search",
+    "txt": ""
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "btn",
+    "parent": "actions",
+    "txt": "Run order"
+   }
+  ]
+ },
+ {
+  "page": "09b-stress-dense-dashboard",
+  "text": {
+   "n": 222,
+   "fail": [],
+   "disabled": 0,
+   "min": 5.5496958116037005,
+   "minSample": "Critical"
+  },
+  "nontext": [
+   {
+    "label": "outline button border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "btn",
+    "parent": "quick",
+    "txt": "New Job"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "btn",
+    "parent": "quick",
+    "txt": "View All Jobs"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "btn",
+    "parent": "quick",
+    "txt": "Drivers"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "btn",
+    "parent": "quick",
+    "txt": "Expenses"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn sm",
+    "parent": "card-h",
+    "txt": "Refresh"
+   }
+  ]
+ },
+ {
+  "page": "09c-stress-photos",
+  "text": {
+   "n": 45,
+   "fail": [],
+   "disabled": 0,
+   "min": 5.5496958116037005,
+   "minSample": "Interior"
+  },
+  "nontext": [
+   {
+    "label": "input/select border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "input",
+    "parent": "field",
+    "txt": ""
+   },
+   {
+    "label": "outline button border",
+    "ratio": 4.84,
+    "pass": true,
+    "cls": "btn xs",
+    "parent": "photo",
+    "txt": "Retry"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn lg",
+    "parent": "m-cta",
+    "txt": "Back"
+   },
+   {
+    "label": "empty photo slot border",
+    "ratio": 7.08,
+    "pass": true,
+    "cls": "photo",
+    "parent": "photos",
+    "txt": "Driver Side64%"
+   },
+   {
+    "label": "empty photo slot border",
+    "ratio": 4.64,
+    "pass": true,
+    "cls": "photo",
+    "parent": "photos",
+    "txt": "Passenger SideQueued"
+   },
+   {
+    "label": "empty photo slot border",
+    "ratio": 5.08,
+    "pass": true,
+    "cls": "photo",
+    "parent": "photos",
+    "txt": "InteriorUpload faile"
+   },
+   {
+    "label": "empty photo slot border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "photo",
+    "parent": "photos",
+    "txt": "DashboardTap to capt"
+   },
+   {
+    "label": "empty photo slot border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "photo",
+    "parent": "photos",
+    "txt": "Fuel GaugeTap to cap"
+   },
+   {
+    "label": "empty photo slot border",
+    "ratio": 4.64,
+    "pass": true,
+    "cls": "photo",
+    "parent": "photos",
+    "txt": "Boot floorQueued · u"
+   },
+   {
+    "label": "empty photo slot border",
+    "ratio": 7.08,
+    "pass": true,
+    "cls": "photo",
+    "parent": "photos",
+    "txt": "Service book40%"
+   },
+   {
+    "label": "empty photo slot border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "photo",
+    "parent": "photos",
+    "txt": "Additional photo"
+   }
+  ]
+ },
+ {
+  "page": "09d-stress-form-validation",
+  "text": {
+   "n": 68,
+   "fail": [],
+   "disabled": 0,
+   "min": 5.5496958116037005,
+   "minSample": "Please complete the required f"
+  },
+  "nontext": [
+   {
+    "label": "input/select border",
+    "ratio": 5.5,
+    "pass": true,
+    "cls": "select input invalid",
+    "parent": "",
+    "txt": "Link client profile…"
+   },
+   {
+    "label": "input/select border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "input",
+    "parent": "field",
+    "txt": ""
+   },
+   {
+    "label": "input/select border",
+    "ratio": 5.5,
+    "pass": true,
+    "cls": "select input invalid",
+    "parent": "field",
+    "txt": "Select make"
+   },
+   {
+    "label": "input/select border",
+    "ratio": 5.5,
+    "pass": true,
+    "cls": "select input invalid",
+    "parent": "field",
+    "txt": "Select make first"
+   },
+   {
+    "label": "input/select border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "input",
+    "parent": "field",
+    "txt": ""
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.2,
+    "pass": true,
+    "cls": "btn",
+    "parent": "actions",
+    "txt": "Cancel"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn",
+    "parent": "",
+    "txt": "New"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn",
+    "parent": "",
+    "txt": "DVLA"
+   },
+   {
+    "label": "checkbox border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "",
+    "parent": "check",
+    "txt": ""
+   }
+  ]
+ },
+ {
+  "page": "09e-stress-settings",
+  "text": {
+   "n": 73,
+   "fail": [],
+   "disabled": 0,
+   "min": 5.736100584579226,
+   "minSample": "Command Center"
+  },
+  "nontext": [
+   {
+    "label": "switch track (off)",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "switch",
+    "parent": "kv",
+    "txt": ""
+   },
+   {
+    "label": "switch track (off)",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "switch",
+    "parent": "kv",
+    "txt": ""
+   },
+   {
+    "label": "switch track (off)",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "switch",
+    "parent": "kv",
+    "txt": ""
+   },
+   {
+    "label": "switch track (off)",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "switch",
+    "parent": "kv",
+    "txt": ""
+   },
+   {
+    "label": "switch track (on)",
+    "ratio": 7.67,
+    "pass": true,
+    "cls": "switch on",
+    "parent": "kv",
+    "txt": ""
+   },
+   {
+    "label": "switch track (on)",
+    "ratio": 7.67,
+    "pass": true,
+    "cls": "switch on",
+    "parent": "kv",
+    "txt": ""
+   },
+   {
+    "label": "switch track (on)",
+    "ratio": 7.67,
+    "pass": true,
+    "cls": "switch on",
+    "parent": "kv",
+    "txt": ""
+   },
+   {
+    "label": "switch track (on)",
+    "ratio": 7.67,
+    "pass": true,
+    "cls": "switch on",
+    "parent": "kv",
+    "txt": ""
+   },
+   {
+    "label": "switch track (on)",
+    "ratio": 7.67,
+    "pass": true,
+    "cls": "switch on",
+    "parent": "kv",
+    "txt": ""
+   },
+   {
+    "label": "switch track (on)",
+    "ratio": 7.67,
+    "pass": true,
+    "cls": "switch on",
+    "parent": "kv",
+    "txt": ""
+   },
+   {
+    "label": "switch track (on)",
+    "ratio": 7.67,
+    "pass": true,
+    "cls": "switch on",
+    "parent": "kv",
+    "txt": ""
+   },
+   {
+    "label": "switch track (on)",
+    "ratio": 7.67,
+    "pass": true,
+    "cls": "switch on",
+    "parent": "kv",
+    "txt": ""
+   }
+  ]
+ },
+ {
+  "page": "09f-stress-mobile-content",
+  "text": {
+   "n": 171,
+   "fail": [],
+   "disabled": 0,
+   "min": 5.5496958116037005,
+   "minSample": "CANCELLED"
+  },
+  "nontext": [
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn sm",
+    "parent": "btns",
+    "txt": "Call"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn sm",
+    "parent": "btns",
+    "txt": "Navigate"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn",
+    "parent": "",
+    "txt": "Collection QR"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn",
+    "parent": "",
+    "txt": "Delivery QR"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "View"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "Reassign"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "Expense"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "View"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "Assign"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "Expense"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "View"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "Reassign"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "Expense"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "View"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "Reassign"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "Expense"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "View"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "Assign"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "Expense"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "View"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "Reassign"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "Expense"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "View"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "Reassign"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "Expense"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "View"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "Reassign"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "Expense"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "View"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "Assign"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "Expense"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "View"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "Reassign"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "Expense"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "View"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "Reassign"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "Expense"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "View"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "Assign"
+   },
+   {
+    "label": "outline button border",
+    "ratio": 3.47,
+    "pass": true,
+    "cls": "btn xs ",
+    "parent": "btns",
+    "txt": "Expense"
+   }
+  ]
+ }
+]

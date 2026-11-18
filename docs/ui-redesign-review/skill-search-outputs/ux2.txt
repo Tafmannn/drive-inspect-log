@@ -1,0 +1,59 @@
+## UI Pro Max Search Results
+**Domain:** ux | **Query:** touch target spacing
+**Source:** ux-guidelines.csv | **Found:** 5 results
+
+### Result 1
+- **Category:** Touch
+- **Issue:** Touch Spacing
+- **Platform:** Mobile
+- **Description:** Adjacent touch targets need adequate spacing
+- **Do:** Minimum 8px gap between touch targets
+- **Don't:** Tightly packed clickable elements
+- **Code Example Good:** gap-2 between buttons
+- **Code Example Bad:** gap-0 or gap-1
+- **Severity:** Medium
+
+### Result 2
+- **Category:** Touch
+- **Issue:** Touch Target Size
+- **Platform:** Mobile
+- **Description:** Touch target guidance depends on platform and web context
+- **Do:** Use 44pt on iOS and 48dp on Android; for web use the separate WCAG Target Size rule
+- **Don't:** Treat one unit or minimum as universal across platforms
+- **Code Example Good:** iOS 44pt; Android 48dp; Web 24 CSS px plus WCAG exceptions
+- **Code Example Bad:** w-6 h-6 buttons
+- **Severity:** High
+
+### Result 3
+- **Category:** Accessibility
+- **Issue:** Text Reflow and Spacing
+- **Platform:** Web
+- **Description:** Text must remain available at narrow widths zoom and user spacing overrides
+- **Do:** Use fluid sizes content-driven height and unitless line height
+- **Don't:** Clip text in fixed-width or fixed-height boxes
+- **Code Example Good:** .copy { inline-size: min(100%, 65ch); height: auto; line-height: 1.5; }
+- **Code Example Bad:** .copy { width: 900px; height: 40px; overflow: hidden; }
+- **Severity:** Critical
+
+### Result 4
+- **Category:** Responsive
+- **Issue:** Touch Friendly
+- **Platform:** Web
+- **Description:** Mobile layouts need touch-sized targets
+- **Do:** Increase touch targets on mobile
+- **Don't:** Same tiny buttons on mobile
+- **Code Example Good:** Larger buttons on mobile
+- **Code Example Bad:** Desktop-sized targets on mobile
+- **Severity:** High
+
+### Result 5
+- **Category:** Navigation
+- **Issue:** Smooth Scroll
+- **Platform:** Web
+- **Description:** Anchor links should scroll smoothly to target section
+- **Do:** Use scroll-behavior: smooth on html element
+- **Don't:** Jump directly without transition
+- **Code Example Good:** html { scroll-behavior: smooth; }
+- **Code Example Bad:** <a href='#section'> without CSS
+- **Severity:** High
+

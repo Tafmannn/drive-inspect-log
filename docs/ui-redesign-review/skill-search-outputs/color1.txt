@@ -1,0 +1,44 @@
+## UI Pro Max Search Results
+**Domain:** color | **Query:** logistics fleet transport
+**Source:** colors.csv | **Found:** 2 results
+
+### Result 1
+- **Product Type:** Autonomous Drone Fleet Manager
+- **Primary:** #00FF41
+- **On Primary:** #0F172A
+- **Secondary:** #008F11
+- **On Secondary:** #000000
+- **Accent:** #FF3333
+- **On Accent:** #000000
+- **Background:** #0D1117
+- **Foreground:** #E6EDF3
+- **Card:** #182424
+- **Card Foreground:** #E6EDF3
+- **Muted:** #25292F
+- **Muted Foreground:** #94A3B8
+- **Border:** #30363D
+- **Destructive:** #EF4444
+- **On Destructive:** #000000
+- **Ring:** #00FF41
+- **Notes:** Terminal green + alert red
+
+### Result 2
+- **Product Type:** Logistics/Delivery
+- **Primary:** #2563EB
+- **On Primary:** #FFFFFF
+- **Secondary:** #3B82F6
+- **On Secondary:** #000000
+- **Accent:** #EA580C
+- **On Accent:** #000000
+- **Background:** #EFF6FF
+- **Foreground:** #1E40AF
+- **Card:** #FFFFFF
+- **Card Foreground:** #1E40AF
+- **Muted:** #E9EFF8
+- **Muted Foreground:** #475569
+- **Border:** #BFDBFE
+- **Destructive:** #DC2626
+- **On Destructive:** #FFFFFF
+- **Ring:** #2563EB
+- **Notes:** Tracking blue + delivery orange [Accent adjusted from #F97316]
+

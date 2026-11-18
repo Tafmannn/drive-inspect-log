@@ -1,0 +1,37 @@
+## UI Pro Max Search Results
+**Domain:** react | **Query:** list rerender memo
+**Source:** react-performance.csv | **Found:** 3 results
+
+### Result 1
+- **Category:** Rerender
+- **Issue:** Memoized Components
+- **Platform:** React/Next.js
+- **Description:** Extract expensive work into memoized components for early returns
+- **Do:** Extract to memo() components
+- **Don't:** Compute expensive values before early return
+- **Code Example Good:** const UserAvatar = memo(({ user }) => ...); if (loading) return <Skeleton />
+- **Code Example Bad:** const avatar = useMemo(() => compute(user)); if (loading) return <Skeleton />
+- **Severity:** Medium
+
+### Result 2
+- **Category:** Rerender
+- **Issue:** Narrow Dependencies
+- **Platform:** React/Next.js
+- **Description:** Specify primitive dependencies instead of objects in effects
+- **Do:** Use primitive values in dependency arrays
+- **Don't:** Use object references as dependencies
+- **Code Example Good:** useEffect(() => { console.log(user.id) }, [user.id])
+- **Code Example Bad:** useEffect(() => { console.log(user.id) }, [user])
+- **Severity:** Low
+
+### Result 3
+- **Category:** Rerender
+- **Issue:** Derived State
+- **Platform:** React/Next.js
+- **Description:** Subscribe to derived booleans instead of continuous values
+- **Do:** Use derived boolean state
+- **Don't:** Subscribe to continuous values
+- **Code Example Good:** const isMobile = useMediaQuery('(max-width: 767px)')
+- **Code Example Bad:** const width = useWindowWidth(); const isMobile = width < 768
+- **Severity:** Medium
+

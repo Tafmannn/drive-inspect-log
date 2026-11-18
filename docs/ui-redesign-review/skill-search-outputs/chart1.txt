@@ -1,0 +1,68 @@
+## UI Pro Max Search Results
+**Domain:** chart | **Query:** kpi dashboard status distribution
+**Source:** charts.csv | **Found:** 4 results
+
+### Result 1
+- **Data Type:** Performance vs Target (Compact)
+- **Keywords:** bullet, compact, kpi, dashboard, target, benchmark, range, accessible chart, keyboard accessible chart
+- **Best Chart Type:** Bullet Chart
+- **Secondary Options:** Gauge, Progress Bar
+- **When to Use:** Dashboard with multiple KPIs side by side; space-constrained contexts where a gauge is too large
+- **When NOT to Use:** Single KPI with emphasis (use gauge); data has no defined target range; fewer than 3 KPIs
+- **Data Volume Threshold:** Ideal for 3–10 bullet charts in a grid; scales to any count efficiently
+- **Color Guidance:** Qualitative ranges: #FFCDD2 / #FFF9C4 / #C8E6C9 (bad/ok/good). Performance bar: #1976D2. Target: black 3px marker
+- **Accessibility Grade:** deprecated: use Accessibility Risk
+- **Accessibility Risk:** risk:low
+- **Accessibility Notes:** Label every qualitative range and target with text; color is supplementary.
+- **A11y Fallback:** Visible KPI/target table plus status summary. Keyboard: focus reveals the same detail as hover.
+- **Library Recommendation:** D3.js, Plotly, Custom SVG
+- **Interactive Level:** Hover
+
+### Result 2
+- **Data Type:** Performance vs Target
+- **Keywords:** performance, target, kpi, gauge, goal, threshold, progress, accessible chart, keyboard accessible chart
+- **Best Chart Type:** Gauge Chart or Bullet Chart
+- **Secondary Options:** Dial, Thermometer
+- **When to Use:** Single KPI measured against a defined target or threshold; dashboard summary context
+- **When NOT to Use:** No target or benchmark exists; comparing multiple KPIs at once (use bullet chart grid)
+- **Data Volume Threshold:** Single metric per gauge; for 3+ KPIs use bullet chart grid layout
+- **Color Guidance:** Performance: Red → Yellow → Green gradient. Target: marker line. Threshold zones clearly differentiated
+- **Accessibility Grade:** deprecated: use Accessibility Risk
+- **Accessibility Risk:** risk:low
+- **Accessibility Notes:** Place the number and target text beside the gauge and label threshold zones; red/yellow/green alone is insufficient.
+- **A11y Fallback:** Visible KPI/target text and a one-row data table plus status summary. Keyboard: focus reveals the same detail as hover.
+- **Library Recommendation:** D3.js, ApexCharts, Custom SVG
+- **Interactive Level:** Hover
+
+### Result 3
+- **Data Type:** Distribution / Statistical
+- **Keywords:** distribution, statistical, spread, median, outlier, quartile, boxplot, accessible chart, keyboard accessible chart
+- **Best Chart Type:** Box Plot
+- **Secondary Options:** Violin Plot, Beeswarm
+- **When to Use:** Showing spread, median, and outliers of a dataset; comparing distributions across multiple groups
+- **When NOT to Use:** Fewer than 20 data points per group (distribution is not meaningful); audience unfamiliar with statistical charts
+- **Data Volume Threshold:** Any sample size; aggregated representation so rendering is ⚡ Excellent at any volume
+- **Color Guidance:** Box fill: #BBDEFB. Border: #1976D2. Median line: #D32F2F bold. Outlier dots: #F44336
+- **Accessibility Grade:** deprecated: use Accessibility Risk
+- **Accessibility Risk:** risk:low
+- **Accessibility Notes:** Label median, quartiles, whiskers, and outliers directly; do not use color alone for statistical roles.
+- **A11y Fallback:** Statistics table plus distribution summary. Keyboard: focus reveals the same statistics as hover.
+- **Library Recommendation:** Plotly, D3.js, Chart.js (plugin)
+- **Interactive Level:** Hover
+
+### Result 4
+- **Data Type:** Real-Time Streaming
+- **Keywords:** streaming, real-time, ticker, live, velocity, pulse, monitoring, accessible chart, keyboard accessible chart
+- **Best Chart Type:** Streaming Area Chart
+- **Secondary Options:** Ticker Tape, Moving Gauge
+- **When to Use:** Live monitoring dashboards; IoT/ops data updating at ≥1 Hz; user needs current value at a glance
+- **When NOT to Use:** Update frequency < 1/min (use periodic-refresh line chart); flashing content without reduced-motion support
+- **Data Volume Threshold:** Canvas/WebGL required. Buffer last 60–300s of data. Downsample older data on scroll
+- **Color Guidance:** Current pulse: #00FF00 (dark theme) or #0080FF (light theme). History: fading opacity. Grid: dark background
+- **Accessibility Grade:** deprecated: use Accessibility Risk
+- **Accessibility Risk:** risk:conditional
+- **Accessibility Notes:** Show the current value and status text and use line styles or markers in addition to color. Do not rely on color alone.
+- **A11y Fallback:** Streaming data table plus current-value/trend summary. Keyboard: Pause/Resume button controls updates; focus reveals values; +/- buttons zoom; Reset restores range.
+- **Library Recommendation:** Smoothed D3.js, CanvasJS
+- **Interactive Level:** Real-time + Pause + Zoom
+

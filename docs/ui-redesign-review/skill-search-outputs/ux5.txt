@@ -1,0 +1,48 @@
+## UI Pro Max Search Results
+**Domain:** ux | **Query:** bottom nav mobile
+**Source:** ux-guidelines.csv | **Found:** 4 results
+
+### Result 1
+- **Category:** Navigation
+- **Issue:** Back Button
+- **Platform:** Mobile
+- **Description:** Users expect back to work predictably
+- **Do:** Preserve navigation history properly
+- **Don't:** Break browser/app back button behavior
+- **Code Example Good:** history.pushState()
+- **Code Example Bad:** location.replace()
+- **Severity:** High
+
+### Result 2
+- **Category:** Navigation
+- **Issue:** Sticky Navigation
+- **Platform:** Web
+- **Description:** Fixed nav should not obscure content
+- **Do:** Add padding-top to body equal to nav height
+- **Don't:** Let nav overlap first section content
+- **Code Example Good:** pt-20 (if nav is h-20)
+- **Code Example Bad:** No padding compensation
+- **Severity:** Medium
+
+### Result 3
+- **Category:** Forms
+- **Issue:** Mobile Keyboards
+- **Platform:** Mobile
+- **Description:** Show appropriate keyboard for input type
+- **Do:** Use inputmode attribute
+- **Don't:** Default keyboard for all inputs
+- **Code Example Good:** inputmode='numeric'
+- **Code Example Bad:** Text keyboard for numbers
+- **Severity:** Medium
+
+### Result 4
+- **Category:** Responsive
+- **Issue:** Mobile First
+- **Platform:** Web
+- **Description:** Design for mobile then enhance for larger
+- **Do:** Start with mobile styles then add breakpoints
+- **Don't:** Desktop-first causing mobile issues
+- **Code Example Good:** Default mobile + md: lg: xl:
+- **Code Example Bad:** Desktop default + max-width queries
+- **Severity:** Medium
+

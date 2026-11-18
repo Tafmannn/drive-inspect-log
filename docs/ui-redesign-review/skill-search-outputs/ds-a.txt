@@ -1,0 +1,68 @@
+╔═════════════════════════════════════════════════════════════════════════════════════════╗
+║  TARGET: Axentra - RECOMMENDED DESIGN SYSTEM                                            ║
+╚═════════════════════════════════════════════════════════════════════════════════════════╝
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+├─── DESIGN DIALS ────────────────────────────────────────────────────────────────────────┤
+│  Density:  7/10 — Standard                                                              │
+├─── PATTERN ─────────────────────────────────────────────────────────────────────────────┤
+│  Name: Real-Time / Operations Landing                                                   │
+│     Conversion: Offer a demo or sandbox and show trust signals. Label telemetry as      │
+│     live only when backed by a current source, with update time and stale state.        │
+│     Provide pause/hide or update-frequency controls for tickers and previews, stop      │
+│     offscreen/hidden work, support keyboard controls, and render a static final         │
+│     snapshot under reduced motion.                                                      │
+│     CTA: Primary CTA in nav + After metrics                                             │
+│     Sections:                                                                           │
+│       1. Hero (product + live preview or status)                                        │
+│       2. Key metrics/indicators                                                         │
+│       3. How it works                                                                   │
+│       4. CTA (Start trial / Contact)                                                    │
+├─── STYLE ───────────────────────────────────────────────────────────────────────────────┤
+│  Name: HUD / Sci-Fi FUI                                                                 │
+│     Mode Support: Light supported | Dark supported                                      │
+│     Keywords: Futuristic, technical, wireframe, neon, data, transparency, iron man,     │
+│     sci-fi, interface                                                                   │
+│     Best For: Sci-fi games, space tech, cybersecurity, movie props, immersive           │
+│     dashboards                                                                          │
+│     Performance: cost:moderate|drivers:animation,blur | Accessibility:                  │
+│     risk:high|requires:contrast-text-4.5,keyboard,visible-focus,reduced-motion          │
+├─── COLORS ──────────────────────────────────────────────────────────────────────────────┤
+│     Primary:           #00FF41    (--color-primary)                                     │
+│     On Primary:        #0F172A    (--color-on-primary)                                  │
+│     Secondary:         #008F11    (--color-secondary)                                   │
+│     On Secondary:      #000000    (--color-on-secondary)                                │
+│     Accent/CTA:        #FF3333    (--color-accent)                                      │
+│     On Accent/CTA:     #000000    (--color-on-accent)                                   │
+│     Background:        #0D1117    (--color-background)                                  │
+│     Foreground:        #E6EDF3    (--color-foreground)                                  │
+│     Card:              #182424    (--color-card)                                        │
+│     Card Foreground:   #E6EDF3    (--color-card-foreground)                             │
+│     Muted:             #25292F    (--color-muted)                                       │
+│     Muted Foreground:  #94A3B8    (--color-muted-foreground)                            │
+│     Border:            #30363D    (--color-border)                                      │
+│     Destructive:       #EF4444    (--color-destructive)                                 │
+│     On Destructive:    #000000    (--color-on-destructive)                              │
+│     Ring:              #00FF41    (--color-ring)                                        │
+│     Notes: Terminal green + alert red                                                   │
+├─── TYPOGRAPHY ──────────────────────────────────────────────────────────────────────────┤
+│  Fira Code / Fira Sans                                                                  │
+│     Mood: dashboard, data, analytics, code, technical, precise                          │
+│     Best For: Dashboards, analytics, data visualization, admin panels                   │
+│     Google Fonts:                                                                       │
+│     https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fir  │
+│     a+Sans:wght@300;400;500;600;700&display=swap                                        │
+│     CSS Import: @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wgh...  │
+├─── KEY EFFECTS ─────────────────────────────────────────────────────────────────────────┤
+│     Glow effects, scanning animations, ticker text, blinking markers, fine line         │
+│     drawing                                                                             │
+├─── AVOID ───────────────────────────────────────────────────────────────────────────────┤
+│     Slow updates + Poor spatial viz                                                     │
+├─── PRE-DELIVERY CHECKLIST ──────────────────────────────────────────────────────────────┤
+│     [ ] No emojis as icons (use SVG: Heroicons/Lucide)                                  │
+│     [ ] cursor-pointer on all clickable elements                                        │
+│     [ ] Hover states with smooth transitions (150-300ms)                                │
+│     [ ] Light mode: text contrast 4.5:1 minimum                                         │
+│     [ ] Focus states visible for keyboard nav                                           │
+│     [ ] prefers-reduced-motion respected                                                │
+│     [ ] Responsive: 375px, 768px, 1024px, 1440px                                        │
+└─────────────────────────────────────────────────────────────────────────────────────────┘

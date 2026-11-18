@@ -1,0 +1,104 @@
+## UI Pro Max Search Results
+**Domain:** color | **Query:** enterprise saas dashboard blue
+**Source:** colors.csv | **Found:** 5 results
+
+### Result 1
+- **Product Type:** SaaS (General)
+- **Primary:** #2563EB
+- **On Primary:** #FFFFFF
+- **Secondary:** #3B82F6
+- **On Secondary:** #000000
+- **Accent:** #EA580C
+- **On Accent:** #000000
+- **Background:** #F8FAFC
+- **Foreground:** #1E293B
+- **Card:** #FFFFFF
+- **Card Foreground:** #1E293B
+- **Muted:** #E9EFF8
+- **Muted Foreground:** #475569
+- **Border:** #E2E8F0
+- **Destructive:** #DC2626
+- **On Destructive:** #FFFFFF
+- **Ring:** #2563EB
+- **Notes:** Trust blue + orange CTA contrast [Accent adjusted from #F97316]
+
+### Result 2
+- **Product Type:** Analytics Dashboard
+- **Primary:** #1E40AF
+- **On Primary:** #FFFFFF
+- **Secondary:** #3B82F6
+- **On Secondary:** #000000
+- **Accent:** #D97706
+- **On Accent:** #000000
+- **Background:** #F8FAFC
+- **Foreground:** #1E3A8A
+- **Card:** #FFFFFF
+- **Card Foreground:** #1E3A8A
+- **Muted:** #E9EEF6
+- **Muted Foreground:** #475569
+- **Border:** #DBEAFE
+- **Destructive:** #DC2626
+- **On Destructive:** #FFFFFF
+- **Ring:** #1E40AF
+- **Notes:** Blue data + amber highlights [Accent adjusted from #F59E0B]
+
+### Result 3
+- **Product Type:** Financial Dashboard
+- **Primary:** #0F172A
+- **On Primary:** #FFFFFF
+- **Secondary:** #1E293B
+- **On Secondary:** #FFFFFF
+- **Accent:** #22C55E
+- **On Accent:** #0F172A
+- **Background:** #020617
+- **Foreground:** #F8FAFC
+- **Card:** #0E1223
+- **Card Foreground:** #F8FAFC
+- **Muted:** #1A1E2F
+- **Muted Foreground:** #94A3B8
+- **Border:** #334155
+- **Destructive:** #EF4444
+- **On Destructive:** #000000
+- **Ring:** #FFFFFF
+- **Notes:** Dark bg + green positive indicators
+
+### Result 4
+- **Product Type:** Micro SaaS
+- **Primary:** #6366F1
+- **On Primary:** #000000
+- **Secondary:** #818CF8
+- **On Secondary:** #0F172A
+- **Accent:** #059669
+- **On Accent:** #000000
+- **Background:** #F5F3FF
+- **Foreground:** #1E1B4B
+- **Card:** #FFFFFF
+- **Card Foreground:** #1E1B4B
+- **Muted:** #EBEFF9
+- **Muted Foreground:** #475569
+- **Border:** #E0E7FF
+- **Destructive:** #DC2626
+- **On Destructive:** #FFFFFF
+- **Ring:** #6366F1
+- **Notes:** Indigo primary + emerald CTA [Accent adjusted from #10B981]
+
+### Result 5
+- **Product Type:** Smart Home/IoT Dashboard
+- **Primary:** #1E293B
+- **On Primary:** #FFFFFF
+- **Secondary:** #334155
+- **On Secondary:** #FFFFFF
+- **Accent:** #22C55E
+- **On Accent:** #0F172A
+- **Background:** #0F172A
+- **Foreground:** #F8FAFC
+- **Card:** #1B2336
+- **Card Foreground:** #F8FAFC
+- **Muted:** #272F42
+- **Muted Foreground:** #94A3B8
+- **Border:** #475569
+- **Destructive:** #EF4444
+- **On Destructive:** #000000
+- **Ring:** #FFFFFF
+- **Notes:** Dark tech + status green
+

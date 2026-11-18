@@ -1,0 +1,100 @@
+## UI Pro Max Search Results
+**Domain:** style | **Query:** bento modern saas clean
+**Source:** styles.csv | **Found:** 4 results
+
+### Result 1
+- **Style ID:** bento-box-grid
+- **Style Category:** Bento Box Grid
+- **Aliases:** Bento Grids|Masonry Grid
+- **Status:** active
+- **Parent Style ID:** 
+- **Preferred Mode:** auto
+- **Type:** General
+- **Keywords:** Modular cards, asymmetric grid, varied sizes, Apple-style, dashboard tiles, negative space, clean hierarchy, cards
+- **Primary Colors:** Neutral base + brand accent, #FFFFFF, #F5F5F5, brand primary
+- **Effects & Animation:** grid-template with varied spans, rounded-xl (16px), subtle shadows, hover scale (1.02), smooth transitions
+- **Best For:** Dashboards, product pages, portfolios, Apple-style marketing, feature showcases, SaaS
+- **Light Mode ✓:** supported
+- **Dark Mode ✓:** supported
+- **Performance:** cost:low|drivers:none
+- **Accessibility:** risk:low|requires:contrast-text-4.5,keyboard,visible-focus,reduced-motion
+- **Framework Compatibility:** tailwind|css-grid
+- **Complexity:** Low
+- **AI Prompt Keywords:** Design a Bento Box grid layout. Use: modular cards with varied sizes (1x1, 2x1, 2x2), Apple-style aesthetic, rounded corners (16-24px), soft shadows, clean hierarchy, asymmetric grid, neutral backgrounds (#F5F5F7), hover effects.
+- **CSS/Technical Keywords:** display: grid, grid-template-columns: repeat(4, 1fr), grid-auto-rows: 200px, gap: 16px, border-radius: 24px, background: #FFFFFF, box-shadow: 0 4px 6px rgba(0,0,0,0.05)
+- **Implementation Checklist:** ☐ Grid responsive (4→2→1 cols), ☐ Card spans varied, ☐ Rounded corners consistent, ☐ Shadows subtle, ☐ Content fits cards, ☐ Hover scale (1.02)
+- **Design System Variables:** --grid-gap: 16px, --card-radius: 24px, --card-bg: #FFFFFF, --page-bg: #F5F5F7, --shadow: 0 4px 6px rgba(0,0,0,0.05), --hover-scale: 1.02
+- **rtl_level:** full
+
+### Result 2
+- **Style ID:** flat-design
+- **Style Category:** Flat Design
+- **Aliases:** 
+- **Status:** active
+- **Parent Style ID:** 
+- **Preferred Mode:** auto
+- **Type:** General
+- **Keywords:** 2D, minimalist, bold colors, no shadows, clean lines, simple shapes, typography-focused, modern, icon-heavy
+- **Primary Colors:** Solid bright: Red, Orange, Blue, Green, limited palette (4-6 max)
+- **Effects & Animation:** No gradients/shadows, simple hover (color/opacity shift), fast loading, clean transitions (150-200ms ease), minimal icons
+- **Best For:** Web apps, mobile apps, cross-platform, startup MVPs, user-friendly, SaaS, dashboards, corporate
+- **Light Mode ✓:** supported
+- **Dark Mode ✓:** supported
+- **Performance:** cost:low|drivers:none
+- **Accessibility:** risk:low|requires:contrast-text-4.5,keyboard,visible-focus,reduced-motion
+- **Framework Compatibility:** tailwind|bootstrap|mui
+- **Complexity:** Low
+- **AI Prompt Keywords:** Create a flat, 2D interface with bold colors, no shadows/gradients, clean lines, simple geometric shapes, icon-heavy, typography-focused, minimal ornamentation. Use 4-6 solid, bright colors in a limited palette with high saturation.
+- **CSS/Technical Keywords:** box-shadow: none, background: solid color, border-radius: 0-4px, color: solid (no gradients), fill: solid, stroke: 1-2px, font: bold sans-serif, icons: simplified SVG
+- **Implementation Checklist:** ☐ No shadows/gradients, ☐ 4-6 solid colors max, ☐ Clean lines consistent, ☐ Simple shapes used, ☐ Icon-heavy layout, ☐ High saturation colors, ☐ Fast loading verified
+- **Design System Variables:** --shadow: none, --color-palette: 4-6 solid, --border-radius: 2px, --gradient: none, --icons: simplified SVG, --animation: minimal 150-200ms
+- **rtl_level:** full
+
+### Result 3
+- **Style ID:** soft-ui-evolution
+- **Style Category:** Soft UI Evolution
+- **Aliases:** 
+- **Status:** active
+- **Parent Style ID:** 
+- **Preferred Mode:** auto
+- **Type:** General
+- **Keywords:** Evolved soft UI, better contrast, modern aesthetics, subtle depth, accessibility-focused, improved shadows, hybrid
+- **Primary Colors:** Improved contrast pastels: Soft Blue #87CEEB, Soft Pink #FFB6C1, Soft Green #90EE90, better hierarchy
+- **Effects & Animation:** Improved shadows (softer than flat, clearer than neumorphism), modern (200-300ms), focus visible, measured contrast targets
+- **Best For:** Modern enterprise apps, SaaS platforms, health/wellness, modern business tools, professional, hybrid
+- **Light Mode ✓:** supported
+- **Dark Mode ✓:** supported
+- **Performance:** cost:low|drivers:none
+- **Accessibility:** risk:low|requires:contrast-text-4.5,keyboard,visible-focus,reduced-motion
+- **Framework Compatibility:** tailwind|mui|chakra
+- **Complexity:** Medium
+- **AI Prompt Keywords:** Design evolved neumorphism with improved contrast (measured contrast targets), modern aesthetics, subtle depth, accessibility focus. Use soft shadows (softer than flat but clearer than pure neumorphism), better color hierarchy, improved focus states, modern 200-300ms animations.
+- **CSS/Technical Keywords:** box-shadow: softer multi-layer (0 2px 4px), background: improved contrast pastels, border-radius: 8-12px, animation: 200-300ms smooth, outline: 2-3px on focus, contrast: 4.5:1+
+- **Implementation Checklist:** ☐ Contrast measured against the chosen project target, ☐ Soft shadows modern, ☐ Border-radius 8-12px, ☐ Animations 200-300ms, ☐ Focus states visible, ☐ Color hierarchy clear
+- **Design System Variables:** --shadow-soft: modern blend, --border-radius: 10px, --animation-duration: 200-300ms, --contrast-ratio: 4.5:1+, --color-hierarchy: improved, --wcag-target: project-defined
+- **rtl_level:** full
+
+### Result 4
+- **Style ID:** glassmorphism
+- **Style Category:** Glassmorphism
+- **Aliases:** 
+- **Status:** active
+- **Parent Style ID:** 
+- **Preferred Mode:** auto
+- **Type:** General
+- **Keywords:** Frosted glass, transparent, blurred background, layered, vibrant background, light source, depth, multi-layer
+- **Primary Colors:** Translucent white: rgba(255,255,255,0.1-0.3)
+- **Effects & Animation:** Backdrop blur (10-20px), subtle border (1px solid rgba white 0.2), light reflection, Z-depth
+- **Best For:** Modern SaaS, financial dashboards, high-end corporate, lifestyle apps, modal overlays, navigation
+- **Light Mode ✓:** supported
+- **Dark Mode ✓:** supported
+- **Performance:** cost:low|drivers:none
+- **Accessibility:** risk:conditional|requires:contrast-text-4.5,keyboard,visible-focus,reduced-motion
+- **Framework Compatibility:** tailwind|mui|chakra
+- **Complexity:** Medium
+- **AI Prompt Keywords:** Design a glassmorphic interface with frosted glass effect. Use backdrop blur (10-20px), translucent overlays (rgba 10-30% opacity), vibrant background colors, subtle borders, light source reflection, layered depth. Perfect for modern overlays and cards.
+- **CSS/Technical Keywords:** backdrop-filter: blur(15px), background: rgba(255, 255, 255, 0.15), border: 1px solid rgba(255,255,255,0.2), -webkit-backdrop-filter: blur(15px), z-index layering for depth
+- **Implementation Checklist:** ☐ Backdrop-filter blur 10-20px, ☐ Translucent white 15-30% opacity, ☐ Subtle border 1px light, ☐ Vibrant background verified, ☐ Text contrast 4.5:1 checked
+- **Design System Variables:** --blur-amount: 15px, --glass-opacity: 0.15, --border-color: rgba(255,255,255,0.2), --background: vibrant color, --text-color: light/dark based on BG
+- **rtl_level:** full
+

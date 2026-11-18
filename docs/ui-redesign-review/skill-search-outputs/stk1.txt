@@ -1,0 +1,74 @@
+## UI Pro Max Stack Guidelines
+**Stack:** shadcn | **Query:** table form tailwind
+**Source:** stacks/shadcn.csv | **Found:** 5 results
+
+### Result 1
+- **Category:** Table
+- **Guideline:** Use Table for data display
+- **Description:** Table component for structured data
+- **Do:** Table for tabular data display
+- **Don't:** Div grid for table-like layouts
+- **Code Good:** <Table><TableHeader><TableBody><TableRow>
+- **Code Bad:** <div className="grid">
+- **Severity:** Medium
+- **Docs URL:** https://ui.shadcn.com/docs/components/table
+- **Applies To:** shadcn cli 4; base=base|radix|aria
+- **Status:** active
+- **Verified At:** 2026-08-13
+
+### Result 2
+- **Category:** Table
+- **Guideline:** Include proper table structure
+- **Description:** Use TableHeader TableBody TableRow TableCell
+- **Do:** Semantic table structure
+- **Don't:** Missing thead or tbody
+- **Code Good:** <TableHeader><TableRow><TableHead>
+- **Code Bad:** <Table><TableRow> without header
+- **Severity:** High
+- **Docs URL:** https://ui.shadcn.com/docs/components/table
+- **Applies To:** shadcn cli 4; base=base|radix|aria
+- **Status:** active
+- **Verified At:** 2026-08-13
+
+### Result 3
+- **Category:** DataTable
+- **Guideline:** Use DataTable for complex tables
+- **Description:** Combine Table with TanStack Table for features
+- **Do:** DataTable pattern for sorting filtering pagination
+- **Don't:** Custom table implementation
+- **Code Good:** useReactTable + Table components
+- **Code Bad:** Custom sort filter pagination logic
+- **Severity:** Medium
+- **Docs URL:** https://ui.shadcn.com/docs/components/data-table
+- **Applies To:** shadcn cli 4; base=base|radix|aria
+- **Status:** active
+- **Verified At:** 2026-08-13
+
+### Result 4
+- **Category:** Form
+- **Guideline:** TanStack Form integration
+- **Description:** Use TanStack Form field adapters with shadcn Field primitives when that form library is selected
+- **Do:** form.Field + Field + FieldError
+- **Don't:** Apply React Hook Form Controller APIs to TanStack Form
+- **Code Good:** <form.Field name='email'>{field => <Field><Input value={field.state.value}/></Field>}</form.Field>
+- **Code Bad:** <Controller control={form.control}/>
+- **Severity:** High
+- **Docs URL:** https://ui.shadcn.com/docs/forms/tanstack-form
+- **Applies To:** shadcn cli 4; base=base|radix|aria
+- **Status:** active
+- **Verified At:** 2026-08-13
+
+### Result 5
+- **Category:** Form
+- **Guideline:** React Hook Form integration
+- **Description:** Use a native form with React Hook Form Controller and shadcn Field primitives
+- **Do:** useForm + Controller + Field
+- **Don't:** Depend on the retired FormField-only abstraction
+- **Code Good:** <Controller render={({ field }) => <Field><Input {...field}/></Field>}/>
+- **Code Bad:** <FormField control={form.control}>
+- **Severity:** High
+- **Docs URL:** https://ui.shadcn.com/docs/forms/react-hook-form
+- **Applies To:** shadcn cli 4; base=base|radix|aria
+- **Status:** active
+- **Verified At:** 2026-08-13
+

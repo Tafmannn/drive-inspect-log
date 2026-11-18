@@ -1,0 +1,152 @@
+{
+ "total": 383,
+ "by_size": {
+  "11": 173,
+  "10": 175,
+  "9": 33,
+  "8": 2
+ },
+ "by_category": {
+  "other / unclassified": 81,
+  "caption / helper paragraph": 100,
+  "uppercase/tracked micro-label": 70,
+  "numeric / count / mono": 7,
+  "badge / status pill": 63,
+  "form label / helper under input": 28,
+  "button label": 28,
+  "nav / tab label": 1,
+  "table header / cell": 5
+ },
+ "top_files": [
+  [
+   "src/features/users/components/UserDetailEditor.tsx",
+   30
+  ],
+  [
+   "src/pages/AdminDashboard.tsx",
+   25
+  ],
+  [
+   "src/features/control/pages/ControlDrivers.tsx",
+   13
+  ],
+  [
+   "src/features/control/pages/ControlCompliance.tsx",
+   12
+  ],
+  [
+   "src/features/control/pages/ControlFinance.tsx",
+   12
+  ],
+  [
+   "src/features/onboarding/components/DriverIdCard.tsx",
+   12
+  ],
+  [
+   "src/components/DriverJobCard.tsx",
+   11
+  ],
+  [
+   "src/features/users/components/PermissionEditor.tsx",
+   11
+  ],
+  [
+   "src/features/invoicing/pages/InvoicePrepScreen.tsx",
+   11
+  ],
+  [
+   "src/features/control/pages/jobs/JobsColumns.tsx",
+   11
+  ],
+  [
+   "src/features/control/pages/drivers/DriverCard.tsx",
+   11
+  ],
+  [
+   "src/features/control/pages/ControlOverview.tsx",
+   10
+  ],
+  [
+   "src/pages/SuperAdminPages.tsx",
+   10
+  ],
+  [
+   "src/features/control/pages/ControlPodReview.tsx",
+   9
+  ],
+  [
+   "src/features/control/pages/ControlSuperAdmin.tsx",
+   8
+  ]
+ ],
+ "matrix": {
+  "badge / status pill | 10px": 33,
+  "badge / status pill | 11px": 20,
+  "badge / status pill | 8px": 1,
+  "badge / status pill | 9px": 9,
+  "button label | 10px": 22,
+  "button label | 11px": 6,
+  "caption / helper paragraph | 10px": 39,
+  "caption / helper paragraph | 11px": 56,
+  "caption / helper paragraph | 9px": 5,
+  "form label / helper under input | 10px": 1,
+  "form label / helper under input | 11px": 27,
+  "nav / tab label | 10px": 1,
+  "numeric / count / mono | 10px": 2,
+  "numeric / count / mono | 11px": 5,
+  "other / unclassified | 10px": 30,
+  "other / unclassified | 11px": 35,
+  "other / unclassified | 8px": 1,
+  "other / unclassified | 9px": 15,
+  "table header / cell | 10px": 4,
+  "table header / cell | 11px": 1,
+  "uppercase/tracked micro-label | 10px": 43,
+  "uppercase/tracked micro-label | 11px": 23,
+  "uppercase/tracked micro-label | 9px": 4
+ },
+ "examples": {
+  "other / unclassified": [
+   "src/components/PhotoViewer.tsx:119  className=\"text-[11px] text-primary font-medium hover:underline\"",
+   "src/components/PhotoViewer.tsx:141  <div className=\"absolute inset-0 flex items-center justify-center bg-muted text-muted-foreground text-[10px] t",
+   "src/components/PhotoViewer.tsx:154  <span className=\"absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] px-1 py-0.5 truncate\">"
+  ],
+  "caption / helper paragraph": [
+   "src/components/PhotoViewer.tsx:126  <p className=\"text-[11px] text-muted-foreground\">",
+   "src/components/LauncherCard.tsx:55  <span className=\"text-[10px] font-medium text-muted-foreground truncate\">",
+   "src/components/LauncherCard.tsx:73  <span className=\"inline-flex items-center gap-1 text-[10px] text-muted-foreground\">"
+  ],
+  "uppercase/tracked micro-label": [
+   "src/components/LauncherCard.tsx:51  className=\"inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase leading-none ",
+   "src/components/JobCard.tsx:150  className=\"inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase leading-none ",
+   "src/components/JobCard.tsx:275  <span className=\"text-[10px] font-semibold text-muted-foreground uppercase\">"
+  ],
+  "numeric / count / mono": [
+   "src/components/QueuedSubmissionsSection.tsx:285  <p className=\"font-mono text-[11px] leading-snug whitespace-pre-wrap\">",
+   "src/features/control/pages/ControlOverview.tsx:144  <span className=\"text-[11px] text-muted-foreground tabular-nums\">{humanAge(r.updated_at)}</span>",
+   "src/features/control/pages/ControlPodReview.tsx:123  render: (r) => <span className=\"text-[11px] text-muted-foreground tabular-nums\">{humanAge(r.completed_at ?? r."
+  ],
+  "badge / status pill": [
+   "src/components/DriverReadOnlyProfile.tsx:104  <Badge variant=\"outline\" className=\"text-[10px]\">Admin-managed</Badge>",
+   "src/components/DriverReadOnlyProfile.tsx:149  <Badge key={c} variant=\"secondary\" className=\"text-[10px] px-2 py-0.5\">{c}</Badge>",
+   "src/features/users/components/UserStatusBadge.tsx:17  <Badge variant=\"outline\" className={`text-[10px] px-1.5 py-0 gap-0.5 font-medium ${cfg.className}`}>"
+  ],
+  "form label / helper under input": [
+   "src/features/users/components/CreateUserModal.tsx:138  <Label className=\"text-[11px]\">First Name *</Label>",
+   "src/features/users/components/CreateUserModal.tsx:147  <Label className=\"text-[11px]\">Last Name *</Label>",
+   "src/features/users/components/CreateUserModal.tsx:157  <Label className=\"text-[11px]\">Email *</Label>"
+  ],
+  "button label": [
+   "src/features/users/components/ProfilePhotoUpload.tsx:103  className=\"h-6 text-[10px] px-2\"",
+   "src/features/users/components/ProfilePhotoUpload.tsx:114  className=\"h-6 text-[10px] px-2 text-destructive\"",
+   "src/features/control/components/AssignDriverModal.tsx:298  className=\"h-6 text-[10px] px-2 text-destructive\""
+  ],
+  "nav / tab label": [
+   "src/features/control/components/ControlSidebar.tsx:131  <p className=\"text-[10px] text-sidebar-foreground/50 truncate\">{userEmail}</p>"
+  ],
+  "table header / cell": [
+   "src/features/control/pages/jobs/JobsColumns.tsx:53  <span className=\"text-[10px] text-muted-foreground truncate\">",
+   "src/features/control/pages/jobs/JobsColumns.tsx:94  <span className=\"text-[10px] text-muted-foreground truncate\">",
+   "src/features/control/pages/jobs/JobsColumns.tsx:121  <span className=\"inline-flex items-center gap-0.5 text-[10px] text-warning font-medium\">"
+  ]
+ }
+}
