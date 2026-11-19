@@ -123,6 +123,20 @@ interface InspectionRow {
   customer_signature_url: string | null;
 }
 
+/**
+ * True for a log entry that records a genuine upload failure.
+ *
+ * pendingUploads logs `photo_upload_failed` (warn, reason "stale_run_purged")
+ * for every queued photo it deliberately discards because the job's evidence
+ * run changed. That is housekeeping working as designed, and it logs one entry
+ * per photo in a burst, so counting them raised a false "Repeated upload
+ * failures" alert on healthy jobs.
+ */
+export function isGenuineUploadFailure(l: { event: string; context?: any }): boolean {
+  if (l.event !== "photo_upload_failed" && l.event !== "upload_failed") return false;
+  return l.context?.reason !== "stale_run_purged";
+}
+
 export function deriveEvidenceExceptions(
   completedJobs: JobRow[],
   inspections: InspectionRow[],
@@ -194,7 +208,7 @@ export function deriveEvidenceExceptions(
   // the cutoff here too for engine-level correctness regardless of caller.
   const cutoff24h = new Date(Date.now() - 24 * 3600_000).toISOString();
   const uploadFailures = logEntries.filter(l =>
-    (l.event === "photo_upload_failed" || l.event === "upload_failed") &&
+    isGenuineUploadFailure(l) &&
     l.created_at >= cutoff24h
   );
   const failsByJob = new Map<string, { count: number; latestAt: string }>();
