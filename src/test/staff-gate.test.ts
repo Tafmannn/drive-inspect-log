@@ -53,7 +53,7 @@ describe("staffDecision", () => {
 });
 
 describe("paid lookup functions are staff-gated", () => {
-  const FUNCTIONS = ["business-search", "place-details", "postcode-lookup", "maps-directions", "vehicle-lookup"];
+  const FUNCTIONS = ["business-search", "place-details", "postcode-lookup", "maps-directions", "vehicle-lookup", "address-validate"];
 
   it.each(FUNCTIONS)("%s calls checkStaff and has no public path", (fn) => {
     const src = readFileSync(join(__dirname, "../../supabase/functions", fn, "index.ts"), "utf8");

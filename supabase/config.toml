@@ -18,6 +18,9 @@ verify_jwt = false
 [functions.postcode-lookup]
 verify_jwt = false
 
+[functions.address-validate]
+verify_jwt = false
+
 [functions.business-search]
 verify_jwt = false
 
