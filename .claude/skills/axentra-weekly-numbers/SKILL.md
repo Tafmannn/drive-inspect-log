@@ -15,7 +15,7 @@ description: Axentra's weekly CEO numbers from the live database — jobs done, 
 1. **Data you can't trust yet** — first, if any apply: `price_capture_pct` < 95, `client_link_pct` < 95, `unpriced_completed_jobs_180d` > 0, `drivers_without_pay_basis` > 0. Say what each blocks (below).
 2. **Cash** — `unbilled_value` (completed, priced, on no invoice; all time), `draft_value` (drafted, never issued), `outstanding_value`, `overdue_value`, `paid_last_28d`.
 3. **Activity** — this week vs `trailing_4_weeks.avg_jobs_per_week`; recorded revenue; contribution on priced jobs.
-4. **Clients (90 days)** — top by contribution; flag any with unpriced jobs.
+4. **Clients and sources (90 days)** — top clients by contribution, flag any with unpriced jobs; `sources_90d` compares Movex / Revilo / direct (`jobs.job_source`, set on the job form). `(not recorded)` means the job predates the source field or was never tagged.
 5. **One next action** — the largest £ item above, with the page to fix it in.
 
 ## KPI definitions → decision

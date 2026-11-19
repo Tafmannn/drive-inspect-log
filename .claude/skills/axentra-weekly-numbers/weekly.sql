@@ -4,7 +4,7 @@
 with
 w as (select date_trunc('week', now()) as wk, date_trunc('week', now()) - interval '28 days' as t4),
 done as (
-  select j.id, j.completed_at, j.total_price, j.client_id,
+  select j.id, j.completed_at, j.total_price, j.client_id, coalesce(j.job_source, '(not recorded)') as source,
          coalesce(nullif(trim(j.client_company), ''), nullif(trim(c.company), ''), nullif(trim(c.trading_name), ''), nullif(trim(c.name), ''), '(unlinked)') as client,
          coalesce((select sum(e.amount) from expenses e where e.job_id = j.id and not e.is_hidden), 0) as costs,
          -- expenses recharged on a live invoice: recovered, so credited back
@@ -46,5 +46,10 @@ select json_build_object(
              round(coalesce(sum(total_price + recharged - costs) filter (where total_price > 0), 0)::numeric, 2) as contribution,
              count(*) filter (where coalesce(total_price, 0) <= 0) as unpriced
       from done where completed_at >= now() - interval '90 days' group by client) x),
+  'sources_90d', (select coalesce(json_agg(x order by x.contribution desc), '[]'::json) from (
+      select source, count(*) as jobs, round(coalesce(sum(total_price), 0)::numeric, 2) as revenue,
+             round(coalesce(sum(total_price + recharged - costs) filter (where total_price > 0), 0)::numeric, 2) as contribution,
+             count(*) filter (where coalesce(total_price, 0) <= 0) as unpriced
+      from done where completed_at >= now() - interval '90 days' group by source) x),
   'drivers_without_pay_basis', (select count(*) from driver_profiles where pay_basis is null and archived_at is null)
 ) as weekly;
