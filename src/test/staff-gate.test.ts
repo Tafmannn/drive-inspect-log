@@ -62,7 +62,7 @@ describe("paid lookup functions are staff-gated", () => {
     expect(src).not.toMatch(/isPublicCall/);
     // The gate must run before any billed key is read.
     const gate = src.indexOf("checkStaff(req)");
-    const key = Math.max(src.indexOf("GOOGLE_MAPS_API_KEY"), src.indexOf("DVLA_VES_API_KEY"));
+    const key = Math.max(src.indexOf("GOOGLE_PLACES_API_KEY"), src.indexOf("DVLA_VES_API_KEY"));
     expect(gate).toBeGreaterThan(-1);
     expect(key).toBeGreaterThan(gate);
   });

@@ -46,6 +46,8 @@ interface NeedsActionItem {
   queueLabel: string;
   jobId?: string;
   jobRef?: string;
+  title?: string; // exception headline (evidence items have no vehicle/route)
+  detail?: string;
   vehicleReg?: string;
   route?: string; // compressed route
   age: string;
@@ -212,6 +214,8 @@ function NeedsActionQueue() {
         queueType: "evidence",
         queueLabel: "Evidence",
         jobRef: ex.jobNumber ?? undefined,
+        title: ex.title,
+        detail: ex.detail,
         age: humanAge(ex.createdAt),
         actionLabel: ex.actionLabel || "Review",
         actionRoute: ex.actionRoute,
@@ -328,9 +332,14 @@ function NeedsActionQueue() {
                   </span>
                 )}
                 {!item.vehicleReg && !item.route && (
-                  <span className="text-[11px] text-foreground truncate">{item.jobRef}</span>
+                  <span className="text-[11px] text-foreground truncate">
+                    {item.title ?? item.jobRef}
+                  </span>
                 )}
               </div>
+              {item.detail && !item.vehicleReg && !item.route && (
+                <p className="text-[10px] text-muted-foreground truncate">{item.detail}</p>
+              )}
 
               {/* Band 2b: driver state (for job items) */}
               {item.jobId && (
