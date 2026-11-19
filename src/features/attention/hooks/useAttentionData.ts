@@ -13,6 +13,7 @@ import {
   deriveStateExceptions,
   deriveComplianceExceptions,
   deriveBillingExceptions,
+  isGenuineUploadFailure,
   sortExceptions,
   type BillingJobRow,
 } from "../engine/exceptionEngine";
@@ -266,7 +267,7 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
       // KPIs (based on active only)
       const allActiveCount = (await supabase.from("jobs").select("id", { count: "exact", head: true }).eq("is_hidden", false).in("status", ACTIVE_STATUSES as string[])).count ?? 0;
       const uploadFailuresToday = logEntries.filter(l =>
-        (l.event === "photo_upload_failed" || l.event === "upload_failed") && l.created_at >= todayStart
+        isGenuineUploadFailure(l) && l.created_at >= todayStart
       ).length;
 
       const kpis: AttentionKpiData = {
