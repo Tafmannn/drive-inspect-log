@@ -27,6 +27,7 @@ import { hapticSuccess, hapticError } from "@/lib/haptics";
 import { notifyJobAssigned } from "@/lib/pushApi";
 import { lookupPostcode, type AddressSuggestion } from "@/lib/postcodeApi";
 import { BusinessSearchInput } from "@/components/BusinessSearchInput";
+import { AddressCheck } from "@/components/AddressCheck";
 import { getPlaceDetails, type BusinessResult } from "@/lib/businessSearchApi";
 import { logClientEvent } from "@/lib/logger";
 import { supabase } from "@/integrations/supabase/client";
@@ -1262,6 +1263,7 @@ export const JobForm = () => {
               {pickupLookupLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Search className="h-4 w-4 mr-2" />}
               Find Address
             </Button>
+            <AddressCheck formRef={formRef} side="pickup" />
             {pickupLookupError && (
               <p className="text-xs text-muted-foreground">{pickupLookupError}</p>
             )}
@@ -1428,6 +1430,7 @@ export const JobForm = () => {
               {deliveryLookupLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Search className="h-4 w-4 mr-2" />}
               Find Address
             </Button>
+            <AddressCheck formRef={formRef} side="delivery" />
             {deliveryLookupError && (
               <p className="text-xs text-muted-foreground">{deliveryLookupError}</p>
             )}
