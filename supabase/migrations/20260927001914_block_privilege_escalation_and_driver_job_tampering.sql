@@ -1,4 +1,4 @@
--- 20260927100100_block_privilege_escalation_and_driver_job_tampering
+-- 20260927001914_block_privilege_escalation_and_driver_job_tampering
 --
 -- SECURITY — found by a live RLS probe (run inside a rolled-back transaction):
 --

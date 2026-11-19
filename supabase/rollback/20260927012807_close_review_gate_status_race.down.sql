@@ -1,4 +1,4 @@
--- Rollback for 20260927110000_close_review_gate_status_race.sql
+-- Rollback for 20260927012807_close_review_gate_status_race.sql
 -- Restores guard_job_driver_writes() without the review-gate exit check.
 CREATE OR REPLACE FUNCTION public.guard_job_driver_writes()
 RETURNS trigger

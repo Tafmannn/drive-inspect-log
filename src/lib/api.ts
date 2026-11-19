@@ -443,7 +443,7 @@ export async function insertPhoto(
   const row = { ...rest, org_id: orgId, run_id: runId } as any;
 
   // Idempotent on backend_ref (see migration
-  // 20260927120000_photos_idempotent_insert_on_retry): the storage path is
+  // 20260927113543_photos_backend_ref_unique_plain): the storage path is
   // deterministic per captured photo, so a retry after the response leg was
   // lost — a very plausible drop on a weak mobile connection right after the
   // insert actually committed — updates the existing row instead of
