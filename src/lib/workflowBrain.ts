@@ -590,7 +590,18 @@ export function getWorkflowBrain(input: BrainInput): WorkflowBrain {
   // ── POD readiness ─────────────────────────────────────────────────
   const podBlockerCodes: string[] = [];
   const podBlockerMessages: string[] = [];
-  for (const b of base.blockers) {
+  // List rows (job cards, Control table) carry no photos/inspections. An
+  // unloaded tree is "unknown", not "missing": judging it as empty flags every
+  // completed job as lacking evidence. Without evidence we can only use the
+  // has_delivery_inspection flag; full checks run where the tree is loaded.
+  const evidenceKnown = inspections != null && photos != null;
+  if (!evidenceKnown) {
+    if (job.has_delivery_inspection === false) {
+      podBlockerCodes.push("missing_delivery_inspection");
+      podBlockerMessages.push("Delivery inspection is not yet recorded.");
+    }
+  }
+  for (const b of evidenceKnown ? base.blockers : []) {
     if (
       b.code === "missing_delivery_inspection" ||
       b.code === "missing_delivery_photos" ||

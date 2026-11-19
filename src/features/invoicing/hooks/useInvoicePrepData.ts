@@ -20,6 +20,7 @@ import {
   INVOICEABLE_STATUSES,
   type InvoiceReadinessResult,
 } from "@/lib/invoiceReadiness";
+import type { Inspection, Photo } from "@/lib/types";
 import { findAlreadyInvoicedJobs } from "../api/createInvoice";
 
 export interface EligibleJob {
@@ -43,6 +44,10 @@ export interface EligibleJob {
   pickup_postcode?: string | null;
   delivery_city?: string | null;
   delivery_postcode?: string | null;
+  // Evidence inputs for the readiness check (loaded in step 5).
+  current_run_id?: string | null;
+  photos?: Photo[];
+  inspections?: Inspection[];
   // receipt count from expenses
   receiptCount?: number;
   // Stage 5 readiness — populated below.
@@ -72,7 +77,7 @@ export function useEligibleJobs(
       let query = supabase
         .from("jobs")
         .select(
-          "id, external_job_number, vehicle_reg, vehicle_make, vehicle_model, job_date, completed_at, total_price, distance_miles, client_id, client_company, client_name, client_email, client_phone, status, pickup_city, pickup_postcode, delivery_city, delivery_postcode"
+          "id, external_job_number, vehicle_reg, vehicle_make, vehicle_model, job_date, completed_at, total_price, distance_miles, client_id, client_company, client_name, client_email, client_phone, status, current_run_id, pickup_city, pickup_postcode, delivery_city, delivery_postcode"
         )
         .eq("is_hidden", false)
         .in("status", TERMINAL_STATUSES)
@@ -133,10 +138,39 @@ export function useEligibleJobs(
         });
       }
 
+      // 4b. Evidence inputs. Readiness judges evidence health from the job's
+      //    photos, inspections and run id; without them every job looks like it
+      //    has no evidence and is wrongly blocked as "evidence issue (red)".
+      //    A failed read must not silently pass jobs, so it throws.
+      const photosByJob = new Map<string, Photo[]>();
+      const inspectionsByJob = new Map<string, Inspection[]>();
+      if (jobIds.length > 0) {
+        const [photoRes, inspRes] = await Promise.all([
+          supabase.from("photos").select("*").in("job_id", jobIds),
+          supabase
+            .from("inspections")
+            .select("*")
+            .in("job_id", jobIds)
+            .is("archived_at", null),
+        ]);
+        if (photoRes.error) throw photoRes.error;
+        if (inspRes.error) throw inspRes.error;
+        for (const p of (photoRes.data ?? []) as unknown as Photo[]) {
+          const k = p.job_id;
+          (photosByJob.get(k) ?? photosByJob.set(k, []).get(k)!).push(p);
+        }
+        for (const i of (inspRes.data ?? []) as unknown as Inspection[]) {
+          const k = i.job_id;
+          (inspectionsByJob.get(k) ?? inspectionsByJob.set(k, []).get(k)!).push(i);
+        }
+      }
+
       // 5. Annotate every row with strict invoice readiness so the UI
       //    can render an exact reason badge per row.
       for (const j of clientJobs) {
         j.receiptCount = countMap.get(j.id) ?? 0;
+        j.photos = photosByJob.get(j.id) ?? [];
+        j.inspections = inspectionsByJob.get(j.id) ?? [];
         j.readiness = evaluateInvoiceReadiness({
           job: j,
           alreadyInvoiced: invoicedIds.has(j.id),

@@ -213,3 +213,20 @@ describe("getWorkflowBrain — Stage 1 spec scenarios", () => {
     expect(b.debug.podBlockerCodes).toContain("blocked_uploads");
   });
 });
+
+describe("getWorkflowBrain — evidence not loaded (list rows)", () => {
+  it("completed row without photos/inspections is not flagged as missing evidence", () => {
+    const b = getWorkflowBrain({
+      job: mkJob({ status: "completed", total_price: 300, client_name: "Acme", has_delivery_inspection: true }),
+    });
+    expect(b.podReadiness.ready).toBe(true);
+    expect(b.riskLevel).toBe("none");
+  });
+  it("still flags a row whose has_delivery_inspection flag is false", () => {
+    const b = getWorkflowBrain({
+      job: mkJob({ status: "pod_ready", has_delivery_inspection: false }),
+    });
+    expect(b.podReadiness.ready).toBe(false);
+    expect(b.debug.podBlockerCodes).toContain("missing_delivery_inspection");
+  });
+});
