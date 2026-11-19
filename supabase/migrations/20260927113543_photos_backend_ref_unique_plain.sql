@@ -1,4 +1,4 @@
--- 20260927120000_photos_idempotent_insert_on_retry
+-- 20260927113543_photos_backend_ref_unique_plain
 --
 -- Found during a mobile-conditions audit ("photo uploads interrupted
 -- mid-flight"): insertPhoto() does a plain INSERT with no idempotency key.
@@ -30,5 +30,10 @@
 -- (confirmed against a live rolled-back probe before settling on this
 -- shape). A plain unique index already allows unlimited NULLs, which is all
 -- the nullability handling this needed anyway.
+-- Version 20260927113543 in production's history (was 20260927120000 in this repo).
+-- Production's live index is this plain one. Drop first: 20260927113425 above
+-- creates a partial index with the same name, and IF NOT EXISTS would otherwise
+-- skip this statement on a fresh build.
+DROP INDEX IF EXISTS public.photos_backend_ref_unique;
 CREATE UNIQUE INDEX IF NOT EXISTS photos_backend_ref_unique
   ON public.photos (backend_ref);

@@ -1,4 +1,4 @@
--- Rollback for 20260927100000_submit_inspection_post_lock_idempotency.sql
+-- Rollback for 20260927002442_submit_inspection_post_lock_idempotency.sql
 -- Restores submit_inspection without the post-lock idempotency re-check.
 
 CREATE OR REPLACE FUNCTION public.submit_inspection(p_job_id uuid, p_type text, p_inspection jsonb, p_damage_items jsonb, p_submission_session_id uuid DEFAULT NULL::uuid)

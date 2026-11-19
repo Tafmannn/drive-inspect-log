@@ -1,4 +1,4 @@
--- Rollback for 20260927100100_block_privilege_escalation_and_driver_job_tampering.sql
+-- Rollback for 20260927001914_block_privilege_escalation_and_driver_job_tampering.sql
 DROP TRIGGER IF EXISTS trg_user_profiles_guard_privileged ON public.user_profiles;
 DROP FUNCTION IF EXISTS public.guard_user_profile_privileged_columns();
 DROP TRIGGER IF EXISTS trg_jobs_guard_driver_writes ON public.jobs;

@@ -10,7 +10,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // `backend_ref`, which is deterministic per captured photo, so a retry
 // updates the existing row instead of creating a duplicate.
 //
-// migration 20260927120000_photos_idempotent_insert_on_retry adds the
+// migration 20260927113543_photos_backend_ref_unique_plain adds the
 // unique index this upsert relies on; it is deliberately NOT partial —
 // PostgREST's upsert can only express a conflict target as a column list,
 // so an `on_conflict=backend_ref` request against a partial index fails at

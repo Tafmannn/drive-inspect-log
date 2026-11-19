@@ -63,7 +63,7 @@
 -- "auth_leaked_password_protection" WARN — enable "Prevent use of leaked
 -- passwords" under Authentication → Passwords in the Supabase dashboard.
 --
--- Rollback: supabase/rollback/20260716170000_lockdown_security_definer_function_grants.down.sql
+-- Rollback: supabase/rollback/20260716192611_lockdown_security_definer_function_grants.down.sql
 -- =====================================================================
 
 -- ── Group A: internal only (postgres owner + service_role) ──────────────

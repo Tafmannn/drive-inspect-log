@@ -1,4 +1,4 @@
--- Rollback for 20260716170000_lockdown_security_definer_function_grants.sql
+-- Rollback for 20260716192611_lockdown_security_definer_function_grants.sql
 -- Restores the pre-migration EXECUTE grants (Supabase defaults: anon +
 -- authenticated + service_role on every function; several also carried an
 -- implicit PUBLIC grant, restored here only where it existed before).

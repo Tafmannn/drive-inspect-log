@@ -1,4 +1,4 @@
--- Rollback for 20261116150000_driver_lock_cancelled_archived_jobs.sql
+-- Rollback for 20261116214609_driver_lock_cancelled_archived_jobs.sql
 -- Restores the previous helper bodies, which locked drivers out of
 -- 'completed' jobs only.
 BEGIN;

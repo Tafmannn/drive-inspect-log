@@ -1,4 +1,4 @@
--- 20260927100000_submit_inspection_post_lock_idempotency
+-- 20260927002442_submit_inspection_post_lock_idempotency
 --
 -- Concurrency fix for submit_inspection (found by a parallel-session drill):
 -- N concurrent calls carrying the SAME p_submission_session_id produced one

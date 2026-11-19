@@ -1,7 +1,7 @@
--- 20260927115900_dedupe_photos_before_backend_ref_unique
+-- 20260927113400_dedupe_photos_before_backend_ref_unique
 --
 -- One-time data cleanup, run immediately before
--- 20260927120000_photos_idempotent_insert_on_retry adds a unique index on
+-- 20260927113543_photos_backend_ref_unique_plain adds a unique index on
 -- photos.backend_ref. Three jobs' pickup inspections, each submitted over a
 -- sustained bad connection, had retried every photo upload repeatedly
 -- (insertPhoto had no idempotency key — see that migration for the full

@@ -1,4 +1,4 @@
--- Verification for 20260716170000_lockdown_security_definer_function_grants.sql
+-- Verification for 20260716192611_lockdown_security_definer_function_grants.sql
 -- Run each block against the target environment; expected results inline.
 
 -- ─────────────────────────────────────────────────────────────────────────
