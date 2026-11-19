@@ -1,0 +1,185 @@
+{
+ "keys": {
+  "DRAFT": "draft",
+  "PENDING": "pending",
+  "INCOMPLETE": "incomplete",
+  "NEW": "new",
+  "READY_FOR_PICKUP": "ready_for_pickup",
+  "ASSIGNED": "assigned",
+  "PICKUP_IN_PROGRESS": "pickup_in_progress",
+  "PICKUP_COMPLETE": "pickup_complete",
+  "IN_TRANSIT": "in_transit",
+  "DELIVERY_IN_PROGRESS": "delivery_in_progress",
+  "DELIVERY_COMPLETE": "delivery_complete",
+  "POD_READY": "pod_ready",
+  "COMPLETED": "completed",
+  "CANCELLED": "cancelled",
+  "FAILED": "failed",
+  "ARCHIVED": "archived"
+ },
+ "active": [
+  "assigned",
+  "ready_for_pickup",
+  "pickup_in_progress",
+  "pickup_complete",
+  "in_transit",
+  "delivery_in_progress"
+ ],
+ "pending": [
+  "pod_ready",
+  "delivery_complete"
+ ],
+ "terminal": [
+  "completed",
+  "failed",
+  "archived"
+ ],
+ "styles": {
+  "draft": {
+   "label": "DRAFT",
+   "bg": "#EEF1F5",
+   "fg": "#475467"
+  },
+  "pending": {
+   "label": "PENDING",
+   "bg": "#EEF1F5",
+   "fg": "#475467"
+  },
+  "incomplete": {
+   "label": "INCOMPLETE",
+   "bg": "#EEF1F5",
+   "fg": "#475467"
+  },
+  "new": {
+   "label": "NEW",
+   "bg": "#E8F0FB",
+   "fg": "#1E4FA8"
+  },
+  "ready_for_pickup": {
+   "label": "READY",
+   "bg": "#E3F4EA",
+   "fg": "#0F6B3A"
+  },
+  "assigned": {
+   "label": "ASSIGNED",
+   "bg": "#E3F4EA",
+   "fg": "#0F6B3A"
+  },
+  "pickup_in_progress": {
+   "label": "IN PROGRESS",
+   "bg": "#FFF1D1",
+   "fg": "#7A4A00"
+  },
+  "pickup_complete": {
+   "label": "IN PROGRESS",
+   "bg": "#FFF1D1",
+   "fg": "#7A4A00"
+  },
+  "in_transit": {
+   "label": "IN PROGRESS",
+   "bg": "#FFF1D1",
+   "fg": "#7A4A00"
+  },
+  "delivery_in_progress": {
+   "label": "IN PROGRESS",
+   "bg": "#FFF1D1",
+   "fg": "#7A4A00"
+  },
+  "delivery_complete": {
+   "label": "COMPLETED",
+   "bg": "#ECE9FB",
+   "fg": "#4A3CB0"
+  },
+  "pod_ready": {
+   "label": "COMPLETED",
+   "bg": "#ECE9FB",
+   "fg": "#4A3CB0"
+  },
+  "completed": {
+   "label": "COMPLETED",
+   "bg": "#ECE9FB",
+   "fg": "#4A3CB0"
+  },
+  "cancelled": {
+   "label": "CANCELLED",
+   "bg": "#FDE7E4",
+   "fg": "#B42318"
+  },
+  "failed": {
+   "label": "FAILED",
+   "bg": "#EEF1F5",
+   "fg": "#475467"
+  },
+  "archived": {
+   "label": "ARCHIVED",
+   "bg": "#EEF1F5",
+   "fg": "#475467"
+  }
+ },
+ "transitions": {
+  "ADMIN_ALLOWED_TRANSITIONS": {
+   "draft": [
+    "ready_for_pickup",
+    "cancelled"
+   ],
+   "new": [
+    "ready_for_pickup",
+    "assigned",
+    "cancelled"
+   ],
+   "incomplete": [
+    "ready_for_pickup",
+    "cancelled"
+   ],
+   "ready_for_pickup": [
+    "assigned",
+    "cancelled"
+   ],
+   "assigned": [
+    "ready_for_pickup",
+    "pickup_in_progress",
+    "cancelled"
+   ],
+   "pickup_in_progress": [
+    "pickup_complete",
+    "cancelled"
+   ],
+   "pickup_complete": [
+    "in_transit",
+    "delivery_in_progress",
+    "cancelled"
+   ],
+   "in_transit": [
+    "delivery_in_progress",
+    "cancelled"
+   ],
+   "delivery_in_progress": [
+    "delivery_complete",
+    "pod_ready",
+    "cancelled"
+   ],
+   "delivery_complete": [
+    "pod_ready",
+    "completed",
+    "cancelled"
+   ],
+   "pod_ready": [
+    "completed",
+    "cancelled"
+   ],
+   "completed": [
+    "ready_for_pickup"
+   ],
+   "cancelled": [
+    "ready_for_pickup"
+   ],
+   "failed": [
+    "ready_for_pickup"
+   ],
+   "pending": [
+    "ready_for_pickup",
+    "cancelled"
+   ]
+  }
+ }
+}

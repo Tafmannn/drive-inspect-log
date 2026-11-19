@@ -1,0 +1,37 @@
+## UI Pro Max Search Results
+**Domain:** ux | **Query:** text contrast normal
+**Source:** ux-guidelines.csv | **Found:** 3 results
+
+### Result 1
+- **Category:** Typography
+- **Issue:** Contrast Readability
+- **Platform:** All
+- **Description:** Body text needs good contrast
+- **Do:** Use darker text on light backgrounds
+- **Don't:** Gray text on gray background
+- **Code Example Good:** text-gray-900 on white
+- **Code Example Bad:** text-gray-400 on gray-100
+- **Severity:** High
+
+### Result 2
+- **Category:** Accessibility
+- **Issue:** Color Contrast
+- **Platform:** All
+- **Description:** Text must be readable against background
+- **Do:** Minimum 4.5:1 ratio for normal text
+- **Don't:** Low contrast text
+- **Code Example Good:** #333 on white (7:1)
+- **Code Example Bad:** #999 on white (2.8:1)
+- **Severity:** High
+
+### Result 3
+- **Category:** Accessibility
+- **Issue:** Alt Text
+- **Platform:** All
+- **Description:** Images need text alternatives
+- **Do:** Descriptive alt text for meaningful images
+- **Don't:** Empty or missing alt attributes
+- **Code Example Good:** alt='Dog playing in park'
+- **Code Example Bad:** alt='' for content images
+- **Severity:** High
+

@@ -78,7 +78,7 @@ export function ControlTopbar({
           >
             <Search className="h-3.5 w-3.5" />
             <span className="text-xs">Search…</span>
-            <kbd className="ml-auto text-[10px] border rounded px-1 py-0.5 text-muted-foreground/60">
+            <kbd className="ml-auto text-caption border rounded px-1 py-0.5 text-muted-foreground">
               ⌘K
             </kbd>
           </Button>

@@ -68,6 +68,15 @@ export default {
 					DEFAULT: 'hsl(var(--app-header))',
 					foreground: 'hsl(var(--app-header-foreground))'
 				},
+				// Phase 1a additive tokens (see src/index.css)
+				'border-strong': 'hsl(var(--border-strong))',
+				'primary-soft': 'hsl(var(--primary-soft))',
+				'success-soft': 'hsl(var(--success-soft))',
+				'warning-soft': 'hsl(var(--warning-soft))',
+				'danger-soft': 'hsl(var(--danger-soft))',
+				'info-soft': 'hsl(var(--info-soft))',
+				'done-soft': 'hsl(var(--done-soft))',
+				'neutral-soft': 'hsl(var(--neutral-soft))',
 				sidebar: {
 					DEFAULT: 'hsl(var(--sidebar-background))',
 					foreground: 'hsl(var(--sidebar-foreground))',
@@ -78,6 +87,16 @@ export default {
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
 				}
+			},
+			// Phase 1a type scale tokens. Additive only: Tailwind's default text-xs/sm/... and
+			// every existing text-[Npx] use are untouched. 12px (caption) is the floor.
+			fontSize: {
+				caption: ['var(--text-caption)', { lineHeight: 'var(--lh-caption)' }],
+				label: ['var(--text-label)', { lineHeight: 'var(--lh-label)', fontWeight: '600' }],
+				body: ['var(--text-body)', { lineHeight: 'var(--lh-body)' }],
+				title: ['var(--text-title)', { lineHeight: 'var(--lh-title)', fontWeight: '650' }],
+				h1: ['var(--text-h1)', { lineHeight: 'var(--lh-h1)', fontWeight: '650', letterSpacing: '-0.02em' }],
+				display: ['var(--text-display)', { lineHeight: 'var(--lh-display)', fontWeight: '650', letterSpacing: '-0.02em' }]
 			},
 			borderRadius: {
 				lg: 'var(--radius)',

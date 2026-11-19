@@ -1,0 +1,2314 @@
+{
+ "label": "after4",
+ "metrics": [
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "login",
+   "w": 320,
+   "n": 6,
+   "small": 1,
+   "fail": [
+    {
+     "t": "Forgot password?",
+     "ratio": 2.86,
+     "need": 4.5,
+     "fs": 12
+    },
+    {
+     "t": "Sign in",
+     "ratio": 4.48,
+     "need": 4.5,
+     "fs": 15.2
+    },
+    {
+     "t": "Secure access powered by Supab",
+     "ratio": 2.05,
+     "need": 4.5,
+     "fs": 11
+    }
+   ],
+   "dev": 0,
+   "docOverflow": false,
+   "nt": [
+    {
+     "k": "input",
+     "r": 1.3,
+     "cls": "flex h-10 w-full border px-3 py-2 text-base ring-offset-back",
+     "ph": "you@example.com"
+    },
+    {
+     "k": "input",
+     "r": 1.3,
+     "cls": "flex h-10 w-full border px-3 py-2 text-base ring-offset-back",
+     "ph": "••••••••"
+    },
+    {
+     "k": "button[checkbox]",
+     "r": 1.83,
+     "cls": "peer h-4 w-4 shrink-0 rounded border ring-offset-background ",
+     "ph": ""
+    }
+   ]
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "login",
+   "w": 1024,
+   "n": 6,
+   "small": 1,
+   "fail": [
+    {
+     "t": "Forgot password?",
+     "ratio": 2.86,
+     "need": 4.5,
+     "fs": 12
+    },
+    {
+     "t": "Sign in",
+     "ratio": 4.48,
+     "need": 4.5,
+     "fs": 15.2
+    },
+    {
+     "t": "Secure access powered by Supab",
+     "ratio": 2.05,
+     "need": 4.5,
+     "fs": 11
+    }
+   ],
+   "dev": 0,
+   "docOverflow": false,
+   "nt": [
+    {
+     "k": "input",
+     "r": 1.3,
+     "cls": "flex h-10 w-full border px-3 py-2 text-base ring-offset-back",
+     "ph": "you@example.com"
+    },
+    {
+     "k": "input",
+     "r": 1.3,
+     "cls": "flex h-10 w-full border px-3 py-2 text-base ring-offset-back",
+     "ph": "••••••••"
+    },
+    {
+     "k": "button[checkbox]",
+     "r": 1.83,
+     "cls": "peer h-4 w-4 shrink-0 rounded border ring-offset-background ",
+     "ph": ""
+    }
+   ]
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "login",
+   "w": 768,
+   "n": 6,
+   "small": 1,
+   "fail": [
+    {
+     "t": "Forgot password?",
+     "ratio": 2.86,
+     "need": 4.5,
+     "fs": 12
+    },
+    {
+     "t": "Sign in",
+     "ratio": 4.48,
+     "need": 4.5,
+     "fs": 15.2
+    },
+    {
+     "t": "Secure access powered by Supab",
+     "ratio": 2.05,
+     "need": 4.5,
+     "fs": 11
+    }
+   ],
+   "dev": 0,
+   "docOverflow": false,
+   "nt": [
+    {
+     "k": "input",
+     "r": 1.3,
+     "cls": "flex h-10 w-full border px-3 py-2 text-base ring-offset-back",
+     "ph": "you@example.com"
+    },
+    {
+     "k": "input",
+     "r": 1.3,
+     "cls": "flex h-10 w-full border px-3 py-2 text-base ring-offset-back",
+     "ph": "••••••••"
+    },
+    {
+     "k": "button[checkbox]",
+     "r": 1.83,
+     "cls": "peer h-4 w-4 shrink-0 rounded border ring-offset-background ",
+     "ph": ""
+    }
+   ]
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "login",
+   "w": 390,
+   "n": 6,
+   "small": 1,
+   "fail": [
+    {
+     "t": "Forgot password?",
+     "ratio": 2.86,
+     "need": 4.5,
+     "fs": 12
+    },
+    {
+     "t": "Sign in",
+     "ratio": 4.48,
+     "need": 4.5,
+     "fs": 15.2
+    },
+    {
+     "t": "Secure access powered by Supab",
+     "ratio": 2.05,
+     "need": 4.5,
+     "fs": 11
+    }
+   ],
+   "dev": 0,
+   "docOverflow": false,
+   "nt": [
+    {
+     "k": "input",
+     "r": 1.3,
+     "cls": "flex h-10 w-full border px-3 py-2 text-base ring-offset-back",
+     "ph": "you@example.com"
+    },
+    {
+     "k": "input",
+     "r": 1.3,
+     "cls": "flex h-10 w-full border px-3 py-2 text-base ring-offset-back",
+     "ph": "••••••••"
+    },
+    {
+     "k": "button[checkbox]",
+     "r": 1.83,
+     "cls": "peer h-4 w-4 shrink-0 rounded border ring-offset-background ",
+     "ph": ""
+    }
+   ]
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "login",
+   "w": 1440,
+   "n": 6,
+   "small": 1,
+   "fail": [
+    {
+     "t": "Forgot password?",
+     "ratio": 2.86,
+     "need": 4.5,
+     "fs": 12
+    },
+    {
+     "t": "Sign in",
+     "ratio": 4.48,
+     "need": 4.5,
+     "fs": 15.2
+    },
+    {
+     "t": "Secure access powered by Supab",
+     "ratio": 2.05,
+     "need": 4.5,
+     "fs": 11
+    }
+   ],
+   "dev": 0,
+   "docOverflow": false,
+   "nt": [
+    {
+     "k": "input",
+     "r": 1.3,
+     "cls": "flex h-10 w-full border px-3 py-2 text-base ring-offset-back",
+     "ph": "you@example.com"
+    },
+    {
+     "k": "input",
+     "r": 1.3,
+     "cls": "flex h-10 w-full border px-3 py-2 text-base ring-offset-back",
+     "ph": "••••••••"
+    },
+    {
+     "k": "button[checkbox]",
+     "r": 1.83,
+     "cls": "peer h-4 w-4 shrink-0 rounded border ring-offset-background ",
+     "ph": ""
+    }
+   ]
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "driver-home",
+   "w": 320,
+   "n": 3,
+   "small": 0,
+   "fail": [],
+   "dev": 0,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "driver-home",
+   "w": 390,
+   "n": 3,
+   "small": 0,
+   "fail": [],
+   "dev": 0,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "driver-home",
+   "w": 768,
+   "n": 3,
+   "small": 0,
+   "fail": [],
+   "dev": 0,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "driver-jobs",
+   "w": 390,
+   "n": 9,
+   "small": 0,
+   "fail": [],
+   "dev": 0,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "driver-home",
+   "w": 1440,
+   "n": 3,
+   "small": 0,
+   "fail": [],
+   "dev": 0,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "driver-home",
+   "w": 1024,
+   "n": 3,
+   "small": 0,
+   "fail": [],
+   "dev": 0,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "driver-jobs",
+   "w": 320,
+   "n": 9,
+   "small": 0,
+   "fail": [],
+   "dev": 0,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "driver-jobs",
+   "w": 768,
+   "n": 9,
+   "small": 0,
+   "fail": [],
+   "dev": 0,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "driver-jobs",
+   "w": 1440,
+   "n": 9,
+   "small": 0,
+   "fail": [],
+   "dev": 0,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "driver-jobs",
+   "w": 1024,
+   "n": 9,
+   "small": 0,
+   "fail": [],
+   "dev": 0,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "profile",
+   "w": 320,
+   "n": 27,
+   "small": 4,
+   "fail": [],
+   "dev": 0,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "profile",
+   "w": 390,
+   "n": 27,
+   "small": 4,
+   "fail": [],
+   "dev": 0,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "profile",
+   "w": 768,
+   "n": 27,
+   "small": 4,
+   "fail": [],
+   "dev": 0,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "profile",
+   "w": 1024,
+   "n": 27,
+   "small": 4,
+   "fail": [],
+   "dev": 0,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "profile",
+   "w": 1440,
+   "n": 27,
+   "small": 4,
+   "fail": [],
+   "dev": 0,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "expenses",
+   "w": 1440,
+   "n": 18,
+   "small": 0,
+   "fail": [],
+   "dev": 0,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "admin-home",
+   "w": 320,
+   "n": 39,
+   "small": 22,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "expenses",
+   "w": 390,
+   "n": 18,
+   "small": 0,
+   "fail": [],
+   "dev": 0,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "admin-home",
+   "w": 390,
+   "n": 39,
+   "small": 22,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "admin-home",
+   "w": 768,
+   "n": 39,
+   "small": 22,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "admin-home",
+   "w": 1024,
+   "n": 39,
+   "small": 22,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "admin-home",
+   "w": 1440,
+   "n": 39,
+   "small": 22,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "admin-dash",
+   "w": 320,
+   "n": 41,
+   "small": 22,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "admin-dash",
+   "w": 390,
+   "n": 41,
+   "small": 22,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "admin-dash",
+   "w": 768,
+   "n": 41,
+   "small": 22,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "admin-dash",
+   "w": 1024,
+   "n": 41,
+   "small": 22,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "admin-dash",
+   "w": 1440,
+   "n": 41,
+   "small": 22,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "admin-job-new",
+   "w": 320,
+   "n": 66,
+   "small": 8,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": [
+    {
+     "k": "button[combobox]",
+     "r": 3.44,
+     "cls": "inline-flex items-center gap-2 whitespace-nowrap rounded-md ",
+     "ph": ""
+    },
+    {
+     "k": "button[checkbox]",
+     "r": 5.5,
+     "cls": "peer h-4 w-4 shrink-0 rounded border border-primary ring-off",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "Auto-generated if le"
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "Vehicle registration"
+    },
+    {
+     "k": "select",
+     "r": 3.44,
+     "cls": "flex h-10 w-full items-center rounded-md border border-input",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "e.g. Metallic Black"
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "e.g. 2020"
+    },
+    {
+     "k": "button[combobox]",
+     "r": 3.44,
+     "cls": "inline-flex items-center gap-2 whitespace-nowrap rounded-md ",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "Search business or e"
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "textarea",
+     "r": 3.44,
+     "cls": "flex min-h-[80px] w-full rounded-md border border-input bg-b",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "Search business or e"
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "textarea",
+     "r": 3.44,
+     "cls": "flex min-h-[80px] w-full rounded-md border border-input bg-b",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "e.g. 250.00"
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "defaults to client/o"
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "defaults to client/o"
+    }
+   ]
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "admin-job-new",
+   "w": 390,
+   "n": 66,
+   "small": 8,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": [
+    {
+     "k": "button[combobox]",
+     "r": 3.44,
+     "cls": "inline-flex items-center gap-2 whitespace-nowrap rounded-md ",
+     "ph": ""
+    },
+    {
+     "k": "button[checkbox]",
+     "r": 5.5,
+     "cls": "peer h-4 w-4 shrink-0 rounded border border-primary ring-off",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "Auto-generated if le"
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "Vehicle registration"
+    },
+    {
+     "k": "select",
+     "r": 3.44,
+     "cls": "flex h-10 w-full items-center rounded-md border border-input",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "e.g. Metallic Black"
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "e.g. 2020"
+    },
+    {
+     "k": "button[combobox]",
+     "r": 3.44,
+     "cls": "inline-flex items-center gap-2 whitespace-nowrap rounded-md ",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "Search business or e"
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "textarea",
+     "r": 3.44,
+     "cls": "flex min-h-[80px] w-full rounded-md border border-input bg-b",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "Search business or e"
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "textarea",
+     "r": 3.44,
+     "cls": "flex min-h-[80px] w-full rounded-md border border-input bg-b",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "e.g. 250.00"
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "defaults to client/o"
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "defaults to client/o"
+    }
+   ]
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "admin-job-new",
+   "w": 768,
+   "n": 66,
+   "small": 8,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": [
+    {
+     "k": "button[combobox]",
+     "r": 3.44,
+     "cls": "inline-flex items-center gap-2 whitespace-nowrap rounded-md ",
+     "ph": ""
+    },
+    {
+     "k": "button[checkbox]",
+     "r": 5.5,
+     "cls": "peer h-4 w-4 shrink-0 rounded border border-primary ring-off",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "Auto-generated if le"
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "Vehicle registration"
+    },
+    {
+     "k": "select",
+     "r": 3.44,
+     "cls": "flex h-10 w-full items-center rounded-md border border-input",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "e.g. Metallic Black"
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "e.g. 2020"
+    },
+    {
+     "k": "button[combobox]",
+     "r": 3.44,
+     "cls": "inline-flex items-center gap-2 whitespace-nowrap rounded-md ",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "Search business or e"
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "textarea",
+     "r": 3.44,
+     "cls": "flex min-h-[80px] w-full rounded-md border border-input bg-b",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "Search business or e"
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "textarea",
+     "r": 3.44,
+     "cls": "flex min-h-[80px] w-full rounded-md border border-input bg-b",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "e.g. 250.00"
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "defaults to client/o"
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "defaults to client/o"
+    }
+   ]
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "admin-job-new",
+   "w": 1024,
+   "n": 66,
+   "small": 8,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": [
+    {
+     "k": "button[combobox]",
+     "r": 3.44,
+     "cls": "inline-flex items-center gap-2 whitespace-nowrap rounded-md ",
+     "ph": ""
+    },
+    {
+     "k": "button[checkbox]",
+     "r": 5.5,
+     "cls": "peer h-4 w-4 shrink-0 rounded border border-primary ring-off",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "Auto-generated if le"
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "Vehicle registration"
+    },
+    {
+     "k": "select",
+     "r": 3.44,
+     "cls": "flex h-10 w-full items-center rounded-md border border-input",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "e.g. Metallic Black"
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "e.g. 2020"
+    },
+    {
+     "k": "button[combobox]",
+     "r": 3.44,
+     "cls": "inline-flex items-center gap-2 whitespace-nowrap rounded-md ",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "Search business or e"
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "textarea",
+     "r": 3.44,
+     "cls": "flex min-h-[80px] w-full rounded-md border border-input bg-b",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "Search business or e"
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "textarea",
+     "r": 3.44,
+     "cls": "flex min-h-[80px] w-full rounded-md border border-input bg-b",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "e.g. 250.00"
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "defaults to client/o"
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "defaults to client/o"
+    }
+   ]
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "admin-job-new",
+   "w": 1440,
+   "n": 66,
+   "small": 8,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": [
+    {
+     "k": "button[combobox]",
+     "r": 3.44,
+     "cls": "inline-flex items-center gap-2 whitespace-nowrap rounded-md ",
+     "ph": ""
+    },
+    {
+     "k": "button[checkbox]",
+     "r": 5.5,
+     "cls": "peer h-4 w-4 shrink-0 rounded border border-primary ring-off",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "Auto-generated if le"
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "Vehicle registration"
+    },
+    {
+     "k": "select",
+     "r": 3.44,
+     "cls": "flex h-10 w-full items-center rounded-md border border-input",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "e.g. Metallic Black"
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "e.g. 2020"
+    },
+    {
+     "k": "button[combobox]",
+     "r": 3.44,
+     "cls": "inline-flex items-center gap-2 whitespace-nowrap rounded-md ",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "Search business or e"
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "textarea",
+     "r": 3.44,
+     "cls": "flex min-h-[80px] w-full rounded-md border border-input bg-b",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "Search business or e"
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "textarea",
+     "r": 3.44,
+     "cls": "flex min-h-[80px] w-full rounded-md border border-input bg-b",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "e.g. 250.00"
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "defaults to client/o"
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "defaults to client/o"
+    }
+   ]
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "admin-users",
+   "w": 390,
+   "n": 7,
+   "small": 1,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": [
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex w-full rounded-md border border-input bg-background px-",
+     "ph": "Search name or email"
+    },
+    {
+     "k": "button[combobox]",
+     "r": 3.44,
+     "cls": "flex items-center justify-between rounded-md border border-i",
+     "ph": ""
+    },
+    {
+     "k": "button[combobox]",
+     "r": 3.44,
+     "cls": "flex items-center justify-between rounded-md border border-i",
+     "ph": ""
+    },
+    {
+     "k": "button[combobox]",
+     "r": 3.44,
+     "cls": "flex items-center justify-between rounded-md border border-i",
+     "ph": ""
+    }
+   ]
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "admin-users",
+   "w": 1440,
+   "n": 7,
+   "small": 1,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": [
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex w-full rounded-md border border-input bg-background px-",
+     "ph": "Search name or email"
+    },
+    {
+     "k": "button[combobox]",
+     "r": 3.44,
+     "cls": "flex items-center justify-between rounded-md border border-i",
+     "ph": ""
+    },
+    {
+     "k": "button[combobox]",
+     "r": 3.44,
+     "cls": "flex items-center justify-between rounded-md border border-i",
+     "ph": ""
+    },
+    {
+     "k": "button[combobox]",
+     "r": 3.44,
+     "cls": "flex items-center justify-between rounded-md border border-i",
+     "ph": ""
+    }
+   ]
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "control-overview",
+   "w": 320,
+   "n": 27,
+   "small": 12,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "control-overview",
+   "w": 390,
+   "n": 27,
+   "small": 12,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "control-overview",
+   "w": 768,
+   "n": 29,
+   "small": 12,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "control-overview",
+   "w": 1024,
+   "n": 52,
+   "small": 12,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "control-overview",
+   "w": 1440,
+   "n": 52,
+   "small": 12,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "control-jobs",
+   "w": 320,
+   "n": 33,
+   "small": 13,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": [
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex w-full rounded-md border border-input bg-background px-",
+     "ph": "Search reg, client, "
+    }
+   ]
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "control-jobs",
+   "w": 390,
+   "n": 33,
+   "small": 13,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": [
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex w-full rounded-md border border-input bg-background px-",
+     "ph": "Search reg, client, "
+    }
+   ]
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "control-jobs",
+   "w": 768,
+   "n": 37,
+   "small": 13,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": [
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex w-full rounded-md border border-input bg-background px-",
+     "ph": "Search reg, client, "
+    }
+   ]
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "control-jobs",
+   "w": 1024,
+   "n": 60,
+   "small": 13,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": [
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex w-full rounded-md border border-input bg-background px-",
+     "ph": "Search reg, client, "
+    }
+   ]
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "control-jobs",
+   "w": 1440,
+   "n": 60,
+   "small": 13,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": [
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex w-full rounded-md border border-input bg-background px-",
+     "ph": "Search reg, client, "
+    }
+   ]
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "control-pod",
+   "w": 390,
+   "n": 25,
+   "small": 11,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": [
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex w-full rounded-md border border-input bg-background px-",
+     "ph": "Search reg, driver, "
+    }
+   ]
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "control-pod",
+   "w": 1440,
+   "n": 51,
+   "small": 11,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": [
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex w-full rounded-md border border-input bg-background px-",
+     "ph": "Search reg, driver, "
+    }
+   ]
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "control-drivers",
+   "w": 390,
+   "n": 16,
+   "small": 5,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": [
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex w-full rounded-md border border-input bg-background px-",
+     "ph": "Search name, phone, "
+    }
+   ]
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "control-drivers",
+   "w": 1440,
+   "n": 42,
+   "small": 5,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": [
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex w-full rounded-md border border-input bg-background px-",
+     "ph": "Search name, phone, "
+    }
+   ]
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "control-compliance",
+   "w": 390,
+   "n": 26,
+   "small": 9,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "control-compliance",
+   "w": 1440,
+   "n": 52,
+   "small": 9,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "control-finance",
+   "w": 390,
+   "n": 15,
+   "small": 7,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": [
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex w-full rounded-md border border-input bg-background px-",
+     "ph": "Search job, reg, cat"
+    }
+   ]
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "control-finance",
+   "w": 1440,
+   "n": 42,
+   "small": 7,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": [
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex w-full rounded-md border border-input bg-background px-",
+     "ph": "Search job, reg, cat"
+    }
+   ]
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "control-clients",
+   "w": 390,
+   "n": 9,
+   "small": 3,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": [
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex w-full rounded-md border border-input bg-background px-",
+     "ph": "Search clients..."
+    },
+    {
+     "k": "button[switch]",
+     "r": 3.44,
+     "cls": "peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-cent",
+     "ph": ""
+    }
+   ]
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "control-clients",
+   "w": 1440,
+   "n": 35,
+   "small": 3,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": [
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex w-full rounded-md border border-input bg-background px-",
+     "ph": "Search clients..."
+    },
+    {
+     "k": "button[switch]",
+     "r": 3.44,
+     "cls": "peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-cent",
+     "ph": ""
+    }
+   ]
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "control-exports",
+   "w": 390,
+   "n": 34,
+   "small": 1,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": [
+    {
+     "k": "select",
+     "r": 3.44,
+     "cls": "h-10 w-full rounded-md border border-input bg-background px-",
+     "ph": ""
+    },
+    {
+     "k": "button[checkbox]",
+     "r": 5.5,
+     "cls": "peer h-4 w-4 shrink-0 rounded border border-primary ring-off",
+     "ph": ""
+    },
+    {
+     "k": "button[checkbox]",
+     "r": 5.5,
+     "cls": "peer h-4 w-4 shrink-0 rounded border border-primary ring-off",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    }
+   ]
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "control-exports",
+   "w": 1440,
+   "n": 60,
+   "small": 1,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": [
+    {
+     "k": "select",
+     "r": 3.44,
+     "cls": "h-10 w-full rounded-md border border-input bg-background px-",
+     "ph": ""
+    },
+    {
+     "k": "button[checkbox]",
+     "r": 5.5,
+     "cls": "peer h-4 w-4 shrink-0 rounded border border-primary ring-off",
+     "ph": ""
+    },
+    {
+     "k": "button[checkbox]",
+     "r": 5.5,
+     "cls": "peer h-4 w-4 shrink-0 rounded border border-primary ring-off",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    },
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": ""
+    }
+   ]
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "super-dash",
+   "w": 320,
+   "n": 32,
+   "small": 4,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "super-dash",
+   "w": 390,
+   "n": 32,
+   "small": 4,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "super-dash",
+   "w": 768,
+   "n": 32,
+   "small": 4,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "super-dash",
+   "w": 1024,
+   "n": 32,
+   "small": 4,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "super-dash",
+   "w": 1440,
+   "n": 32,
+   "small": 4,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "super-settings",
+   "w": 320,
+   "n": 24,
+   "small": 4,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "super-settings",
+   "w": 390,
+   "n": 24,
+   "small": 4,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "super-settings",
+   "w": 768,
+   "n": 24,
+   "small": 4,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "super-settings",
+   "w": 1024,
+   "n": 24,
+   "small": 4,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "super-settings",
+   "w": 1440,
+   "n": 24,
+   "small": 4,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "control-super",
+   "w": 320,
+   "n": 18,
+   "small": 4,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "control-super",
+   "w": 390,
+   "n": 23,
+   "small": 9,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "control-super",
+   "w": 768,
+   "n": 26,
+   "small": 9,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "control-super",
+   "w": 1024,
+   "n": 51,
+   "small": 9,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "route",
+   "theme": "dark",
+   "slug": "control-super",
+   "w": 1440,
+   "n": 51,
+   "small": 9,
+   "fail": [],
+   "dev": 1,
+   "docOverflow": false,
+   "nt": []
+  },
+  {
+   "kind": "fixture",
+   "theme": "dark",
+   "slug": "fixture",
+   "w": 390,
+   "n": 332,
+   "small": 157,
+   "fail": [],
+   "dev": 0,
+   "docOverflow": false,
+   "nt": [
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "Placeholder text"
+    },
+    {
+     "k": "textarea",
+     "r": 3.44,
+     "cls": "flex min-h-[80px] w-full rounded-md border border-input bg-b",
+     "ph": "Notes"
+    },
+    {
+     "k": "button[checkbox]",
+     "r": 5.5,
+     "cls": "peer h-4 w-4 shrink-0 rounded border border-primary ring-off",
+     "ph": ""
+    },
+    {
+     "k": "button[switch]",
+     "r": 3.44,
+     "cls": "peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-cent",
+     "ph": "Switch"
+    },
+    {
+     "k": "button[switch]",
+     "r": 5.5,
+     "cls": "peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-cent",
+     "ph": "Switch on"
+    }
+   ]
+  },
+  {
+   "kind": "fixture",
+   "theme": "dark",
+   "slug": "fixture",
+   "w": 1440,
+   "n": 332,
+   "small": 157,
+   "fail": [],
+   "dev": 0,
+   "docOverflow": false,
+   "nt": [
+    {
+     "k": "input",
+     "r": 3.44,
+     "cls": "flex h-10 w-full rounded-md border border-input bg-backgroun",
+     "ph": "Placeholder text"
+    },
+    {
+     "k": "textarea",
+     "r": 3.44,
+     "cls": "flex min-h-[80px] w-full rounded-md border border-input bg-b",
+     "ph": "Notes"
+    },
+    {
+     "k": "button[checkbox]",
+     "r": 5.5,
+     "cls": "peer h-4 w-4 shrink-0 rounded border border-primary ring-off",
+     "ph": ""
+    },
+    {
+     "k": "button[switch]",
+     "r": 3.44,
+     "cls": "peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-cent",
+     "ph": "Switch"
+    },
+    {
+     "k": "button[switch]",
+     "r": 5.5,
+     "cls": "peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-cent",
+     "ph": "Switch on"
+    }
+   ]
+  }
+ ],
+ "focus": []
+}

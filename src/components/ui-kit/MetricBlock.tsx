@@ -33,8 +33,8 @@ export function MetricBlock({
         <span
           className={cn(
             tone === "headline"
-              ? "text-2xl font-bold tracking-tight text-foreground"
-              : "text-lg font-semibold text-foreground/80",
+              ? "text-2xl font-bold tracking-tight text-foreground tabular-nums"
+              : "text-lg font-semibold text-foreground/80 tabular-nums",
           )}
         >
           {value}

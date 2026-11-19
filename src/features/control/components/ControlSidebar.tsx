@@ -69,7 +69,7 @@ export function ControlSidebar() {
             <span className="text-sm font-semibold text-sidebar-foreground block truncate">
               Axentra
             </span>
-            <span className="text-[10px] text-sidebar-foreground/60 uppercase tracking-widest">
+            <span className="text-caption text-sidebar-foreground/80 uppercase tracking-wider">
               Command Center
             </span>
           </div>
@@ -81,7 +81,7 @@ export function ControlSidebar() {
         {navGroups.map((group) => (
           <div key={group.label}>
             {!collapsed && (
-              <span className="px-2 mb-1 block text-[10px] font-semibold text-sidebar-foreground/50 uppercase tracking-widest">
+              <span className="px-2 mb-1 block text-caption font-semibold text-sidebar-foreground/80 uppercase tracking-wider">
                 {group.label}
               </span>
             )}
@@ -97,7 +97,7 @@ export function ControlSidebar() {
                         "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
                         active
                           ? "bg-sidebar-accent text-sidebar-primary"
-                          : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                          : "text-sidebar-foreground/85 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
                       )}
                       title={collapsed ? item.label : undefined}
                     >
@@ -117,7 +117,7 @@ export function ControlSidebar() {
         {/* Back to mobile app link */}
         <Link
           to="/"
-          className="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-xs text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors"
+          className="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-xs text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors"
           title={collapsed ? "Back to App" : undefined}
         >
           <LogOut className="h-3.5 w-3.5 shrink-0 rotate-180" />
@@ -128,7 +128,7 @@ export function ControlSidebar() {
         {!collapsed && (
           <div className="px-2.5 py-1.5">
             <p className="text-xs font-medium text-sidebar-foreground truncate">{userName}</p>
-            <p className="text-[10px] text-sidebar-foreground/50 truncate">{userEmail}</p>
+            <p className="text-caption text-sidebar-foreground/80 truncate">{userEmail}</p>
           </div>
         )}
 
@@ -136,7 +136,7 @@ export function ControlSidebar() {
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-sidebar-foreground/50 hover:text-sidebar-foreground mx-auto"
+          className="h-8 w-8 text-sidebar-foreground/70 hover:text-sidebar-foreground mx-auto"
           onClick={() => setCollapsed((v) => !v)}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >

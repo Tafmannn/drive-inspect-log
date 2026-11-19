@@ -9,41 +9,73 @@ All colors MUST be HSL.
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 215 28% 17%;
+    /* Phase 1a (Concept A, docs/ui-redesign-review/04-design-system.md): light-theme
+       values only. The .dark block below is intentionally NOT changed. */
+    --foreground: 216 50% 12%;
 
     --card: 0 0% 100%;
-    --card-foreground: 215 28% 17%;
+    --card-foreground: 216 50% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 215 28% 17%;
+    --popover-foreground: 216 50% 12%;
 
-    --primary: 215 84% 32%;
+    /* Approved action blue #1E4FA8 (7.68:1 with white). */
+    --primary: 219 70% 39%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 210 16% 82%;
-    --secondary-foreground: 215 28% 17%;
+    --secondary-foreground: 216 50% 12%;
 
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 13% 46%;
+    --muted: 210 31% 95%;
+    /* #5B6779-class secondary text: 5.64:1 on white, 5.03:1 on --muted
+       (was 4.41:1 on --muted). */
+    --muted-foreground: 216 14% 42%;
 
     --accent: 260 84% 32%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
+    /* Semantic colours are used both as solid fills with white text AND as text
+       on 10% tints of themselves. Spec values (#C62E22 / #15803D / #B45309) were
+       lowered 1% lightness so BOTH uses clear 4.5:1 (spec warning/success gave
+       4.40/4.43 on a 10% tint). Solid+white: 5.8 / 5.4 / 5.3. */
+    --destructive: 4 71% 44%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 215 84% 32%;
+    /* Decorative dividers/cards stay light; CONTROL boundaries use --input
+       (= --border-strong, 3.4:1 on white, 3.06:1 on --muted). */
+    --border: 214 25% 89%;
+    --border-strong: 215 16% 56%;
+    --input: 215 16% 56%;
+    /* Focus ring = action blue; paired with ring-offset-background (white) this
+       is a solid two-colour ring, >= 6.7:1 on every light surface. */
+    --ring: 219 70% 39%;
 
-    --success: 142 76% 36%;
+    --success: 142 72% 28%;
     --success-foreground: 355.7 100% 97.3%;
 
-    --warning: 38 92% 50%;
+    --warning: 26 90% 36%;
     --warning-foreground: 0 0% 100%;
 
-    --info: 215 84% 32%;
+    --info: 219 70% 39%;
     --info-foreground: 0 0% 100%;
+
+    /* Additive tints for future use (not consumed by Phase 1a code). */
+    --primary-soft: 215 70% 95%;
+    --success-soft: 145 44% 92%;
+    --warning-soft: 42 100% 91%;
+    --danger-soft: 7 86% 94%;
+    --info-soft: 215 70% 95%;
+    --done-soft: 250 69% 95%;
+    --neutral-soft: 214 26% 95%;
+
+    /* Type scale tokens (size / line-height). Consumed via tailwind fontSize
+       (text-caption, text-label, ...); existing text-[Npx] uses are NOT rewritten. */
+    --text-caption: 0.75rem;   --lh-caption: 1rem;
+    --text-label: 0.8125rem;   --lh-label: 1.125rem;
+    --text-body: 0.875rem;     --lh-body: 1.25rem;
+    --text-title: 1.125rem;    --lh-title: 1.5rem;
+    --text-h1: 1.5rem;         --lh-h1: 2rem;
+    --text-display: 1.75rem;   --lh-display: 2rem;
 
     --app-header: 215 28% 17%;
     --app-header-foreground: 0 0% 100%;
@@ -99,15 +131,21 @@ All colors MUST be HSL.
     --accent: 260 60% 68%;
     --accent-foreground: 222.2 84% 4.9%;
 
-    /* 56% (not 50.6%) so standalone text-destructive (error copy, 50+ call
-       sites) clears 4.5:1 against the page background; destructive-foreground
-       (white button/badge text) still clears 4:1+, comfortably above the 3:1
-       required for the bold/large button-label text it's used on. */
-    --destructive: 0 62.8% 56%;
-    --destructive-foreground: 210 40% 98%;
+    /* Phase 1a follow-up: 56% / white measured 4.12:1 for white-on-destructive
+       (button and badge text), below 4.5:1, and white-on-red cannot also keep
+       standalone text-destructive >= 4.5:1 on the page background. Lighten the
+       red and pair it with a dark foreground (the same pattern success/warning/
+       info already use): both uses now measure ~5.6:1. */
+    --destructive: 0 72% 62%;
+    --destructive-foreground: 222.2 84% 4.9%;
 
     --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 22%;
+    /* Phase 1a: unchanged dark values; new tokens mirror existing dark ones so
+       nothing that consumes them can render a light-theme colour on a dark page. */
+    /* Phase 1a follow-up: 22% lightness measured 1.59:1 against the page
+       background; 42% reaches 3.44:1 (WCAG 1.4.11 non-text contrast, 3:1). */
+    --border-strong: 217 20% 42%;
+    --input: 217 20% 42%;
     --ring: 212.7 26.8% 83.9%;
 
     --success: 142 76% 42%;
@@ -124,12 +162,22 @@ All colors MUST be HSL.
     --info: 217 91% 60%;
     --info-foreground: 222.2 84% 4.9%;
 
+    --primary-soft: 217 91% 60% / 0.16;
+    --success-soft: 142 76% 42% / 0.16;
+    --warning-soft: 38 92% 55% / 0.16;
+    --danger-soft: 0 72% 62% / 0.16;
+    --info-soft: 217 91% 60% / 0.16;
+    --done-soft: 260 60% 68% / 0.16;
+    --neutral-soft: 217.2 32.6% 17.5%;
+
     --app-header: 222.2 84% 6%;
     --app-header-foreground: 210 40% 98%;
 
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    /* Phase 1a follow-up: active item label was 2.22:1 on --sidebar-accent;
+       68% lightness reaches 5.4:1 there and 6.4:1 on the sidebar background. */
+    --sidebar-primary: 217 91% 68%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 3.7% 15.9%;
     --sidebar-accent-foreground: 240 4.8% 95.9%;
@@ -172,6 +220,26 @@ All colors MUST be HSL.
   body,
   #root {
     min-height: 100%;
+  }
+
+  /* Phase 1a — keyboard-visible focus fallback. Zero specificity (:where), so every
+     component that already styles focus (shadcn primitives use ring-2 + offset, or
+     focus-visible:outline-none + their own ring) keeps its own treatment; only
+     controls with NO focus styling (e.g. plain <button>/<a> in BottomNav, headers,
+     cards) gain a solid ring-coloured outline with a page-colour halo. Works in light
+     and dark (--ring / --background). */
+  :where(a[href], button, summary, [role="button"], [role="tab"], [role="menuitem"], [tabindex]:not([tabindex="-1"])):focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    /* Page-colour halo under the ring (same idea as ring-offset-background): keeps the
+       focus indicator visible on saturated/dark surfaces such as the blue brand band,
+       where the ring colour alone measured 1.12:1. */
+    box-shadow: 0 0 0 4px hsl(var(--background));
+  }
+
+  /* Phase 1a — table figures (amounts, counts, ages, dates) align by column. */
+  table {
+    font-variant-numeric: tabular-nums;
   }
 
   #root {

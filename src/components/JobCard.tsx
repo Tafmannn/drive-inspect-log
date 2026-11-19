@@ -151,7 +151,7 @@ export const JobCard = ({
           >
             {statusStyle.label}
           </span>
-          <span className="text-xs font-medium text-muted-foreground truncate">
+          <span className="text-xs font-medium text-muted-foreground truncate tabular-nums">
             Job {jobRef}
           </span>
         </div>
