@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { checkStaff } from "../_shared/staffAuth.ts";
 import { createIpRateLimiter } from "../_shared/rateLimit.ts";
+import { geocodeRefused, placesRefused } from "../_shared/lookupFallback.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -128,7 +129,7 @@ serve(async (req) => {
     const MAPS_KEY = Deno.env.get("GOOGLE_MAPS_API_KEY");
     if (!MAPS_KEY) {
       return new Response(
-        JSON.stringify({ results: [] }),
+        JSON.stringify({ results: [], degraded: true }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -140,6 +141,10 @@ serve(async (req) => {
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // True when Google itself refused a request (billing off, API not enabled,
+    // quota used up), as opposed to simply finding no match.
+    let degraded = false;
 
     // If postcode provided, geocode it first for location bias
     let locationBias: any = {
@@ -157,6 +162,7 @@ serve(async (req) => {
         geoUrl.searchParams.set("key", MAPS_KEY);
         const geoResp = await fetch(geoUrl.toString());
         const geoData = await geoResp.json();
+        if (geocodeRefused(geoData.status)) degraded = true;
         if (geoData.status === "OK" && geoData.results?.[0]?.geometry?.location) {
           const loc = geoData.results[0].geometry.location;
           locationBias = {
@@ -189,7 +195,8 @@ serve(async (req) => {
       }),
     });
 
-    const placesData = await resp.json();
+    const placesData = await resp.json().catch(() => ({}));
+    if (placesRefused(resp.ok, placesData)) degraded = true;
     if (!placesData.places?.length) {
       console.log("business-search primary empty. status:", resp.status, "body:", JSON.stringify(placesData).slice(0, 500));
     }
@@ -211,7 +218,8 @@ serve(async (req) => {
           locationBias,
         }),
       });
-      const data2 = await resp2.json();
+      const data2 = await resp2.json().catch(() => ({}));
+      if (placesRefused(resp2.ok, data2)) degraded = true;
       if (!data2.places?.length) {
         console.log("business-search retry empty. status:", resp2.status, "body:", JSON.stringify(data2).slice(0, 500));
       }
@@ -224,6 +232,7 @@ serve(async (req) => {
         legacyUrl.searchParams.set("key", MAPS_KEY);
         const legacyResp = await fetch(legacyUrl.toString());
         const legacyData = await legacyResp.json();
+        if (geocodeRefused(legacyData.status)) degraded = true;
         if (legacyData.status !== "OK" || !legacyData.results?.length) {
           console.log("business-search legacy fallback empty. status:", legacyData.status, "err:", legacyData.error_message);
           const geoUrl = new URL("https://maps.googleapis.com/maps/api/geocode/json");
@@ -232,17 +241,21 @@ serve(async (req) => {
           geoUrl.searchParams.set("key", MAPS_KEY);
           const geoResp = await fetch(geoUrl.toString());
           const geoData = await geoResp.json();
+          if (geocodeRefused(geoData.status)) degraded = true;
           if (geoData.status !== "OK" || !geoData.results?.length) {
             console.log("business-search geocode fallback empty. status:", geoData.status, "err:", geoData.error_message);
-            const nominatimResults = await searchNominatim(query, postcode);
+            const nominatimResults = await searchNominatim(query, postcode).catch((e) => {
+              console.warn("business-search: OpenStreetMap fallback failed:", e instanceof Error ? e.message : e);
+              return [];
+            });
             if (nominatimResults.length) {
               return new Response(
-                JSON.stringify({ results: nominatimResults }),
+                JSON.stringify({ results: nominatimResults, degraded }),
                 { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
               );
             }
             return new Response(
-              JSON.stringify({ results: [] }),
+              JSON.stringify({ results: [], degraded }),
               { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
           }
@@ -259,7 +272,7 @@ serve(async (req) => {
             };
           });
           return new Response(
-            JSON.stringify({ results: geocodeResults }),
+            JSON.stringify({ results: geocodeResults, degraded: false }),
             { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
@@ -276,7 +289,7 @@ serve(async (req) => {
           };
         });
         return new Response(
-          JSON.stringify({ results: legacyResults }),
+          JSON.stringify({ results: legacyResults, degraded: false }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -289,7 +302,7 @@ serve(async (req) => {
       }));
 
       return new Response(
-        JSON.stringify({ results }),
+        JSON.stringify({ results, degraded: false }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -302,13 +315,13 @@ serve(async (req) => {
     }));
 
     return new Response(
-      JSON.stringify({ results }),
+      JSON.stringify({ results, degraded: false }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
     console.error("business-search error:", e instanceof Error ? e.message : e);
     return new Response(
-      JSON.stringify({ results: [] }),
+      JSON.stringify({ results: [], degraded: true }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

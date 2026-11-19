@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Loader2, Building2 } from "lucide-react";
-import { searchBusinesses, type BusinessResult } from "@/lib/businessSearchApi";
+import { businessSearchMessage, searchBusinessesDetailed, type BusinessResult } from "@/lib/businessSearchApi";
 
 interface BusinessSearchInputProps {
   name: string;
@@ -22,6 +22,7 @@ export function BusinessSearchInput({
   const [results, setResults] = useState<BusinessResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [note, setNote] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -49,15 +50,17 @@ export function BusinessSearchInput({
       if (value.trim().length < 3) {
         setResults([]);
         setShowDropdown(false);
+        setNote("");
         return;
       }
 
       debounceRef.current = setTimeout(async () => {
         setLoading(true);
         try {
-          const r = await searchBusinesses(value.trim(), postcode);
-          setResults(r);
-          setShowDropdown(r.length > 0);
+          const outcome = await searchBusinessesDetailed(value.trim(), postcode);
+          setResults(outcome.results);
+          setShowDropdown(outcome.results.length > 0);
+          setNote(businessSearchMessage(outcome));
         } catch {
           setResults([]);
           setShowDropdown(false);
@@ -97,6 +100,10 @@ export function BusinessSearchInput({
           <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
         )}
       </div>
+
+      {note && !loading && (
+        <p className="mt-1 text-xs text-muted-foreground" role="status">{note}</p>
+      )}
 
       {showDropdown && results.length > 0 && (
         <div className="absolute z-50 w-full mt-1 border border-border rounded-md bg-popover shadow-md max-h-56 overflow-y-auto">

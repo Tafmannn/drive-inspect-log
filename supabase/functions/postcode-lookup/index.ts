@@ -1,6 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { checkStaff } from "../_shared/staffAuth.ts";
 import { createIpRateLimiter } from "../_shared/rateLimit.ts";
+import {
+  geocodeRefused,
+  parsePostcodesIo,
+  placesRefused,
+  timeoutSignal,
+} from "../_shared/lookupFallback.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -36,16 +42,38 @@ async function lookupPostcodeWithNominatim(postcode: string) {
   url.searchParams.set("limit", "10");
   url.searchParams.set("postalcode", postcode);
 
-  const resp = await fetch(url.toString(), {
-    headers: {
-      "Accept": "application/json",
-      "User-Agent": "AxentraVehicleLogistics/1.0 (postcode-lookup)",
-    },
-  });
-  if (!resp.ok) return [];
-  const data = await resp.json();
-  if (!Array.isArray(data)) return [];
-  return data.map((item: any, i: number) => parseNominatimAddress(item, postcode, i));
+  try {
+    const resp = await fetch(url.toString(), {
+      headers: {
+        "Accept": "application/json",
+        "User-Agent": "AxentraVehicleLogistics/1.0 (postcode-lookup)",
+      },
+      signal: timeoutSignal(5000),
+    });
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    if (!Array.isArray(data)) return [];
+    return data.map((item: any, i: number) => parseNominatimAddress(item, postcode, i));
+  } catch (e) {
+    console.warn("postcode-lookup: OpenStreetMap fallback failed:", e instanceof Error ? e.message : e);
+    return [];
+  }
+}
+
+// Last resort: postcodes.io is free and needs no key, but gives the area for a
+// postcode rather than street addresses.
+async function lookupPostcodeWithPostcodesIo(postcode: string) {
+  try {
+    const resp = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(postcode)}`, {
+      headers: { "Accept": "application/json" },
+      signal: timeoutSignal(4000),
+    });
+    if (!resp.ok) return [];
+    return parsePostcodesIo(await resp.json(), postcode);
+  } catch (e) {
+    console.warn("postcode-lookup: postcodes.io fallback failed:", e instanceof Error ? e.message : e);
+    return [];
+  }
 }
 
 serve(async (req) => {
@@ -87,6 +115,10 @@ serve(async (req) => {
 
     const normalised = postcode.trim().toUpperCase();
 
+    // True when Google itself refused a request (billing off, API not enabled,
+    // quota used up), as opposed to simply finding no match.
+    let degraded = false;
+
     const resp = await fetch("https://places.googleapis.com/v1/places:searchText", {
       method: "POST",
       headers: {
@@ -108,7 +140,11 @@ serve(async (req) => {
       }),
     });
 
-    const data = await resp.json();
+    const data = await resp.json().catch(() => ({}));
+    if (placesRefused(resp.ok, data)) {
+      degraded = true;
+      console.warn("postcode-lookup: Google Places refused the request:", resp.status, data?.error?.status ?? "");
+    }
 
     if (!data.places?.length) {
       const geoUrl = new URL("https://maps.googleapis.com/maps/api/geocode/json");
@@ -118,17 +154,28 @@ serve(async (req) => {
 
       const geoResp = await fetch(geoUrl.toString());
       const geoData = await geoResp.json();
+      if (geocodeRefused(geoData.status)) {
+        degraded = true;
+        console.warn("postcode-lookup: Google Geocoding refused the request:", geoData.status, geoData.error_message ?? "");
+      }
 
       if (geoData.status !== "OK" || !geoData.results?.length) {
         const fallbackResults = await lookupPostcodeWithNominatim(normalised);
         if (fallbackResults.length) {
           return new Response(
-            JSON.stringify({ results: fallbackResults }),
+            JSON.stringify({ results: fallbackResults, source: "openstreetmap", degraded }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        const areaOnly = await lookupPostcodeWithPostcodesIo(normalised);
+        if (areaOnly.length) {
+          return new Response(
+            JSON.stringify({ results: areaOnly, source: "postcodes.io", degraded }),
             { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
         return new Response(
-          JSON.stringify({ results: [], error: "No addresses found" }),
+          JSON.stringify({ results: [], error: "No addresses found", degraded }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -146,7 +193,7 @@ serve(async (req) => {
       });
 
       return new Response(
-        JSON.stringify({ results }),
+        JSON.stringify({ results, source: "google", degraded: false }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -179,7 +226,7 @@ serve(async (req) => {
     });
 
     return new Response(
-      JSON.stringify({ results }),
+      JSON.stringify({ results, source: "google", degraded: false }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
