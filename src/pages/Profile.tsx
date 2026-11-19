@@ -161,7 +161,7 @@ export const Profile = () => {
             </Card>
             <Card>
               <CardContent className="p-4 text-center">
-                <p className="text-2xl font-bold">{expenseTotal ?? "–"}</p>
+                <p className="text-2xl font-bold tabular-nums">{expenseTotal ?? "–"}</p>
                 <p className="text-xs text-muted-foreground">Expenses This Month</p>
               </CardContent>
             </Card>
