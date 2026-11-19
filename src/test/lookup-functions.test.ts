@@ -267,3 +267,27 @@ describe("business-search", () => {
     expect(calls).toEqual([]);
   });
 });
+
+describe("business-search Places request", () => {
+  it("asks Google's Places API once, with no type filter Google would reject", async () => {
+    const bodies: string[] = [];
+    const base = fakeFetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input).startsWith("https://places.googleapis.com/")) bodies.push(String(init?.body ?? ""));
+        return base(input);
+      }),
+    );
+    const r = await call("business-search", { query: "acme motors", postcode: "LS1 1AA" });
+    expect(r.body.results[0]).toMatchObject({ placeId: "g1" });
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]).not.toContain("includedType");
+  });
+
+  it("when Places finds nothing it goes on to the next Google service, not a second identical Places call", async () => {
+    world.places = "empty";
+    await call("business-search", { query: "acme motors" });
+    expect(calls.filter((c) => c.startsWith("places.googleapis.com")).length).toBe(1);
+  });
+});

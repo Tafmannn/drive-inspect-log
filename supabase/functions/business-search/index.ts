@@ -191,118 +191,81 @@ serve(async (req) => {
         languageCode: "en",
         maxResultCount: 8,
         locationBias,
-        includedType: "establishment",
       }),
     });
 
     const placesData = await resp.json().catch(() => ({}));
     if (placesRefused(resp.ok, placesData)) degraded = true;
     if (!placesData.places?.length) {
-      console.log("business-search primary empty. status:", resp.status, "body:", JSON.stringify(placesData).slice(0, 500));
+      console.log("business-search places empty. status:", resp.status, "body:", JSON.stringify(placesData).slice(0, 500));
     }
 
     if (!placesData.places?.length) {
-      // Retry without includedType restriction
-      const resp2 = await fetch("https://places.googleapis.com/v1/places:searchText", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Goog-Api-Key": MAPS_KEY,
-          "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.types",
-        },
-        body: JSON.stringify({
-          textQuery: query.trim(),
-          regionCode: "GB",
-          languageCode: "en",
-          maxResultCount: 8,
-          locationBias,
-        }),
-      });
-      const data2 = await resp2.json().catch(() => ({}));
-      if (placesRefused(resp2.ok, data2)) degraded = true;
-      if (!data2.places?.length) {
-        console.log("business-search retry empty. status:", resp2.status, "body:", JSON.stringify(data2).slice(0, 500));
-      }
-
-      if (!data2.places?.length) {
-        // Legacy Places Text Search fallback (in case Places API New is not enabled)
-        const legacyUrl = new URL("https://maps.googleapis.com/maps/api/place/textsearch/json");
-        legacyUrl.searchParams.set("query", [query.trim(), postcode?.trim()].filter(Boolean).join(" "));
-        legacyUrl.searchParams.set("region", "gb");
-        legacyUrl.searchParams.set("key", MAPS_KEY);
-        const legacyResp = await fetch(legacyUrl.toString());
-        const legacyData = await legacyResp.json();
-        if (geocodeRefused(legacyData.status)) degraded = true;
-        if (legacyData.status !== "OK" || !legacyData.results?.length) {
-          console.log("business-search legacy fallback empty. status:", legacyData.status, "err:", legacyData.error_message);
-          const geoUrl = new URL("https://maps.googleapis.com/maps/api/geocode/json");
-          geoUrl.searchParams.set("address", [query.trim(), postcode?.trim(), "UK"].filter(Boolean).join(" "));
-          geoUrl.searchParams.set("components", "country:GB");
-          geoUrl.searchParams.set("key", MAPS_KEY);
-          const geoResp = await fetch(geoUrl.toString());
-          const geoData = await geoResp.json();
-          if (geocodeRefused(geoData.status)) degraded = true;
-          if (geoData.status !== "OK" || !geoData.results?.length) {
-            console.log("business-search geocode fallback empty. status:", geoData.status, "err:", geoData.error_message);
-            const nominatimResults = await searchNominatim(query, postcode).catch((e) => {
-              console.warn("business-search: OpenStreetMap fallback failed:", e instanceof Error ? e.message : e);
-              return [];
-            });
-            if (nominatimResults.length) {
-              return new Response(
-                JSON.stringify({ results: nominatimResults, degraded }),
-                { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-              );
-            }
+      // Legacy Places Text Search fallback (in case Places API New is not enabled)
+      const legacyUrl = new URL("https://maps.googleapis.com/maps/api/place/textsearch/json");
+      legacyUrl.searchParams.set("query", [query.trim(), postcode?.trim()].filter(Boolean).join(" "));
+      legacyUrl.searchParams.set("region", "gb");
+      legacyUrl.searchParams.set("key", MAPS_KEY);
+      const legacyResp = await fetch(legacyUrl.toString());
+      const legacyData = await legacyResp.json();
+      if (geocodeRefused(legacyData.status)) degraded = true;
+      if (legacyData.status !== "OK" || !legacyData.results?.length) {
+        console.log("business-search legacy fallback empty. status:", legacyData.status, "err:", legacyData.error_message);
+        const geoUrl = new URL("https://maps.googleapis.com/maps/api/geocode/json");
+        geoUrl.searchParams.set("address", [query.trim(), postcode?.trim(), "UK"].filter(Boolean).join(" "));
+        geoUrl.searchParams.set("components", "country:GB");
+        geoUrl.searchParams.set("key", MAPS_KEY);
+        const geoResp = await fetch(geoUrl.toString());
+        const geoData = await geoResp.json();
+        if (geocodeRefused(geoData.status)) degraded = true;
+        if (geoData.status !== "OK" || !geoData.results?.length) {
+          console.log("business-search geocode fallback empty. status:", geoData.status, "err:", geoData.error_message);
+          const nominatimResults = await searchNominatim(query, postcode).catch((e) => {
+            console.warn("business-search: OpenStreetMap fallback failed:", e instanceof Error ? e.message : e);
+            return [];
+          });
+          if (nominatimResults.length) {
             return new Response(
-              JSON.stringify({ results: [], degraded }),
+              JSON.stringify({ results: nominatimResults, degraded }),
               { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
           }
-          const geocodeResults = geoData.results.slice(0, 8).map((r: any, i: number) => {
-            const parsed = parseGeocodeAddress(r, postcode || "");
-            return {
-              placeId: r.place_id ? `geocode:${r.place_id}` : `geocode-${i}`,
-              name: query.trim(),
-              address: r.formatted_address || "",
-              types: r.types || [],
-              line1: parsed.line1,
-              city: parsed.city,
-              postcode: parsed.postcode,
-            };
-          });
           return new Response(
-            JSON.stringify({ results: geocodeResults, degraded: false }),
+            JSON.stringify({ results: [], degraded }),
             { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
-        const legacyResults = legacyData.results.slice(0, 8).map((p: any) => {
-          const parsed = parseGeocodeAddress({ formatted_address: p.formatted_address, address_components: [] }, postcode || "");
+        const geocodeResults = geoData.results.slice(0, 8).map((r: any, i: number) => {
+          const parsed = parseGeocodeAddress(r, postcode || "");
           return {
-            placeId: p.place_id,
-            name: p.name || "",
-            address: p.formatted_address || "",
-            types: p.types || [],
+            placeId: r.place_id ? `geocode:${r.place_id}` : `geocode-${i}`,
+            name: query.trim(),
+            address: r.formatted_address || "",
+            types: r.types || [],
             line1: parsed.line1,
             city: parsed.city,
             postcode: parsed.postcode,
           };
         });
         return new Response(
-          JSON.stringify({ results: legacyResults, degraded: false }),
+          JSON.stringify({ results: geocodeResults, degraded: false }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-
-      const results = data2.places.map((p: any) => ({
-        placeId: p.id,
-        name: p.displayName?.text || "",
-        address: p.formattedAddress || "",
-        types: p.types || [],
-      }));
-
+      const legacyResults = legacyData.results.slice(0, 8).map((p: any) => {
+        const parsed = parseGeocodeAddress({ formatted_address: p.formatted_address, address_components: [] }, postcode || "");
+        return {
+          placeId: p.place_id,
+          name: p.name || "",
+          address: p.formatted_address || "",
+          types: p.types || [],
+          line1: parsed.line1,
+          city: parsed.city,
+          postcode: parsed.postcode,
+        };
+      });
       return new Response(
-        JSON.stringify({ results, degraded: false }),
+        JSON.stringify({ results: legacyResults, degraded: false }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
