@@ -125,7 +125,7 @@ serve(async (req) => {
     }
 
     // ─── Original logic ───
-    const MAPS_KEY = Deno.env.get("GOOGLE_MAPS_API_KEY");
+    const MAPS_KEY = Deno.env.get("GOOGLE_PLACES_API_KEY");
     if (!MAPS_KEY) {
       return new Response(
         JSON.stringify({ results: [] }),
@@ -217,66 +217,41 @@ serve(async (req) => {
       }
 
       if (!data2.places?.length) {
-        // Legacy Places Text Search fallback (in case Places API New is not enabled)
-        const legacyUrl = new URL("https://maps.googleapis.com/maps/api/place/textsearch/json");
-        legacyUrl.searchParams.set("query", [query.trim(), postcode?.trim()].filter(Boolean).join(" "));
-        legacyUrl.searchParams.set("region", "gb");
-        legacyUrl.searchParams.set("key", MAPS_KEY);
-        const legacyResp = await fetch(legacyUrl.toString());
-        const legacyData = await legacyResp.json();
-        if (legacyData.status !== "OK" || !legacyData.results?.length) {
-          console.log("business-search legacy fallback empty. status:", legacyData.status, "err:", legacyData.error_message);
-          const geoUrl = new URL("https://maps.googleapis.com/maps/api/geocode/json");
-          geoUrl.searchParams.set("address", [query.trim(), postcode?.trim(), "UK"].filter(Boolean).join(" "));
-          geoUrl.searchParams.set("components", "country:GB");
-          geoUrl.searchParams.set("key", MAPS_KEY);
-          const geoResp = await fetch(geoUrl.toString());
-          const geoData = await geoResp.json();
-          if (geoData.status !== "OK" || !geoData.results?.length) {
-            console.log("business-search geocode fallback empty. status:", geoData.status, "err:", geoData.error_message);
-            const nominatimResults = await searchNominatim(query, postcode);
-            if (nominatimResults.length) {
-              return new Response(
-                JSON.stringify({ results: nominatimResults }),
-                { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-              );
-            }
+        // Geocoding fallback, followed by OpenStreetMap/Nominatim.
+        const geoUrl = new URL("https://maps.googleapis.com/maps/api/geocode/json");
+        geoUrl.searchParams.set("address", [query.trim(), postcode?.trim(), "UK"].filter(Boolean).join(" "));
+        geoUrl.searchParams.set("components", "country:GB");
+        geoUrl.searchParams.set("key", MAPS_KEY);
+        const geoResp = await fetch(geoUrl.toString());
+        const geoData = await geoResp.json();
+        if (geoData.status !== "OK" || !geoData.results?.length) {
+          console.log("business-search geocode fallback empty. status:", geoData.status, "err:", geoData.error_message);
+          const nominatimResults = await searchNominatim(query, postcode);
+          if (nominatimResults.length) {
             return new Response(
-              JSON.stringify({ results: [] }),
+              JSON.stringify({ results: nominatimResults }),
               { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
           }
-          const geocodeResults = geoData.results.slice(0, 8).map((r: any, i: number) => {
-            const parsed = parseGeocodeAddress(r, postcode || "");
-            return {
-              placeId: r.place_id ? `geocode:${r.place_id}` : `geocode-${i}`,
-              name: query.trim(),
-              address: r.formatted_address || "",
-              types: r.types || [],
-              line1: parsed.line1,
-              city: parsed.city,
-              postcode: parsed.postcode,
-            };
-          });
           return new Response(
-            JSON.stringify({ results: geocodeResults }),
+            JSON.stringify({ results: [] }),
             { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
-        const legacyResults = legacyData.results.slice(0, 8).map((p: any) => {
-          const parsed = parseGeocodeAddress({ formatted_address: p.formatted_address, address_components: [] }, postcode || "");
+        const geocodeResults = geoData.results.slice(0, 8).map((r: any, i: number) => {
+          const parsed = parseGeocodeAddress(r, postcode || "");
           return {
-            placeId: p.place_id,
-            name: p.name || "",
-            address: p.formatted_address || "",
-            types: p.types || [],
+            placeId: r.place_id ? `geocode:${r.place_id}` : `geocode-${i}`,
+            name: query.trim(),
+            address: r.formatted_address || "",
+            types: r.types || [],
             line1: parsed.line1,
             city: parsed.city,
             postcode: parsed.postcode,
           };
         });
         return new Response(
-          JSON.stringify({ results: legacyResults }),
+          JSON.stringify({ results: geocodeResults }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }

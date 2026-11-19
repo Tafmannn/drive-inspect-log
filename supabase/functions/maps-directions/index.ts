@@ -32,10 +32,10 @@ serve(async (req) => {
     }
 
     // ─── Original logic ───
-    const MAPS_KEY = Deno.env.get("GOOGLE_MAPS_API_KEY");
+    const MAPS_KEY = Deno.env.get("GOOGLE_PLACES_API_KEY");
     if (!MAPS_KEY) {
       return new Response(
-        JSON.stringify({ error: "GOOGLE_MAPS_API_KEY not configured" }),
+        JSON.stringify({ error: "GOOGLE_PLACES_API_KEY not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -57,16 +57,32 @@ serve(async (req) => {
       );
     }
 
-    const url = new URL("https://maps.googleapis.com/maps/api/directions/json");
-    url.searchParams.set("origin", `${originPC}, UK`);
-    url.searchParams.set("destination", `${destination}, UK`);
-    url.searchParams.set("units", "imperial");
-    url.searchParams.set("key", MAPS_KEY);
-
-    const resp = await fetch(url.toString());
+    const resp = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": MAPS_KEY,
+        "X-Goog-FieldMask": "routes.distanceMeters,routes.duration",
+      },
+      body: JSON.stringify({
+        origin: { address: `${originPC}, UK` },
+        destination: { address: `${destination}, UK` },
+        travelMode: "DRIVE",
+        regionCode: "GB",
+        units: "IMPERIAL",
+      }),
+    });
     const data = await resp.json();
 
-    if (data.status === "ZERO_RESULTS" || !data.routes?.length) {
+    if (!resp.ok) {
+      const apiStatus = data.error?.status || data.error?.message || `HTTP ${resp.status}`;
+      return new Response(
+        JSON.stringify({ error: `Maps API error: ${apiStatus}`, valid: false }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!data.routes?.length) {
       return new Response(
         JSON.stringify({
           error: "No route found between these postcodes",
@@ -78,27 +94,28 @@ serve(async (req) => {
       );
     }
 
-    if (data.status !== "OK") {
-      return new Response(
-        JSON.stringify({ error: `Maps API error: ${data.status}`, valid: false }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    const route = data.routes[0];
+    const distanceMeters = Number(route.distanceMeters ?? 0);
+    const durationSeconds = Number.parseFloat(route.duration);
+    if (!Number.isFinite(distanceMeters) || !Number.isFinite(durationSeconds)) {
+      throw new Error("Invalid route response from Maps API");
     }
-
-    const leg = data.routes[0].legs[0];
-    const distanceMeters = leg.distance.value;
-    const durationSeconds = leg.duration.value;
 
     const distanceMiles = Math.round((distanceMeters / 1609.344) * 10) / 10;
     const etaMinutes = Math.round(durationSeconds / 60);
+    const hours = Math.floor(etaMinutes / 60);
+    const minutes = etaMinutes % 60;
+    const durationText = hours
+      ? `${hours} ${hours === 1 ? "hour" : "hours"}${minutes ? ` ${minutes} mins` : ""}`
+      : `${minutes} mins`;
 
     return new Response(
       JSON.stringify({
         valid: true,
         distanceMiles,
         etaMinutes,
-        distanceText: leg.distance.text,
-        durationText: leg.duration.text,
+        distanceText: `${distanceMiles} mi`,
+        durationText,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
