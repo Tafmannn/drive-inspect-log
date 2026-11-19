@@ -209,6 +209,7 @@ export type Database = {
           rate_type: string | null
           rate_value: number | null
           signature_required: boolean
+          status_emails_enabled: boolean
           trading_name: string | null
           updated_at: string
           vat_number: string | null
@@ -243,6 +244,7 @@ export type Database = {
           rate_type?: string | null
           rate_value?: number | null
           signature_required?: boolean
+          status_emails_enabled?: boolean
           trading_name?: string | null
           updated_at?: string
           vat_number?: string | null
@@ -277,6 +279,7 @@ export type Database = {
           rate_type?: string | null
           rate_value?: number | null
           signature_required?: boolean
+          status_emails_enabled?: boolean
           trading_name?: string | null
           updated_at?: string
           vat_number?: string | null
@@ -336,6 +339,79 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      customer_notifications: {
+        Row: {
+          attempts: number
+          claimed_at: string | null
+          client_id: string
+          created_at: string
+          event: string
+          id: string
+          job_id: string
+          last_error: string | null
+          org_id: string
+          provider_ids: string[]
+          recipients: string[]
+          sent_at: string | null
+          skip_reason: string | null
+          status: string
+        }
+        Insert: {
+          attempts?: number
+          claimed_at?: string | null
+          client_id: string
+          created_at?: string
+          event: string
+          id?: string
+          job_id: string
+          last_error?: string | null
+          org_id: string
+          provider_ids?: string[]
+          recipients?: string[]
+          sent_at?: string | null
+          skip_reason?: string | null
+          status?: string
+        }
+        Update: {
+          attempts?: number
+          claimed_at?: string | null
+          client_id?: string
+          created_at?: string
+          event?: string
+          id?: string
+          job_id?: string
+          last_error?: string | null
+          org_id?: string
+          provider_ids?: string[]
+          recipients?: string[]
+          sent_at?: string | null
+          skip_reason?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_notifications_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_notifications_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_notifications_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       damage_items: {
         Row: {
@@ -1158,14 +1234,17 @@ export type Database = {
       }
       invoice_number_counters: {
         Row: {
+          last_credit_seq: number
           last_seq: number
           org_id: string
         }
         Insert: {
+          last_credit_seq?: number
           last_seq?: number
           org_id: string
         }
         Update: {
+          last_credit_seq?: number
           last_seq?: number
           org_id?: string
         }
@@ -1291,6 +1370,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_credits_invoice_id_fkey"
+            columns: ["credits_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
             referencedColumns: ["id"]
           },
           {
@@ -2079,6 +2165,72 @@ export type Database = {
         }
         Relationships: []
       }
+      push_config: {
+        Row: {
+          id: boolean
+          updated_at: string
+          vapid_private_key: string
+          vapid_public_key: string
+          vapid_subject: string
+        }
+        Insert: {
+          id?: boolean
+          updated_at?: string
+          vapid_private_key: string
+          vapid_public_key: string
+          vapid_subject: string
+        }
+        Update: {
+          id?: boolean
+          updated_at?: string
+          vapid_private_key?: string
+          vapid_public_key?: string
+          vapid_subject?: string
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          failure_count: number
+          id: string
+          last_success_at: string | null
+          p256dh: string
+          platform: string | null
+          updated_at: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          failure_count?: number
+          id?: string
+          last_success_at?: string | null
+          p256dh: string
+          platform?: string | null
+          updated_at?: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          failure_count?: number
+          id?: string
+          last_success_at?: string | null
+          p256dh?: string
+          platform?: string | null
+          updated_at?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       qr_confirmations: {
         Row: {
           confirmed_at: string | null
@@ -2256,6 +2408,7 @@ export type Database = {
           activated_by: string | null
           auth_user_id: string
           avatar_url: string | null
+          client_id: string | null
           created_at: string
           display_name: string | null
           email: string
@@ -2282,6 +2435,7 @@ export type Database = {
           activated_by?: string | null
           auth_user_id: string
           avatar_url?: string | null
+          client_id?: string | null
           created_at?: string
           display_name?: string | null
           email: string
@@ -2308,6 +2462,7 @@ export type Database = {
           activated_by?: string | null
           auth_user_id?: string
           avatar_url?: string | null
+          client_id?: string | null
           created_at?: string
           display_name?: string | null
           email?: string
@@ -2329,6 +2484,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "user_profiles_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "user_profiles_org_id_fkey"
             columns: ["org_id"]
@@ -2532,6 +2694,7 @@ export type Database = {
           activated_by: string | null
           auth_user_id: string
           avatar_url: string | null
+          client_id: string | null
           created_at: string
           display_name: string | null
           email: string
@@ -2559,12 +2722,11 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      allocate_credit_note_number: { Args: { p_org_id: string }; Returns: string }
-      allocate_invoice_number: { Args: { p_org_id: string }; Returns: string }
-      cancel_invoice: {
-        Args: { p_invoice_id: string; p_reason: string }
-        Returns: string | null
+      allocate_credit_note_number: {
+        Args: { p_org_id: string }
+        Returns: string
       }
+      allocate_invoice_number: { Args: { p_org_id: string }; Returns: string }
       archive_driver_profile: {
         Args: {
           p_reason?: string
@@ -2637,6 +2799,10 @@ export type Database = {
       can_actor_manage_target_user: {
         Args: { p_actor_user_id: string; p_target_user_id: string }
         Returns: boolean
+      }
+      cancel_invoice: {
+        Args: { p_invoice_id: string; p_reason: string }
+        Returns: string
       }
       complete_job: {
         Args: { p_job_id: string; p_notes?: string }
@@ -2731,6 +2897,7 @@ export type Database = {
         }
       }
       current_actor_email: { Args: never; Returns: string }
+      current_driver_profile_id: { Args: never; Returns: string }
       current_user_has_permission: {
         Args: { p_permission_key: string }
         Returns: boolean
@@ -2748,16 +2915,45 @@ export type Database = {
             }
             Returns: undefined
           }
+      driver_can_access_expense: {
+        Args: { p_expense_id: string }
+        Returns: boolean
+      }
+      driver_can_read_inspection_evidence: {
+        Args: { p_inspection_id: string }
+        Returns: boolean
+      }
+      driver_can_read_job_evidence: {
+        Args: { p_job_id: string }
+        Returns: boolean
+      }
+      driver_can_use_job_path: { Args: { p_name: string }; Returns: boolean }
+      driver_owns_job: { Args: { p_job_id: string }; Returns: boolean }
+      expense_is_invoiced: { Args: { p_expense_id: string }; Returns: boolean }
       is_admin_or_super_admin: { Args: never; Returns: boolean }
       is_protected_user: { Args: { p_user_id: string }; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
       job_current_run_id: { Args: { p_job_id: string }; Returns: string }
+      link_jobs_to_client: {
+        Args: { p_client_id: string; p_job_ids: string[] }
+        Returns: number
+      }
       link_unlinked_photos_to_inspection: {
         Args: { p_inspection_type: string; p_job_id: string; p_org_id: string }
         Returns: undefined
       }
       next_job_number: { Args: never; Returns: string }
       normalize_client_name: { Args: { input: string }; Returns: string }
+      portal_can_read_invoice_pdf: {
+        Args: { p_object_name: string }
+        Returns: boolean
+      }
+      portal_client_id: { Args: never; Returns: string }
+      portal_context: { Args: never; Returns: Json }
+      portal_get_invoice: { Args: { p_invoice_id: string }; Returns: Json }
+      portal_get_job: { Args: { p_job_id: string }; Returns: Json }
+      portal_list_invoices: { Args: never; Returns: Json }
+      portal_list_jobs: { Args: never; Returns: Json }
       qr_confirm: {
         Args: { p_customer_name: string; p_notes?: string; p_token: string }
         Returns: Json
@@ -2855,6 +3051,7 @@ export type Database = {
           activated_by: string | null
           auth_user_id: string
           avatar_url: string | null
+          client_id: string | null
           created_at: string
           display_name: string | null
           email: string
@@ -2931,12 +3128,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2960,11 +3157,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2985,11 +3182,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3010,11 +3207,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3027,11 +3224,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

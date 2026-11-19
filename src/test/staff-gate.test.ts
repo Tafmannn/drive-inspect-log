@@ -53,7 +53,7 @@ describe("staffDecision", () => {
 });
 
 describe("paid lookup functions are staff-gated", () => {
-  const FUNCTIONS = ["business-search", "place-details", "postcode-lookup", "maps-directions", "vehicle-lookup"];
+  const FUNCTIONS = ["business-search", "place-details", "postcode-lookup", "maps-directions", "vehicle-lookup", "address-validate", "address-autocomplete"];
 
   it.each(FUNCTIONS)("%s calls checkStaff and has no public path", (fn) => {
     const src = readFileSync(join(__dirname, "../../supabase/functions", fn, "index.ts"), "utf8");
@@ -62,7 +62,7 @@ describe("paid lookup functions are staff-gated", () => {
     expect(src).not.toMatch(/isPublicCall/);
     // The gate must run before any billed key is read.
     const gate = src.indexOf("checkStaff(req)");
-    const key = Math.max(src.indexOf("GOOGLE_MAPS_API_KEY"), src.indexOf("DVLA_VES_API_KEY"));
+    const key = Math.max(src.indexOf("GOOGLE_PLACES_API_KEY"), src.indexOf("DVLA_VES_API_KEY"));
     expect(gate).toBeGreaterThan(-1);
     expect(key).toBeGreaterThan(gate);
   });
