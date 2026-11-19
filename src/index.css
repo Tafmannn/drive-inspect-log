@@ -221,10 +221,15 @@ All colors MUST be HSL.
      component that already styles focus (shadcn primitives use ring-2 + offset, or
      focus-visible:outline-none + their own ring) keeps its own treatment; only
      controls with NO focus styling (e.g. plain <button>/<a> in BottomNav, headers,
-     cards) gain a solid ring-coloured outline. Works in light and dark (--ring). */
+     cards) gain a solid ring-coloured outline with a page-colour halo. Works in light
+     and dark (--ring / --background). */
   :where(a[href], button, summary, [role="button"], [role="tab"], [role="menuitem"], [tabindex]:not([tabindex="-1"])):focus-visible {
     outline: 2px solid hsl(var(--ring));
     outline-offset: 2px;
+    /* Page-colour halo under the ring (same idea as ring-offset-background): keeps the
+       focus indicator visible on saturated/dark surfaces such as the blue brand band,
+       where the ring colour alone measured 1.12:1. */
+    box-shadow: 0 0 0 4px hsl(var(--background));
   }
 
   /* Phase 1a — table figures (amounts, counts, ages, dates) align by column. */
