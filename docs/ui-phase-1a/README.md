@@ -24,7 +24,7 @@ Branch `claude/ui-phase-1a-tokens`, based on `main` @ `b1c0784`. Design review (
 | `--accent` | **Not changed** (stays purple) | Used as hover surface (25×) **and** text colour (16×); the spec's soft-blue `--accent` would make `text-accent` unreadable |
 | Brand band blue | `bg-[hsl(216,100%,40%)]` in `AppHeader` **left as is**; only the role-label colour changed | Banner colour is a brand decision, not in the authorised list. (Main just merged navy PDF/email banners.) |
 | Status badge dot | **Not added** | Would require markup edits in ~12 components; label text is still shown (not colour-only) |
-| Dark theme | **No dark-theme redesign**; `.dark` values unchanged; new tokens mirror existing dark values | Prohibited; see §6 for pre-existing dark defects |
+| Dark theme | Initially unchanged (additive tokens only). **Follow-up commit, at the user's explicit request:** four dark *contrast* token values changed (`--sidebar-primary`, `--input`/`--border-strong`, `--destructive` + `--destructive-foreground`); no redesign | See §5.7 |
 | Focus halo | Added `box-shadow` halo after finding the ring alone was **1.12:1 on the blue brand band** | Defect found by measurement during this phase and fixed |
 | Dev-only banner | "DEV ROLE OVERRIDE" now renders dark orange (it uses `bg-warning`) | Not shipped to production |
 
@@ -93,6 +93,18 @@ Indicator contrast against the surface: **before 74 of 80 ≥ 3:1** (6 stops —
 ### 5.5 Responsive overflow
 Page-level horizontal overflow at **320 / 390 / 768 / 1024 / 1440 px: 0 of 76 route captures in light and 0 of 76 in dark, before and after**. Wrapping/truncation of the enlarged 12px sidebar text was checked **by eye on the 1440 and 1024 px composites** (no wrap or truncation); the 320 / 390 / 768 composites are included for reviewers but were not individually inspected for this.
 
+### 5.7 Dark-mode follow-up (requested after the first draft; token values only, all inside `.dark`)
+
+| Token (dark) | Before → after | Measured effect |
+|---|---|---|
+| `--sidebar-primary` | `224.3 76.3% 48%` → `217 91% 68%` | active sidebar label 2.22:1 → 5.42:1 on the active item (6.45:1 on the sidebar) — **D1 closed** |
+| `--input`, `--border-strong` | `217.2 32.6% 22%` → `217 20% 42%` | control border vs page 1.59:1 → 3.44:1; all 50 non-login dark controls now >= 3:1 — **D2 closed** |
+| `--destructive`, `--destructive-foreground`, `--danger-soft` | `0 62.8% 56%` + near-white → `0 72% 62%` + dark (`222.2 84% 4.9%`) | white-on-red 4.12:1 → dark-on-red 5.56:1; `text-destructive` on page 4.63:1 → 5.56:1 — **D3 closed**. White-on-red cannot also keep red *text* >= 4.5:1, so this reuses the success/warning/info "bright fill + dark text" pattern already in `.dark`. **Visible change:** destructive buttons/badges in dark mode are a lighter red with dark text. |
+
+Real-route + fixture re-measurement (dark; `data/metrics-dark-followup.json`; `main` → first draft → follow-up): routes 1440 **28 → 10 → 0** text-contrast failures; routes 390 **10 → 1 → 0**; fixture components **33 → 7 → 0** (D4 closed). Overflow 0 in all dark captures. Only the login page's own-styled inputs/checkbox remain below 3:1 (D5, unchanged). Added `src/test/ui-dark-token-contrast.test.ts`, which reads the real `.dark` block and asserts these pairs. Full suite 1,091 tests, `tsc` and build pass. Evidence class: A (real routes, empty/skeleton data) + B (real components, fixture props) + D (tests); **not** populated data, **not** real devices.
+
+Rollback for the follow-up alone: revert its commit; the first-draft dark values return.
+
 ### 5.6 Light and dark regression (real routes + real components)
 - **Light:** only improvements (§5.2–5.4); no layout shift observed in any composite.
 - **Dark (corrected run):** routes 1440: 28 → 10 contrast failures; 390: 10 → 1; fixture components 33 → 7. No new failure appears in dark that was not already there. Status badges render as self-contained light pills in dark (readable, slightly brighter than before; a dark-specific palette would be a dark-theme decision).
@@ -101,10 +113,10 @@ Page-level horizontal overflow at **320 / 390 / 768 / 1024 / 1440 px: 0 of 76 ro
 ## 6. Unresolved defects (all pre-existing unless stated; none introduced by Phase 1a)
 | # | Defect | Measured | Why not fixed here |
 |---|---|---|---|
-| D1 | Dark theme: active sidebar item label (`--sidebar-primary` on `--sidebar-accent`) | 2.22:1 on 9 Control routes (identical before/after) | dark-token change; dark redesign prohibited |
-| D2 | Dark theme: control boundaries use `--input` 22% lightness | 1.59:1 | same |
-| D3 | Dark theme: `text-destructive` / white-on-destructive | 4.14:1 ("Sign Out", destructive badge) | same |
-| D4 | Dark theme fixture: 7 text nodes (e.g. "Action needed" 4.34:1) | see `data/results.json` | same |
+| D1 | ~~Dark theme: active sidebar item label~~ **FIXED** in follow-up (2.22 → 5.42:1) | — | closed |
+| D2 | ~~Dark theme: control boundaries~~ **FIXED** in follow-up (1.59 → 3.44:1) | — | closed |
+| D3 | ~~Dark theme: white-on-destructive~~ **FIXED** in follow-up (now dark-on-red 5.56:1; visible change noted in §5.7) | — | closed |
+| D4 | ~~Dark theme fixture: 7 text nodes~~ **FIXED** (0 failures after follow-up) | — | closed |
 | D5 | Login/forgot/welcome glass pages: faint secondary text, own-styled inputs/checkbox (10 inputs + 1 checkbox boundary < 3:1) | contrast of text indeterminate by method | Phase 6 (auth screens) |
 | D6 | ≈135 text nodes per route set remain < 12px (badges, captions, button labels) | measured | no global rewrite authorised |
 | D7 | Text on **15%** tints of the new semantic colours: warning 4.27:1, success 4.35:1 | calculated | rare combination; would need a further 1–2% darkening |
