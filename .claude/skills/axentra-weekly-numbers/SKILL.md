@@ -9,6 +9,7 @@ description: Axentra's weekly CEO numbers from the live database — jobs done, 
 
 1. Execute `weekly.sql` (this folder) **unchanged** with the Supabase MCP `execute_sql` tool on the production project (`project_id` = `project_id` in `supabase/config.toml`). It is SELECT-only and returns no personal data. Never run any other write or DDL from this skill.
 2. If the Supabase tool is unavailable, say so and stop — do not estimate figures.
+3. Check `CLAUDE.md` → *Data status*. While it says production holds test data, label every figure as test data and give no commercial conclusions.
 
 ## Report (≤ 12 lines, in this order)
 

@@ -4,6 +4,12 @@ UK vehicle-movement app: React + Vite + TypeScript + shadcn, Supabase (Postgres 
 Functions in `supabase/functions`), deployed via Lovable/Vercel. Production Supabase project id is
 `project_id` in `supabase/config.toml`; `axentra-staging` exists as a separate project.
 
+## Data status (owner, 2026-11-19)
+- The production database holds **test data only**; the app is not yet in live use. Do not present its
+  figures as business performance or draw commercial conclusions from them.
+- Invoicing workflow (owner decision): create every invoice in the app (Invoice Prep), email the app's PDF
+  yourself, then "Mark as sent" and "Record payment". Platform work (Movex, Revilo) included.
+
 ## Commands
 - `npm test` (vitest, ~40s) · `npm run typecheck` · `npm run build` (typecheck + vite). CI runs tests only.
 - `npx eslint <files>` on files you touch — the repo has ~300 pre-existing lint errors; don't add more.
