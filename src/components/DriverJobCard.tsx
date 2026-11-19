@@ -69,7 +69,7 @@ export function DriverJobCard({ summary, onPrimaryAction, onCardClick }: DriverJ
             <p className="text-sm font-semibold text-foreground truncate leading-tight">
               {summary.client_name}
             </p>
-            <p className="text-[10px] text-muted-foreground leading-tight">
+            <p className="text-[10px] text-muted-foreground leading-tight tabular-nums">
               {summary.job_ref}
             </p>
           </div>

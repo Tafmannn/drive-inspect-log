@@ -41,6 +41,25 @@ fixtures — run it only on a scratch database.
 - **Clients**: set payment terms (drives the due date) and tick *PO required*
   where a client rejects invoices without one.
 
+## Bank details and late-payment wording (migration `20261115100000`)
+
+Bank details are stored per organisation, not in the code. Enter them under
+Organisations → your organisation → *Invoicing & VAT* → **Bank details on
+invoices** (bank, account name, sort code, account number; the sort code and
+account number are validated). Every new invoice prints them in the payment
+box. With none saved there is no payment box (the organisation page warns).
+Invoices already issued keep the details they were sent with.
+
+*Late-payment wording* (same card, on by default) adds the statutory sentence:
+interest at 8% above the Bank of England base rate plus a fixed £40 / £70 /
+£100 fee, under the Late Payment of Commercial Debts (Interest) Act 1998. It
+applies to **business** clients only, so switch it off if you invoice private
+individuals, and have your accountant confirm the wording. Credit notes never
+carry it.
+
+The migration is additive and safe to apply before deploying (the current app
+ignores the new columns). It contains no bank details.
+
 ## Creating an invoice (Control → Invoice Prep)
 
 1. Pick the client.
@@ -109,8 +128,6 @@ are not counted; the page says how many were left out.
 - Xero's CSV import cannot take credit notes: cancelled invoices and their
   credit notes are listed for manual entry rather than exported.
 - Xero account codes are saved per browser, not per organisation.
-- Bank details on the invoice are still fixed in `src/lib/invoicePdf.ts`
-  (`AXENTRA_BANK`), not per organisation.
 - A receipt that is a PDF file (not a photo) cannot be embedded in the
   invoice PDF; it shows as "image unavailable" there but is included in the
   pack ZIP.

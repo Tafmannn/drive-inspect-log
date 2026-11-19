@@ -49,6 +49,7 @@ import {
   fetchInvoiceExpenseLines,
   fetchOrgInvoiceSettings,
   generateInvoiceDocumentPdf,
+  settingsToPdfFields,
 } from "@/features/invoicing/api/invoiceDocument";
 import { fetchBillableExpenses } from "@/features/invoicing/api/billableExpenses";
 import { buildInvoicePack } from "@/features/invoicing/api/receiptExport";
@@ -96,10 +97,12 @@ function respond(blob: Blob | null, status = 200) {
 
 describe("fetchOrgInvoiceSettings", () => {
   it("reads the VAT switch and the business identity, preferring legal name and trading address", async () => {
-    h.tables.organisations = [{ name: "Axentra Vehicles", legal_name: "T Example t/a Axentra", branding_name: "Axentra", trading_address: "1 Yard Lane", registered_address: "Reg Office", company_number: "123", vat_number: "GB1", vat_registered: true }];
+    h.tables.organisations = [{ name: "Axentra Vehicles", legal_name: "T Example t/a Axentra", branding_name: "Axentra", trading_address: "1 Yard Lane", registered_address: "Reg Office", company_number: "123", vat_number: "GB1", vat_registered: true, bank_name: "Test Bank", bank_account_name: "Test Ltd", bank_sort_code: "12-34-56", bank_account_number: "12345678", late_payment_notice: true }];
     await expect(fetchOrgInvoiceSettings("org-1")).resolves.toEqual({
       vatRegistered: true,
       business: { name: "T Example t/a Axentra", address: "1 Yard Lane", companyNumber: "123", vatNumber: "GB1" },
+      bank: { bankName: "Test Bank", accountName: "Test Ltd", sortCode: "12-34-56", accountNumber: "12345678" },
+      latePaymentNotice: true,
     });
   });
 
@@ -108,7 +111,32 @@ describe("fetchOrgInvoiceSettings", () => {
     await expect(fetchOrgInvoiceSettings("org-1")).resolves.toEqual({
       vatRegistered: false,
       business: { name: "Axentra Vehicles", address: "Reg Office", companyNumber: null, vatNumber: null },
+      bank: { bankName: null, accountName: null, sortCode: null, accountNumber: null },
+      latePaymentNotice: true, // on unless explicitly switched off
     });
+  });
+
+  it("switches the late-payment notice off only when the organisation says so", async () => {
+    h.tables.organisations = [{ name: "A", late_payment_notice: false }];
+    await expect(fetchOrgInvoiceSettings("org-1")).resolves.toMatchObject({ latePaymentNotice: false });
+  });
+
+  it("turns settings into invoice PDF fields, leaving out what is off or missing", () => {
+    expect(settingsToPdfFields(null)).toEqual({});
+    expect(settingsToPdfFields({ vatRegistered: false, business: { name: "A" } })).toEqual({ business: { name: "A" } });
+    expect(
+      settingsToPdfFields({ vatRegistered: false, business: { name: "A" }, bank: { sortCode: "12-34-56" }, latePaymentNotice: false }),
+    ).toEqual({ business: { name: "A" }, bank: { sortCode: "12-34-56" } });
+    expect(
+      settingsToPdfFields({ vatRegistered: false, business: { name: "A" }, latePaymentNotice: true }),
+    ).toEqual({ business: { name: "A" }, latePaymentNotice: true });
+  });
+
+  it("carries the bank details and notice onto the invoice document", async () => {
+    const data = await buildInvoiceDocument(record(), {
+      settings: { vatRegistered: false, business: { name: "Axentra" }, bank: { accountNumber: "12345678" }, latePaymentNotice: true },
+    });
+    expect(data).toMatchObject({ bank: { accountNumber: "12345678" }, latePaymentNotice: true });
   });
 
   it("treats a missing organisation as not VAT registered, and surfaces a read error", async () => {

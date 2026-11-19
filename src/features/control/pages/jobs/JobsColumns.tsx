@@ -37,7 +37,7 @@ export function buildJobColumns(actions: JobsColumnActions): CompactColumn<JobCo
       header: "Ref",
       className: "w-[100px]",
       render: (r) => (
-        <span className="text-xs font-semibold text-foreground">
+        <span className="text-xs font-semibold text-foreground tabular-nums">
           {r.external_job_number || r.id.slice(0, 8)}
         </span>
       ),

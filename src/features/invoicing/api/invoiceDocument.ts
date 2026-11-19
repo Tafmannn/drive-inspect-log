@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   generateInvoicePdf,
   type ExpenseScheduleRow,
+  type InvoiceBankDetails,
   type InvoiceBusinessDetails,
   type InvoiceData,
   type ReceiptImage,
@@ -20,12 +21,30 @@ import { loadReceiptImage } from "./receiptImages";
 export interface OrgInvoiceSettings {
   vatRegistered: boolean;
   business: InvoiceBusinessDetails;
+  /** Where clients pay. Absent or empty: invoices print no payment card. */
+  bank?: InvoiceBankDetails;
+  /** Print the statutory late-payment sentence on invoices. */
+  latePaymentNotice?: boolean;
+}
+
+/** The invoice-PDF fields that come from the organisation's settings. */
+export function settingsToPdfFields(
+  settings: OrgInvoiceSettings | null | undefined,
+): Pick<InvoiceData, "business" | "bank" | "latePaymentNotice"> {
+  if (!settings) return {};
+  return {
+    business: settings.business,
+    ...(settings.bank ? { bank: settings.bank } : {}),
+    ...(settings.latePaymentNotice ? { latePaymentNotice: true } : {}),
+  };
 }
 
 export async function fetchOrgInvoiceSettings(orgId: string): Promise<OrgInvoiceSettings> {
   const { data, error } = await supabase
     .from("organisations")
-    .select("name, legal_name, branding_name, trading_address, registered_address, company_number, vat_number, vat_registered")
+    .select(
+      "name, legal_name, branding_name, trading_address, registered_address, company_number, vat_number, vat_registered, bank_name, bank_account_name, bank_sort_code, bank_account_number, late_payment_notice",
+    )
     .eq("id", orgId)
     .maybeSingle();
   if (error) throw new Error(`Could not load organisation settings: ${error.message}`);
@@ -39,6 +58,14 @@ export async function fetchOrgInvoiceSettings(orgId: string): Promise<OrgInvoice
       // A VAT number is only printed while the business is VAT registered.
       vatNumber: vatRegistered ? data?.vat_number || null : null,
     },
+    bank: {
+      bankName: data?.bank_name || null,
+      accountName: data?.bank_account_name || null,
+      sortCode: data?.bank_sort_code || null,
+      accountNumber: data?.bank_account_number || null,
+    },
+    // On unless explicitly turned off (the column defaults to true).
+    latePaymentNotice: data?.late_payment_notice !== false,
   };
 }
 
@@ -133,7 +160,7 @@ export async function buildInvoiceDocument(
   opts: { settings?: OrgInvoiceSettings | null; withReceipts?: boolean } = {},
 ): Promise<InvoiceData> {
   const base = invoiceRecordToPdfData(record);
-  const data: InvoiceData = { ...base, ...(opts.settings ? { business: opts.settings.business } : {}) };
+  const data: InvoiceData = { ...base, ...settingsToPdfFields(opts.settings) };
   if (record.document_type === "credit_note") return data;
 
   const lines = await fetchInvoiceExpenseLines(record.id);

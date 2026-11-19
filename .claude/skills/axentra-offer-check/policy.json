@@ -1,0 +1,10 @@
+{
+  "_readme": "Owner-editable. Every value marked ASSUMPTION is unconfirmed by the owner; confirm or change it. targetContributionPerHour = weeklyContributionTarget / (workingDaysPerWeek * workingHoursPerDay).",
+  "weeklyContributionTarget": 2000,
+  "_weeklyContributionTarget_source": "Owner brief: >= £2,000 weekly net contribution across five working days. ASSUMPTION: treated as per driver-week; for the whole business divide by active drivers.",
+  "workingDaysPerWeek": 5,
+  "workingHoursPerDay": 10,
+  "_workingHoursPerDay_source": "ASSUMPTION — door-to-door hours a driver can work in a day, including travel and waiting.",
+  "minContributionPerJob": 40,
+  "_minContributionPerJob_source": "ASSUMPTION — floor below which a job is declined regardless of hourly rate."
+}

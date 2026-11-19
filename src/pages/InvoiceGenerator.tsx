@@ -19,6 +19,7 @@ import { getOrgId } from "@/lib/orgHelper";
 import { downloadInvoicePdf, type InvoiceLineItem, type InvoiceData } from "@/lib/invoicePdf";
 import { findAlreadyInvoicedJobs } from "@/features/invoicing/api/createInvoice";
 import { useOrgInvoiceSettings } from "@/features/invoicing/hooks/useInvoiceSettings";
+import { settingsToPdfFields } from "@/features/invoicing/api/invoiceDocument";
 import {
   Loader2, Plus, Trash2, FileDown, Receipt,
   Building2, User, Calendar, CreditCard
@@ -222,7 +223,7 @@ export function InvoiceGenerator() {
     invoiceNumber, issueDate,
     dueDate: dueDate || undefined,
     paymentTerms, vatRate, vatRegistered, clientName,
-    business: invoiceSettings?.business,
+    ...settingsToPdfFields(invoiceSettings),
     clientCompany: clientCompany || undefined,
     clientEmail: clientEmail || undefined,
     clientAddress: clientAddress || undefined,

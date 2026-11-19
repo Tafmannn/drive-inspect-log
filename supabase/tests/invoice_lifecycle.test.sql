@@ -245,3 +245,34 @@ SELECT pg_temp.expect_error($q$SELECT portal_list_invoices()$q$, '%PORTAL_ACCESS
 
 RESET ROLE;
 SELECT 'ALL PORTAL INVOICE TESTS PASSED' AS result;
+
+-- =====================================================================
+-- 20261115100000_org_bank_details_and_late_payment.sql
+-- =====================================================================
+DO $$ BEGIN
+  ASSERT (SELECT bool_and(late_payment_notice) FROM organisations), 'late-payment notice defaults on';
+  ASSERT (SELECT bool_and(bank_name IS NULL AND bank_sort_code IS NULL AND bank_account_number IS NULL) FROM organisations),
+    'the migration must not invent bank details';
+END $$;
+
+-- format checks
+SELECT pg_temp.expect_error($q$UPDATE organisations SET bank_sort_code = '123456' WHERE name = 'Org A'$q$, '%bank_sort_code_format%', 'sort code format');
+SELECT pg_temp.expect_error($q$UPDATE organisations SET bank_account_number = '12AB' WHERE name = 'Org A'$q$, '%bank_account_number_format%', 'account number format');
+UPDATE organisations
+   SET bank_name = 'Test Bank', bank_account_name = 'Test Ltd', bank_sort_code = '12-34-56', bank_account_number = '12345678'
+ WHERE name = 'Org A';
+
+-- a portal user's invoice detail carries the operator's bank details
+SELECT pg_temp.act_as('00000000-0000-0000-0000-00000000c1c1');
+DO $$
+DECLARE op jsonb := portal_get_invoice('00000000-0000-0000-0000-000000000f01') -> 'operator';
+BEGIN
+  ASSERT op->>'bank_sort_code' = '12-34-56' AND op->>'bank_account_number' = '12345678'
+     AND op->>'bank_name' = 'Test Bank' AND op->>'bank_account_name' = 'Test Ltd', 'operator bank details: ' || op::text;
+  ASSERT (op->>'late_payment_notice')::boolean = true, 'operator late-payment flag';
+END $$;
+-- ...and still cannot reach another client's invoice
+SELECT pg_temp.expect_error($q$SELECT portal_get_invoice('00000000-0000-0000-0000-000000000f11')$q$, '%NOT_FOUND%', 'bank details do not widen portal access');
+
+RESET ROLE;
+SELECT 'ALL BANK DETAILS TESTS PASSED' AS result;

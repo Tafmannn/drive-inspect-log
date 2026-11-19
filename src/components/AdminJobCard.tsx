@@ -80,7 +80,7 @@ export function AdminJobCard({ job, onView, onAssign, onPod, onExpense, footer }
           >
             {statusStyle.label}
           </span>
-          <span className="text-[10px] font-medium text-muted-foreground truncate">
+          <span className="text-[10px] font-medium text-muted-foreground truncate tabular-nums">
             {job.external_job_number || job.id.slice(0, 8)}
           </span>
           {stale && (

@@ -51,6 +51,13 @@ function toPdfData(inv: PortalInvoiceDetail) {
       companyNumber: inv.operator.company_number,
       vatNumber: inv.vat_registered ? inv.operator.vat_number : null,
     },
+    bank: {
+      bankName: inv.operator.bank_name,
+      accountName: inv.operator.bank_account_name,
+      sortCode: inv.operator.bank_sort_code,
+      accountNumber: inv.operator.bank_account_number,
+    },
+    ...(inv.operator.late_payment_notice !== false ? { latePaymentNotice: true } : {}),
   };
 }
 

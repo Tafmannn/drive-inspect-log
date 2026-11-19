@@ -23,12 +23,11 @@ const THEME = {
   sectionTitle:[17, 29, 58]    as [number, number, number],
 };
 
-const AXENTRA_BANK = {
-  bankName: "Monzo",
-  accountName: "Terrence Tapfumaneyi trading as Axentra Vehicle Logistics",
-  sortCode: "04-00-03",
-  accountNumber: "24861835",
-} as const;
+/**
+ * Bank details are not defined here: they belong to the organisation
+ * (organisations.bank_*) and arrive on InvoiceData.bank, so each business
+ * invoices with its own account and nothing sensitive lives in the code.
+ */
 
 /**
  * Logos tried in order. These are files in /public, so they are served by
@@ -65,6 +64,13 @@ export interface ExpenseScheduleRow {
   net: number;
   vat: number;
   gross: number;
+}
+
+export interface InvoiceBankDetails {
+  bankName?: string | null;
+  accountName?: string | null;
+  sortCode?: string | null;
+  accountNumber?: string | null;
 }
 
 export interface InvoiceBusinessDetails {
@@ -109,6 +115,10 @@ export interface InvoiceData {
   business?: InvoiceBusinessDetails;
   /** "credit_note" retitles the document and labels the total as a credit. */
   documentType?: "invoice" | "credit_note";
+  /** Where to pay. Omitted / empty: no payment card is printed. */
+  bank?: InvoiceBankDetails;
+  /** Print the statutory late-payment sentence (business clients only). */
+  latePaymentNotice?: boolean;
   /** Receipt copies per page: 2 (large), 4 or 6 (compact). Default 2. */
   receiptsPerPage?: 2 | 4 | 6;
   /**
@@ -787,37 +797,88 @@ function drawNotes(doc: jsPDF, notes: string | undefined, y: number): number {
 /*  6. Payment Information                                             */
 /* ------------------------------------------------------------------ */
 
+/** UK sort code as NN-NN-NN when it is six digits; anything else is shown as typed. */
+export function formatSortCode(raw: string | null | undefined): string {
+  const t = (raw ?? "").trim();
+  const digits = t.replace(/\D/g, "");
+  return digits.length === 6 && /^[\d\s-]+$/.test(t) ? `${digits.slice(0, 2)}-${digits.slice(2, 4)}-${digits.slice(4)}` : t;
+}
+
+/** The labelled rows of the payment card: only the details that are filled in. */
+export function bankRows(bank: InvoiceBankDetails | undefined): Array<[string, string]> {
+  if (!bank) return [];
+  const rows: Array<[string, string | null | undefined]> = [
+    ["Bank:", bank.bankName],
+    ["Account Name:", bank.accountName],
+    ["Sort Code:", formatSortCode(bank.sortCode)],
+    ["Account Number:", bank.accountNumber],
+  ];
+  return rows
+    .map(([label, value]): [string, string] => [label, sanitize(value)])
+    .filter(([, value]) => value !== "");
+}
+
+/**
+ * Statutory interest and fixed fee on late B2B payments: the Late Payment of
+ * Commercial Debts (Interest) Act 1998. Not for consumers, so it is opt-in.
+ */
+export const LATE_PAYMENT_NOTICE =
+  "Late payment: statutory interest at 8% above the Bank of England base rate, and a fixed recovery fee of " +
+  "\u00A340, \u00A370 or \u00A3100 depending on the amount owed, may be charged under the Late Payment of " +
+  "Commercial Debts (Interest) Act 1998.";
+
+function showLateNotice(data: InvoiceData): boolean {
+  return data.latePaymentNotice === true && !isCreditNote(data);
+}
+
 function paymentRefNote(data: InvoiceData): string {
   return data.paymentTerms?.trim()
     ? `${sanitize(data.paymentTerms)}. Please use invoice number as payment reference.`
     : "Please use invoice number as payment reference.";
 }
 
-/** Card height incl. wrapped values and reference note, so callers can reserve space */
+interface SmallPrintBlock {
+  lines: string[];
+  size: number;
+}
+
+/** The payment section's small print, wrapped to `width` mm at the size it is drawn at. */
+function paymentSmallPrint(doc: jsPDF, data: InvoiceData, width: number, withBank: boolean): SmallPrintBlock[] {
+  doc.setFont("helvetica", "italic");
+  const block = (text: string, size: number): SmallPrintBlock => {
+    doc.setFontSize(size);
+    return { lines: doc.splitTextToSize(text, width) as string[], size };
+  };
+  const blocks: SmallPrintBlock[] = [];
+  // The "use the invoice number" line only makes sense next to bank details.
+  if (withBank) blocks.push(block(paymentRefNote(data), 7));
+  else if (data.paymentTerms?.trim()) blocks.push(block(`${sanitize(data.paymentTerms)}.`, 7));
+  if (showLateNotice(data)) blocks.push(block(sanitize(LATE_PAYMENT_NOTICE), 6.5));
+  return blocks;
+}
+
+/**
+ * Height the payment section needs (0 when there is nothing to print), so
+ * callers can reserve space. With bank details it is a card; without, a few
+ * lines of small print.
+ */
 function paymentInfoHeight(doc: jsPDF, data: InvoiceData, contentW: number): number {
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8.5);
+  if (isCreditNote(data)) return 0;
+  const rows = bankRows(data.bank);
+  const blocks = paymentSmallPrint(doc, data, contentW - (rows.length ? 14 : 0), rows.length > 0);
+  const lines = blocks.reduce((n, b) => n + b.lines.length, 0);
+  if (!rows.length) return lines ? lines * 3.4 + (blocks.length - 1) * 1.5 + 4 : 0;
+
   let h = 10;
-  for (const [label, value] of paymentDetails()) {
+  for (const [label, value] of rows) {
     doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
     const labelW = doc.getTextWidth(`${label} `);
     doc.setFont("helvetica", "normal");
     const n = (doc.splitTextToSize(value, contentW - 14 - labelW) as string[]).length;
     h += 5.5 + (n - 1) * 4;
   }
-  doc.setFont("helvetica", "italic");
-  doc.setFontSize(7);
-  const refN = (doc.splitTextToSize(paymentRefNote(data), contentW - 14) as string[]).length;
-  return h + 2 + refN * 3.5 + 3;
-}
-
-function paymentDetails(): Array<[string, string]> {
-  return [
-    ["Bank:", AXENTRA_BANK.bankName],
-    ["Account Name:", AXENTRA_BANK.accountName],
-    ["Sort Code:", AXENTRA_BANK.sortCode],
-    ["Account Number:", AXENTRA_BANK.accountNumber],
-  ];
+  return h + 2 + lines * 3.5 + (blocks.length - 1) * 1.5 + 3;
 }
 
 function drawPaymentInfo(
@@ -828,34 +889,47 @@ function drawPaymentInfo(
   contentW: number = PAGE_W - MARGIN * 2,
   skipSpaceCheck = false,
 ): number {
-  if (!skipSpaceCheck) y = ensureSpace(doc, y, 50);
+  const cardH = paymentInfoHeight(doc, data, contentW);
+  if (cardH === 0) return y;
+  if (!skipSpaceCheck) y = ensureSpace(doc, y, cardH + 8);
   const MARGIN_X = x;
+  const rows = bankRows(data.bank);
+
+  const drawSmallPrint = (startY: number, left: number, width: number, withBank: boolean): number => {
+    let yy = startY;
+    doc.setFont("helvetica", "italic");
+    doc.setTextColor(...THEME.muted);
+    for (const block of paymentSmallPrint(doc, data, width, withBank)) {
+      doc.setFontSize(block.size);
+      doc.text(block.lines, left, yy);
+      yy += block.lines.length * 3.4 + 1.5;
+    }
+    return yy;
+  };
+
+  // No bank details saved: just the small print, no card.
+  if (!rows.length) {
+    drawSmallPrint(y + 1, MARGIN_X, contentW, false);
+    return y + cardH + 4;
+  }
 
   // Payment card with accent left border
-  const details = paymentDetails();
-  const cardH = paymentInfoHeight(doc, data, contentW);
-
-  // Card background
   doc.setFillColor(...THEME.softBg);
   doc.roundedRect(MARGIN_X, y - 2, contentW, cardH, 2, 2, "F");
   doc.setDrawColor(...THEME.lightBorder);
   doc.setLineWidth(0.2);
   doc.roundedRect(MARGIN_X, y - 2, contentW, cardH, 2, 2);
-
-  // Accent left border
   doc.setFillColor(...THEME.accent);
   doc.rect(MARGIN_X, y - 2, 1.2, cardH, "F");
 
-  // Section title
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
   doc.setTextColor(...THEME.sectionTitle);
   doc.text("PAYMENT INFORMATION", MARGIN_X + 7, y + 4);
   y += 10;
 
-  // Bank details
   doc.setFontSize(8.5);
-  for (const [label, value] of details) {
+  for (const [label, value] of rows) {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...THEME.muted);
     doc.text(label, MARGIN_X + 7, y);
@@ -867,18 +941,8 @@ function drawPaymentInfo(
     y += 5.5 + (vLines.length - 1) * 4;
   }
 
-  y += 2;
-
-  // Reference note
-  const refNote = paymentRefNote(data);
-
-  doc.setFont("helvetica", "italic");
-  doc.setFontSize(7);
-  doc.setTextColor(...THEME.muted);
-  const lines = doc.splitTextToSize(refNote, contentW - 14);
-  doc.text(lines, MARGIN_X + 7, y);
-
-  return y + lines.length * 3.5 + 8;
+  y = drawSmallPrint(y + 2, MARGIN_X + 7, contentW - 14, true);
+  return y + 8;
 }
 
 /** Compact layout: notes as a short muted line directly under the table */
@@ -904,7 +968,7 @@ function drawTotalsAndPaymentSideBySide(doc: jsPDF, data: InvoiceData, y: number
   const payH = paymentInfoHeight(doc, data, payW);
   y = ensureSpace(doc, y, Math.max(totalsHeight(data), payH) + 2);
   const yTotals = buildTotalsBlock(doc, data, y, true);
-  const yPay = drawPaymentInfo(doc, data, y + 2, MARGIN, payW, true);
+  const yPay = payH > 0 ? drawPaymentInfo(doc, data, y + 2, MARGIN, payW, true) : y;
   return Math.max(yTotals, yPay);
 }
 

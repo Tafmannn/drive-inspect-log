@@ -61,6 +61,16 @@ describe("findAlreadyInvoicedJobs (WORKFLOW-008)", () => {
     expect(result.has("job-2")).toBe(false);
   });
 
+  it("fails closed: a failed lookup throws instead of reporting 'nothing invoiced'", async () => {
+    mockInvoiceItemsIn.mockResolvedValue({ data: null, error: { message: "network down" } });
+    mockInvoicesIn.mockResolvedValue({ data: [], error: null });
+    await expect(findAlreadyInvoicedJobs(["job-1"])).rejects.toThrow(/Could not check invoiced jobs: network down/);
+
+    mockInvoiceItemsIn.mockResolvedValue({ data: [], error: null });
+    mockInvoicesIn.mockResolvedValue({ data: null, error: { message: "timeout" } });
+    await expect(findAlreadyInvoicedJobs(["job-1"])).rejects.toThrow(/timeout/);
+  });
+
   it("returns an empty set without querying when given no job ids", async () => {
     const result = await findAlreadyInvoicedJobs([]);
     expect(result.size).toBe(0);

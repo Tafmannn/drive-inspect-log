@@ -19,6 +19,7 @@ import { Loader2, MapPin, Navigation, Search, UserCheck, ChevronsUpDown, X } fro
 import { CAR_MAKES, getModelsForMake } from "@/lib/carData";
 import { isValidUkPostcode, calculateRoute, type RouteResult } from "@/lib/mapsApi";
 import { computeJobCaz, lookupCazZone } from "@/lib/cazLookup";
+import { jobSourceOptions, resolveJobSourceForSave } from "@/lib/jobSource";
 import { lookupVehicle } from "@/lib/vehicleLookupApi";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import { saveDraft, loadDraft, clearDraft, draftKey } from "@/lib/autosave";
@@ -504,6 +505,11 @@ export const JobForm = () => {
       if (!val) e[field] = msg;
     }
 
+    // New jobs must say where they came from (weekly numbers by channel).
+    if (!isEdit && !((data.get("job_source") as string | null)?.trim())) {
+      e.job_source = "Choose where this job came from.";
+    }
+
     // Only for new jobs: older jobs without a client can still be edited.
     if (!isEdit && !selectedClientId && !oneOffJob) {
       e.client = "Choose the client for this job, or tick “One-off job”.";
@@ -538,6 +544,7 @@ export const JobForm = () => {
 
     const payload = {
       external_job_number: getStr(data, "external_job_number") || null,
+      job_source: resolveJobSourceForSave(getStr(data, "job_source"), existingJob?.job_source),
       vehicle_reg: getStr(data, "vehicle_reg"),
       vehicle_make: getStr(data, "vehicle_make"),
       vehicle_model: getStr(data, "vehicle_model"),
@@ -769,6 +776,25 @@ export const JobForm = () => {
                 className="mt-1"
               />
               <ErrorText field="external_job_number" />
+            </div>
+
+            {/* Source — which platform / channel the job came from */}
+            <div>
+              <Label htmlFor="job_source" className="text-sm font-medium">
+                Source{isEdit ? "" : " *"}
+              </Label>
+              <select
+                id="job_source"
+                name="job_source"
+                defaultValue={existingJob?.job_source ?? ""}
+                className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 mt-1"
+              >
+                <option value="">{isEdit ? "Not recorded" : "Select source"}</option>
+                {jobSourceOptions(existingJob?.job_source).map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+              <ErrorText field="job_source" />
             </div>
 
             {/* Registration + DVLA Lookup */}

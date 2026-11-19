@@ -117,6 +117,12 @@ export interface PortalInvoiceDetail extends PortalInvoiceSummary {
     registered_address: string | null;
     vat_number: string | null;
     company_number: string | null;
+    // Present once the bank-details migration is applied.
+    bank_name?: string | null;
+    bank_account_name?: string | null;
+    bank_sort_code?: string | null;
+    bank_account_number?: string | null;
+    late_payment_notice?: boolean | null;
   };
 }
 

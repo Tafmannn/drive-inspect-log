@@ -1,0 +1,8 @@
+-- Rollback for 20260927113400_dedupe_photos_before_backend_ref_unique.sql
+--
+-- Not reversible: archiving and clearing backend_ref on the duplicate rows
+-- doesn't record which rows were touched or what their prior backend_ref
+-- values were, so there's nothing to restore them to. This is a one-time
+-- data cleanup, not a schema change — if the unique index needs to come
+-- off, roll back 20260927113543_photos_backend_ref_unique_plain instead;
+-- the archived duplicate rows are harmless to leave as they are.

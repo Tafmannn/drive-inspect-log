@@ -20,7 +20,7 @@ import {
   decidePodRecipient,
   isOwnSignedStorageUrl,
   renderPodEmail,
-  resolveLogoUrl,
+  resolveEmailLogoUrl,
 } from "../_shared/podEmail.ts";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -148,7 +148,7 @@ serve(async (req) => {
       kind: isCollection ? "collection" : "delivery",
       operator: {
         name: operatorName,
-        logoUrl: resolveLogoUrl(org?.logo_url, appBaseUrl(req)),
+        logoUrl: resolveEmailLogoUrl(org?.logo_url, appBaseUrl(req)),
         primaryColour: org?.primary_colour,
         contactEmail: org?.main_contact_email,
         contactPhone: org?.main_contact_phone,

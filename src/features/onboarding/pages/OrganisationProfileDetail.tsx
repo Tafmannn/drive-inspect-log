@@ -19,6 +19,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { scoreOrg } from "../lib/completion";
 import { CompletionBadge } from "../components/CompletionBadge";
+import { OrgPaymentSettings } from "../components/OrgPaymentSettings";
 
 export default function OrganisationProfileDetail() {
   const navigate = useNavigate();
@@ -170,6 +171,11 @@ export default function OrganisationProfileDetail() {
               No business address is saved, so invoices cannot print one in their footer. Add it under Edit organisation.
             </p>
           )}
+          <OrgPaymentSettings
+            orgId={orgId}
+            org={org ?? {}}
+            onSaved={(changed) => setOrg((prev: any) => (prev ? { ...prev, ...changed } : prev))}
+          />
         </SectionCard>
 
         <SectionCard icon={<Mail className="w-4 h-4" />} title="Main contact">

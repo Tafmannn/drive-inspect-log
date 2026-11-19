@@ -141,7 +141,7 @@ export const Expenses = () => {
             ].map(t => (
               <div key={t.label} className="p-3 rounded-xl bg-card border border-border text-center">
                 <p className="text-[13px] text-muted-foreground uppercase tracking-wide">{t.label}</p>
-                <p className="text-base font-semibold text-foreground">{fmt(t.value)}</p>
+                <p className="text-base font-semibold text-foreground tabular-nums">{fmt(t.value)}</p>
               </div>
             ))}
           </div>

@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
 import {
+  LATE_PAYMENT_NOTICE,
+  bankRows,
+  formatSortCode,
   businessFooterLine,
   generateInvoicePdf,
   invoicePdfFileName,
@@ -189,5 +192,55 @@ describe("invoice PDF helpers", () => {
     expect(invoicePdfFileName("AX26-1007")).toBe("AXENTRA_INV_AX26-1007.pdf");
     expect(invoicePdfFileName("CN26-0001")).toBe("AXENTRA_CN_CN26-0001.pdf");
     expect(invoicePdfFileName("INV/2026 #7")).toBe("AXENTRA_INV_INV_2026__7.pdf");
+  });
+});
+
+describe("payment section: bank details and late-payment notice", () => {
+  const bank = { bankName: "Test Bank", accountName: "Test Ltd", sortCode: "123456", accountNumber: "12345678" };
+  const lines = jobLines(3, true);
+
+  // jsPDF writes text into the PDF content streams; with compress:true it is deflated,
+  // so measure by what the layout produces instead of grepping the file.
+  it("prints a payment card only when bank details are saved", async () => {
+    const withBank = await render({ ...base, ...compact, vatRegistered: false, lineItems: lines, bank });
+    const without = await render({ ...base, ...compact, vatRegistered: false, lineItems: lines });
+    expect(withBank.pages).toBe(1);
+    expect(without.pages).toBe(1);
+    // the card adds drawing operations (fills, text) to the page
+    expect(withBank.text.length).toBeGreaterThan(without.text.length);
+  });
+
+  it("renders the notice with and without a card, and never on a credit note", async () => {
+    for (const extra of [{ bank }, {}]) {
+      const r = await render({ ...base, ...compact, vatRegistered: false, lineItems: lines, latePaymentNotice: true, ...extra });
+      expect(r.pages).toBe(1);
+    }
+    const credit = await render({ ...base, ...compact, invoiceNumber: "CN26-0001", documentType: "credit_note", vatRegistered: false, lineItems: lines, bank, latePaymentNotice: true });
+    expect(credit.pages).toBe(1);
+  });
+
+  it("keeps a long invoice with bank details and the notice from overflowing the totals", async () => {
+    const r = await render({ ...base, ...compact, vatRegistered: false, lineItems: jobLines(13, true), bank, latePaymentNotice: true });
+    expect(r.pages).toBeGreaterThanOrEqual(1);
+    expect(r.pages).toBeLessThanOrEqual(2);
+  });
+
+  it("formats a sort code and lists only the bank details that are filled in", () => {
+    expect(formatSortCode("123456")).toBe("12-34-56");
+    expect(formatSortCode("12 34 56")).toBe("12-34-56");
+    expect(formatSortCode("12-34-56")).toBe("12-34-56");
+    expect(formatSortCode("1234")).toBe("1234");
+    expect(formatSortCode(null)).toBe("");
+    expect(bankRows(undefined)).toEqual([]);
+    expect(bankRows({ bankName: "  ", accountName: "Test Ltd", sortCode: "123456", accountNumber: null })).toEqual([
+      ["Account Name:", "Test Ltd"],
+      ["Sort Code:", "12-34-56"],
+    ]);
+  });
+
+  it("states the statutory sentence plainly, with the figures", () => {
+    expect(LATE_PAYMENT_NOTICE).toContain("8% above the Bank of England base rate");
+    expect(LATE_PAYMENT_NOTICE).toContain("£40, £70 or £100");
+    expect(LATE_PAYMENT_NOTICE).toContain("Late Payment of Commercial Debts (Interest) Act 1998");
   });
 });

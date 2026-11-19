@@ -85,6 +85,10 @@ export async function findAlreadyInvoicedJobs(jobIds: string[]): Promise<Set<str
     supabase.from("invoice_items").select("job_id, voided").in("job_id", jobIds),
     supabase.from("invoices").select("job_id, status").in("job_id", jobIds),
   ]);
+  // Fail closed: this set is the duplicate-invoice guard. Treating a failed
+  // lookup as "nothing invoiced" would let the same job be billed twice.
+  const lookupError = itemsResult.error ?? legacyResult.error;
+  if (lookupError) throw new Error(`Could not check invoiced jobs: ${lookupError.message}`);
   const ids = new Set<string>();
   // A cancelled invoice releases its jobs: its items are flagged voided, and
   // a cancelled legacy single-job invoice no longer claims its job.
