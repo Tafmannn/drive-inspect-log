@@ -108,4 +108,21 @@ describe("computeJobMargin — pure margin derivation", () => {
     expect(r.margin).toBe(-70);
     expect(r.marginPct).toBe(-140);
   });
+
+  it("counts expenses recharged on an invoice as revenue, so a passed-through cost nets to zero", () => {
+    // £150 job, £85 train fare logged and recharged to the client at cost,
+    // driver paid £60 per job. Before the fix this reported £5 margin.
+    const r = computeJobMargin({
+      totalPrice: 150,
+      routeDistanceMiles: 120,
+      loggedExpenses: 85,
+      rechargedRevenue: 85,
+      driverPayRate: 60,
+      driverPayBasis: "per_job",
+    });
+    expect(r.revenue).toBe(235);
+    expect(r.cost).toBe(145);
+    expect(r.margin).toBe(90);
+    expect(r.costIncomplete).toBe(false);
+  });
 });

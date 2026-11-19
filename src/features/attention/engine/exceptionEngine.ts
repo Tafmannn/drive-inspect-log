@@ -420,6 +420,88 @@ export function deriveComplianceExceptions(
 
 const SEV_ORDER: Record<ExceptionSeverity, number> = { critical: 0, high: 1, medium: 2, low: 3 };
 
+/* ── Billing exceptions (completed work that is not turning into cash) ── */
+
+export interface BillingJobRow {
+  id: string;
+  org_id: string;
+  external_job_number: string | null;
+  vehicle_reg: string | null;
+  status: string;
+  completed_at: string | null;
+  total_price: number | null;
+  client_id: string | null;
+}
+
+/**
+ * One exception per completed job, for the FIRST thing blocking its
+ * invoice, in the order an admin has to fix them:
+ *   1. no price      → cannot be invoiced at all          (high)
+ *   2. no client     → invisible to Invoice Prep          (medium)
+ *   3. not invoiced  → after unbilledWarnDays (medium), unbilledHighDays (high)
+ * "Invoiced" uses the same definition as the duplicate-invoice guard
+ * (findAlreadyInvoicedJobs): a non-voided invoice_items row or a
+ * non-cancelled legacy invoices.job_id. A draft invoice counts as invoiced
+ * here; drafts are chased from the invoice list, not per job.
+ */
+export function deriveBillingExceptions(
+  jobs: BillingJobRow[],
+  invoicedJobIds: Set<string>,
+  orgLookup?: Map<string, string>,
+  nowMs: number = Date.now(),
+): AttentionException[] {
+  const out: AttentionException[] = [];
+  const lookbackFrom = nowMs - T.billingLookbackDays * 86_400_000;
+
+  for (const job of jobs) {
+    if (job.status !== "completed" && job.status !== "closed") continue;
+    if (!job.completed_at) continue;
+    const completedMs = new Date(job.completed_at).getTime();
+    if (!Number.isFinite(completedMs) || completedMs < lookbackFrom) continue;
+    if (invoicedJobIds.has(job.id)) continue;
+
+    const ref = job.external_job_number || job.vehicle_reg || job.id.slice(0, 8);
+    const base = {
+      jobId: job.id,
+      jobNumber: ref,
+      orgId: job.org_id,
+      orgName: orgLookup?.get(job.org_id),
+      createdAt: job.completed_at,
+      category: "billing" as const,
+    };
+
+    if (job.total_price == null || !(Number(job.total_price) > 0)) {
+      out.push(exc({
+        ...base, severity: "high",
+        title: "Completed job has no price",
+        detail: `${ref} was completed but has no agreed price, so it cannot be invoiced or counted in profit.`,
+        actionLabel: "Set price", actionRoute: `/jobs/${job.id}`,
+      }, "no-price"));
+      continue;
+    }
+
+    if (!job.client_id) {
+      out.push(exc({
+        ...base, severity: "medium",
+        title: "Completed job not linked to a client",
+        detail: `${ref} has no client record, so Invoice Prep and client profitability cannot see it.`,
+        actionLabel: "Link to client", actionRoute: "/control/clients/link-jobs",
+      }, "no-client"));
+      continue;
+    }
+
+    const days = Math.floor((nowMs - completedMs) / 86_400_000);
+    if (days < T.unbilledWarnDays) continue;
+    out.push(exc({
+      ...base, severity: days >= T.unbilledHighDays ? "high" : "medium",
+      title: "Completed job not invoiced",
+      detail: `${ref} (£${Number(job.total_price).toFixed(2)}) was completed ${days} day${days === 1 ? "" : "s"} ago and is not on any invoice.`,
+      actionLabel: "Invoice Prep", actionRoute: "/control/invoice-prep",
+    }, "unbilled"));
+  }
+  return out;
+}
+
 export function sortExceptions(exceptions: AttentionException[]): AttentionException[] {
   return [...exceptions].sort((a, b) =>
     SEV_ORDER[a.severity] - SEV_ORDER[b.severity] ||

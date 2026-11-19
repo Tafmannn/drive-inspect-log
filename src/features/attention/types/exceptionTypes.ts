@@ -2,7 +2,7 @@
 
 export type ExceptionSeverity = "critical" | "high" | "medium" | "low";
 
-export type ExceptionCategory = "timing" | "evidence" | "sync" | "state" | "compliance";
+export type ExceptionCategory = "timing" | "evidence" | "sync" | "state" | "compliance" | "billing";
 
 export interface AttentionException {
   id: string;

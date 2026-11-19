@@ -63,6 +63,7 @@ export function AttentionFilters({ filters, onChange, onRefresh, refreshing, sho
           <SelectItem value="sync">🔄 Sync</SelectItem>
           <SelectItem value="state">🔒 State</SelectItem>
           <SelectItem value="compliance">🛡 Compliance</SelectItem>
+          <SelectItem value="billing">£ Billing</SelectItem>
         </SelectContent>
       </Select>
 

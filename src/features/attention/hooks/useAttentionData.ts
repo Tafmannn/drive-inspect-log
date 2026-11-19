@@ -12,8 +12,12 @@ import {
   deriveSyncExceptions,
   deriveStateExceptions,
   deriveComplianceExceptions,
+  deriveBillingExceptions,
   sortExceptions,
+  type BillingJobRow,
 } from "../engine/exceptionEngine";
+import { ATTENTION_THRESHOLDS } from "../config/thresholds";
+import { findAlreadyInvoicedJobs } from "@/features/invoicing/api/createInvoice";
 import type { AttentionException, AttentionKpiData, AttentionFiltersState } from "../types/exceptionTypes";
 import { ACTIVE_STATUSES } from "@/lib/statusConfig";
 import type { Tables } from "@/integrations/supabase/types";
@@ -50,6 +54,7 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
         acksRes,
         docsRes,
         driversRes,
+        billingJobsRes,
       ] = await Promise.all([
         supabase.from("jobs").select("*")
           .eq("is_hidden", false)
@@ -98,6 +103,15 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
           .is("archived_at", null)
           .eq("is_active", true)
           .limit(500),
+
+        // Completed work inside the billing lookback, for unpriced /
+        // unlinked / uninvoiced checks.
+        supabase.from("jobs")
+          .select("id, org_id, external_job_number, vehicle_reg, status, completed_at, total_price, client_id")
+          .eq("is_hidden", false)
+          .in("status", ["completed", "closed"])
+          .gte("completed_at", new Date(Date.now() - ATTENTION_THRESHOLDS.billingLookbackDays * 86400_000).toISOString())
+          .limit(1000),
       ]);
 
       const activeJobs = (activeJobsRes.data ?? []) as JobRow[];
@@ -137,6 +151,16 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
         }
       }
 
+      // Billing: throws (→ query error state) rather than raising false
+      // "not invoiced" alerts if either lookup fails.
+      if (billingJobsRes.error) throw billingJobsRes.error;
+      const billingJobs = (billingJobsRes.data ?? []) as BillingJobRow[];
+      const billingIds = billingJobs.map((j) => j.id);
+      const invoicedJobIds = new Set<string>();
+      for (let i = 0; i < billingIds.length; i += 100) {
+        for (const id of await findAlreadyInvoicedJobs(billingIds.slice(i, i + 100))) invoicedJobIds.add(id);
+      }
+
       const orgLookup = new Map<string, string>();
       for (const o of orgs) orgLookup.set(o.id, o.name);
 
@@ -174,6 +198,7 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
           orgLookup,
           driverUserIdByProfileId,
         ),
+        ...deriveBillingExceptions(billingJobs, invoicedJobIds, orgLookup),
       ]);
 
       // Build a set of jobIds that an admin has explicitly resolved
