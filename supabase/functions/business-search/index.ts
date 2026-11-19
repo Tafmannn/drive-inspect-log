@@ -126,7 +126,7 @@ serve(async (req) => {
     }
 
     // ─── Original logic ───
-    const MAPS_KEY = Deno.env.get("GOOGLE_MAPS_API_KEY");
+    const MAPS_KEY = Deno.env.get("GOOGLE_PLACES_API_KEY") ?? Deno.env.get("GOOGLE_MAPS_API_KEY");
     if (!MAPS_KEY) {
       return new Response(
         JSON.stringify({ results: [], degraded: true }),
@@ -208,7 +208,7 @@ serve(async (req) => {
       legacyUrl.searchParams.set("key", MAPS_KEY);
       const legacyResp = await fetch(legacyUrl.toString());
       const legacyData = await legacyResp.json();
-      if (geocodeRefused(legacyData.status)) degraded = true;
+      // Not counted as "limited": the old Places API is often not enabled even when the new one works.
       if (legacyData.status !== "OK" || !legacyData.results?.length) {
         console.log("business-search legacy fallback empty. status:", legacyData.status, "err:", legacyData.error_message);
         const geoUrl = new URL("https://maps.googleapis.com/maps/api/geocode/json");

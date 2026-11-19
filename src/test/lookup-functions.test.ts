@@ -124,7 +124,7 @@ const call = async (fn: "postcode-lookup" | "business-search", body: unknown) =>
 const loadFunction = (name: string) => import(/* @vite-ignore */ `../../supabase/functions/${name}/index.ts`);
 
 beforeAll(async () => {
-  vi.stubGlobal("Deno", { env: { get: (k: string) => (k === "GOOGLE_MAPS_API_KEY" ? "test-key" : undefined) } });
+  vi.stubGlobal("Deno", { env: { get: (k: string) => (k === "GOOGLE_PLACES_API_KEY" ? "test-key" : undefined) } });
   h.current = "postcode-lookup";
   await loadFunction("postcode-lookup");
   h.current = "business-search";
@@ -289,5 +289,16 @@ describe("business-search Places request", () => {
     world.places = "empty";
     await call("business-search", { query: "acme motors" });
     expect(calls.filter((c) => c.startsWith("places.googleapis.com")).length).toBe(1);
+  });
+});
+
+describe("business-search with the old Places API switched off", () => {
+  it("Places works but finds nothing: not reported as limited just because the old API refuses", async () => {
+    world.places = "empty";
+    world.geocode = "zero";
+    world.legacy = "refused";
+    world.osm = "empty";
+    const r = await call("business-search", { query: "no such business" });
+    expect(r.body).toEqual({ results: [], degraded: false });
   });
 });

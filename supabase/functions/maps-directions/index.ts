@@ -32,10 +32,10 @@ serve(async (req) => {
     }
 
     // ─── Original logic ───
-    const MAPS_KEY = Deno.env.get("GOOGLE_MAPS_API_KEY");
+    const MAPS_KEY = Deno.env.get("GOOGLE_PLACES_API_KEY") ?? Deno.env.get("GOOGLE_MAPS_API_KEY");
     if (!MAPS_KEY) {
       return new Response(
-        JSON.stringify({ error: "GOOGLE_MAPS_API_KEY not configured" }),
+        JSON.stringify({ error: "GOOGLE_PLACES_API_KEY not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
