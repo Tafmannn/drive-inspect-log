@@ -51,7 +51,7 @@ import { ExpensePicker } from "../components/ExpensePicker";
 import { InvoiceList, InvoiceStatusBadge } from "../components/InvoiceList";
 import { DEFAULT_RECHARGE_CATEGORIES } from "../api/billableExpenses";
 import { loadReceiptImage } from "../api/receiptImages";
-import { receiptCaption, receiptFileRef } from "../api/invoiceDocument";
+import { receiptCaption, receiptFileRef, settingsToPdfFields } from "../api/invoiceDocument";
 import { downloadBlob } from "../api/receiptExport";
 import {
   buildInvoiceDraft,
@@ -371,7 +371,7 @@ export function InvoicePrepScreen() {
           draft.lineItems.map((l) => l.job_date),
           draft.lineItems.length
         ),
-        business: settings?.business,
+        ...settingsToPdfFields(settings),
         lineItems: draft.lineItems.map((l) => ({
           description: l.description,
           quantity: 1,
