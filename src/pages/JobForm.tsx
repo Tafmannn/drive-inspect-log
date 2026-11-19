@@ -28,6 +28,7 @@ import { notifyJobAssigned } from "@/lib/pushApi";
 import { lookupPostcode, type AddressSuggestion } from "@/lib/postcodeApi";
 import { BusinessSearchInput } from "@/components/BusinessSearchInput";
 import { AddressCheck } from "@/components/AddressCheck";
+import { AddressSearchInput } from "@/components/AddressSearchInput";
 import { getPlaceDetails, type BusinessResult } from "@/lib/businessSearchApi";
 import { logClientEvent } from "@/lib/logger";
 import { supabase } from "@/integrations/supabase/client";
@@ -321,6 +322,18 @@ export const JobForm = () => {
     }
   }, []);
 
+  // The house number lives in Address Line 1 and the street in Line 2 when Google
+  // gives us both. When it only gives a street, put the caret at the start of
+  // Line 1 so the user can just type the number in front of it.
+  const focusLine1AtStart = useCallback((side: "pickup" | "delivery") => {
+    requestAnimationFrame(() => {
+      const el = formRef.current?.elements.namedItem(`${side}_address_line1`) as HTMLInputElement | null;
+      if (!el || typeof el.focus !== "function") return;
+      el.focus();
+      try { el.setSelectionRange(0, 0); } catch { /* not a text input */ }
+    });
+  }, []);
+
   const handleSelectSuggestion = useCallback((side: "pickup" | "delivery", suggestion: AddressSuggestion) => {
     if (!formRef.current) return;
     const fields = formRef.current.elements;
@@ -341,6 +354,7 @@ export const JobForm = () => {
     } else {
       setVal(`${side}_address_line1`, suggestion.line1);
       setVal(`${side}_address_line2`, "");
+      if (suggestion.line1) focusLine1AtStart(side);
     }
     setVal(`${side}_city`, suggestion.town);
     setVal(`${side}_postcode`, suggestion.postcode);
@@ -354,10 +368,10 @@ export const JobForm = () => {
     if (pickupPC && deliveryPC) triggerRouteCalc(pickupPC, deliveryPC);
 
     saveDraftFromForm();
-  }, [triggerRouteCalc, saveDraftFromForm]);
+  }, [triggerRouteCalc, saveDraftFromForm, focusLine1AtStart]);
 
   // Business search selection handler
-  const handleBusinessSelect = useCallback(async (side: "pickup" | "delivery", result: BusinessResult) => {
+  const handleBusinessSelect = useCallback(async (side: "pickup" | "delivery", result: BusinessResult, opts?: { focusNumber?: boolean }) => {
     if (!formRef.current) return;
     const fields = formRef.current.elements;
     const setVal = (name: string, val: string) => {
@@ -408,6 +422,8 @@ export const JobForm = () => {
     } else {
       setVal(`${side}_address_line1`, addr.line1);
       setVal(`${side}_address_line2`, "");
+      // Street-only result from address search: let the user add the number.
+      if (opts?.focusNumber && addr.line1) focusLine1AtStart(side);
     }
 
     if (addr.city) setVal(`${side}_city`, addr.city);
@@ -428,7 +444,7 @@ export const JobForm = () => {
     }
 
     saveDraftFromForm();
-  }, [triggerRouteCalc, saveDraftFromForm]);
+  }, [triggerRouteCalc, saveDraftFromForm, focusLine1AtStart]);
 
   // Sync make/model + driver when editing once job is loaded
   useEffect(() => {
@@ -1193,6 +1209,17 @@ export const JobForm = () => {
             </div>
             <div>
               <Label className="text-sm font-medium">
+                Search address
+              </Label>
+              <AddressSearchInput
+                className="mt-1"
+                onSelect={(p) =>
+                  handleBusinessSelect("pickup", { placeId: p.placeId, name: p.main, address: p.text, types: [] }, { focusNumber: true })
+                }
+              />
+            </div>
+            <div>
+              <Label className="text-sm font-medium">
                 Address Line 1 *
               </Label>
               <Input
@@ -1356,6 +1383,17 @@ export const JobForm = () => {
                 })()}
                 onSelect={(r) => handleBusinessSelect("delivery", r)}
                 className="mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-sm font-medium">
+                Search address
+              </Label>
+              <AddressSearchInput
+                className="mt-1"
+                onSelect={(p) =>
+                  handleBusinessSelect("delivery", { placeId: p.placeId, name: p.main, address: p.text, types: [] }, { focusNumber: true })
+                }
               />
             </div>
             <div>

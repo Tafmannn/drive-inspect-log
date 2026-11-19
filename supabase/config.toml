@@ -21,6 +21,9 @@ verify_jwt = false
 [functions.address-validate]
 verify_jwt = false
 
+[functions.address-autocomplete]
+verify_jwt = false
+
 [functions.business-search]
 verify_jwt = false
 
