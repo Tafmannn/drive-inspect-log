@@ -4,6 +4,11 @@
  * DATA SOURCES:
  *   - jobs table            → completed jobs: total_price, route_distance_miles, driver_id
  *   - expenses table        → summed per job_id (billable_on_pod or not, all logged cost)
+ *   - invoice_expenses      → non-voided amount_charged per job_id: expenses
+ *                             recharged to the client on an invoice. Counted as
+ *                             revenue, because the cost side already includes
+ *                             the underlying expense — omitting it understated
+ *                             margin on every job with a recharged train fare etc.
  *   - driver_profiles table → pay_rate / pay_basis, joined via jobs.driver_id = driver_profiles.id
  *
  * MARGIN DERIVATION (deliberately conservative — never guesses):
@@ -11,7 +16,8 @@
  *   - driverCost is known only when pay_basis is 'per_job' (= pay_rate) or
  *     'per_mile' (= pay_rate * route_distance_miles); 'hourly' and an unset
  *     rate are surfaced as costIncomplete, never treated as zero cost.
- *   - margin = total_price - cost, margin % = margin / total_price.
+ *   - revenue = total_price + recharged expenses; margin = revenue - cost,
+ *     margin % = margin / revenue.
  *   A job with costIncomplete=true still shows its known partial cost, so
  *   the KPI totals stay honest about what's actually been logged rather
  *   than silently overstating margin.
@@ -58,6 +64,8 @@ export interface ProfitabilityRow {
   driverName: string | null;
   completedAt: string;
   revenue: number;
+  /** Of `revenue`, the part that is expenses recharged on an invoice. */
+  rechargedRevenue: number;
   loggedExpenses: number;
   driverCost: number | null;
   cost: number;
@@ -80,6 +88,8 @@ export function computeJobMargin(input: {
   totalPrice: number | null;
   routeDistanceMiles: number | null;
   loggedExpenses: number;
+  /** Expenses recharged to the client on a non-voided invoice line. */
+  rechargedRevenue?: number;
   driverPayRate: number | null;
   driverPayBasis: string | null;
 }): {
@@ -90,7 +100,7 @@ export function computeJobMargin(input: {
   marginPct: number | null;
   costIncomplete: boolean;
 } {
-  const revenue = input.totalPrice ?? 0;
+  const revenue = (input.totalPrice ?? 0) + (input.rechargedRevenue ?? 0);
   let driverCost: number | null = null;
   let costIncomplete = false;
 
@@ -135,15 +145,24 @@ export function useProfitabilityData(period: ProfitabilityPeriod) {
       const jobIds = (jobs ?? []).map((j) => j.id);
       const driverIds = Array.from(new Set((jobs ?? []).map((j) => j.driver_id).filter((id): id is string => !!id)));
 
-      const [expensesRes, driversRes] = await Promise.all([
+      const [expensesRes, driversRes, rechargesRes] = await Promise.all([
         jobIds.length > 0
           ? supabase.from("expenses").select("job_id, amount").eq("is_hidden", false).in("job_id", jobIds)
           : Promise.resolve({ data: [], error: null }),
         driverIds.length > 0
           ? (supabase.from("driver_profiles") as any).select("id, pay_rate, pay_basis").in("id", driverIds)
           : Promise.resolve({ data: [], error: null }),
+        jobIds.length > 0
+          ? supabase.from("invoice_expenses").select("job_id, amount_charged").eq("voided", false).in("job_id", jobIds)
+          : Promise.resolve({ data: [], error: null }),
       ]);
       if (expensesRes.error) throw expensesRes.error;
+      if (rechargesRes.error) throw rechargesRes.error;
+      const rechargedByJob = new Map<string, number>();
+      for (const r of (rechargesRes.data ?? []) as { job_id: string | null; amount_charged: number }[]) {
+        if (!r.job_id) continue;
+        rechargedByJob.set(r.job_id, (rechargedByJob.get(r.job_id) ?? 0) + (Number(r.amount_charged) || 0));
+      }
       if (driversRes.error) throw driversRes.error;
 
       const expensesByJob = new Map<string, number>();
@@ -162,6 +181,7 @@ export function useProfitabilityData(period: ProfitabilityPeriod) {
           totalPrice: j.total_price,
           routeDistanceMiles: j.route_distance_miles,
           loggedExpenses,
+          rechargedRevenue: rechargedByJob.get(j.id) ?? 0,
           driverPayRate: driver?.pay_rate ?? null,
           driverPayBasis: driver?.pay_basis ?? null,
         });
@@ -174,6 +194,7 @@ export function useProfitabilityData(period: ProfitabilityPeriod) {
           driverName: j.driver_name,
           completedAt: j.completed_at as string,
           revenue: computed.revenue,
+          rechargedRevenue: rechargedByJob.get(j.id) ?? 0,
           loggedExpenses,
           driverCost: computed.driverCost,
           cost: computed.cost,
