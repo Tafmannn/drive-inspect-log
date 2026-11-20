@@ -43,3 +43,15 @@ Reads go through `src/lib/jobPricingApi.ts` (`withPricing`): if the lookup fails
 values, so deploying phase 2 before phase 1 is applied degrades to today's behaviour rather than breaking screens
 (the JSON backup is the exception and needs phase 1 applied).
 Drivers' reads get no pricing rows (row-level security), so their screens are unchanged.
+
+## Phase 3 as built (migration `20261121110000_job_pricing_seal.sql`)
+- Proves first: fills any gap in `job_pricing` from the old columns, then aborts (`JOB_PRICING_MISMATCH`) if a job's
+  old column holds a value that differs from its pricing row. Nothing is emptied in that case.
+- Replaces the phase 1 mirror with the seal: `BEFORE UPDATE` (forward non-NULL values, store NULL) and `AFTER INSERT`
+  (the foreign key needs the job row to exist). Both fire only when a NEW value is non-NULL, so emptying the columns
+  does not re-fire them. Only non-NULL values are forwarded and a forwarded value never overwrites with NULL.
+- Then sets the seven columns to NULL on the rows that hold anything (this bumps those rows' `updated_at` once).
+- Clearing a price is the app's explicit `job_pricing` write (see phase 2); an old tab clearing a price on the sealed
+  column is a no-op, which is the safe direction.
+- Rollback drops the seal first, copies the values back, then restores the phase 1 mirror byte for byte
+  (`src/test/job-pricing-seal.test.ts` compares it to the phase 1 definition).
