@@ -120,6 +120,11 @@ export function PricingSuggestionPanel(props: PricingSuggestionPanelProps) {
         setSuggestion(s);
         props.onSuggestionChange?.(s);
       })
+      .catch(() => {
+        // The suggestion is advisory. If working it out (or the caller's callback)
+        // throws, show no suggestion instead of leaving an unhandled rejection.
+        if (!cancelled) setSuggestion(null);
+      })
       .finally(() => {
         if (!cancelled) setComputing(false);
       });

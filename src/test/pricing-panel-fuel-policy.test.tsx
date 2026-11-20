@@ -3,7 +3,7 @@
  * includes it: what it says, and that the old "Missing inputs: fuel_estimate, ..." is gone.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 
 const h = vi.hoisted(() => ({
   policy: "recharged" as "recharged" | "included",
@@ -63,5 +63,26 @@ describe("PricingSuggestionPanel and fuel", () => {
     render(panel(null));
     expect(await screen.findByText("Fuel is recharged on the invoice, so it is not in this price")).toBeInTheDocument();
     expect(h.policyFor).not.toHaveBeenCalled();
+  });
+
+  it("if the caller's callback throws, the panel shows no suggestion and nothing is left unhandled", async () => {
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+    try {
+      render(
+        <PricingSuggestionPanel
+          clientId="c1"
+          inputs={{ routeMiles: 100, urgency: "standard" }}
+          onSuggestionChange={() => {
+            throw new Error("callback failed");
+          }}
+        />,
+      );
+      await new Promise((r) => setTimeout(r, 50)); // let the calculation and its callback run
+      await waitFor(() => expect(screen.queryByText(/100 mi × £1\.20/)).toBeNull());
+      expect(unhandled).not.toHaveBeenCalled();
+    } finally {
+      process.off("unhandledRejection", unhandled);
+    }
   });
 });
