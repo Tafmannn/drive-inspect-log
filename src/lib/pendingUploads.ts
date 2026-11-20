@@ -929,6 +929,26 @@ export async function pruneDone(): Promise<void> {
 
 
 /**
+ * Decide what to do with a queued upload tagged with `queuedRun`, given what
+ * the server returned for its job (`row`: null when no row came back).
+ *
+ * `jobs.current_run_id` is NOT NULL in practice (default gen_random_uuid()),
+ * so a missing row or null run means "this caller can't see the job right
+ * now" — e.g. a driver whose job was reassigned or deleted, since drivers
+ * only read jobs assigned to them. That is NOT proof the evidence is stale:
+ * deleting the blob there silently destroyed captured photos. Only a visible
+ * job with a different run id is a definitive stale run.
+ */
+export function classifyRunCheck(
+  queuedRun: string,
+  row: { current_run_id?: string | null } | null | undefined,
+): "match" | "stale" | "unverifiable" {
+  const current = row?.current_run_id ?? null;
+  if (!current) return "unverifiable";
+  return current === queuedRun ? "match" : "stale";
+}
+
+/**
  * Remove queued uploads whose `runId` no longer matches the job's
  * `current_run_id`. Returns count purged.
  */
@@ -959,7 +979,7 @@ export async function purgeStaleRunUploads(): Promise<number> {
       continue;
     }
     const current = currentRunByJob.get(u.jobId);
-    if (!current || current !== u.runId) {
+    if (classifyRunCheck(u.runId, current === undefined ? null : { current_run_id: current }) === "stale") {
       void logClientEvent("photo_upload_failed", "warn", {
         jobId: u.jobId,
         source: "storage",
@@ -981,9 +1001,8 @@ export async function purgeStaleRunUploads(): Promise<number> {
     const purgedIds = all
       .filter(
         (u) =>
-          u.runId &&
-          (!currentRunByJob.get(u.jobId) ||
-            currentRunByJob.get(u.jobId) !== u.runId),
+          !!u.runId &&
+          classifyRunCheck(u.runId, { current_run_id: currentRunByJob.get(u.jobId) ?? null }) === "stale",
       )
       .map((u) => u.id);
     try {
@@ -1042,6 +1061,7 @@ export async function retryUpload(
     if (candidate.runId) {
       let currentRun: string | null = null;
       let verifyFailed = false;
+      let jobNotVisible = false;
       try {
         const { supabase } = await import("@/integrations/supabase/client");
         const { data, error } = await supabase
@@ -1051,6 +1071,18 @@ export async function retryUpload(
           .maybeSingle();
         if (error) throw error;
         currentRun = (data as any)?.current_run_id ?? null;
+        // Job not visible / no run: can't prove staleness — keep the photo.
+        if (classifyRunCheck(candidate.runId, data as { current_run_id?: string | null } | null) === "unverifiable") {
+          verifyFailed = true;
+          jobNotVisible = true;
+          // Surfaces in the Attention Center (unlike stale_run_purged).
+          void logClientEvent("photo_upload_failed", "warn", {
+            jobId: candidate.jobId,
+            source: "storage",
+            type: "upload",
+            context: { reason: "run_job_not_visible", pendingId: id, queuedRun: candidate.runId },
+          });
+        }
       } catch (e) {
         verifyFailed = true;
         void logClientEvent("photo_upload_failed", "warn", {
@@ -1069,8 +1101,8 @@ export async function retryUpload(
       if (!verifyFailed && currentRun && currentRun === candidate.runId) {
         verifiedRunId = candidate.runId;
       } else if (!verifyFailed) {
-        // Definitive mismatch (or job has no current_run_id at all):
-        // purge — evidence must not attach to a different run.
+        // Definitive mismatch: the job is visible and on a different run.
+        // Purge — evidence must not attach to a different run.
         void logClientEvent("photo_upload_failed", "warn", {
           jobId: candidate.jobId,
           source: "storage",
@@ -1092,8 +1124,9 @@ export async function retryUpload(
           state: "blocked",
           status: "failed",
         lastErrorAt: new Date().toISOString(),
-          errorMessage:
-            "Run unverified — left queued. Will retry once the job is reachable.",
+          errorMessage: jobNotVisible
+            ? "This job is no longer assigned to you. The photo is kept on this phone — don't delete it; ask the office to reassign the job so it can upload."
+            : "Run unverified — left queued. Will retry once the job is reachable.",
         }));
         notifyEvidenceQueueChanged();
         return false;

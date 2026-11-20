@@ -60,6 +60,7 @@ import {
   __testing__,
 } from "@/lib/pendingUploads";
 import { clear } from "idb-keyval";
+import { classifyRunCheck as __classify } from "@/lib/pendingUploads";
 
 function makeFile(name = "test.jpg"): File {
   const bytes = new Uint8Array([
@@ -544,5 +545,70 @@ describe("pendingUploads — misc operations", () => {
     const remaining = await getAllPendingUploads();
     expect(remaining).toHaveLength(1);
     expect(remaining[0].state).toBe("ready");
+  });
+});
+
+// ─── Run-isolation guard must never destroy evidence it can't prove stale ──
+// Drivers only read jobs assigned to them. A job reassigned while the
+// driver's photos were still queued used to come back as "no row", which the
+// guard treated as a stale run and deleted the photos from the device.
+
+describe("pendingUploads — run guard keeps evidence it cannot prove stale", () => {
+  const RUN = "run-1111";
+
+  async function queued() {
+    const item = await stagePendingUpload(makeFile(), {
+      submissionSessionId: SESSION_A,
+      clientPhotoId: "cpid-run",
+      jobId: "job-run",
+      inspectionType: "pickup",
+      photoType: "exterior_front",
+      label: null,
+      runId: RUN,
+    });
+    await promoteSubmissionSession(SESSION_A, { inspectionId: "insp-1", damageIdMap: {} });
+    return item;
+  }
+
+  beforeEach(() => {
+    mockUpload.mockResolvedValue({ url: "u", thumbnailUrl: null, backend: "gcs", backendRef: null });
+    mockInsertPhoto.mockResolvedValue({ id: "p" });
+  });
+
+  it("classifyRunCheck: only a visible job on another run is stale", () => {
+    expect(__classify(RUN, null)).toBe("unverifiable");
+    expect(__classify(RUN, { current_run_id: null })).toBe("unverifiable");
+    expect(__classify(RUN, { current_run_id: RUN })).toBe("match");
+    expect(__classify(RUN, { current_run_id: "run-2222" })).toBe("stale");
+  });
+
+  it("job no longer visible (reassigned) → photo KEPT as blocked, not uploaded", async () => {
+    const item = await queued();
+    mockJobsSelect.mockResolvedValue({ data: null, error: null });
+
+    expect(await retryUpload(item.id)).toBe(false);
+    const all = await getAllPendingUploads();
+    expect(all).toHaveLength(1);
+    expect(all[0].state).toBe("blocked");
+    expect(all[0].fileBlob).toBeInstanceOf(Blob);
+    expect(all[0].errorMessage).toMatch(/no longer assigned/);
+    expect(mockUpload).not.toHaveBeenCalled();
+  });
+
+  it("job visible on a different run → purged (must not attach to the new run)", async () => {
+    const item = await queued();
+    mockJobsSelect.mockResolvedValue({ data: { current_run_id: "run-2222" }, error: null });
+
+    expect(await retryUpload(item.id)).toBe(false);
+    expect(await getAllPendingUploads()).toHaveLength(0);
+    expect(mockUpload).not.toHaveBeenCalled();
+  });
+
+  it("job visible on the same run → uploads", async () => {
+    const item = await queued();
+    mockJobsSelect.mockResolvedValue({ data: { current_run_id: RUN }, error: null });
+
+    expect(await retryUpload(item.id)).toBe(true);
+    expect(mockUpload).toHaveBeenCalledTimes(1);
   });
 });
