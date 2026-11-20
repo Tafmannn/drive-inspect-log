@@ -22,6 +22,7 @@ import {
   renderPodEmail,
   resolveEmailLogoUrl,
 } from "../_shared/podEmail.ts";
+import { pickAppOrigin } from "../_shared/appOrigin.ts";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -30,13 +31,7 @@ function fail(status: number, error: string, message: string): Response {
 }
 
 function appBaseUrl(req: Request): string | null {
-  const candidate = Deno.env.get("APP_URL") || req.headers.get("origin") || "";
-  try {
-    const u = new URL(candidate);
-    return u.protocol === "https:" ? u.origin : null;
-  } catch {
-    return null;
-  }
+  return pickAppOrigin(Deno.env.get("APP_URL"), Deno.env.get("APP_ALLOWED_ORIGINS"), req.headers.get("origin"));
 }
 
 function place(city: string | null, postcode: string | null): string | null {

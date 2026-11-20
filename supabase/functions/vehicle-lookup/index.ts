@@ -1,6 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { checkStaff } from "../_shared/staffAuth.ts";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { createIpRateLimiter } from "../_shared/rateLimit.ts";
+
+// Same per-IP throttle as the other lookup functions; protects the DVLA quota.
+const rateLimiter = createIpRateLimiter(corsHeaders);
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -13,6 +17,9 @@ serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const limited = rateLimiter.check(req);
+  if (limited) return limited;
 
   try {
     // ─── Staff only ───
