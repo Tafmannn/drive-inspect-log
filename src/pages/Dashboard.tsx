@@ -25,6 +25,8 @@ import { useNavigate } from "react-router-dom";
 import { useDashboardCounts } from "@/hooks/useJobs";
 import { useDriverGate } from "@/hooks/useDriverGate";
 import { useAuth } from "@/context/AuthContext";
+import { HomeHeader } from "@/features/admin-home/HomeHeader";
+import "@/features/admin-home/admin-home.css";
 
 // Admins/super-admins get the operational dashboard body — lazy so its heavy
 // admin hooks/components never load for a driver, preserving the eager driver
@@ -32,6 +34,11 @@ import { useAuth } from "@/context/AuthContext";
 const AdminDashboardBody = lazy(() =>
   import("@/pages/AdminDashboard").then((m) => ({ default: m.AdminDashboardBody })),
 );
+
+/** "Fri 20 Nov 2026" — UK short date for the admin home. */
+function todayLabel(): string {
+  return new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" }).format(new Date());
+}
 
 /** Time-of-day greeting used in the header instead of a redundant "Dashboard" title. */
 function greetingFor(name: string | undefined): string {
@@ -68,15 +75,24 @@ export const Dashboard = () => {
   const isOps = isAdmin || isSuperAdmin;
   const greeting = greetingFor(user?.name);
 
-  return (
-    <div className="min-h-screen bg-background pb-20">
-      <AppHeader title={greeting} />
-
-      {isOps ? (
-        // Admins / super-admins → the operational dashboard.
+  if (isOps) {
+    // Admins / super-admins → the operational dashboard, in the Admin Home
+    // presentation (own header + greeting, floating dock).
+    return (
+      <div className="ah-root min-h-screen pb-28">
+        <HomeHeader />
+        <div className="mx-auto max-w-5xl px-4 pb-5 pt-5 sm:px-6 lg:px-8">
+          <div className="px-1">
+            <p className="text-[15px] leading-5 text-muted-foreground">{todayLabel()}</p>
+            <h1 className="mt-1 text-[28px] font-semibold leading-[1.12] tracking-[-0.025em] text-foreground min-[380px]:text-[30px] sm:text-[34px]">
+              {greeting}
+            </h1>
+            <p className="mt-1.5 text-[15px] leading-[1.35] text-[hsl(var(--ah-ink-soft))]">Here’s your operations overview.</p>
+          </div>
+        </div>
         <Suspense
           fallback={
-            <div className="p-4 space-y-4">
+            <div className="mx-auto max-w-5xl space-y-4 px-4 sm:px-6 lg:px-8">
               <KpiRowSkeleton items={4} />
               <ListRowsSkeleton rows={3} />
             </div>
@@ -84,7 +100,16 @@ export const Dashboard = () => {
         >
           <AdminDashboardBody />
         </Suspense>
-      ) : (
+        <BottomNav variant="floating" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background pb-20">
+      <AppHeader title={greeting} />
+
+      {(
         // Drivers → compact launcher.
         <div className="p-4 space-y-5 max-w-lg lg:max-w-3xl mx-auto page-enter">
           {/* At-a-glance stat row (replaces three stacked full-width cards) */}
