@@ -16,27 +16,33 @@
 --    called usefully over RPC, but it should not be in the anon/authenticated
 --    API surface at all. Triggers don't need the invoking role to hold EXECUTE.
 --
--- Rollback: see the matching block at the bottom of this file.
+-- Idempotent (applied to staging and prod by hand on 20 Nov 2026 before it
+-- had a version; re-running is a no-op).
+-- Rollback: supabase/rollback/20261121130000_audit_logs_append_only_and_rpc_grants.down.sql
 
 -- ── 1. append-only audit logs ─────────────────────────────────────────
 DROP POLICY IF EXISTS "Org members can manage job_activity_log" ON public.job_activity_log;
+DROP POLICY IF EXISTS job_activity_log_select_org ON public.job_activity_log;
 CREATE POLICY job_activity_log_select_org ON public.job_activity_log
   FOR SELECT TO authenticated
   USING (public.is_super_admin() OR org_id = public.user_org_id());
+DROP POLICY IF EXISTS job_activity_log_insert_org ON public.job_activity_log;
 CREATE POLICY job_activity_log_insert_org ON public.job_activity_log
   FOR INSERT TO authenticated
   WITH CHECK (public.is_super_admin() OR org_id = public.user_org_id());
 
 DROP POLICY IF EXISTS "Org members can manage deviation log" ON public.job_deviation_log;
+DROP POLICY IF EXISTS job_deviation_log_select_org ON public.job_deviation_log;
 CREATE POLICY job_deviation_log_select_org ON public.job_deviation_log
   FOR SELECT TO authenticated
   USING (public.is_super_admin() OR org_id = public.user_org_id());
+DROP POLICY IF EXISTS job_deviation_log_insert_org ON public.job_deviation_log;
 CREATE POLICY job_deviation_log_insert_org ON public.job_deviation_log
   FOR INSERT TO authenticated
   WITH CHECK (public.is_super_admin() OR org_id = public.user_org_id());
 
-REVOKE UPDATE, DELETE ON public.job_activity_log FROM anon, authenticated;
-REVOKE UPDATE, DELETE ON public.job_deviation_log FROM anon, authenticated;
+REVOKE UPDATE, DELETE, TRUNCATE ON public.job_activity_log FROM anon, authenticated;
+REVOKE UPDATE, DELETE, TRUNCATE ON public.job_deviation_log FROM anon, authenticated;
 REVOKE ALL ON public.job_activity_log FROM anon;
 REVOKE ALL ON public.job_deviation_log FROM anon;
 
@@ -78,14 +84,3 @@ BEGIN
     REVOKE EXECUTE ON FUNCTION public.enqueue_customer_notification() FROM PUBLIC, anon, authenticated;
   END IF;
 END $$;
-
--- ── Rollback (run manually if needed) ─────────────────────────────────
--- DROP POLICY job_activity_log_select_org ON public.job_activity_log;
--- DROP POLICY job_activity_log_insert_org ON public.job_activity_log;
--- CREATE POLICY "Org members can manage job_activity_log" ON public.job_activity_log
---   FOR ALL USING (is_super_admin() OR org_id = user_org_id())
---   WITH CHECK (is_super_admin() OR org_id = user_org_id());
--- (same pattern for job_deviation_log / "Org members can manage deviation log")
--- GRANT UPDATE, DELETE ON public.job_activity_log, public.job_deviation_log TO authenticated;
--- Restore the previous allocate_invoice_number body (no is_admin_or_super_admin() check).
--- GRANT EXECUTE ON FUNCTION public.enqueue_customer_notification() TO anon, authenticated;
