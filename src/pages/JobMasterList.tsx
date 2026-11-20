@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { withPricing } from "@/lib/jobPricingApi";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
@@ -78,7 +79,7 @@ export function JobMasterList() {
         .order("created_at", { ascending: false });
       const { data, error } = await query;
       if (error) throw error;
-      return (data ?? []) as Job[];
+      return withPricing((data ?? []) as Job[]);
     },
   });
 

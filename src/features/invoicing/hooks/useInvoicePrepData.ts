@@ -22,6 +22,7 @@ import {
 } from "@/lib/invoiceReadiness";
 import type { Inspection, Photo } from "@/lib/types";
 import { findAlreadyInvoicedJobs } from "../api/createInvoice";
+import { withPricing } from "@/lib/jobPricingApi";
 
 export interface EligibleJob {
   id: string;
@@ -94,9 +95,10 @@ export function useEligibleJobs(
         query = query.lt("completed_at", toDate.toISOString());
       }
 
-      const { data: jobs, error } = await query;
+      const { data: jobsRaw, error } = await query;
       if (error) throw error;
-      if (!jobs?.length) return [];
+      if (!jobsRaw?.length) return [];
+      const jobs = await withPricing(jobsRaw);
 
       // 2. Filter to this client's jobs. A linked job (client_id) belongs to
       //    exactly that client, whatever its free-text name says; only an

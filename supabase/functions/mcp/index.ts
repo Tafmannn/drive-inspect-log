@@ -64,9 +64,15 @@ var list_jobs_default = defineTool2({
     if (error) {
       return { content: [{ type: "text", text: error.message }], isError: true };
     }
+    const rows = data ?? [];
+    if (rows.length > 0) {
+      const { data: pricing } = await client.from("job_pricing").select("job_id, total_price").in("job_id", rows.map((r) => r.id));
+      const byJob = new Map((pricing ?? []).map((p) => [p.job_id, p.total_price]));
+      for (const r of rows) if (byJob.has(r.id)) r.total_price = byJob.get(r.id);
+    }
     return {
-      content: [{ type: "text", text: JSON.stringify(data ?? []) }],
-      structuredContent: { jobs: data ?? [] }
+      content: [{ type: "text", text: JSON.stringify(rows) }],
+      structuredContent: { jobs: rows }
     };
   }
 });
@@ -96,16 +102,19 @@ var get_job_default = defineTool3({
       return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
     }
     const JOB_COLUMNS = "id, external_job_number, status, job_type, job_date, priority, driver_name, driver_id, vehicle_reg, vehicle_make, vehicle_model, vehicle_colour, vehicle_year, vehicle_type, vehicle_fuel_type, pickup_company, pickup_city, pickup_postcode, pickup_contact_name, pickup_contact_phone, pickup_time_from, pickup_time_to, pickup_notes, delivery_company, delivery_city, delivery_postcode, delivery_contact_name, delivery_contact_phone, delivery_time_from, delivery_time_to, delivery_notes, client_name, client_company, distance_miles, total_price, has_pickup_inspection, has_delivery_inspection, created_at, updated_at, completed_at";
-    const { data, error } = await supabaseForUser2(ctx).from("jobs").select(JOB_COLUMNS).eq("id", id).maybeSingle();
+    const client = supabaseForUser2(ctx);
+    const { data, error } = await client.from("jobs").select(JOB_COLUMNS).eq("id", id).maybeSingle();
     if (error) {
       return { content: [{ type: "text", text: error.message }], isError: true };
     }
     if (!data) {
       return { content: [{ type: "text", text: "Job not found or not accessible." }], isError: true };
     }
+    const { data: pricing } = await client.from("job_pricing").select("total_price").eq("job_id", id).maybeSingle();
+    const job = pricing ? { ...data, total_price: pricing.total_price } : data;
     return {
-      content: [{ type: "text", text: JSON.stringify(data) }],
-      structuredContent: { job: data }
+      content: [{ type: "text", text: JSON.stringify(job) }],
+      structuredContent: { job }
     };
   }
 });

@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { withPricingOne } from "@/lib/jobPricingApi";
 import { getOrgId } from "@/lib/orgHelper";
 import { downloadInvoicePdf, type InvoiceLineItem, type InvoiceData } from "@/lib/invoicePdf";
 import { findAlreadyInvoicedJobs } from "@/features/invoicing/api/createInvoice";
@@ -171,7 +172,7 @@ export function InvoiceGenerator() {
         if (jobId) {
           const { data: jobData } = await supabase.from("jobs").select("*").eq("id", jobId).single();
           if (jobData) {
-            const j = jobData as Job;
+            const j = await withPricingOne(jobData as Job);
             setJob(j);
             setClientName(j.delivery_contact_name || j.client_name || "");
             setClientCompany(j.delivery_company || j.client_company || "");

@@ -29,6 +29,7 @@ export async function exportJsonBackup(): Promise<BackupResult> {
     invoiceItemsRes,
     expenseReceiptsRes,
     invoiceExpensesRes,
+    jobPricingRes,
   ] = await Promise.all([
     supabase.from("jobs").select("*").limit(20000),
     supabase.from("inspections").select("*").limit(20000),
@@ -42,11 +43,13 @@ export async function exportJsonBackup(): Promise<BackupResult> {
     supabase.from("invoice_items").select("*").limit(50000),
     supabase.from("expense_receipts").select("*").limit(50000),
     supabase.from("invoice_expenses").select("*").limit(50000),
+    // Job prices live in their own admin-only table; without it a backup has no prices.
+    supabase.from("job_pricing" as any).select("*").limit(20000),
   ]);
 
   const errors = [
     jobsRes, inspectionsRes, photosRes, expensesRes, invoicesRes, clientsRes, damageItemsRes,
-    invoiceItemsRes, expenseReceiptsRes, invoiceExpensesRes,
+    invoiceItemsRes, expenseReceiptsRes, invoiceExpensesRes, jobPricingRes,
   ]
     .map((r) => r.error)
     .filter(Boolean);
@@ -54,7 +57,7 @@ export async function exportJsonBackup(): Promise<BackupResult> {
 
   const payload = {
     generatedAt: new Date().toISOString(),
-    schemaVersion: "1.1",
+    schemaVersion: "1.2",
     jobs: jobsRes.data ?? [],
     inspections: inspectionsRes.data ?? [],
     photos: photosRes.data ?? [],
@@ -65,6 +68,7 @@ export async function exportJsonBackup(): Promise<BackupResult> {
     invoice_items: invoiceItemsRes.data ?? [],
     expense_receipts: expenseReceiptsRes.data ?? [],
     invoice_expenses: invoiceExpensesRes.data ?? [],
+    job_pricing: jobPricingRes.data ?? [],
   };
 
   const counts = {
@@ -78,6 +82,7 @@ export async function exportJsonBackup(): Promise<BackupResult> {
     invoice_items: payload.invoice_items.length,
     expense_receipts: payload.expense_receipts.length,
     invoice_expenses: payload.invoice_expenses.length,
+    job_pricing: payload.job_pricing.length,
   };
 
   downloadJson(payload, `axentra-backup-${new Date().toISOString().slice(0, 10)}.json`);

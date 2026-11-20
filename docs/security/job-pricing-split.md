@@ -18,7 +18,7 @@ constraints mention them), and only 20 of 76 jobs hold any pricing data.
 | Phase | What | Visible change |
 |---|---|---|
 | 1. Add | Create `job_pricing`, copy the data across, and mirror any change made to the old columns into it | None. The old columns still work and still hold the data |
-| 2. Switch the app | Every price read and write uses `job_pricing`; exports, the JSON backup and the MCP tool include it | None for admins. Prices are the same |
+| 2. Switch the app | Every price **read** uses `job_pricing` (writes go to both the old columns and `job_pricing`); exports, the JSON backup and the MCP tool include it | None for admins. Prices are the same |
 | 3. Seal | Old columns are forced to NULL and any write to them is redirected into `job_pricing` (so an old browser tab can't lose a price or re-expose one); the mirror is removed | Drivers can no longer read any price |
 
 Order matters: apply phase 1 SQL, deploy phase 2, check the screens, then apply phase 3. Each phase has a
@@ -34,6 +34,12 @@ lost and nothing readable is left behind.
 Reads that must come from `job_pricing`: job lists and detail (`api.ts`), Invoice Prep, Invoice Generator,
 Attention Center billing checks, profitability, driver performance, operations buckets (it filters on
 `total_price > 0`), the Job Master List, CSV exports, the JSON backup, and the MCP tool and edge function.
-Writes that must go to `job_pricing`: the job form (create and edit), the price editor, the pricing
-suggestion panel, and the CAZ/ULEZ lookup.
+Writes (job form create/edit via `createJob`/`updateJob`, price editor, pricing suggestion panel) **dual-write** in
+phase 2: they still update the old columns (so a phase 2 rollback sees current prices) and then upsert the same
+values into `job_pricing` with `saveJobPricing`. The explicit upsert matters for phase 3: once the old columns are
+sealed (always NULL), clearing a price writes NULL over NULL, which no trigger can see, so only the app's own
+write to `job_pricing` can clear it. The seal triggers are the safety net for an old browser tab writing a value.
+Reads go through `src/lib/jobPricingApi.ts` (`withPricing`): if the lookup fails it falls back to the job's own
+values, so deploying phase 2 before phase 1 is applied degrades to today's behaviour rather than breaking screens
+(the JSON backup is the exception and needs phase 1 applied).
 Drivers' reads get no pricing rows (row-level security), so their screens are unchanged.

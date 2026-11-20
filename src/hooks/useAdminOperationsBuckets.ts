@@ -10,6 +10,7 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchPricingByJobId } from "@/lib/jobPricingApi";
 import { listAcknowledgedEvidenceJobIds } from "@/lib/evidenceAckApi";
 
 export interface OperationsBucketCounts {
@@ -49,6 +50,24 @@ async function safeCount(query: any): Promise<number> {
     return 0;
   }
   return count ?? 0;
+}
+
+// The price now lives in job_pricing, so "has a price" cannot be filtered inside the jobs query:
+// fetch the candidate ids, then count those whose pricing row has a total above zero.
+export async function countPricedCandidates(
+  query: PromiseLike<{ data: { id: string }[] | null; error: { message: string } | null }>,
+): Promise<number> {
+  const { data, error } = await query;
+  if (error) {
+    console.warn("[buckets] priced-candidates query failed", error.message);
+    return 0;
+  }
+  const ids = (data ?? []).map((r) => r.id);
+  if (ids.length === 0) return 0;
+  const pricing = await fetchPricingByJobId(ids);
+  let n = 0;
+  for (const id of ids) if (Number(pricing.get(id)?.total_price) > 0) n++;
+  return n;
 }
 
 export function useAdminOperationsBuckets() {
@@ -122,16 +141,16 @@ export function useAdminOperationsBuckets() {
         // both inspections present. We don't try to filter "not yet
         // invoiced" here (requires invoice_items join); the finance page
         // owns the strict gate.
-        safeCount(
+        countPricedCandidates(
           supabase
             .from("jobs")
-            .select("id", { count: "exact", head: true })
+            .select("id")
             .eq("is_hidden", false)
             .in("status", TERMINAL_STATUSES)
-            .gt("total_price", 0)
             .not("client_id", "is", null)
             .eq("has_pickup_inspection", true)
-            .eq("has_delivery_inspection", true),
+            .eq("has_delivery_inspection", true)
+            .limit(5000),
         ),
         // Completed but not invoiced — proxy via pdf_url null is unreliable;
         // we use total completed without pdf_url as the visible signal.
