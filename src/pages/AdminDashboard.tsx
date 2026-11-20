@@ -372,19 +372,23 @@ function NeedsActionQueue() {
           {items.map(item => (
             <li
               key={item.key}
-              className="ah-row flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5 min-[380px]:flex-nowrap sm:px-5"
-              onClick={() => navigate(item.actionRoute)}
+              className="ah-row flex flex-wrap items-center gap-x-3 px-4 pb-2.5 min-[380px]:flex-nowrap min-[380px]:pb-0 sm:px-5"
             >
-              <div className="min-w-0 flex-1 basis-full space-y-1 min-[380px]:basis-auto">
-                <div className="flex min-w-0 items-center gap-2">
+              {/* Row content is its own button (keyboard reachable, no nested controls). */}
+              <button
+                type="button"
+                onClick={() => navigate(item.actionRoute)}
+                className="min-w-0 flex-1 basis-full space-y-1 py-2.5 text-left min-[380px]:basis-auto"
+              >
+                <span className="flex min-w-0 items-center gap-2">
                   <Chip className={QUEUE_CHIP[item.queueType]}>{item.queueLabel}</Chip>
                   {item.jobRef && (
                     <span className="ah-num ah-ref min-w-0 truncate text-[13px] text-muted-foreground">{item.jobRef}</span>
                   )}
                   <span className="ah-num ml-auto shrink-0 text-[13px] text-muted-foreground">{item.age}</span>
-                </div>
+                </span>
 
-                <div className="flex min-w-0 items-center gap-2">
+                <span className="flex min-w-0 items-center gap-2">
                   {item.vehicleReg && <span className="inline-flex shrink-0"><UKPlate reg={item.vehicleReg} /></span>}
                   {item.route && (
                     <span className="flex min-w-0 items-center gap-1 text-[13px] text-muted-foreground">
@@ -397,9 +401,9 @@ function NeedsActionQueue() {
                       {item.title ?? item.jobRef}
                     </span>
                   )}
-                </div>
+                </span>
                 {item.detail && !item.vehicleReg && !item.route && (
-                  <p className="truncate text-[13px] text-muted-foreground">{item.detail}</p>
+                  <span className="block truncate text-[13px] text-muted-foreground">{item.detail}</span>
                 )}
 
                 {item.jobId && (
@@ -414,7 +418,7 @@ function NeedsActionQueue() {
                     </span>
                   )
                 )}
-              </div>
+              </button>
 
               <Button
                 size="sm"
@@ -557,9 +561,9 @@ function CompactJobRow({
   const unassigned = isUnassigned(job);
 
   return (
-    <li className="ah-row flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5 min-[380px]:flex-nowrap sm:px-5" onClick={onView}>
-      <div className="min-w-0 flex-1 basis-full space-y-1 min-[380px]:basis-auto">
-        <div className="flex min-w-0 items-center gap-2">
+    <li className="ah-row flex flex-wrap items-center gap-x-3 px-4 pb-2.5 min-[380px]:flex-nowrap min-[380px]:pb-0 sm:px-5">
+      <button type="button" onClick={onView} className="min-w-0 flex-1 basis-full space-y-1 py-2.5 text-left min-[380px]:basis-auto">
+        <span className="flex min-w-0 items-center gap-2">
           <Chip style={{ backgroundColor: statusStyle.backgroundColor, color: statusStyle.color }}>
             {sentenceCase(statusStyle.label)}
           </Chip>
@@ -572,13 +576,13 @@ function CompactJobRow({
             </span>
           )}
           <span className="ah-num ml-auto shrink-0 text-[13px] text-muted-foreground">{humanAge(job.updated_at)}</span>
-        </div>
-        <div className="flex min-w-0 items-center gap-2">
+        </span>
+        <span className="flex min-w-0 items-center gap-2">
           <span className="inline-flex shrink-0"><UKPlate reg={job.vehicle_reg} /></span>
           <span className="truncate text-[13px] text-muted-foreground">
             {job.pickup_postcode} → {job.delivery_postcode}
           </span>
-        </div>
+        </span>
         {unassigned ? (
           <span className="flex items-center gap-1 text-[13px] font-medium text-warning">
             <AlertTriangle aria-hidden className="h-3.5 w-3.5" strokeWidth={1.75} /> Unassigned
@@ -589,7 +593,7 @@ function CompactJobRow({
             <span className="truncate">{job.resolvedDriverName}</span>
           </span>
         )}
-      </div>
+      </button>
 
       {/* One dominant action */}
       {unassigned ? (
@@ -798,7 +802,7 @@ function OperationsBuckets() {
       <div className="ah-divide border-t border-[hsl(var(--ah-hairline))] pb-1.5 md:grid md:grid-cols-2 md:[&>*+*]:border-t-0 md:[&>*]:border-b md:[&>*]:border-[hsl(var(--ah-hairline))]">
         {BUCKET_ORDER.map((key) => {
           const def = BUCKET_DEFS[key];
-          const value = counts ? (counts as any)[key] ?? 0 : 0;
+          const value = counts ? (counts as Partial<Record<BucketKey, number>>)[key] ?? 0 : 0;
           return (
             <CountRow
               key={key}

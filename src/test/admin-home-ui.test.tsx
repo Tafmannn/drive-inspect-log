@@ -5,7 +5,7 @@
  * preserved destinations, and no invented figures.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
 const iso = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
@@ -20,9 +20,10 @@ let kpis: Record<string, number>;
 let buckets: Record<string, number>;
 let exceptions: unknown[];
 let queuesError = false;
+const refetchQueues = vi.fn();
 
 vi.mock("@/hooks/useAdminJobQueues", () => ({
-  useAdminJobQueues: () => ({ data: queuesError ? undefined : queues, isLoading: false, isError: queuesError, refetch: vi.fn(), dataUpdatedAt: 0 }),
+  useAdminJobQueues: () => ({ data: queuesError ? undefined : queues, isLoading: false, isError: queuesError, refetch: refetchQueues, dataUpdatedAt: 0 }),
   useAdminJobQueueKpis: () => ({ data: kpis, isLoading: false }),
 }));
 vi.mock("@/hooks/useAdminDashboardData", () => ({
@@ -33,7 +34,7 @@ vi.mock("@/hooks/useAdminOperationsBuckets", () => ({
   useAdminOperationsBuckets: () => ({ data: buckets, isLoading: false }),
 }));
 vi.mock("@/features/attention/hooks/useAttentionData", () => ({
-  useAttentionData: () => ({ data: { exceptions }, isLoading: false }),
+  useAttentionData: () => ({ data: { exceptions }, isLoading: false, isError: false, refetch: vi.fn() }),
 }));
 vi.mock("@/hooks/useRefetchOnFocus", () => ({ useRefetchOnFocus: () => {} }));
 vi.mock("@/hooks/useEvidenceAckRealtime", () => ({ useEvidenceAckRealtime: () => {} }));
@@ -73,6 +74,7 @@ describe("Admin Home UI", () => {
     buckets = zero;
     exceptions = [];
     queuesError = false;
+    refetchQueues.mockClear();
   });
 
   it("shows a modest empty-queue state when nothing needs action", () => {
@@ -138,5 +140,51 @@ describe("Admin Home UI", () => {
     renderBody();
     const row = screen.getByText("Jobs with failed uploads").closest("button")!;
     expect(row.textContent).toContain("—");
+  });
+
+  it("ranks stale jobs and evidence exceptions into the queue and summary", () => {
+    const st = job("s1", "in_transit", "Dan", 40);
+    queues = { ...emptyQueues, needsAttention: [st] };
+    exceptions = [{
+      id: "ex1", severity: "high", category: "evidence", createdAt: new Date().toISOString(),
+      jobNumber: "AXN-9", title: "Photos failed to upload", detail: "4 of 8 missing",
+      actionLabel: "Review", actionRoute: "/jobs/x/pod",
+    }];
+    renderBody();
+    expect(screen.getByText("1 stale")).toBeTruthy();
+    expect(screen.getByText("1 evidence issue")).toBeTruthy();
+    expect(screen.getByText("Photos failed to upload")).toBeTruthy();
+    const queue = screen.getByRole("region", { name: /Needs action/ });
+    fireEvent.click(within(queue).getByRole("button", { name: /^Review$/ }));
+    expect(screen.getByTestId("landed").textContent).toBe("/jobs/x/pod");
+  });
+
+  it("row content is a keyboard-reachable button that opens the job", () => {
+    const st = job("s2", "in_transit", "Dan", 40);
+    queues = { ...emptyQueues, needsAttention: [st] };
+    renderBody();
+    const rowButtons = screen.getAllByRole("button", { name: /AXN-s2/ });
+    expect(rowButtons.length).toBeGreaterThan(0);
+    fireEvent.click(rowButtons[0]);
+    expect(screen.getByTestId("landed").textContent).toBe("/jobs/s2");
+  });
+
+  it("Try again refetches the failed queues", () => {
+    queuesError = true;
+    renderBody();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(refetchQueues).toHaveBeenCalled();
+  });
+
+  it("Review scrolls to the Needs action queue and focuses its heading", () => {
+    const u = job("u3", "ready_for_pickup", null);
+    queues = { ...emptyQueues, unassigned: [u], needsAttention: [u] };
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    window.matchMedia ??= ((q: string) => ({ matches: false, media: q })) as never;
+    renderBody();
+    fireEvent.click(screen.getByRole("button", { name: /^Review/ }));
+    expect(scroll).toHaveBeenCalled();
+    expect(document.activeElement?.textContent).toMatch(/^Needs action/);
   });
 });
