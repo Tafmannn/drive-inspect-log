@@ -13,6 +13,7 @@ import {
   deriveStateExceptions,
   deriveComplianceExceptions,
   deriveBillingExceptions,
+  deriveStaleUnpricedSummary,
   isGenuineUploadFailure,
   sortExceptions,
   type BillingJobRow,
@@ -22,6 +23,7 @@ import { findAlreadyInvoicedJobs } from "@/features/invoicing/api/createInvoice"
 import type { AttentionException, AttentionKpiData, AttentionFiltersState } from "../types/exceptionTypes";
 import { ACTIVE_STATUSES } from "@/lib/statusConfig";
 import type { Tables } from "@/integrations/supabase/types";
+import { fetchStaleCompletedJobs } from "../api/staleUnpriced";
 import { withPricing } from "@/lib/jobPricingApi";
 
 type JobRow = Tables<"jobs">;
@@ -157,6 +159,7 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
       // "not invoiced" alerts if either lookup fails.
       if (billingJobsRes.error) throw billingJobsRes.error;
       const billingJobs = await withPricing((billingJobsRes.data ?? []) as BillingJobRow[]);
+      const staleBillingJobs = await fetchStaleCompletedJobs();
       const billingIds = billingJobs.map((j) => j.id);
       const invoicedJobIds = new Set<string>();
       for (let i = 0; i < billingIds.length; i += 100) {
@@ -201,6 +204,7 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
           driverUserIdByProfileId,
         ),
         ...deriveBillingExceptions(billingJobs, invoicedJobIds, orgLookup),
+        ...deriveStaleUnpricedSummary(staleBillingJobs, orgLookup),
       ]);
 
       // Build a set of jobIds that an admin has explicitly resolved

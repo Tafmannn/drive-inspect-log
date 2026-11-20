@@ -28,6 +28,14 @@ import {
   type InvoiceDraft,
 } from "../lib/invoiceMath";
 
+/**
+ * 23505 = unique_violation. Raised by invoice_items_job_id_unique and by the
+ * one-live-invoice-per-job trigger when a job is already on a live invoice.
+ */
+export function isAlreadyInvoicedError(err: unknown): boolean {
+  return !!err && typeof err === "object" && (err as { code?: string }).code === "23505";
+}
+
 export interface CreateInvoiceInput {
   client: Client;
   jobs: EligibleJob[];
@@ -207,7 +215,7 @@ export async function createMultiJobInvoice(
     // 23505 = unique_violation on invoice_items.job_id: a concurrent invoice
     // claimed one of these jobs after our duplicate guard ran (TOCTOU). The
     // DB constraint is the real safety net; surface a clear message.
-    if ((itemsErr as { code?: string }).code === "23505") {
+    if (isAlreadyInvoicedError(itemsErr)) {
       throw new Error(
         "One or more selected jobs were just invoiced on another invoice. Refresh and try again.",
       );
@@ -225,7 +233,7 @@ export async function createMultiJobInvoice(
     );
     if (expErr) {
       await rollback();
-      if ((expErr as { code?: string }).code === "23505") {
+      if (isAlreadyInvoicedError(expErr)) {
         throw new Error(
           "One or more selected expenses were just billed on another invoice. Refresh and try again.",
         );
