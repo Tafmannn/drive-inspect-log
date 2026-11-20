@@ -109,6 +109,8 @@ export interface Job {
   created_at: string;
   updated_at: string;
   is_hidden?: boolean;
+  /** One-off flag: data older than a week when it was set is treated as test data and left out of reports. */
+  is_test?: boolean;
   admin_rate?: number | null;
   pod_pdf_url?: string | null;
   route_distance_miles?: number | null;

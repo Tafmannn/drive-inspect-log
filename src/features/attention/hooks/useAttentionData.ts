@@ -111,6 +111,7 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
         supabase.from("jobs")
           .select("id, org_id, external_job_number, vehicle_reg, status, completed_at, client_id")
           .eq("is_hidden", false)
+          .eq("is_test", false)
           .in("status", ["completed", "closed"])
           .gte("completed_at", new Date(Date.now() - ATTENTION_THRESHOLDS.billingLookbackDays * 86400_000).toISOString())
           .limit(1000),

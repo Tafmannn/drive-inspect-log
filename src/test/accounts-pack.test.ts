@@ -103,10 +103,12 @@ beforeEach(() => {
 });
 
 describe("fetchAccountsData", () => {
-  it("limits expenses to the period and hides hidden ones; invoices are read for all dates", async () => {
+  it("limits expenses to the period, hides hidden ones and leaves out test data; invoices are read for all dates", async () => {
     await fetchAccountsData(PERIOD);
     expect(h.filters).toEqual([
+      ["invoices", "eq:is_test", false],
       ["expenses", "eq:is_hidden", false],
+      ["expenses", "eq:is_test", false],
       ["expenses", "gte:date", "2026-11-01"],
       ["expenses", "lte:date", "2026-11-30"],
     ]);

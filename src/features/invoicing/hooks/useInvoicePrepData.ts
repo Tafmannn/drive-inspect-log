@@ -81,6 +81,7 @@ export function useEligibleJobs(
           "id, external_job_number, vehicle_reg, vehicle_make, vehicle_model, job_date, completed_at, distance_miles, client_id, client_company, client_name, client_email, client_phone, status, current_run_id, pickup_city, pickup_postcode, delivery_city, delivery_postcode"
         )
         .eq("is_hidden", false)
+        .eq("is_test", false)
         .in("status", TERMINAL_STATUSES)
         .order("completed_at", { ascending: false });
 

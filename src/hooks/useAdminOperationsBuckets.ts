@@ -146,6 +146,7 @@ export function useAdminOperationsBuckets() {
             .from("jobs")
             .select("id")
             .eq("is_hidden", false)
+            .eq("is_test", false)
             .in("status", TERMINAL_STATUSES)
             .not("client_id", "is", null)
             .eq("has_pickup_inspection", true)
