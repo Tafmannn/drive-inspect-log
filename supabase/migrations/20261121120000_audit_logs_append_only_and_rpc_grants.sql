@@ -71,7 +71,13 @@ REVOKE EXECUTE ON FUNCTION public.allocate_invoice_number(uuid) FROM PUBLIC, ano
 GRANT EXECUTE ON FUNCTION public.allocate_invoice_number(uuid) TO authenticated;
 
 -- ── 3. trigger function out of the RPC surface ────────────────────────
-REVOKE EXECUTE ON FUNCTION public.enqueue_customer_notification() FROM PUBLIC, anon, authenticated;
+-- Guarded: the function only exists once 20261113184311 has run.
+DO $$
+BEGIN
+  IF to_regprocedure('public.enqueue_customer_notification()') IS NOT NULL THEN
+    REVOKE EXECUTE ON FUNCTION public.enqueue_customer_notification() FROM PUBLIC, anon, authenticated;
+  END IF;
+END $$;
 
 -- ── Rollback (run manually if needed) ─────────────────────────────────
 -- DROP POLICY job_activity_log_select_org ON public.job_activity_log;
