@@ -53,3 +53,19 @@ verify_jwt = false
 
 [functions.notify-customers]
 verify_jwt = false
+
+# Listed so the GitHub integration deploys them on merge. Each either verifies the
+# caller inside its handler (authenticateCaller) or is a retired 410 stub.
+# send-push is deliberately NOT listed yet: it bundles npm:web-push and is the next
+# suspect if the integration's "413 request entity too large" ever returns.
+[functions.send-pod-email]
+verify_jwt = false
+
+[functions.send-invoice-email]
+verify_jwt = false
+
+[functions.google-sheets-sync]
+verify_jwt = false
+
+[functions.promote-admin]
+verify_jwt = false
