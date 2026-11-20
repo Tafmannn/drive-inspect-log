@@ -1501,6 +1501,56 @@ export type Database = {
           },
         ]
       }
+      job_pricing: {
+        Row: {
+          admin_rate: number | null
+          caz_ulez_cost: number | null
+          created_at: string
+          job_id: string
+          org_id: string
+          pricing_metadata: Json | null
+          pricing_suggestion_used_at: string | null
+          pricing_suggestion_used_by: string | null
+          rate_per_mile: number | null
+          total_price: number | null
+          updated_at: string
+        }
+        Insert: {
+          admin_rate?: number | null
+          caz_ulez_cost?: number | null
+          created_at?: string
+          job_id: string
+          org_id: string
+          pricing_metadata?: Json | null
+          pricing_suggestion_used_at?: string | null
+          pricing_suggestion_used_by?: string | null
+          rate_per_mile?: number | null
+          total_price?: number | null
+          updated_at?: string
+        }
+        Update: {
+          admin_rate?: number | null
+          caz_ulez_cost?: number | null
+          created_at?: string
+          job_id?: string
+          org_id?: string
+          pricing_metadata?: Json | null
+          pricing_suggestion_used_at?: string | null
+          pricing_suggestion_used_by?: string | null
+          rate_per_mile?: number | null
+          total_price?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_pricing_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       jobs: {
         Row: {
           admin_rate: number | null
