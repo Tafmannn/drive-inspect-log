@@ -121,7 +121,7 @@ export const VehicleDamageModal = ({ isOpen, onClose, onSubmit }: VehicleDamageM
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-md max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             Please provide details and evidence of the damage

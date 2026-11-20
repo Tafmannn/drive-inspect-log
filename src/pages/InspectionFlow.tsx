@@ -11,6 +11,7 @@ import { VehicleDiagram } from "@/components/VehicleDiagram";
 import { VehicleDamageModal } from "@/components/VehicleDamageModal";
 import { PhotoLabelModal } from "@/components/PhotoLabelModal";
 import { SignaturePad, type SignaturePadRef } from "@/components/SignaturePad";
+import { signatureDraftKey, clearSignatureDrafts } from "@/lib/signatureDraft";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { isTooDark, measurePhotoBrightness, prepareCapturedPhoto } from "@/lib/capturedPhoto";
 import { clearActiveInspection, markActiveInspection } from "@/lib/activeInspection";
@@ -46,6 +47,7 @@ import { EvidenceStatusBadges } from "@/components/EvidenceStatusBadges";
 import { StorageFailureCard } from "@/components/StorageFailureCard";
 import { useAuth } from "@/context/AuthContext";
 import { saveDraft, loadDraft, clearDraft, draftKey } from "@/lib/autosave";
+import { decideDraftRestore } from "@/features/inspection/draftRestore";
 import { hapticError } from "@/lib/haptics";
 import { SuccessMoment, type SuccessMomentVariant } from "@/components/SuccessMoment";
 import { notifyPodSubmitted } from "@/lib/pushApi";
@@ -218,6 +220,19 @@ export const InspectionFlow = () => {
     [formState.standardPhotoUrls, formState.additionalPhotos]
   );
 
+  // ─── New step starts at its heading ───
+  // Next/Previous swap the step in place, so the window kept the previous
+  // step's offset and the driver landed partway down the new step (its title
+  // above the screen). Skip the first run so mount/restore don't jump.
+  const stepScrollReady = useRef(false);
+  useEffect(() => {
+    if (!stepScrollReady.current) {
+      stepScrollReady.current = true;
+      return;
+    }
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [currentStep]);
+
   // ─── AUTOSAVE: save draft on every form change ───
   const dk = jobId ? draftKey(type, jobId) : "";
 
@@ -246,39 +261,29 @@ export const InspectionFlow = () => {
     (location.state as { resumeAfterRestart?: boolean } | null)?.resumeAfterRestart === true;
 
   // ─── DRAFT RESTORE: check on mount (once) ───
-  // Guard against false triggers from screen rotation / orientation change:
-  // If the draft was saved <10 seconds ago, it's a remount, not a genuine interruption.
-  // In that case, silently restore without showing the prompt.
+  // Silent for a same-session remount (rotation, in-app back-and-forth, iOS
+  // reloading the tab), a just-saved draft, or a restart we resumed; prompt
+  // only for a genuinely earlier session. See decideDraftRestore.
   useEffect(() => {
-    if (!dk || sessionActive.current) return;
+    if (!dk) return;
     const draft = loadDraft<Record<string, unknown>>(dk);
-    if (draft?.data) {
-      // Only show prompt if draft has meaningful data (not just empty strings)
-      const d = draft.data;
-      const hasMeaningful = d.odometer || d.fuelLevel || d.notes || d.customerName || d.driverName ||
-        d.vehicleCondition || d.lightCondition || d.numberOfKeys;
-      if (hasMeaningful) {
-        // Check if this is a rotation/remount (draft saved very recently)
-        const savedAge = draft.savedAt
-          ? Date.now() - new Date(draft.savedAt).getTime()
-          : Infinity;
-        if (savedAge < 10_000 || resumedAfterRestart) {
-          // Silent restore — rotation or brief remount, or the app was
-          // reopened after Android closed it mid-inspection (we already
-          // brought the driver straight back here).
-          const { _currentStep, ...fields } = draft.data;
-          setFormState(prev => ({ ...prev, ...fields }));
-          if (typeof _currentStep === "number" && _currentStep >= 1 && _currentStep <= totalSteps) {
-            setCurrentStep(_currentStep);
-          }
-          markSessionActive();
-          return;
-        }
-        setShowDraftPrompt(true);
-        return;
+    const decision = decideDraftRestore({
+      draft,
+      sessionActive: sessionActive.current,
+      resumedAfterRestart,
+      now: Date.now(),
+    });
+    if (decision === "prompt") {
+      setShowDraftPrompt(true);
+      return;
+    }
+    if (decision === "silent" && draft?.data) {
+      const { _currentStep, ...fields } = draft.data;
+      setFormState(prev => ({ ...prev, ...fields }));
+      if (typeof _currentStep === "number" && _currentStep >= 1 && _currentStep <= totalSteps) {
+        setCurrentStep(_currentStep);
       }
     }
-    // No meaningful draft — start fresh and mark session active
     markSessionActive();
   }, [dk]);
 
@@ -299,7 +304,7 @@ export const InspectionFlow = () => {
 
   const handleDiscardDraft = () => {
     if (dk) clearDraft(dk);
-    if (jobId) void clearPhotoDraft(type, jobId);
+    if (jobId) { void clearPhotoDraft(type, jobId); clearSignatureDrafts(type, jobId); }
     markSessionActive();
     setShowDraftPrompt(false);
   };
@@ -674,7 +679,7 @@ export const InspectionFlow = () => {
             description: "Returning you to the job.",
           });
           if (dk) clearDraft(dk);
-          if (jobId) void clearPhotoDraft(type, jobId);
+          if (jobId) { void clearPhotoDraft(type, jobId); clearSignatureDrafts(type, jobId); }
           try { sessionStorage.removeItem(sessionKey); } catch { /* ignore */ }
           setSubmitting(false);
           submitInFlight.current = false;
@@ -920,7 +925,7 @@ export const InspectionFlow = () => {
         });
 
         if (dk) clearDraft(dk);
-        if (jobId) void clearPhotoDraft(type, jobId);
+        if (jobId) { void clearPhotoDraft(type, jobId); clearSignatureDrafts(type, jobId); }
         try { sessionStorage.removeItem(sessionKey); } catch { /* ignore */ }
         // The enqueue above IS the durable save — only now is the overlay
         // allowed to appear. Its onDone runs the replace-navigation (draft
@@ -1042,7 +1047,7 @@ export const InspectionFlow = () => {
         });
         hapticError();
         if (dk) clearDraft(dk);
-        if (jobId) void clearPhotoDraft(type, jobId);
+        if (jobId) { void clearPhotoDraft(type, jobId); clearSignatureDrafts(type, jobId); }
         try { sessionStorage.removeItem(sessionKey); } catch { /* ignore */ }
         // replace: true — draft is gone; don't leave a blank form on the
         // back stack.
@@ -1163,7 +1168,7 @@ export const InspectionFlow = () => {
       if (type === "delivery" && jobId) notifyPodSubmitted(jobId);
 
       if (dk) clearDraft(dk);
-      if (jobId) void clearPhotoDraft(type, jobId);
+      if (jobId) { void clearPhotoDraft(type, jobId); clearSignatureDrafts(type, jobId); }
       try { sessionStorage.removeItem(sessionKey); } catch { /* ignore */ }
       // Submit committed + evidence linked — show the completion moment
       // (delivery completion = the job is done). Its onDone runs the
@@ -1591,6 +1596,7 @@ export const InspectionFlow = () => {
         </div>
         <SignaturePad
           ref={driverSigRef}
+          persistKey={jobId ? signatureDraftKey(type, jobId, "driver") : undefined}
           onSignStart={() => setDriverSigned(true)}
           className="w-full"
         />
@@ -1623,6 +1629,7 @@ export const InspectionFlow = () => {
         </div>
         <SignaturePad
           ref={customerSigRef}
+          persistKey={jobId ? signatureDraftKey(type, jobId, "customer") : undefined}
           onSignStart={() => setCustomerSigned(true)}
           className="w-full"
         />
@@ -2229,7 +2236,9 @@ export const InspectionFlow = () => {
         </div>
       </div>
 
-      <div className="p-4">
+      {/* Bottom padding clears the home indicator so Next/Submit is never
+          under it when scrolled to the end (env() is 0 elsewhere). */}
+      <div className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         {/*
           Early-warning surface (non-review steps only). Uses the same
           canonical card so the driver sees one consistent UX from the

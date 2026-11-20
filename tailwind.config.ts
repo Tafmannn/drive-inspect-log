@@ -9,6 +9,11 @@ export default {
 		"./src/**/*.{ts,tsx}",
 	],
 	prefix: "",
+	// hover: styles only where a real pointer can hover, so a tapped card or
+	// button on a phone doesn't stay in its hover state after the finger lifts.
+	future: {
+		hoverOnlyWhenSupported: true,
+	},
 	theme: {
 		container: {
 			center: true,

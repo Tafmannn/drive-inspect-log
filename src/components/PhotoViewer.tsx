@@ -161,10 +161,15 @@ export const PhotoViewer = ({ photos, title, totalExpected, onRetry }: PhotoView
       </div>
 
       <Dialog open={selectedIndex !== null} onOpenChange={() => close()}>
-        <DialogContent className="max-w-[100vw] max-h-[100vh] w-screen h-screen p-0 border-none bg-black/95 [&>button]:hidden">
-          <div className="relative w-full h-full flex flex-col">
+        {/* Pinned to the visible viewport (inset-0 + dvh), not 100vw/100vh:
+            on iOS 100vh is the toolbar-collapsed height, so the bottom bar sat
+            under Safari's toolbar, and 100vw includes any overflow. No entry
+            animation: the base dialog's slide/zoom would animate from the centred
+            translate this override removes, so it simply appears. */}
+        <DialogContent className="left-0 top-0 translate-x-0 translate-y-0 w-full h-dvh max-w-none max-h-[100dvh] overflow-hidden overscroll-contain p-0 gap-0 border-none rounded-none sm:rounded-none bg-black/95 data-[state=open]:!animate-none data-[state=closed]:!animate-none [&>button]:hidden">
+          <div className="relative w-full h-full min-h-0 flex flex-col">
             {/* Top bar */}
-            <div className="flex items-center justify-between px-4 py-3 bg-black/80 z-10 pt-[calc(0.75rem+env(safe-area-inset-top))]">
+            <div className="flex items-center justify-between py-3 bg-black/80 z-10 pt-[calc(0.75rem+env(safe-area-inset-top))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
               <span className="text-white text-sm truncate mr-2">
                 {selectedIndex !== null && photos[selectedIndex]?.label
                   ? photos[selectedIndex].label
@@ -177,14 +182,14 @@ export const PhotoViewer = ({ photos, title, totalExpected, onRetry }: PhotoView
                 <Button variant="ghost" size="sm" onClick={toggleZoom} className="text-white hover:bg-white/20">
                   {zoom > 1 ? <ZoomOut className="h-4 w-4" /> : <ZoomIn className="h-4 w-4" />}
                 </Button>
-                <Button variant="ghost" size="sm" onClick={close} className="text-white hover:bg-white/20">
+                <Button variant="ghost" size="sm" onClick={close} aria-label="Close photo" className="text-white hover:bg-white/20">
                   <X className="h-4 w-4" />
                 </Button>
               </div>
             </div>
 
             {/* Image */}
-            <div className="flex-1 flex items-center justify-center overflow-auto touch-pinch-zoom">
+            <div className="flex-1 min-h-0 flex items-center justify-center overflow-auto overscroll-contain touch-pinch-zoom">
               {selectedIndex !== null && (
                 failedKeys.has(keyFor(photos[selectedIndex], selectedIndex)) ? (
                   <div className="flex items-center justify-center text-white text-sm">
@@ -210,13 +215,15 @@ export const PhotoViewer = ({ photos, title, totalExpected, onRetry }: PhotoView
               <>
                 <button
                   onClick={prev}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 z-10"
+                  aria-label="Previous photo"
+                  className="absolute left-[max(0.5rem,env(safe-area-inset-left))] top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 z-10"
                 >
                   <ChevronLeft className="h-6 w-6" />
                 </button>
                 <button
                   onClick={next}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 z-10"
+                  aria-label="Next photo"
+                  className="absolute right-[max(0.5rem,env(safe-area-inset-right))] top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 z-10"
                 >
                   <ChevronRight className="h-6 w-6" />
                 </button>

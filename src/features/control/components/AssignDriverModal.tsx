@@ -269,7 +269,7 @@ export function AssignDriverModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[80vh] flex flex-col">
+      <DialogContent className="sm:max-w-md max-h-[80dvh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-sm">Assign Driver — {jobRef}</DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">

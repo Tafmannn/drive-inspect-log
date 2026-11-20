@@ -63,7 +63,7 @@ export function PortalLayout() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header
-        className="border-b border-border bg-card"
+        className="border-b border-border bg-card pt-[env(safe-area-inset-top)]"
         style={accent ? { borderTop: `3px solid ${accent}` } : undefined}
       >
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
@@ -93,7 +93,7 @@ export function PortalLayout() {
         <Outlet />
       </main>
 
-      <footer className="border-t border-border print:hidden">
+      <footer className="border-t border-border pb-[env(safe-area-inset-bottom)] print:hidden">
         <div className="max-w-5xl mx-auto px-4 py-4 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
           <span>Questions about a move? Contact {ctx.operator.name}</span>
           {ctx.operator.contact_email && (

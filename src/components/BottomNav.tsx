@@ -30,6 +30,11 @@ export const BottomNav = () => {
   };
 
   return (
+    <>
+    {/* Pages reserve pb-20 for this bar, but on a phone with a home indicator
+        the bar is taller by env(safe-area-inset-bottom). This in-flow spacer
+        adds exactly that, so the last card / action isn't hidden behind it. */}
+    <div aria-hidden className="h-[env(safe-area-inset-bottom)]" />
     <nav className="fixed bottom-0 inset-x-0 bg-card border-t border-border shadow-[0_-2px_8px_rgba(0,0,0,0.06)] flex justify-around py-2 z-50 safe-area-bottom">
       {tabs.map(({ icon: Icon, label, path }) => {
         const active = isActive(path);
@@ -50,5 +55,6 @@ export const BottomNav = () => {
         );
       })}
     </nav>
+    </>
   );
 };

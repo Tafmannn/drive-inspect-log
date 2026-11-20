@@ -60,8 +60,8 @@ export function PhotoViewer({
                 {title} · {index! + 1} of {count}
               </DialogDescription>
             </div>
-            <div className="relative bg-muted rounded-md overflow-hidden flex items-center justify-center min-h-[40vh]">
-              <img src={photo.url} alt={photo.caption} className="max-h-[70vh] w-auto max-w-full object-contain" />
+            <div className="relative bg-muted rounded-md overflow-hidden flex items-center justify-center min-h-[min(40dvh,calc(100dvh-10rem))]">
+              <img src={photo.url} alt={photo.caption} className="max-h-[min(70dvh,calc(100dvh-10rem))] w-auto max-w-full object-contain" />
               {count > 1 && (
                 <>
                   <Button
