@@ -6,7 +6,7 @@ w as (select date_trunc('week', now()) as wk, date_trunc('week', now()) - interv
 done as (
   select j.id, j.completed_at, jp.total_price, j.client_id, coalesce(j.job_source, '(not recorded)') as source,
          coalesce(nullif(trim(j.client_company), ''), nullif(trim(c.company), ''), nullif(trim(c.trading_name), ''), nullif(trim(c.name), ''), '(unlinked)') as client,
-         coalesce((select sum(e.amount) from expenses e where e.job_id = j.id and not e.is_hidden), 0) as costs,
+         coalesce((select sum(e.amount) from expenses e where e.job_id = j.id and not e.is_hidden and not e.is_test), 0) as costs,
          -- expenses recharged on a live invoice: recovered, so credited back
          coalesce((select sum(x.amount_charged) from invoice_expenses x where x.job_id = j.id and not x.voided), 0) as recharged,
          exists (select 1 from invoice_items ii where ii.job_id = j.id and not ii.voided)
@@ -14,9 +14,9 @@ done as (
   from jobs j left join clients c on c.id = j.client_id
   -- prices live in job_pricing (jobs.total_price was dropped in phase 4 of the job-pricing split)
   left join job_pricing jp on jp.job_id = j.id
-  where not j.is_hidden and j.status in ('completed', 'closed') and j.completed_at is not null
+  where not j.is_hidden and not j.is_test and j.status in ('completed', 'closed') and j.completed_at is not null
 ),
-inv as (select * from invoices where document_type = 'invoice')
+inv as (select * from invoices where document_type = 'invoice' and not is_test)
 select json_build_object(
   'this_week', (select json_build_object(
       'completed_jobs', count(*),

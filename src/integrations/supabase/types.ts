@@ -891,6 +891,7 @@ export type Database = {
       }
       expenses: {
         Row: {
+          is_test: boolean
           amount: number
           billable_on_pod: boolean
           category: string
@@ -911,6 +912,7 @@ export type Database = {
           vat_amount: number | null
         }
         Insert: {
+          is_test?: boolean
           amount: number
           billable_on_pod?: boolean
           category: string
@@ -931,6 +933,7 @@ export type Database = {
           vat_amount?: number | null
         }
         Update: {
+          is_test?: boolean
           amount?: number
           billable_on_pod?: boolean
           category?: string
@@ -1263,6 +1266,7 @@ export type Database = {
       }
       invoices: {
         Row: {
+          is_test: boolean
           cancel_reason: string | null
           cancelled_at: string | null
           client_address: string | null
@@ -1298,6 +1302,7 @@ export type Database = {
           vat_registered: boolean | null
         }
         Insert: {
+          is_test?: boolean
           cancel_reason?: string | null
           cancelled_at?: string | null
           client_address?: string | null
@@ -1333,6 +1338,7 @@ export type Database = {
           vat_registered?: boolean | null
         }
         Update: {
+          is_test?: boolean
           cancel_reason?: string | null
           cancelled_at?: string | null
           client_address?: string | null
@@ -1553,6 +1559,7 @@ export type Database = {
       }
       jobs: {
         Row: {
+          is_test: boolean
           cancellation_reason: string | null
           caz_ulez_flag: string | null
           client_company: string | null
@@ -1629,6 +1636,7 @@ export type Database = {
           vehicle_year: string | null
         }
         Insert: {
+          is_test?: boolean
           cancellation_reason?: string | null
           caz_ulez_flag?: string | null
           client_company?: string | null
@@ -1705,6 +1713,7 @@ export type Database = {
           vehicle_year?: string | null
         }
         Update: {
+          is_test?: boolean
           cancellation_reason?: string | null
           caz_ulez_flag?: string | null
           client_company?: string | null

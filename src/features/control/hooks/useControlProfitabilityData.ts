@@ -138,6 +138,7 @@ export function useProfitabilityData(period: ProfitabilityPeriod) {
         .select("id, external_job_number, vehicle_reg, client_name, client_company, driver_id, driver_name, route_distance_miles, completed_at")
         .eq("status", "completed")
         .eq("is_hidden", false)
+        .eq("is_test", false)
         .not("completed_at", "is", null);
       if (since) jobsQ = jobsQ.gte("completed_at", since);
       const { data: jobsRaw, error: jobsErr } = await jobsQ;

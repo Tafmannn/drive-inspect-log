@@ -66,7 +66,7 @@ interface ExpenseRow {
 
 export async function fetchAccountsData(period: Pick<Period, "from" | "to">): Promise<AccountsData> {
   const [invoiceResult, expenseResult] = await Promise.all([
-    supabase.from("invoices").select(INVOICE_LIST_COLUMNS).order("issue_date", { ascending: true }).limit(MAX_ROWS),
+    supabase.from("invoices").select(INVOICE_LIST_COLUMNS).eq("is_test", false).order("issue_date", { ascending: true }).limit(MAX_ROWS),
     supabase
       .from("expenses")
       .select(
@@ -76,6 +76,7 @@ export async function fetchAccountsData(period: Pick<Period, "from" | "to">): Pr
           "invoice_expenses(voided, amount_charged, invoices(invoice_number))",
       )
       .eq("is_hidden", false)
+      .eq("is_test", false)
       .gte("date", period.from)
       .lte("date", period.to)
       .order("date", { ascending: true })
