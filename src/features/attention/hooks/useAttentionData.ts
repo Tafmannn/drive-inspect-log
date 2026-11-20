@@ -13,6 +13,7 @@ import {
   deriveStateExceptions,
   deriveComplianceExceptions,
   deriveBillingExceptions,
+  deriveStaleUnpricedSummary,
   isGenuineUploadFailure,
   sortExceptions,
   type BillingJobRow,
@@ -57,6 +58,7 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
         docsRes,
         driversRes,
         billingJobsRes,
+        staleBillingRes,
       ] = await Promise.all([
         supabase.from("jobs").select("*")
           .eq("is_hidden", false)
@@ -114,6 +116,15 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
           .in("status", ["completed", "closed"])
           .gte("completed_at", new Date(Date.now() - ATTENTION_THRESHOLDS.billingLookbackDays * 86400_000).toISOString())
           .limit(1000),
+
+        // Completed work OLDER than the lookback — only used to count jobs
+        // that still have no price (one summary exception, not a flood).
+        supabase.from("jobs")
+          .select("id, org_id, completed_at")
+          .eq("is_hidden", false)
+          .in("status", ["completed", "closed"])
+          .lt("completed_at", new Date(Date.now() - ATTENTION_THRESHOLDS.billingLookbackDays * 86400_000).toISOString())
+          .limit(2000),
       ]);
 
       const activeJobs = (activeJobsRes.data ?? []) as JobRow[];
@@ -157,6 +168,10 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
       // "not invoiced" alerts if either lookup fails.
       if (billingJobsRes.error) throw billingJobsRes.error;
       const billingJobs = await withPricing((billingJobsRes.data ?? []) as BillingJobRow[]);
+      if (staleBillingRes.error) throw staleBillingRes.error;
+      const staleBillingJobs = await withPricing(
+        (staleBillingRes.data ?? []) as Array<{ id: string; org_id: string; completed_at: string | null }>,
+      );
       const billingIds = billingJobs.map((j) => j.id);
       const invoicedJobIds = new Set<string>();
       for (let i = 0; i < billingIds.length; i += 100) {
@@ -201,6 +216,7 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
           driverUserIdByProfileId,
         ),
         ...deriveBillingExceptions(billingJobs, invoicedJobIds, orgLookup),
+        ...deriveStaleUnpricedSummary(staleBillingJobs, orgLookup),
       ]);
 
       // Build a set of jobIds that an admin has explicitly resolved

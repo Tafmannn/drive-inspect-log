@@ -448,6 +448,43 @@ export interface BillingJobRow {
 }
 
 /**
+ * Completed jobs OLDER than the billing lookback that still have no price.
+ * They are deliberately not listed one-by-one (that would flood the queue),
+ * but they must not vanish either: unpriced work can never be invoiced or
+ * counted in profit. One summary exception per org keeps them visible.
+ * `rows` = completed jobs older than the lookback, already joined to pricing.
+ */
+export function deriveStaleUnpricedSummary(
+  rows: Array<Pick<BillingJobRow, "org_id" | "completed_at" | "total_price">>,
+  orgLookup?: Map<string, string>,
+  nowMs: number = Date.now(),
+): AttentionException[] {
+  const byOrg = new Map<string, { count: number; oldest: string | null }>();
+  for (const r of rows) {
+    if (r.total_price != null && Number(r.total_price) > 0) continue;
+    const cur = byOrg.get(r.org_id) ?? { count: 0, oldest: null };
+    cur.count++;
+    if (r.completed_at && (!cur.oldest || r.completed_at < cur.oldest)) cur.oldest = r.completed_at;
+    byOrg.set(r.org_id, cur);
+  }
+  const out: AttentionException[] = [];
+  for (const [orgId, { count, oldest }] of byOrg) {
+    out.push(exc({
+      severity: "medium",
+      category: "billing",
+      orgId,
+      orgName: orgLookup?.get(orgId),
+      title: `${count} older completed job${count === 1 ? "" : "s"} with no price`,
+      detail: `${count} job${count === 1 ? " was" : "s were"} completed more than ${T.billingLookbackDays} days ago and still ${count === 1 ? "has" : "have"} no price, so ${count === 1 ? "it" : "they"} can't be invoiced or counted in profit. Price them, or confirm they were never chargeable.`,
+      createdAt: oldest ?? new Date(nowMs).toISOString(),
+      actionLabel: "Review completed jobs",
+      actionRoute: "/jobs/completed",
+    }, "stale-unpriced"));
+  }
+  return out;
+}
+
+/**
  * One exception per completed job, for the FIRST thing blocking its
  * invoice, in the order an admin has to fix them:
  *   1. no price      → cannot be invoiced at all          (high)
