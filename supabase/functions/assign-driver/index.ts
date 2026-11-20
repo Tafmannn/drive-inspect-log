@@ -10,6 +10,7 @@ import { findAuthUserByEmail } from "../_shared/adminUsers.ts";
 import { decideAssignDriver } from "../_shared/assignDriverPolicy.ts";
 
 // deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function writeAssignAudit(admin: any, caller: { id: string; email: string }, action: string, targetId: string, state: { before_state: unknown; after_state: unknown }) {
   try {
     await admin.from("admin_audit_log").insert({
