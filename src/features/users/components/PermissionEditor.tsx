@@ -84,7 +84,7 @@ export function PermissionEditor({ userId, userRole }: PermissionEditorProps) {
   return (
     <div className="space-y-4">
       <p className="text-[10px] text-muted-foreground">
-        Role defaults for <span className="font-medium">{userRole}</span>. Override per-user below.
+        Role defaults for <span className="font-medium">{userRole}</span>. Per-user selections below are recorded, not enforced.
       </p>
       {/* Overrides are stored and audited but not yet enforced: access is
           currently decided by role (RLS + edge functions). Say so rather than
@@ -93,7 +93,7 @@ export function PermissionEditor({ userId, userRole }: PermissionEditorProps) {
         role="note"
         className="text-[10px] rounded border border-amber-300 bg-amber-50 text-amber-900 px-2 py-1.5 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200"
       >
-        Overrides are recorded for audit but don't change access yet. What a user can do is
+        Overrides are recorded for audit but don't change access yet. The status labels below describe stored selections, not actual authorisation. What a user can do is
         currently set by their role. To restrict someone, change their role or suspend them.
       </p>
 
@@ -152,14 +152,14 @@ export function PermissionEditor({ userId, userRole }: PermissionEditorProps) {
 
 function EffectiveBadge({ state }: { state: EffectiveState }) {
   const config: Record<EffectiveState, { label: string; className: string }> = {
-    allow: { label: "✓ Allowed", className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" },
-    deny: { label: "✗ Denied", className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" },
-    default_allow: { label: "✓ Role", className: "bg-muted text-muted-foreground" },
-    default_deny: { label: "✗ Role", className: "bg-muted text-muted-foreground" },
+    allow: { label: "Recorded allow", className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" },
+    deny: { label: "Recorded deny", className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" },
+    default_allow: { label: "Role default: allow", className: "bg-muted text-muted-foreground" },
+    default_deny: { label: "Role default: deny", className: "bg-muted text-muted-foreground" },
   };
   const c = config[state];
   return (
-    <span className={`text-[8px] px-1 py-0 rounded font-medium ${c.className}`}>
+    <span className={`text-[9px] px-1 py-0 rounded font-medium ${c.className}`}>
       {c.label}
     </span>
   );
