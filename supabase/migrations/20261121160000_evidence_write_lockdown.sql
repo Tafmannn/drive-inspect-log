@@ -17,7 +17,7 @@
 --   • qr_confirm and the photo-link triggers are SECURITY DEFINER.
 --   • nothing DELETEs or TRUNCATEs these tables.
 --
--- Rollback: supabase/rollback/20261121150000_evidence_write_lockdown.down.sql
+-- Rollback: supabase/rollback/20261121160000_evidence_write_lockdown.down.sql
 
 -- 1. No client deletes or truncates evidence.
 REVOKE DELETE, TRUNCATE ON public.photos, public.inspections, public.damage_items,

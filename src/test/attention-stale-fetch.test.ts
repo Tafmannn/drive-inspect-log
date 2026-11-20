@@ -7,7 +7,7 @@ const pricing = vi.fn();
 vi.mock("@/integrations/supabase/client", () => {
   const chain: Record<string, unknown> = {};
   for (const m of ["select", "eq", "in", "lt"]) {
-    chain[m] = (...args: unknown[]) => { calls[m] = args; return chain; };
+    chain[m] = (...args: unknown[]) => { calls[m] = args; (calls[`${m}All`] ??= []).push(args); return chain; };
   }
   chain.limit = async (n: number) => { calls.limit = [n]; return jobsResult; };
   return { supabase: { from: (t: string) => { calls.from = [t]; return chain; } } };
@@ -26,6 +26,7 @@ describe("fetchStaleCompletedJobs", () => {
     const rows = await fetchStaleCompletedJobs(now);
     expect(calls.from).toEqual(["jobs"]);
     expect(calls.in).toEqual(["status", ["completed", "closed"]]);
+    expect(calls.eqAll).toContainEqual(["is_test", false]);
     expect(calls.lt).toEqual(["completed_at", new Date(now - 180 * 86_400_000).toISOString()]);
     expect(pricing).toHaveBeenCalledOnce();
     expect(rows).toHaveLength(1);

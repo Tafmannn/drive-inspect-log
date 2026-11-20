@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
-const sql = readFileSync("supabase/migrations/20261121150000_evidence_write_lockdown.sql", "utf8");
+const sql = readFileSync("supabase/migrations/20261121160000_evidence_write_lockdown.sql", "utf8");
 const EVIDENCE = ["photos", "inspections", "damage_items", "evidence_items", "qr_confirmations"];
 
 describe("evidence write lock-down — migration contract", () => {
