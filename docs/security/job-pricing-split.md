@@ -18,7 +18,7 @@ constraints mention them), and only 20 of 76 jobs hold any pricing data.
 | Phase | What | Visible change |
 |---|---|---|
 | 1. Add | Create `job_pricing`, copy the data across, and mirror any change made to the old columns into it | None. The old columns still work and still hold the data |
-| 2. Switch the app | Every price read and write uses `job_pricing`; exports, the JSON backup and the MCP tool include it | None for admins. Prices are the same |
+| 2. Switch the app | Every price **read** uses `job_pricing` (writes still go to the old columns and the phase 1 trigger copies them across; after phase 3 the seal forwards them); exports, the JSON backup and the MCP tool include it | None for admins. Prices are the same |
 | 3. Seal | Old columns are forced to NULL and any write to them is redirected into `job_pricing` (so an old browser tab can't lose a price or re-expose one); the mirror is removed | Drivers can no longer read any price |
 
 Order matters: apply phase 1 SQL, deploy phase 2, check the screens, then apply phase 3. Each phase has a
@@ -34,6 +34,10 @@ lost and nothing readable is left behind.
 Reads that must come from `job_pricing`: job lists and detail (`api.ts`), Invoice Prep, Invoice Generator,
 Attention Center billing checks, profitability, driver performance, operations buckets (it filters on
 `total_price > 0`), the Job Master List, CSV exports, the JSON backup, and the MCP tool and edge function.
-Writes that must go to `job_pricing`: the job form (create and edit), the price editor, the pricing
-suggestion panel, and the CAZ/ULEZ lookup.
+Writes (job form, price editor, pricing suggestion panel, CAZ/ULEZ lookup) deliberately stay on the old columns
+in phase 2: the phase 1 mirror copies them into `job_pricing`, and the phase 3 seal forwards them. One write path
+means one place to get wrong, and a phase 2 rollback still sees current prices.
+Reads go through `src/lib/jobPricingApi.ts` (`withPricing`): if the lookup fails it falls back to the job's own
+values, so deploying phase 2 before phase 1 is applied degrades to today's behaviour rather than breaking screens
+(the JSON backup is the exception and needs phase 1 applied).
 Drivers' reads get no pricing rows (row-level security), so their screens are unchanged.

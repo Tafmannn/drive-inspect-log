@@ -18,6 +18,7 @@ import {
   type DriverPerfJob,
   type DriverPerformance,
 } from "@/lib/driverPerformance";
+import { withPricing } from "@/lib/jobPricingApi";
 
 const LOOKBACK_DAYS = 60;
 
@@ -52,7 +53,7 @@ export function useDriverPerformance(driverIds: string[] | undefined) {
         .limit(2000);
 
       if (jobsRes.error) throw jobsRes.error;
-      const jobsRows = jobsRes.data ?? [];
+      const jobsRows = await withPricing(jobsRes.data ?? []);
       const jobIds = jobsRows.map((j) => j.id);
 
       // Pull inspection summaries (signatures + timestamps) for those jobs.

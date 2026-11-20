@@ -46,9 +46,19 @@ export default defineTool({
     if (error) {
       return { content: [{ type: "text", text: error.message }], isError: true };
     }
+    // Prices live in the admin-only job_pricing table; a non-admin gets no rows there.
+    const rows = (data ?? []) as Array<{ id: string; total_price?: number | null }>;
+    if (rows.length > 0) {
+      const { data: pricing } = await client
+        .from("job_pricing")
+        .select("job_id, total_price")
+        .in("job_id", rows.map((r) => r.id));
+      const byJob = new Map((pricing ?? []).map((p: any) => [p.job_id, p.total_price]));
+      for (const r of rows) if (byJob.has(r.id)) r.total_price = byJob.get(r.id) as number | null;
+    }
     return {
-      content: [{ type: "text", text: JSON.stringify(data ?? []) }],
-      structuredContent: { jobs: data ?? [] },
+      content: [{ type: "text", text: JSON.stringify(rows) }],
+      structuredContent: { jobs: rows },
     };
   },
 });

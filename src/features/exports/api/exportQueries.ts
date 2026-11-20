@@ -6,6 +6,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { buildCsv, downloadCsv, isoRange } from "./csvWriter";
+import { withPricing } from "@/lib/jobPricingApi";
 
 export interface ExportFilters {
   /** YYYY-MM-DD inclusive */
@@ -37,7 +38,7 @@ export async function fetchJobsForExport(filters: ExportFilters) {
   q = q.order("created_at", { ascending: false }).limit(10000);
   const { data, error } = await q;
   if (error) throw error;
-  return data ?? [];
+  return withPricing(data ?? []);
 }
 
 export async function exportJobsCsvSql(filters: ExportFilters): Promise<number> {

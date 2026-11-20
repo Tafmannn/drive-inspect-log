@@ -36,7 +36,8 @@ export default defineTool({
       "distance_miles, total_price, " +
       "has_pickup_inspection, has_delivery_inspection, " +
       "created_at, updated_at, completed_at";
-    const { data, error } = await supabaseForUser(ctx)
+    const client = supabaseForUser(ctx);
+    const { data, error } = await client
       .from("jobs")
       .select(JOB_COLUMNS)
       .eq("id", id)
@@ -47,9 +48,16 @@ export default defineTool({
     if (!data) {
       return { content: [{ type: "text", text: "Job not found or not accessible." }], isError: true };
     }
+    // Prices live in the admin-only job_pricing table; a non-admin gets no row there.
+    const { data: pricing } = await client
+      .from("job_pricing")
+      .select("total_price")
+      .eq("job_id", id)
+      .maybeSingle();
+    const job = pricing ? { ...(data as object), total_price: pricing.total_price } : data;
     return {
-      content: [{ type: "text", text: JSON.stringify(data) }],
-      structuredContent: { job: data },
+      content: [{ type: "text", text: JSON.stringify(job) }],
+      structuredContent: { job },
     };
   },
 });

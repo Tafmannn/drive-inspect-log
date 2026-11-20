@@ -25,6 +25,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { subDays, subMonths } from "date-fns";
+import { withPricing } from "@/lib/jobPricingApi";
 
 export type ProfitabilityPeriod = "30d" | "90d" | "12m" | "all";
 
@@ -139,8 +140,9 @@ export function useProfitabilityData(period: ProfitabilityPeriod) {
         .eq("is_hidden", false)
         .not("completed_at", "is", null);
       if (since) jobsQ = jobsQ.gte("completed_at", since);
-      const { data: jobs, error: jobsErr } = await jobsQ;
+      const { data: jobsRaw, error: jobsErr } = await jobsQ;
       if (jobsErr) throw jobsErr;
+      const jobs = await withPricing(jobsRaw ?? []);
 
       const jobIds = (jobs ?? []).map((j) => j.id);
       const driverIds = Array.from(new Set((jobs ?? []).map((j) => j.driver_id).filter((id): id is string => !!id)));

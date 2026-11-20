@@ -12,6 +12,7 @@ import { JOB_STATUS, ACTIVE_STATUSES, PENDING_STATUSES, ADMIN_ALLOWED_TRANSITION
 import { logClientEvent } from './logger';
 import { kickCustomerNotifications } from './customerNotifyApi';
 import { getOrgId } from './orgHelper';
+import { withPricing, withPricingOne } from './jobPricingApi';
 
 // Statuses that re-open a completed/cancelled job. These go through the
 // reopen_job RPC which soft-archives prior evidence and starts a new run.
@@ -36,7 +37,7 @@ export async function listJobs(filter?: { statuses?: string[] }): Promise<Job[]>
   }
   const { data, error } = await query;
   if (error) throw error;
-  return (data ?? []) as Job[];
+  return withPricing((data ?? []) as Job[]);
 }
 
 export async function listActiveJobs(): Promise<Job[]> {
@@ -55,7 +56,7 @@ export async function listCompletedJobs(): Promise<Job[]> {
     .gte('completed_at', fourteenDaysAgo.toISOString())
     .order('completed_at', { ascending: false });
   if (error) throw error;
-  return (data ?? []) as Job[];
+  return withPricing((data ?? []) as Job[]);
 }
 
 export async function listPendingJobs(): Promise<Job[]> {
@@ -65,7 +66,7 @@ export async function listPendingJobs(): Promise<Job[]> {
 export async function getJob(jobId: string): Promise<Job> {
   const { data, error } = await supabase.from('jobs').select('*').eq('id', jobId).single();
   if (error) throw error;
-  return data as Job;
+  return withPricingOne(data as Job);
 }
 
 export async function getJobWithRelations(jobId: string): Promise<JobWithRelations> {
@@ -117,8 +118,10 @@ export async function getJobWithRelations(jobId: string): Promise<JobWithRelatio
     return rid === currentRun;
   });
 
+  const priced = await withPricingOne(raw as Job);
+
   return {
-    ...(raw as Job),
+    ...priced,
     resolvedDriverName,
     inspections,
     photos: activePhotos,
@@ -142,13 +145,13 @@ export async function createJob(input: Partial<Omit<Job, 'id' | 'status' | 'has_
   const { data, error } = await supabase.from('jobs').insert(payload).select().single();
   if (error) throw error;
   await logJobActivity(data.id, 'job_created', undefined, JOB_STATUS.READY_FOR_PICKUP);
-  return data as Job;
+  return withPricingOne(data as Job);
 }
 
 export async function updateJob(jobId: string, input: Partial<Job>): Promise<Job> {
   const { data, error } = await supabase.from('jobs').update(input as any).eq('id', jobId).select().single();
   if (error) throw error;
-  return data as Job;
+  return withPricingOne(data as Job);
 }
 
 // Optimistic-concurrency status poke: only writes `status` when the job's

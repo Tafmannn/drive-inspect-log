@@ -22,6 +22,7 @@ import { findAlreadyInvoicedJobs } from "@/features/invoicing/api/createInvoice"
 import type { AttentionException, AttentionKpiData, AttentionFiltersState } from "../types/exceptionTypes";
 import { ACTIVE_STATUSES } from "@/lib/statusConfig";
 import type { Tables } from "@/integrations/supabase/types";
+import { withPricing } from "@/lib/jobPricingApi";
 
 type JobRow = Tables<"jobs">;
 
@@ -155,7 +156,7 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
       // Billing: throws (→ query error state) rather than raising false
       // "not invoiced" alerts if either lookup fails.
       if (billingJobsRes.error) throw billingJobsRes.error;
-      const billingJobs = (billingJobsRes.data ?? []) as BillingJobRow[];
+      const billingJobs = await withPricing((billingJobsRes.data ?? []) as BillingJobRow[]);
       const billingIds = billingJobs.map((j) => j.id);
       const invoicedJobIds = new Set<string>();
       for (let i = 0; i < billingIds.length; i += 100) {
