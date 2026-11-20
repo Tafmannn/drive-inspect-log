@@ -42,7 +42,8 @@ vi.mock("@supabase/supabase-js", () => ({ createClient: () => h.client }));
 import { listJobs, listCompletedJobs, getJob, createJob, updateJob } from "@/lib/api";
 import { exportJsonBackup } from "@/features/exports/api/jsonBackup";
 import { exportJobsCsvSql } from "@/features/exports/api/exportQueries";
-import { countPricedCandidates } from "@/hooks/useAdminOperationsBuckets";
+import { countReadyToInvoice, countOrNull, fetchAllIds } from "@/hooks/useAdminOperationsBuckets";
+import { fetchPricingByJobId } from "@/lib/jobPricingApi";
 
 const pricing = (rows: Record<string, unknown>[]) => ({ data: rows, error: null });
 
@@ -136,19 +137,21 @@ describe("CSV export", () => {
 describe("operations bucket 'ready to invoice' counts only priced jobs", () => {
   const q = (data: unknown, error: { message: string } | null = null) => chain({ data, error });
 
-  it("counts jobs whose pricing row has a total above zero", async () => {
+  it("counts jobs whose pricing row (from job_pricing) has a total above zero", async () => {
     h.tables.job_pricing = pricing([
       { job_id: "a", total_price: 100 },
       { job_id: "b", total_price: 0 },
       { job_id: "c", total_price: null },
     ]);
-    expect(await countPricedCandidates(q([{ id: "a" }, { id: "b" }, { id: "c" }, { id: "d" }]))).toBe(1);
+    const ids = ["a", "b", "c", "d"];
+    expect(countReadyToInvoice(ids, await fetchPricingByJobId(ids), new Set())).toBe(1);
   });
 
-  it("is 0 with no candidates, and 0 (not a crash) if the query fails", async () => {
-    expect(await countPricedCandidates(q([]))).toBe(0);
+  it("is 0 with no candidates, and unknown (null, not 0) if a query fails", async () => {
+    expect(await fetchAllIds(() => q([]))).toEqual([]);
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    expect(await countPricedCandidates(q(null, { message: "boom" }))).toBe(0);
+    await expect(fetchAllIds(() => q(null, { message: "boom" }))).rejects.toThrow("boom");
+    expect(await countOrNull(chain({ count: null, error: { message: "boom" } }))).toBeNull();
     warn.mockRestore();
   });
 });

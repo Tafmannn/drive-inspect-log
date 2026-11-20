@@ -134,8 +134,8 @@ states stay calm.
 
 | Count (unchanged source) | What it actually checks | Old label | New label / placement |
 |---|---|---|---|
-| `completed_not_invoiced` | completed/closed AND `pod_pdf_url` is null | "Completed, not invoiced" (KPI) | "Completed, no POD PDF", moved to Operations (hint "Opens invoice prep"); banner fallback "POD PDFs missing" |
-| `ready_to_invoice` | completed/closed, client, price > 0, both inspections, not test; **no invoice check** | "Ready to invoice" | "Invoice candidates" (KPI, buckets, hint says it is not checked against invoices) |
+| `completed_not_invoiced` | *(at the time)* completed/closed AND `pod_pdf_url` is null | "Completed, not invoiced" (KPI) | "Completed, no POD PDF" in Operations. **Superseded:** the count now checks invoices, so it is labelled "Completed, not invoiced" again (see below) |
+| `ready_to_invoice` | *(at the time)* completed/closed, client, price > 0, both inspections, not test; no invoice check | "Ready to invoice" | "Invoice candidates". **Superseded:** invoiced jobs are now excluded, so it is "Ready to invoice" again |
 | `failed_uploads` | hard-coded `0` in the hook | "0" | "—" with hint: counted on each device; open Pending uploads |
 | KPI slot freed | `kpis.unassigned` (existing) | — | "Unassigned" KPI tile (same route as before) |
 | `kpis.podReview` | `pod_ready`, `delivery_complete` | "Needs review" | "POD review" (it is not the same set as `needs_admin_review`) |
@@ -160,13 +160,21 @@ are 4 px tighter.
 `cubic-bezier(.23,1,.32,1)`. That is CSS easing, not spring physics. The entrance is 240 ms
 (was 320). The disclosure chevron is 200 ms. Reduced motion: no transforms. No haptics are claimed.
 
-**Known underlying defects (not fixed here: logic, out of UI scope).**
-1. `safeCount` / `countPricedCandidates` return 0 on a query error, so bucket zeros can't be told
-   apart from failures.
-2. `useAdminJobQueueKpis` ignores the `error` field of its four count requests, with the same effect.
-3. `completed_not_invoiced` is a POD-PDF proxy, not an invoice check.
-4. `ready_to_invoice` does not exclude already-invoiced jobs.
-5. `failed_uploads` is hard-coded to 0.
+**Underlying data defects: fixed in a follow-up (branch `claude/admin-home-data-defects`).**
+1. `safeCount` / `countPricedCandidates` returned 0 on a query error. Now every bucket is
+   `number | null`; a failed query is `null`, and the UI shows it as "—".
+2. `useAdminJobQueueKpis` ignored its count errors. Each KPI is now `null` on error.
+3. `completed_not_invoiced` was a POD-PDF proxy. It now means completed or closed visible jobs
+   with no non-cancelled invoice, checked with `findAlreadyInvoicedJobs`.
+4. `ready_to_invoice` didn't exclude invoiced jobs. It now does, with the same guard; the guard
+   fails closed, so the bucket is `null` if the invoice lookup errors.
+5. `failed_uploads` was hard-coded to 0. It is now always `null`: uploads that fail are queued on
+   each driver's device and are not recorded centrally.
+6. (found while fixing) id-list queries were capped at 1,000 rows. They are now paged with `range()`.
+
+With 3 and 4 fixed, the UI labels return to "Completed, not invoiced" and "Ready to invoice",
+and the banner fallback says "N completed jobs are not yet invoiced." The preview has a new
+`?fixture=unavailable` that shows the "—" state.
 
 **Verification (this pass).**
 

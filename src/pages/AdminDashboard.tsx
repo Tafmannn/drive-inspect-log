@@ -7,11 +7,12 @@
  * all operational buckets. Visual building blocks live in
  * features/admin-home/components.tsx.
  *
- * Data contract (unchanged): every number comes from the same hooks, query
- * keys and calculations as before (useAdminJobQueueKpis, useAdminJobQueues,
- * useAdminOperationsBuckets, useAdminMissingEvidence, useAdminComplianceCounts,
- * useAttentionData). Every control keeps its previous destination or action.
- * No figures are derived, summed across overlapping buckets, or invented.
+ * Data contract: every number comes from the existing hooks
+ * (useAdminJobQueueKpis, useAdminJobQueues, useAdminOperationsBuckets,
+ * useAdminMissingEvidence, useAdminComplianceCounts, useAttentionData). A count
+ * that could not be loaded is `null` and is shown as "—", never as 0; an
+ * unknown count never raises a banner. No figures are derived, summed across
+ * overlapping buckets, or invented.
  */
 
 import { useState, useMemo, useCallback } from "react";
@@ -215,7 +216,7 @@ function KpiTiles() {
     <div className="grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-4">
       <KpiTile
         label="Active jobs"
-        value={kpis?.active ?? 0}
+        value={kpis?.active ?? null}
         icon={Truck}
         tone="info"
         loading={isLoading}
@@ -223,7 +224,7 @@ function KpiTiles() {
       />
       <KpiTile
         label="Unassigned"
-        value={kpis?.unassigned ?? 0}
+        value={kpis?.unassigned ?? null}
         icon={UserX}
         tone="danger"
         attention
@@ -232,7 +233,7 @@ function KpiTiles() {
       />
       <KpiTile
         label="POD review"
-        value={kpis?.podReview ?? 0}
+        value={kpis?.podReview ?? null}
         icon={FileSearch}
         tone="warning"
         attention
@@ -240,8 +241,8 @@ function KpiTiles() {
         onClick={() => navigate("/control/pod-review")}
       />
       <KpiTile
-        label="Invoice candidates"
-        value={buckets?.ready_to_invoice ?? 0}
+        label="Ready to invoice"
+        value={buckets?.ready_to_invoice ?? null}
         icon={FileText}
         tone="info"
         loading={bucketsLoading}
@@ -260,7 +261,14 @@ const timeFmt = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-d
 function AttentionSummary() {
   const navigate = useNavigate();
   const { items, loading, failed, retry, updatedAt } = useNeedsActionItems();
-  const { data: buckets, isLoading: bucketsLoading } = useAdminOperationsBuckets();
+  const bucketsQuery = useAdminOperationsBuckets();
+  const kpisQuery = useAdminJobQueueKpis();
+  const { data: buckets, isLoading: bucketsLoading } = bucketsQuery;
+  // Any count that could not be loaded (null, or the whole query failed).
+  const countsIncomplete =
+    bucketsQuery.isError || kpisQuery.isError ||
+    Object.values(kpisQuery.data ?? {}).some((v) => v === null) ||
+    Object.entries(buckets ?? {}).some(([k, v]) => k !== "failed_uploads" && v === null);
 
   const scrollToQueue = useCallback(() => {
     const el = document.getElementById(NEEDS_ACTION_ID);
@@ -308,17 +316,36 @@ function AttentionSummary() {
     );
   }
 
-  // completed_not_invoiced counts completed jobs WITHOUT A POD PDF; it does
-  // not check invoices, so it is described as exactly that.
-  const noPodPdf = buckets?.completed_not_invoiced ?? 0;
-  if (noPodPdf > 0) {
+  // completed_not_invoiced = completed jobs with no non-cancelled invoice
+  // (duplicate-invoice guard). null (unknown) never raises this banner.
+  const notInvoiced = buckets?.completed_not_invoiced ?? 0;
+  if (notInvoiced > 0) {
     return (
       <AttentionBanner
         icon={FileWarning}
-        title="POD PDFs missing"
-        message={`${noPodPdf.toLocaleString("en-GB")} completed ${noPodPdf === 1 ? "job has" : "jobs have"} no POD PDF on file.`}
+        title="Needs your attention"
+        message={`${notInvoiced.toLocaleString("en-GB")} completed ${notInvoiced === 1 ? "job is" : "jobs are"} not yet invoiced.`}
         actionLabel="Invoice prep"
         onAction={() => navigate(BUCKET_DEFS.completed_not_invoiced.defaultRoute!)}
+      />
+    );
+  }
+
+  // Don't reassure while some counts are unknown.
+  if (countsIncomplete) {
+    return (
+      <NoticeCard
+        icon={AlertTriangle}
+        tone="warning"
+        title="Some counts didn’t load"
+        message="Figures shown as — are unavailable."
+        action={{
+          label: "Try again",
+          onClick: () => {
+            void bucketsQuery.refetch();
+            void kpisQuery.refetch();
+          },
+        }}
       />
     );
   }
@@ -486,7 +513,7 @@ function JobQueues() {
           key: s.key,
           label: s.label,
           tone: s.tone,
-          value: buckets?.[s.key] ?? 0,
+          value: buckets ? buckets[s.key] : null,
           onClick: () => navigate(BUCKET_DEFS[s.key].defaultRoute!),
         }))}
       />
@@ -506,14 +533,14 @@ function OperationsCard() {
     <Card aria-labelledby="ops-title">
       <SectionHeader id="ops-title" icon={Activity} title="Operations" />
       <div className="ah-divide pb-1">
-        <CountRow icon={Clock} label="Stale jobs" tone="warning" value={kpis?.stale ?? 0} loading={isLoading} onClick={() => navigate("/control/jobs?view=stale")} />
-        <CountRow icon={ImageOff} label="Evidence issues" tone="danger" value={missingEvidence ?? 0} loading={evidenceLoading} onClick={() => navigate("/control/jobs?view=evidence")} />
+        <CountRow icon={Clock} label="Stale jobs" tone="warning" value={kpis?.stale ?? null} loading={isLoading} onClick={() => navigate("/control/jobs?view=stale")} />
+        <CountRow icon={ImageOff} label="Evidence issues" tone="danger" value={missingEvidence ?? null} loading={evidenceLoading} onClick={() => navigate("/control/jobs?view=evidence")} />
         <CountRow
           icon={FileWarning}
-          label="Completed, no POD PDF"
+          label="Completed, not invoiced"
           hint="Opens invoice prep"
           tone="info"
-          value={buckets?.completed_not_invoiced ?? 0}
+          value={buckets?.completed_not_invoiced ?? null}
           loading={bucketsLoading}
           onClick={() => navigate(BUCKET_DEFS.completed_not_invoiced.defaultRoute!)}
         />
@@ -537,9 +564,9 @@ function ComplianceCard() {
         action={{ label: "Onboarding", onClick: go, ariaLabel: "Open driver onboarding" }}
       />
       <div className="ah-divide pb-1">
-        <CountRow icon={ListChecks} label="Pending review" tone="warning" value={counts?.pendingReview ?? 0} loading={isLoading} onClick={go} />
-        <CountRow icon={FileWarning} label="Missing documents" tone="danger" value={counts?.missingDocs ?? 0} loading={isLoading} onClick={go} />
-        <CountRow icon={IdCard} label="Expired licences" tone="warning" value={counts?.expiredLicences ?? 0} loading={isLoading} onClick={go} />
+        <CountRow icon={ListChecks} label="Pending review" tone="warning" value={counts?.pendingReview ?? null} loading={isLoading} onClick={go} />
+        <CountRow icon={FileWarning} label="Missing documents" tone="danger" value={counts?.missingDocs ?? null} loading={isLoading} onClick={go} />
+        <CountRow icon={IdCard} label="Expired licences" tone="warning" value={counts?.expiredLicences ?? null} loading={isLoading} onClick={go} />
       </div>
     </Card>
   );
@@ -763,18 +790,11 @@ const BUCKET_ORDER: BucketKey[] = [
 ];
 
 /**
- * Display-only wording for buckets whose library label claims more than the
- * underlying count checks. The counts and BUCKET_DEFS are unchanged.
+ * Display-only wording where the library label would overstate the data.
+ * failed_uploads is not recorded centrally (the hook returns null), so the
+ * row explains where to look instead of showing a count.
  */
 const BUCKET_DISPLAY: Partial<Record<BucketKey, { label: string; hint: string }>> = {
-  ready_to_invoice: {
-    label: "Invoice candidates",
-    hint: "Completed, client linked, priced, both inspections. Not checked against existing invoices.",
-  },
-  completed_not_invoiced: {
-    label: "Completed, no POD PDF",
-    hint: "Completed or closed jobs without a POD PDF on file. Not checked against invoices.",
-  },
   failed_uploads: {
     label: "Jobs with failed uploads",
     hint: "Not counted here. Failed uploads are held on each device; open Pending uploads.",
@@ -802,14 +822,14 @@ function OperationsBuckets() {
       <div className="ah-divide border-t border-[hsl(var(--ah-hairline))] pb-1.5 md:grid md:grid-cols-2 md:[&>*+*]:border-t-0 md:[&>*]:border-b md:[&>*]:border-[hsl(var(--ah-hairline))]">
         {BUCKET_ORDER.map((key) => {
           const def = BUCKET_DEFS[key];
-          const value = counts ? (counts as Partial<Record<BucketKey, number>>)[key] ?? 0 : 0;
+          // null = could not be counted (or not counted centrally); shown as "—".
+          const value = counts ? (counts as Partial<Record<BucketKey, number | null>>)[key] ?? null : null;
           return (
             <CountRow
               key={key}
               icon={key === "cancelled_archived" ? FileText : key === "failed_uploads" ? AlertTriangle : Layers}
               label={BUCKET_DISPLAY[key]?.label ?? def.label}
               hint={BUCKET_DISPLAY[key]?.hint ?? def.reason}
-              valueText={key === "failed_uploads" ? "—" : undefined}
               tone={PRIORITY_TONE[def.priority]}
               value={value}
               loading={isLoading}
