@@ -81,13 +81,12 @@ export const Dashboard = () => {
     return (
       <div className="ah-root min-h-screen pb-28">
         <HomeHeader />
-        <div className="mx-auto max-w-5xl px-4 pb-5 pt-5 sm:px-6 lg:px-8">
-          <div className="px-1">
-            <p className="text-[15px] leading-5 text-muted-foreground">{todayLabel()}</p>
-            <h1 className="mt-1 text-[28px] font-semibold leading-[1.12] tracking-[-0.025em] text-foreground min-[380px]:text-[30px] sm:text-[34px]">
+        <div className="mx-auto max-w-5xl px-4 pb-3 pt-2 sm:px-6 sm:pb-4 lg:px-8">
+          <div className="px-0.5">
+            <p className="text-[13px] font-medium leading-[18px] text-muted-foreground">{todayLabel()}</p>
+            <h1 className="text-[26px] font-semibold leading-[32px] tracking-[-0.024em] text-foreground min-[380px]:text-[28px] min-[380px]:leading-[34px] sm:text-[32px] sm:leading-[38px]">
               {greeting}
             </h1>
-            <p className="mt-1.5 text-[15px] leading-[1.35] text-[hsl(var(--ah-ink-soft))]">Here’s your operations overview.</p>
           </div>
         </div>
         <Suspense

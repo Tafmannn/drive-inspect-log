@@ -1,5 +1,8 @@
 # Admin Home — UI refresh (spec, inventory, verification)
 
+> **Refinement pass (after `ed9e69b`)**: compact KPI tiles, a denser first screen, and
+> truthful labels. See §7; it supersedes the earlier sections where they differ.
+
 Scope: presentation only for the admin / super-admin home (`/`) and `/admin`, which share
 `AdminDashboardBody`. No queries, query keys, hooks, calculations, routes, permissions or
 Supabase objects were changed. Driver home is untouched.
@@ -112,3 +115,68 @@ the floating dock is used on the admin home only (other routes keep the bar).
 `screenshots/`: real browser renders, lossless PNG. Phones at 3× (320→960, 390→1170,
 430→1290 px wide), desktop at 2× (1280→2560). `before-after-*` pairs use identical viewport and
 scale. Emulated in Chromium, not captured on an iPhone.
+
+## 7. Refinement pass (after ed9e69b)
+
+**First screen (390×844, busy fixture).** The header is 52 px (was 64). The greeting is date plus
+title only; the filler subtitle is gone. KPI tiles are 89 px (was ~130). The banner is 104 px with
+the CTA in the title row (was 168 px, with a full-width button). Result: the first queue row ends
+at 580 px and three rows are visible above the dock (top 766 px). Before, none were.
+At 430×932 the first row ends at 580 px (dock at 854).
+
+**KPI tiles.** The value leads at full tile width and is never truncated. Font steps down by
+length: 28 → 24 → 21 px, and values of a million or more are compact ("1.2M"; the exact value is
+in `aria-label`). The label sits beside an 18 px tinted icon. There are no chevrons; the card, the
+press state and the hover lift carry the affordance. Zero values are drawn at 45% ink so calm
+states stay calm.
+
+**Truthful labels (display only; queries and `BUCKET_DEFS` unchanged).**
+
+| Count (unchanged source) | What it actually checks | Old label | New label / placement |
+|---|---|---|---|
+| `completed_not_invoiced` | completed/closed AND `pod_pdf_url` is null | "Completed, not invoiced" (KPI) | "Completed, no POD PDF", moved to Operations (hint "Opens invoice prep"); banner fallback "POD PDFs missing" |
+| `ready_to_invoice` | completed/closed, client, price > 0, both inspections, not test; **no invoice check** | "Ready to invoice" | "Invoice candidates" (KPI, buckets, hint says it is not checked against invoices) |
+| `failed_uploads` | hard-coded `0` in the hook | "0" | "—" with hint: counted on each device; open Pending uploads |
+| KPI slot freed | `kpis.unassigned` (existing) | — | "Unassigned" KPI tile (same route as before) |
+| `kpis.podReview` | `pod_ready`, `delivery_complete` | "Needs review" | "POD review" (it is not the same set as `needs_admin_review`) |
+
+**Banner / empty state.** If the job-queues or attention query errors, the banner shows "Some
+queues didn’t load, so counts below may be incomplete" with **Try again** (calls `refetch()` on those two
+existing queries). It never says "All clear" on a failed load. The empty state now says exactly what
+was checked: "Action queue is empty: no unassigned, stale, evidence or POD items at HH:MM"
+(from `dataUpdatedAt`). The attention title is "Needs your attention", and the breakdown is a list of
+parts that never break mid-part.
+
+**Pipeline → Job queues.** It now shows three independent queue counts (With drivers ·
+Admin review · Evidence blocked), separated by hairlines, with **no connector line or arrows**.
+These are status buckets, not a sequence every job passes through. "Evidence blocked" (an existing
+bucket, previously only in the folded list) replaced "Ready to invoice", which already has a KPI.
+
+**Rows.** Job references are never truncated at realistic lengths. Below 380 px the row action
+wraps under the content. Below 440 px the action button's icon is hidden (the label is kept). Rows
+are 4 px tighter.
+
+**Motion (emil-design-eng).** Press is `scale(.97)`, 100 ms in and 160 ms out, with
+`cubic-bezier(.23,1,.32,1)`. That is CSS easing, not spring physics. The entrance is 240 ms
+(was 320). The disclosure chevron is 200 ms. Reduced motion: no transforms. No haptics are claimed.
+
+**Known underlying defects (not fixed here: logic, out of UI scope).**
+1. `safeCount` / `countPricedCandidates` return 0 on a query error, so bucket zeros can't be told
+   apart from failures.
+2. `useAdminJobQueueKpis` ignores the `error` field of its four count requests, with the same effect.
+3. `completed_not_invoiced` is a POD-PDF proxy, not an invoice check.
+4. `ready_to_invoice` does not exclude already-invoiced jobs.
+5. `failed_uploads` is hard-coded to 0.
+
+**Verification (this pass).**
+
+- `typecheck` ✓, `build` ✓, full `npm test` ✓ (see the commit).
+- `admin-home-ui.test.tsx`: 9 tests (error state, truthful labels, dash for failed uploads).
+- Browser QA: 56/56. That covers 30 navigation targets, roles, the Assign modal, banner states,
+  Review → scroll and focus, the first row above the dock at 390 and 430, no clipped figures or
+  headings at 320/390 (busy and worst case), no truncated references, 44 px targets, keyboard,
+  reduced motion, and axe WCAG 2.1 AA in light and dark.
+- **Not verified:** physical iPhone (Safari and the installed PWA), VoiceOver, OS text size.
+
+Screenshots: `screenshots/` holds first screens. `screenshots/full/` holds full pages.
+`screenshots/compare/` holds `ed9e69b` vs now and `main` vs now, at identical viewport and DPR.

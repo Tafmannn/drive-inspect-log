@@ -37,13 +37,13 @@ import type { AdminJobRow } from "@/components/AdminJobCard";
 import type { AttentionFiltersState } from "@/features/attention/types/exceptionTypes";
 import { cn } from "@/lib/utils";
 import {
-  AllClearBanner, AttentionBanner, BannerSkeleton, Card, Chip, CountRow, EmptyLine,
-  KpiTile, Pipeline, SectionHeader, type Tone,
+  AttentionBanner, BannerSkeleton, Card, Chip, CountRow, EmptyLine,
+  KpiTile, NoticeCard, QueueStrip, SectionHeader, type Tone,
 } from "@/features/admin-home/components";
 import {
   UserX, Clock, FileSearch, ImageOff, Zap, Eye, UserPlus, MapPin, AlertTriangle, User,
   Truck, Users, ClipboardCheck, Receipt, Globe, CheckCircle2, FileText, Layers, Route,
-  ShieldCheck, FileWarning, IdCard, History, LayoutGrid, ChevronRight, ListChecks,
+  ShieldCheck, FileWarning, IdCard, History, LayoutGrid, ChevronRight, ListChecks, Activity,
 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -84,8 +84,10 @@ function sentenceCase(label: string): string {
 const NEEDS_ACTION_FILTERS: AttentionFiltersState = { severity: "all", category: "all", orgId: "all", dateFrom: "", dateTo: "" };
 
 function useNeedsActionItems() {
-  const { data: queues, isLoading: queuesLoading } = useAdminJobQueues();
-  const { data: attentionData, isLoading: attentionLoading } = useAttentionData({ scope: "org", filters: NEEDS_ACTION_FILTERS });
+  const queuesQuery = useAdminJobQueues();
+  const attentionQuery = useAttentionData({ scope: "org", filters: NEEDS_ACTION_FILTERS });
+  const { data: queues, isLoading: queuesLoading } = queuesQuery;
+  const { data: attentionData, isLoading: attentionLoading } = attentionQuery;
 
   const loading = queuesLoading || attentionLoading;
 
@@ -187,12 +189,22 @@ function useNeedsActionItems() {
     return result;
   }, [queues, attentionData]);
 
-  return { items, loading };
+  // Query state only (no new requests): lets the UI tell an empty queue apart
+  // from one that failed to load, and say when the data was fetched.
+  const failed = queuesQuery.isError || attentionQuery.isError;
+  const retry = () => {
+    void queuesQuery.refetch();
+    void attentionQuery.refetch();
+  };
+  const updatedAt = queuesQuery.dataUpdatedAt;
+
+  return { items, loading, failed, retry, updatedAt };
 }
 
 const NEEDS_ACTION_ID = "needs-action";
 
 // ── Tier 1: KPI tiles ────────────────────────────────────────────────
+// Labels describe exactly what each count measures (see docs/admin-home).
 
 function KpiTiles() {
   const navigate = useNavigate();
@@ -200,7 +212,7 @@ function KpiTiles() {
   const { data: buckets, isLoading: bucketsLoading } = useAdminOperationsBuckets();
 
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-4">
       <KpiTile
         label="Active jobs"
         value={kpis?.active ?? 0}
@@ -210,29 +222,30 @@ function KpiTiles() {
         onClick={() => navigate("/control/jobs?view=active")}
       />
       <KpiTile
-        label="Completed, not invoiced"
-        value={buckets?.completed_not_invoiced ?? 0}
-        icon={CheckCircle2}
-        tone="success"
-        loading={bucketsLoading}
-        onClick={() => navigate(BUCKET_DEFS.completed_not_invoiced.defaultRoute!)}
+        label="Unassigned"
+        value={kpis?.unassigned ?? 0}
+        icon={UserX}
+        tone="danger"
+        attention
+        loading={isLoading}
+        onClick={() => navigate("/control/jobs?view=unassigned")}
       />
       <KpiTile
-        label="Ready to invoice"
+        label="POD review"
+        value={kpis?.podReview ?? 0}
+        icon={FileSearch}
+        tone="warning"
+        attention
+        loading={isLoading}
+        onClick={() => navigate("/control/pod-review")}
+      />
+      <KpiTile
+        label="Invoice candidates"
         value={buckets?.ready_to_invoice ?? 0}
         icon={FileText}
         tone="info"
         loading={bucketsLoading}
         onClick={() => navigate(BUCKET_DEFS.ready_to_invoice.defaultRoute!)}
-      />
-      <KpiTile
-        label="Needs review"
-        value={kpis?.podReview ?? 0}
-        icon={AlertTriangle}
-        tone="warning"
-        attention
-        loading={isLoading}
-        onClick={() => navigate("/control/pod-review")}
       />
     </div>
   );
@@ -242,9 +255,11 @@ function KpiTiles() {
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
+const timeFmt = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit" });
+
 function AttentionSummary() {
   const navigate = useNavigate();
-  const { items, loading } = useNeedsActionItems();
+  const { items, loading, failed, retry, updatedAt } = useNeedsActionItems();
   const { data: buckets, isLoading: bucketsLoading } = useAdminOperationsBuckets();
 
   const scrollToQueue = useCallback(() => {
@@ -261,40 +276,61 @@ function AttentionSummary() {
 
   if (loading || bucketsLoading) return <BannerSkeleton />;
 
+  // A failed queue load must never read as "nothing to do".
+  if (failed) {
+    return (
+      <NoticeCard
+        icon={AlertTriangle}
+        tone="warning"
+        title="Some queues didn’t load"
+        message="Counts below may be incomplete."
+        action={{ label: "Try again", onClick: retry }}
+      />
+    );
+  }
+
   if (items.length > 0) {
     const count = (t: NeedsActionItem["queueType"]) => items.filter((i) => i.queueType === t).length;
     const parts = [
-      count("unassigned") && plural(count("unassigned"), "unassigned job", "unassigned jobs"),
-      count("stale") && plural(count("stale"), "stale job", "stale jobs"),
+      count("unassigned") && plural(count("unassigned"), "unassigned", "unassigned"),
+      count("stale") && plural(count("stale"), "stale", "stale"),
       count("evidence") && plural(count("evidence"), "evidence issue", "evidence issues"),
       count("pod_review") && plural(count("pod_review"), "POD to review", "PODs to review"),
     ].filter(Boolean) as string[];
-    const message = parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}.` : `${parts[0]}.`;
     return (
       <AttentionBanner
         icon={AlertTriangle}
         title="Needs your attention"
-        message={message.charAt(0).toUpperCase() + message.slice(1)}
-        actionLabel="Review now"
+        message={parts}
+        actionLabel="Review"
         onAction={scrollToQueue}
       />
     );
   }
 
-  const notInvoiced = buckets?.completed_not_invoiced ?? 0;
-  if (notInvoiced > 0) {
+  // completed_not_invoiced counts completed jobs WITHOUT A POD PDF; it does
+  // not check invoices, so it is described as exactly that.
+  const noPodPdf = buckets?.completed_not_invoiced ?? 0;
+  if (noPodPdf > 0) {
     return (
       <AttentionBanner
-        icon={Receipt}
-        title="Needs your attention"
-        message={`${plural(notInvoiced, "completed job is", "completed jobs are").replace(/^(\d+)/, (n) => Number(n).toLocaleString("en-GB"))} not yet invoiced.`}
-        actionLabel="Review jobs"
+        icon={FileWarning}
+        title="POD PDFs missing"
+        message={`${noPodPdf.toLocaleString("en-GB")} completed ${noPodPdf === 1 ? "job has" : "jobs have"} no POD PDF on file.`}
+        actionLabel="Invoice prep"
         onAction={() => navigate(BUCKET_DEFS.completed_not_invoiced.defaultRoute!)}
       />
     );
   }
 
-  return <AllClearBanner icon={CheckCircle2} title="All clear" message="No interventions required." />;
+  return (
+    <NoticeCard
+      icon={CheckCircle2}
+      tone="success"
+      title="Action queue is empty"
+      message={`No unassigned, stale, evidence or POD items${updatedAt ? ` at ${timeFmt.format(updatedAt)}` : ""}.`}
+    />
+  );
 }
 
 // ── Tier 2: Ranked Needs Action Queue ────────────────────────────────
@@ -306,7 +342,7 @@ const QUEUE_CHIP: Record<NeedsActionItem["queueType"], string> = {
   pod_review: "bg-[hsl(var(--primary-soft))] text-primary",
 };
 
-const ACTION_BTN = "min-h-11 shrink-0 rounded-full px-3.5 text-[14px] font-semibold ah-press [&_svg]:max-[399px]:hidden";
+const ACTION_BTN = "ml-auto min-h-11 shrink-0 rounded-full px-3.5 text-[14px] font-semibold ah-press [&_svg]:max-[439px]:hidden";
 
 function NeedsActionQueue() {
   const navigate = useNavigate();
@@ -336,14 +372,14 @@ function NeedsActionQueue() {
           {items.map(item => (
             <li
               key={item.key}
-              className="ah-row flex cursor-pointer items-center gap-3 px-4 py-3 sm:px-5"
+              className="ah-row flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5 min-[380px]:flex-nowrap sm:px-5"
               onClick={() => navigate(item.actionRoute)}
             >
-              <div className="min-w-0 flex-1 space-y-1.5">
+              <div className="min-w-0 flex-1 basis-full space-y-1 min-[380px]:basis-auto">
                 <div className="flex min-w-0 items-center gap-2">
                   <Chip className={QUEUE_CHIP[item.queueType]}>{item.queueLabel}</Chip>
                   {item.jobRef && (
-                    <span className="ah-num truncate text-[13px] text-muted-foreground">{item.jobRef}</span>
+                    <span className="ah-num ah-ref min-w-0 truncate text-[13px] text-muted-foreground">{item.jobRef}</span>
                   )}
                   <span className="ah-num ml-auto shrink-0 text-[13px] text-muted-foreground">{item.age}</span>
                 </div>
@@ -422,32 +458,30 @@ function NeedsActionQueue() {
   );
 }
 
-// ── Job pipeline (existing bucket counts, disjoint status sets) ──────
+// ── Job queues (existing bucket counts; independent queues, not a sequence) ──
 
-function JobPipeline() {
+function JobQueues() {
   const navigate = useNavigate();
   const { data: buckets, isLoading } = useAdminOperationsBuckets();
-  // Three buckets with non-overlapping status sets, in lifecycle order.
-  // (ready_to_close is a subset of admin review, so it is not a stage.)
-  const stages: { key: BucketKey; label: string; icon: typeof Route }[] = [
-    { key: "needs_driver_action", label: "With drivers", icon: Route },
-    { key: "needs_admin_review", label: "Admin review", icon: ClipboardCheck },
-    { key: "ready_to_invoice", label: "Ready to invoice", icon: Receipt },
+  const stats: { key: BucketKey; label: string; tone?: "danger" }[] = [
+    { key: "needs_driver_action", label: "With drivers" },
+    { key: "needs_admin_review", label: "Admin review" },
+    { key: "blocked_evidence", label: "Evidence blocked", tone: "danger" },
   ];
   return (
-    <Card aria-labelledby="pipeline-title">
+    <Card aria-labelledby="queues-title">
       <SectionHeader
-        id="pipeline-title"
+        id="queues-title"
         icon={Layers}
-        title="Job pipeline"
+        title="Job queues"
         action={{ label: "All jobs", onClick: () => navigate("/control/jobs"), ariaLabel: "Open the full jobs queue" }}
       />
-      <Pipeline
+      <QueueStrip
         loading={isLoading}
-        stages={stages.map((s) => ({
+        stats={stats.map((s) => ({
           key: s.key,
           label: s.label,
-          icon: s.icon,
+          tone: s.tone,
           value: buckets?.[s.key] ?? 0,
           onClick: () => navigate(BUCKET_DEFS[s.key].defaultRoute!),
         }))}
@@ -456,21 +490,29 @@ function JobPipeline() {
   );
 }
 
-// ── Operations (the four intervention counts, same routes as before) ─
+// ── Operations (remaining intervention counts; same routes as before) ─
 
 function OperationsCard() {
   const navigate = useNavigate();
   const { data: kpis, isLoading } = useAdminJobQueueKpis();
   const { data: missingEvidence, isLoading: evidenceLoading } = useAdminMissingEvidence();
+  const { data: buckets, isLoading: bucketsLoading } = useAdminOperationsBuckets();
 
   return (
     <Card aria-labelledby="ops-title">
-      <SectionHeader id="ops-title" icon={Zap} title="Operations" />
-      <div className="ah-divide pb-1.5">
-        <CountRow icon={UserX} label="Unassigned" tone="danger" value={kpis?.unassigned ?? 0} loading={isLoading} onClick={() => navigate("/control/jobs?view=unassigned")} />
+      <SectionHeader id="ops-title" icon={Activity} title="Operations" />
+      <div className="ah-divide pb-1">
         <CountRow icon={Clock} label="Stale jobs" tone="warning" value={kpis?.stale ?? 0} loading={isLoading} onClick={() => navigate("/control/jobs?view=stale")} />
-        <CountRow icon={FileSearch} label="POD review" tone="warning" value={kpis?.podReview ?? 0} loading={isLoading} onClick={() => navigate("/control/pod-review")} />
         <CountRow icon={ImageOff} label="Evidence issues" tone="danger" value={missingEvidence ?? 0} loading={evidenceLoading} onClick={() => navigate("/control/jobs?view=evidence")} />
+        <CountRow
+          icon={FileWarning}
+          label="Completed, no POD PDF"
+          hint="Opens invoice prep"
+          tone="info"
+          value={buckets?.completed_not_invoiced ?? 0}
+          loading={bucketsLoading}
+          onClick={() => navigate(BUCKET_DEFS.completed_not_invoiced.defaultRoute!)}
+        />
       </div>
     </Card>
   );
@@ -490,7 +532,7 @@ function ComplianceCard() {
         title="Driver compliance"
         action={{ label: "Onboarding", onClick: go, ariaLabel: "Open driver onboarding" }}
       />
-      <div className="ah-divide pb-1.5">
+      <div className="ah-divide pb-1">
         <CountRow icon={ListChecks} label="Pending review" tone="warning" value={counts?.pendingReview ?? 0} loading={isLoading} onClick={go} />
         <CountRow icon={FileWarning} label="Missing documents" tone="danger" value={counts?.missingDocs ?? 0} loading={isLoading} onClick={go} />
         <CountRow icon={IdCard} label="Expired licences" tone="warning" value={counts?.expiredLicences ?? 0} loading={isLoading} onClick={go} />
@@ -515,13 +557,13 @@ function CompactJobRow({
   const unassigned = isUnassigned(job);
 
   return (
-    <li className="ah-row flex cursor-pointer items-center gap-3 px-4 py-3 sm:px-5" onClick={onView}>
-      <div className="min-w-0 flex-1 space-y-1.5">
+    <li className="ah-row flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5 min-[380px]:flex-nowrap sm:px-5" onClick={onView}>
+      <div className="min-w-0 flex-1 basis-full space-y-1 min-[380px]:basis-auto">
         <div className="flex min-w-0 items-center gap-2">
           <Chip style={{ backgroundColor: statusStyle.backgroundColor, color: statusStyle.color }}>
             {sentenceCase(statusStyle.label)}
           </Chip>
-          <span className="ah-num truncate text-[13px] text-muted-foreground">
+          <span className="ah-num ah-ref min-w-0 truncate text-[13px] text-muted-foreground">
             {job.external_job_number || job.id.slice(0, 8)}
           </span>
           {stale && (
@@ -716,6 +758,25 @@ const BUCKET_ORDER: BucketKey[] = [
   "cancelled_archived",
 ];
 
+/**
+ * Display-only wording for buckets whose library label claims more than the
+ * underlying count checks. The counts and BUCKET_DEFS are unchanged.
+ */
+const BUCKET_DISPLAY: Partial<Record<BucketKey, { label: string; hint: string }>> = {
+  ready_to_invoice: {
+    label: "Invoice candidates",
+    hint: "Completed, client linked, priced, both inspections. Not checked against existing invoices.",
+  },
+  completed_not_invoiced: {
+    label: "Completed, no POD PDF",
+    hint: "Completed or closed jobs without a POD PDF on file. Not checked against invoices.",
+  },
+  failed_uploads: {
+    label: "Jobs with failed uploads",
+    hint: "Not counted here. Failed uploads are held on each device; open Pending uploads.",
+  },
+};
+
 const PRIORITY_TONE: Record<BucketPriority, Tone> = {
   critical: "danger",
   high: "warning",
@@ -742,8 +803,9 @@ function OperationsBuckets() {
             <CountRow
               key={key}
               icon={key === "cancelled_archived" ? FileText : key === "failed_uploads" ? AlertTriangle : Layers}
-              label={def.label}
-              hint={def.reason}
+              label={BUCKET_DISPLAY[key]?.label ?? def.label}
+              hint={BUCKET_DISPLAY[key]?.hint ?? def.reason}
+              valueText={key === "failed_uploads" ? "—" : undefined}
               tone={PRIORITY_TONE[def.priority]}
               value={value}
               loading={isLoading}
@@ -820,11 +882,11 @@ export function AdminDashboardBody() {
   const staleItems = (queues?.needsAttention ?? []).filter(j => isJobStale(j));
 
   return (
-    <div className="ah-enter mx-auto max-w-5xl space-y-4 px-4 sm:space-y-5 sm:px-6 lg:px-8">
+    <div className="ah-enter mx-auto max-w-5xl space-y-3 px-4 sm:space-y-4 sm:px-6 lg:space-y-5 lg:px-8">
       <KpiTiles />
       <AttentionSummary />
 
-      <div className="flex flex-col gap-4 sm:gap-5 lg:grid lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-start">
+      <div className="flex flex-col gap-3 sm:gap-4 lg:gap-5 lg:grid lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-start">
         <div className="contents lg:flex lg:flex-col lg:gap-5">
           <div className="order-1"><NeedsActionQueue /></div>
           <div className="order-5">
@@ -852,7 +914,7 @@ export function AdminDashboardBody() {
           <div className="order-7"><RecentActivity /></div>
         </div>
         <div className="contents lg:flex lg:flex-col lg:gap-5">
-          <div className="order-2"><JobPipeline /></div>
+          <div className="order-2"><JobQueues /></div>
           <div className="order-3"><OperationsCard /></div>
           <div className="order-4"><ComplianceCard /></div>
           <div className="order-8"><ManagementRoutes /></div>

@@ -98,16 +98,16 @@
 
 /* ── Interaction ──────────────────────────────────────────────────── */
 
-/* Press feedback: quick scale-down on touch, released with a strong
-   ease-out so it settles like a spring and can be re-pressed mid-flight
-   (CSS transitions retarget from the current value). */
+/* Press feedback (emil-design-eng): scale(0.97) on :active, 160 ms with a
+   strong ease-out. This is CSS easing, not spring physics; transitions
+   retarget from the current value, so a re-press mid-flight stays smooth. */
 .ah-press {
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
   touch-action: manipulation;
   transition:
-    transform 260ms cubic-bezier(0.23, 1, 0.32, 1),
+    transform 160ms cubic-bezier(0.23, 1, 0.32, 1),
     background-color 160ms ease,
     box-shadow 200ms ease,
     border-color 160ms ease;
@@ -115,7 +115,7 @@
 
 .ah-press:active {
   transform: scale(0.97);
-  transition-duration: 90ms, 90ms, 200ms, 160ms;
+  transition-duration: 100ms, 100ms, 200ms, 160ms;
 }
 
 /* Rows inside a card: tint, no scale (scaling a full-width row reads as jitter). */
@@ -151,19 +151,20 @@
   display: none;
 }
 .ah-details .ah-chevron {
-  transition: transform 220ms cubic-bezier(0.23, 1, 0.32, 1);
+  transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 .ah-details[open] .ah-chevron {
   transform: rotate(90deg);
 }
 
-/* One-time, short entrance for the page body (opacity + 6px). */
+/* One-time entrance for the page body (opacity + 6px, 240 ms). Runs once per
+   mount; never on refetch. */
 @keyframes ah-enter {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
 }
 .ah-enter {
-  animation: ah-enter 320ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  animation: ah-enter 240ms cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {

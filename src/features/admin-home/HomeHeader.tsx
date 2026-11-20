@@ -16,7 +16,7 @@ import { useAuth } from "@/context/AuthContext";
 const SRC_W = 700;
 const SRC_H = 474;
 const MARK = { x: 114, y: 15, w: 450, h: 236 };
-const MARK_HEIGHT = 30; // CSS px
+const MARK_HEIGHT = 26; // CSS px
 const k = MARK_HEIGHT / MARK.h;
 
 export function HomeHeader() {
@@ -29,7 +29,7 @@ export function HomeHeader() {
     <header>
       {/* Only visible in the installed PWA (env() is 0 in a browser tab). */}
       <div aria-hidden className="ah-statusbar" />
-      <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 pt-3 sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 pt-1.5 sm:px-6 sm:pt-3 lg:px-8">
         <button
           type="button"
           onClick={() => navigate("/")}
@@ -51,22 +51,27 @@ export function HomeHeader() {
             />
           </span>
           <span className="flex min-w-0 flex-col items-start text-left">
-            <span className="text-[17px] font-semibold leading-5 tracking-[0.08em] text-foreground">AXENTRA</span>
-            <span className="truncate text-[12px] font-medium leading-4 text-muted-foreground">Vehicle Logistics</span>
+            <span className="text-[15px] font-semibold leading-[18px] tracking-[0.1em] text-foreground">AXENTRA</span>
+            <span className="truncate text-[11px] font-medium leading-[14px] tracking-[0.01em] text-muted-foreground">Vehicle Logistics</span>
           </span>
         </button>
 
         <div className="flex shrink-0 items-center gap-2">
-          <span className="hidden min-[360px]:inline-flex h-7 items-center rounded-full border border-[hsl(var(--ah-line))] bg-card px-2.5 text-[12px] font-medium text-muted-foreground">
+          <span className="hidden h-6 items-center rounded-full border border-[hsl(var(--ah-line))] bg-card px-2 text-[12px] font-medium text-muted-foreground min-[360px]:inline-flex">
             {roleLabel}
           </span>
           <button
             type="button"
             onClick={() => navigate("/profile")}
             aria-label={`Profile${user?.name ? ` — ${user.name}` : ""}`}
-            className="ah-press flex h-11 w-11 items-center justify-center rounded-full bg-primary text-[17px] font-semibold text-primary-foreground shadow-[0_1px_2px_hsl(var(--ah-shadow)/0.15),0_6px_14px_-6px_hsl(var(--primary)/0.6)]"
+            className="ah-press -mr-1 flex h-11 w-11 items-center justify-center rounded-full"
           >
-            {initial}
+            <span
+              aria-hidden
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-[15px] font-semibold text-primary-foreground shadow-[0_1px_2px_hsl(var(--ah-shadow)/0.15),0_4px_10px_-4px_hsl(var(--primary)/0.55)]"
+            >
+              {initial}
+            </span>
           </button>
         </div>
       </div>

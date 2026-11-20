@@ -19,9 +19,10 @@ let queues: Record<string, unknown[]>;
 let kpis: Record<string, number>;
 let buckets: Record<string, number>;
 let exceptions: unknown[];
+let queuesError = false;
 
 vi.mock("@/hooks/useAdminJobQueues", () => ({
-  useAdminJobQueues: () => ({ data: queues, isLoading: false }),
+  useAdminJobQueues: () => ({ data: queuesError ? undefined : queues, isLoading: false, isError: queuesError, refetch: vi.fn(), dataUpdatedAt: 0 }),
   useAdminJobQueueKpis: () => ({ data: kpis, isLoading: false }),
 }));
 vi.mock("@/hooks/useAdminDashboardData", () => ({
@@ -71,12 +72,20 @@ describe("Admin Home UI", () => {
     kpis = { active: 0, podReview: 0, unassigned: 0, stale: 0 };
     buckets = zero;
     exceptions = [];
+    queuesError = false;
   });
 
-  it("shows the all-clear state when nothing needs action", () => {
+  it("shows a modest empty-queue state when nothing needs action", () => {
     renderBody();
-    expect(screen.getByText("All clear")).toBeTruthy();
+    expect(screen.getByText("Action queue is empty")).toBeTruthy();
     expect(screen.queryByText("Needs your attention")).toBeNull();
+  });
+
+  it("never reports an empty queue when the queues failed to load", () => {
+    queuesError = true;
+    renderBody();
+    expect(screen.getByText("Some queues didn’t load")).toBeTruthy();
+    expect(screen.queryByText("Action queue is empty")).toBeNull();
   });
 
   it("summarises the Needs Action queue in the banner when items exist", () => {
@@ -84,21 +93,22 @@ describe("Admin Home UI", () => {
     queues = { ...emptyQueues, unassigned: [u], needsAttention: [u], review: [job("r1", "pod_ready", "Pat"), job("r2", "pod_ready", "Sam")] };
     renderBody();
     expect(screen.getByText("Needs your attention")).toBeTruthy();
-    expect(screen.getByText("1 unassigned job and 2 PODs to review.")).toBeTruthy();
+    expect(screen.getByText("1 unassigned")).toBeTruthy();
+    expect(screen.getByText("2 PODs to review")).toBeTruthy();
   });
 
-  it("falls back to the not-invoiced banner and keeps its destination", () => {
+  it("describes the POD-PDF proxy accurately and keeps its destination", () => {
     buckets = { ...zero, completed_not_invoiced: 68 };
     renderBody();
-    expect(screen.getByText("68 completed jobs are not yet invoiced.")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /Review jobs/ }));
+    expect(screen.getByText("68 completed jobs have no POD PDF on file.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Invoice prep/ }));
     expect(screen.getByTestId("landed").textContent).toBe("/control/invoice-prep");
   });
 
   it("keeps the intervention destinations", () => {
     kpis = { active: 5, podReview: 2, unassigned: 1, stale: 3 };
     renderBody();
-    fireEvent.click(screen.getByRole("button", { name: /^Needs review: 2$/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^POD review: 2$/ }));
     expect(screen.getByTestId("landed").textContent).toBe("/control/pod-review");
   });
 
@@ -115,5 +125,18 @@ describe("Admin Home UI", () => {
     buckets = { ...zero, completed_not_invoiced: 68, ready_to_invoice: 3 };
     const { container } = renderBody();
     expect(container.textContent).not.toMatch(/£|\+\d+%/);
+  });
+
+  it("never labels proxy counts as confirmed invoicing totals", () => {
+    buckets = { ...zero, completed_not_invoiced: 68, ready_to_invoice: 3 };
+    const { container } = renderBody();
+    expect(container.textContent).not.toMatch(/not (yet )?invoiced|ready to invoice/i);
+    expect(screen.getAllByText("Invoice candidates").length).toBeGreaterThan(0);
+  });
+
+  it("shows a dash, not a fake zero, for the uncounted failed-uploads bucket", () => {
+    renderBody();
+    const row = screen.getByText("Jobs with failed uploads").closest("button")!;
+    expect(row.textContent).toContain("—");
   });
 });
