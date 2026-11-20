@@ -23,7 +23,7 @@ export function UpdatePrompt() {
   return (
     <div
       role="status"
-      className="fixed bottom-20 inset-x-4 z-50 max-w-lg mx-auto rounded-xl border border-border bg-card shadow-lg p-3 flex items-center gap-3"
+      className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] inset-x-4 z-50 max-w-lg mx-auto rounded-xl border border-border bg-card shadow-lg p-3 flex items-center gap-3"
     >
       <RefreshCw className="h-5 w-5 text-primary shrink-0" />
       <div className="min-w-0 flex-1">

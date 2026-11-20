@@ -53,7 +53,7 @@ export function ControlSidebar() {
   return (
     <aside
       className={cn(
-        "flex flex-col h-screen border-r bg-sidebar shrink-0 transition-all duration-200",
+        "flex flex-col h-full border-r bg-sidebar shrink-0 transition-all duration-200",
         collapsed ? "w-16" : "w-60"
       )}
     >

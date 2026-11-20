@@ -136,7 +136,10 @@ export function SwipeableRow({ actions, children, className }: SwipeableRowProps
         style={{
           transform: `translateX(${-offset}px)`,
           transition: dragging ? "none" : "transform 200ms ease-out",
-          touchAction: "pan-y",
+          // pan-y: the browser keeps vertical scrolling; we own horizontal.
+          // pinch-zoom: without it, pan-y alone disabled pinch-zoom over
+          // every job card (i.e. most of the Jobs screen).
+          touchAction: "pan-y pinch-zoom",
         }}
         className="relative bg-background"
       >

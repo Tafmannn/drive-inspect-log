@@ -3,7 +3,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ConfirmProvider } from "@/components/ui/confirm-dialog";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigationType } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { ScrollToTop } from "@/components/ScrollToTop";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { DevRoleBanner } from "@/components/DevRoleBanner";
@@ -246,27 +247,6 @@ function getDevOverrideRoles(): import("@/context/AuthContext").AppRole[] {
   if (params.get("super") === "1") return ["SUPERADMIN", "ADMIN", "DRIVER"];
   if (params.get("admin") === "1") return ["ADMIN", "DRIVER"];
   return ["DRIVER"];
-}
-
-/**
- * BrowserRouter doesn't reset scroll position on navigation the way a
- * full page load does, so pushing a new route (e.g. opening a job from
- * partway down a scrolled list) rendered the new page at the old scroll
- * offset instead of the top. Only resets on PUSH/REPLACE — browser
- * back/forward (POP) is left alone so returning to a list keeps its
- * scroll position, matching native app behavior.
- */
-function ScrollToTop() {
-  const { pathname } = useLocation();
-  const navigationType = useNavigationType();
-
-  useEffect(() => {
-    if (navigationType !== "POP") {
-      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-    }
-  }, [pathname, navigationType]);
-
-  return null;
 }
 
 /* ── App ── */

@@ -5,6 +5,10 @@ import { cn } from "@/lib/utils";
 const TRIGGER_DISTANCE = 70; // px pulled before a release triggers a refresh
 const MAX_PULL = 100; // clamp so the indicator never travels off-screen
 const RESISTANCE = 0.5; // finger travel → indicator travel, for a natural drag
+const SLOP = 8; // px of movement before we decide what the gesture is
+const INDICATOR = 36; // indicator diameter (px)
+
+type Phase = "idle" | "undecided" | "pulling" | "ignored";
 
 interface PullToRefreshProps {
   onRefresh: () => Promise<unknown>;
@@ -14,76 +18,130 @@ interface PullToRefreshProps {
 }
 
 /**
- * Pull-to-refresh for the mobile lists, matching the gesture people bring from
- * every native app. Only engages when the page is scrolled to the very top and
- * the gesture is a deliberate downward drag, so it never fights normal
- * scrolling. `onRefresh` is awaited; the spinner shows until it settles.
+ * Pull-to-refresh for the mobile lists.
+ *
+ * The page itself is never moved or resized by this component: native
+ * scrolling (and iOS's own rubber-band at the top) stays in charge of the
+ * content, so it tracks the finger exactly. Only a small overlaid indicator
+ * follows the pull, animated with transform/opacity (no layout per frame).
+ *
+ * It only arms for a deliberate single-finger downward drag that starts with
+ * the page at the very top. A horizontal/diagonal swipe, a second finger
+ * (pinch), the page starting to scroll, or the OS cancelling the touch all
+ * disarm it without refreshing.
  */
 export function PullToRefresh({ onRefresh, children, disabled }: PullToRefreshProps) {
   const [pull, setPull] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  const startY = useRef<number | null>(null);
+  const phase = useRef<Phase>("idle");
+  const start = useRef({ x: 0, y: 0 });
+  const pullRef = useRef(0);
+
+  const setPullBoth = (v: number) => {
+    pullRef.current = v;
+    setPull(v);
+  };
+
+  const reset = () => {
+    phase.current = "idle";
+    if (pullRef.current !== 0) setPullBoth(0);
+  };
 
   const onTouchStart = (e: TouchEvent) => {
-    if (disabled || refreshing) return;
-    // Only arm the gesture at the top of the page — otherwise this is a scroll.
-    if (window.scrollY > 0) {
-      startY.current = null;
+    if (disabled || refreshing || e.touches.length !== 1 || window.scrollY > 0) {
+      phase.current = "ignored";
       return;
     }
-    startY.current = e.touches[0].clientY;
+    phase.current = "undecided";
+    start.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
   };
 
   const onTouchMove = (e: TouchEvent) => {
-    if (startY.current === null || refreshing) return;
-    const delta = e.touches[0].clientY - startY.current;
-    if (delta <= 0) {
-      setPull(0);
+    if (phase.current === "idle" || phase.current === "ignored") return;
+    if (e.touches.length !== 1 || window.scrollY > 0) {
+      // Second finger (pinch) or the page scrolled: this is not a pull.
+      phase.current = "ignored";
+      if (pullRef.current !== 0) setPullBoth(0);
       return;
     }
-    setPull(Math.min(delta * RESISTANCE, MAX_PULL));
+    const dx = e.touches[0].clientX - start.current.x;
+    const dy = e.touches[0].clientY - start.current.y;
+    if (phase.current === "undecided") {
+      if (Math.abs(dx) < SLOP && Math.abs(dy) < SLOP) return;
+      // Must be clearly downward: more vertical than horizontal, by a margin.
+      if (dy <= 0 || Math.abs(dx) * 1.5 > dy) {
+        phase.current = "ignored";
+        return;
+      }
+      phase.current = "pulling";
+    }
+    setPullBoth(Math.max(0, Math.min(dy * RESISTANCE, MAX_PULL)));
   };
 
   const onTouchEnd = async () => {
-    if (startY.current === null || refreshing) return;
-    startY.current = null;
-    if (pull >= TRIGGER_DISTANCE) {
+    const wasPulling = phase.current === "pulling";
+    phase.current = "idle";
+    if (!wasPulling || refreshing) {
+      reset();
+      return;
+    }
+    if (pullRef.current >= TRIGGER_DISTANCE) {
       setRefreshing(true);
-      setPull(TRIGGER_DISTANCE);
+      setPullBoth(TRIGGER_DISTANCE);
       try {
         await onRefresh();
       } finally {
         setRefreshing(false);
-        setPull(0);
+        setPullBoth(0);
       }
     } else {
-      setPull(0);
+      setPullBoth(0);
     }
   };
 
   const active = pull > 0 || refreshing;
   const ready = pull >= TRIGGER_DISTANCE;
+  const tracking = phase.current === "pulling";
+  const reduceMotion =
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // Indicator rests just above the content and slides down with the pull.
+  const offset = (refreshing ? TRIGGER_DISTANCE : pull) - INDICATOR;
 
   return (
-    <div onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
+    <div
+      className="relative"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      onTouchCancel={reset}
+    >
       <div
-        className="flex items-center justify-center overflow-hidden text-muted-foreground"
-        style={{
-          height: active ? pull : 0,
-          transition: startY.current === null ? "height 0.2s ease" : undefined,
-        }}
+        className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center"
         aria-hidden={!active}
+        data-ptr-indicator
+        style={{
+          transform: `translate3d(0, ${offset}px, 0)`,
+          opacity: active ? Math.min(1, pull / TRIGGER_DISTANCE + (refreshing ? 1 : 0)) : 0,
+          transition: tracking || reduceMotion ? "none" : "transform 200ms ease-out, opacity 200ms ease-out",
+        }}
       >
-        {refreshing ? (
-          <Loader2 className="w-5 h-5 animate-spin text-primary" />
-        ) : (
-          <ArrowDown
-            className={cn(
-              "w-5 h-5 transition-transform",
-              ready ? "rotate-180 text-primary" : "rotate-0",
-            )}
-          />
-        )}
+        <div
+          className="flex items-center justify-center rounded-full border border-border bg-card shadow-md text-muted-foreground"
+          style={{ width: INDICATOR, height: INDICATOR }}
+        >
+          {refreshing ? (
+            <Loader2 className="w-5 h-5 animate-spin text-primary" />
+          ) : (
+            <ArrowDown
+              className={cn(
+                "w-5 h-5 transition-transform",
+                ready ? "rotate-180 text-primary" : "rotate-0",
+              )}
+            />
+          )}
+        </div>
       </div>
       {children}
     </div>

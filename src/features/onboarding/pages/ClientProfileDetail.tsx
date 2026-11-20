@@ -156,7 +156,7 @@ export default function ClientProfileDetail() {
       {/* bottom-16 at all sizes: BottomNav stays fixed+visible on desktop too
           (no lg:hidden), so pinning this to bottom-0 on large screens made
           BottomNav's higher z-index paint over this action bar entirely. */}
-      <div className="fixed bottom-16 inset-x-0 px-4 py-3 bg-background/95 backdrop-blur border-t border-border z-30">
+      <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] inset-x-0 px-4 py-3 bg-background/95 backdrop-blur border-t border-border z-30">
         <div className="max-w-lg lg:max-w-3xl mx-auto">
           <Button className="w-full min-h-[48px]" onClick={() => navigate(`/control/clients/${clientId}/complete`)}>
             <Pencil className="w-4 h-4 mr-2" />

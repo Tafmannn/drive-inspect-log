@@ -270,6 +270,22 @@ All colors MUST be HSL.
 #root {
   width: 100%;
   overflow-x: hidden;
+  /* viewport-fit=cover lets the page run under the notch and rounded corners.
+     In landscape those sit at the left/right edges, so pad the app away from
+     them (env() is 0 in portrait and on desktop). */
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* iOS zooms the page when a text field under 16px gets focus, and keeps that
+   zoom after blur and rotation — the "page is wider than the screen" state.
+   Shared inputs drop to 14px at md (a landscape phone crosses it) and several
+   Textareas are text-sm, so hold every text-entry control at 16px on touch.
+   :root raises specificity above single-class utilities like .text-sm. */
+@media (pointer: coarse) {
+  :root :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"]), textarea, select) {
+    font-size: 16px;
+  }
 }
 
 /* Print styles for POD reports */

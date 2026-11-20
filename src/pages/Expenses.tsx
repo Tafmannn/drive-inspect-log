@@ -263,7 +263,7 @@ export const Expenses = () => {
 
             {/* FAB */}
             {isScoped && (
-              <div className="fixed bottom-20 right-4 z-40">
+              <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] z-40">
                 <Button
                   size="lg"
                   className="rounded-full shadow-lg h-14 w-14 p-0 min-h-[44px] min-w-[44px]"
@@ -276,7 +276,7 @@ export const Expenses = () => {
 
             {/* Admin FAB for global mode */}
             {!isScoped && !isDriverOnly && (
-              <div className="fixed bottom-20 right-4 z-40">
+              <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] z-40">
                 <Button
                   size="lg"
                   className="rounded-full shadow-lg h-14 w-14 p-0 min-h-[44px] min-w-[44px]"

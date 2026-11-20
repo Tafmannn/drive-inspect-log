@@ -49,12 +49,15 @@ export const AppHeader = ({
         <Breadcrumbs compact />
       </div>
       {/* Page header */}
-      <header className="px-4 lg:px-8 py-3 lg:py-4 border-b border-border bg-card flex items-center justify-between min-h-[56px] lg:min-h-[68px]">
-        <div className="flex items-center gap-3">
+      {/* min-w-0 on the title group lets `truncate` work: without it a long
+          job reference grew the header past the screen, widening the layout
+          viewport in portrait and pushing the right-hand actions off-screen. */}
+      <header className="px-4 lg:px-8 py-3 lg:py-4 border-b border-border bg-card flex items-center justify-between gap-2 min-h-[56px] lg:min-h-[68px]">
+        <div className="flex items-center gap-3 min-w-0">
           {showBack && (
             <button
               onClick={handleBack}
-              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-muted-foreground hover:bg-muted transition-colors"
+              className="min-h-[44px] min-w-[44px] shrink-0 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-muted transition-colors"
               aria-label="Go back"
               type="button"
             >
@@ -65,7 +68,7 @@ export const AppHeader = ({
             <h1 className="text-xl lg:text-2xl font-semibold text-foreground truncate">{title}</h1>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {children}
         </div>
       </header>

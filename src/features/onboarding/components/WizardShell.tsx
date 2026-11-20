@@ -88,7 +88,7 @@ export function WizardShell({
       </div>
 
       {/* Sticky action bar */}
-      <div className="fixed bottom-0 inset-x-0 bg-background/95 backdrop-blur border-t border-border px-4 py-3 z-30">
+      <div className="fixed bottom-0 inset-x-0 bg-background/95 backdrop-blur border-t border-border px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] z-30">
         <div className="max-w-2xl mx-auto flex items-center gap-2">
           <Button
             variant="outline"
