@@ -25,6 +25,7 @@ import { DEFAULT_FUEL_POLICY, type FuelPolicy } from "@/lib/fuelPolicy";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
+import { saveJobPricing } from "@/lib/jobPricingApi";
 import {
   SectionCard,
   SectionHeader,
@@ -177,6 +178,12 @@ export function PricingSuggestionPanel(props: PricingSuggestionPanelProps) {
         })
         .eq("id", props.jobId);
       if (jobErr) throw jobErr;
+      await saveJobPricing(props.jobId, {
+        total_price: suggestion.suggestedPrice,
+        pricing_metadata: metadata,
+        pricing_suggestion_used_at: metadata.accepted_at,
+        pricing_suggestion_used_by: user?.id ?? null,
+      });
 
       const { error: snapErr } = await supabase
         .from("pricing_snapshots")

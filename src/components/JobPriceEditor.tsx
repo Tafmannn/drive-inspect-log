@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { Loader2, PoundSterling, Check } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { saveJobPricing } from "@/lib/jobPricingApi";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
@@ -75,6 +76,10 @@ export function JobPriceEditor({
         })
         .eq("id", jobId);
       if (error) throw error;
+      await saveJobPricing(jobId, {
+        total_price: parseNumOrNull(price),
+        rate_per_mile: parseNumOrNull(rate),
+      });
       toast({ title: "Job price updated." });
       qc.invalidateQueries({ queryKey: ["job", jobId] });
       qc.invalidateQueries({ queryKey: ["jobs"] });

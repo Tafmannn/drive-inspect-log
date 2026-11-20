@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { getOrgId } from "./orgHelper";
 import { JOB_PRICING_FIELDS } from "./jobPricingFields";
 
 /**
@@ -61,4 +62,28 @@ export async function withPricing<T extends { id: string }>(jobs: T[]): Promise<
 
 export async function withPricingOne<T extends { id: string }>(job: T): Promise<T> {
   return (await withPricing([job]))[0];
+}
+
+const PRICING_FIELD_SET: ReadonlySet<string> = new Set(JOB_PRICING_FIELDS);
+
+/** The pricing keys in a jobs payload (empty when it holds none). */
+export function pickPricingFields(input: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(input)) if (PRICING_FIELD_SET.has(k) && v !== undefined) out[k] = v;
+  return out;
+}
+
+/**
+ * Write pricing fields to `job_pricing` explicitly. This is what makes clearing a price work once the
+ * `jobs` columns are sealed (NULL over NULL is no change, so the trigger would never see it).
+ * Only the fields given are written; others on an existing row are left alone.
+ */
+export async function saveJobPricing(jobId: string, patch: Record<string, unknown>): Promise<void> {
+  const fields = pickPricingFields(patch);
+  if (Object.keys(fields).length === 0) return;
+  const orgId = await getOrgId();
+  const { error } = await supabase
+    .from("job_pricing")
+    .upsert({ job_id: jobId, org_id: orgId, ...fields } as never, { onConflict: "job_id" });
+  if (error) throw error;
 }
