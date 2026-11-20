@@ -17,7 +17,13 @@ const adminTabs = [
   { icon: User, label: "Profile", path: "/profile" },
 ] as const;
 
-export const BottomNav = () => {
+/**
+ * `variant="bar"` (default) is the full-width bar used across the app.
+ * `variant="floating"` is the rounded dock used on the Admin Home only: same
+ * tabs, same destinations, same role logic; only the presentation differs.
+ * Pages using the floating dock reserve pb-28 (dock + its bottom margin).
+ */
+export const BottomNav = ({ variant = "bar" }: { variant?: "bar" | "floating" }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAdmin, isSuperAdmin } = useAuth();
@@ -28,6 +34,42 @@ export const BottomNav = () => {
     if (path === "/") return location.pathname === "/";
     return location.pathname.startsWith(path);
   };
+
+  if (variant === "floating") {
+    return (
+      <>
+        <div aria-hidden className="h-[env(safe-area-inset-bottom)]" />
+        <nav
+          aria-label="Main"
+          className="pointer-events-none fixed inset-x-0 bottom-0 z-50 px-3 pb-[calc(env(safe-area-inset-bottom,0px)+10px)] pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))]"
+        >
+          <div className="ah-dock pointer-events-auto mx-auto flex max-w-md items-stretch gap-1 p-1.5">
+            {tabs.map(({ icon: Icon, label, path }) => {
+              const active = isActive(path);
+              return (
+                <button
+                  key={path}
+                  onClick={() => navigate(path)}
+                  className={cn(
+                    "ah-press flex min-h-[54px] min-w-0 flex-1 flex-col items-center justify-center gap-[3px] rounded-[20px] px-1",
+                    active
+                      ? "bg-primary text-primary-foreground shadow-[0_1px_2px_hsl(var(--ah-shadow)/0.12),0_8px_18px_-10px_hsl(var(--primary)/0.75)]"
+                      : "text-muted-foreground",
+                  )}
+                  type="button"
+                  aria-label={label}
+                  aria-current={active ? "page" : undefined}
+                >
+                  <Icon aria-hidden className="h-[22px] w-[22px]" strokeWidth={active ? 2 : 1.75} />
+                  <span className="max-w-full truncate text-[11px] font-medium leading-[13px] tracking-[0.005em]">{label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+      </>
+    );
+  }
 
   return (
     <>

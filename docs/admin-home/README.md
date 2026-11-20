@@ -1,0 +1,182 @@
+# Admin Home — UI refresh (spec, inventory, verification)
+
+> **Refinement pass (after `ed9e69b`)**: compact KPI tiles, a denser first screen, and
+> truthful labels. See §7; it supersedes the earlier sections where they differ.
+
+Scope: presentation only for the admin / super-admin home (`/`) and `/admin`, which share
+`AdminDashboardBody`. No queries, query keys, hooks, calculations, routes, permissions or
+Supabase objects were changed. Driver home is untouched.
+
+Visual authority: the approved Axentra dashboard reference (supplied screenshot, Nov 2026).
+
+## 1. Design specification
+
+**Typography**: system stack (`-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, …`),
+so iPhone/Mac render SF natively and no font files are shipped. Antialiased, tabular figures
+(`.ah-num`) for every count.
+
+| Role | Size / line | Weight | Tracking |
+|---|---|---|---|
+| Screen title (greeting) | 28 → 30 (≥380) → 34 (≥640) / 1.12 | 600 | −0.025em |
+| Date, subtitle | 15 / 20 | 400 | 0 |
+| Section heading | 17 / 24 | 600 | −0.012em |
+| Banner title | 19 / 24 | 600 | −0.015em |
+| KPI value | 30–32 (24 when > 6 chars) | 600 | −0.03em |
+| KPI / row label | 14–15 / 20 | 500 / 400 | 0 |
+| Pipeline count | 20 / 28 | 600 | −0.02em |
+| Supporting, chips, ages | 12–13 / 18 | 400–600 | 0 |
+| Dock label | 11 / 13 | 500 | 0.005em |
+| Buttons | 14–15 | 600 | 0 |
+
+No uppercase labels; job-status labels from `statusConfig` are shown in sentence case (display only).
+
+**Spacing**: 4-pt grid. Page gutter 16 (24 ≥640, 32 ≥1024). Gap between cards 16 (20 ≥640).
+Card padding 16/20; list rows 56–60 px tall; icon squares 36–40 px.
+
+**Colour**: existing tokens (`--primary` #1E4FA8 cobalt, `--success/--warning/--destructive` and
+their `-soft` tints). Home-only tokens in `features/admin-home/admin-home.css`, each with a dark
+value: page `hsl(216 33% 97%)`, hairline borders, navy `hsl(222 76% 17%)` → `hsl(220 78% 30%)`
+banner. Colour follows meaning: zero counts are neutral grey; warm/red only when a count needing
+action is above zero.
+
+**Surfaces**: cards radius 20, banner 22, dock 26, chips/buttons full pill. 1 px border plus a
+three-layer soft shadow (≤ 14% opacity). Translucency only on the dock, with a solid fallback.
+
+**Motion** (CSS only, no new dependency): press = `scale(.97)` in 90 ms, release with
+`cubic-bezier(.23,1,.32,1)` over 260 ms (interruptible: transitions retarget mid-flight). List
+rows tint instead of scaling. Hover effects gated to `(hover: hover) and (pointer: fine)`.
+One 320 ms body entrance (opacity + 6 px). `prefers-reduced-motion`: no transforms; fades only.
+Native scrolling throughout; no scroll-linked effects.
+
+**Layout**: phones are a single column (KPI tiles 2×2). At ≥768 px the KPIs go 4-across. At ≥1024 px
+there are two columns (7:5): queue, snapshots and activity on the left; pipeline, operations,
+compliance and management on the right.
+Mobile order is set with `order-*` through `display: contents` wrappers.
+
+**iOS**: the app uses `black-translucent` status bar (white text). The home header paints a navy
+strip of exactly `env(safe-area-inset-top)` so the status bar stays legible in the installed PWA;
+it is 0 px in a browser tab. Dock sits above `env(safe-area-inset-bottom)` + 10 px and respects
+landscape left/right insets.
+
+**Logo**: original `/axentra-logo-lockup.webp`, mark cropped with CSS (not edited or redrawn);
+product name is live text, as in `AppHeader`. A vector horizontal lockup would be sharper still.
+
+## 2. Data → UI mapping (all existing sources)
+
+| UI | Source (unchanged) | Destination (unchanged) |
+|---|---|---|
+| Active jobs | `useAdminJobQueueKpis().active` | `/control/jobs?view=active` |
+| Completed, not invoiced | `useAdminOperationsBuckets().completed_not_invoiced` | `/control/invoice-prep` |
+| Ready to invoice | `…buckets.ready_to_invoice` | `/control/invoice-prep` |
+| Needs review | `kpis.podReview` | `/control/pod-review` |
+| Banner | Needs Action items (same ranking code) → else `completed_not_invoiced` → else all clear | scroll to queue / `/control/invoice-prep` |
+| Pipeline | buckets `needs_driver_action`, `needs_admin_review`, `ready_to_invoice` (disjoint status sets) | each bucket's `defaultRoute` |
+| Operations | kpis `unassigned`, `stale`, `podReview`; `useAdminMissingEvidence` | previous KPI-pill routes |
+| Driver compliance | `useAdminComplianceCounts` | `/admin/onboarding` |
+| Recently updated | rows already loaded by `useAdminJobQueues`, newest first | `/jobs/:id` |
+| All operational buckets | `BUCKET_DEFS` + bucket counts (all 9 kept) | each `defaultRoute` |
+
+Not shown, because the app has no source for them: revenue/£ values, growth %, System Health.
+
+## 3. Functional inventory (before → after)
+
+All preserved: KPI pills (now Operations rows), compliance strip (now a card), Needs Action
+queue with row tap, Assign → `AssignDriverModal`, View / Review / Review POD, Stale active and
+Awaiting review snapshots with View all, Assign and View, all 9 bucket buttons, Management
+links incl. super-admin-only console, brand button → `/`, role label, bottom nav tabs,
+`useRefetchOnFocus` keys, `useEvidenceAckRealtime`. Added: profile avatar → `/profile` (existing
+destination), attention banner and pipeline (views of existing counts).
+
+Behavioural notes: the compliance card is now always visible (previously hidden at zero);
+the floating dock is used on the admin home only (other routes keep the bar).
+
+## 4. Verification (2026-11-20)
+
+- `npm run typecheck` ✓ · `npm test` 179 files / 1546 tests ✓ · `npm run build` ✓
+- `npx eslint` on touched files: no new errors (2 pre-existing `any` in pages, unchanged lines).
+- New: `src/test/admin-home-ui.test.tsx` (banner states, destinations, assign modal, no £/%).
+- Browser QA (Playwright, Chromium, preview harness): 47/47 checks: 31 navigation targets,
+  role visibility, Assign modal open/Escape, three banner states, Review now scroll + focus,
+  loading skeletons, all touch targets ≥ 44×44, keyboard Tab reachability, reduced motion,
+  axe-core WCAG 2.1 A/AA with zero violations in light and dark.
+- No horizontal overflow at 320/360/390/430/768/1024/1280 and 844×390 landscape.
+- Scroll under 4× CPU throttle (390@3x): p95 frame 16.8 ms, 0 frames > 33 ms, CLS 0.
+- **Not verified:** physical iPhone (Safari and installed PWA), VoiceOver, Dynamic Type at OS
+  level, real Supabase data.
+
+## 5. Preview harness
+
+`VITE_ENABLE_AUTH=false npx vite` then open `/preview/admin-home.html?fixture=busy|calm|invoicing|worst|loading`
+(`&theme=dark`, `&role=SUPERADMIN`). Renders the real `<Dashboard/>` from mock fixtures in
+`src/dev/adminHomePreview.tsx`; not included in `vite build`.
+
+## 6. Screenshots
+
+`screenshots/`: real browser renders, lossless PNG. Phones at 3× (320→960, 390→1170,
+430→1290 px wide), desktop at 2× (1280→2560). `before-after-*` pairs use identical viewport and
+scale. Emulated in Chromium, not captured on an iPhone.
+
+## 7. Refinement pass (after ed9e69b)
+
+**First screen (390×844, busy fixture).** The header is 52 px (was 64). The greeting is date plus
+title only; the filler subtitle is gone. KPI tiles are 89 px (was ~130). The banner is 104 px with
+the CTA in the title row (was 168 px, with a full-width button). Result: the first queue row ends
+at 580 px and three rows are visible above the dock (top 766 px). Before, none were.
+At 430×932 the first row ends at 580 px (dock at 854).
+
+**KPI tiles.** The value leads at full tile width and is never truncated. Font steps down by
+length: 28 → 24 → 21 px, and values of a million or more are compact ("1.2M"; the exact value is
+in `aria-label`). The label sits beside an 18 px tinted icon. There are no chevrons; the card, the
+press state and the hover lift carry the affordance. Zero values are drawn at 45% ink so calm
+states stay calm.
+
+**Truthful labels (display only; queries and `BUCKET_DEFS` unchanged).**
+
+| Count (unchanged source) | What it actually checks | Old label | New label / placement |
+|---|---|---|---|
+| `completed_not_invoiced` | completed/closed AND `pod_pdf_url` is null | "Completed, not invoiced" (KPI) | "Completed, no POD PDF", moved to Operations (hint "Opens invoice prep"); banner fallback "POD PDFs missing" |
+| `ready_to_invoice` | completed/closed, client, price > 0, both inspections, not test; **no invoice check** | "Ready to invoice" | "Invoice candidates" (KPI, buckets, hint says it is not checked against invoices) |
+| `failed_uploads` | hard-coded `0` in the hook | "0" | "—" with hint: counted on each device; open Pending uploads |
+| KPI slot freed | `kpis.unassigned` (existing) | — | "Unassigned" KPI tile (same route as before) |
+| `kpis.podReview` | `pod_ready`, `delivery_complete` | "Needs review" | "POD review" (it is not the same set as `needs_admin_review`) |
+
+**Banner / empty state.** If the job-queues or attention query errors, the banner shows "Some
+queues didn’t load, so counts below may be incomplete" with **Try again** (calls `refetch()` on those two
+existing queries). It never says "All clear" on a failed load. The empty state now says exactly what
+was checked: "Action queue is empty: no unassigned, stale, evidence or POD items at HH:MM"
+(from `dataUpdatedAt`). The attention title is "Needs your attention", and the breakdown is a list of
+parts that never break mid-part.
+
+**Pipeline → Job queues.** It now shows three independent queue counts (With drivers ·
+Admin review · Evidence blocked), separated by hairlines, with **no connector line or arrows**.
+These are status buckets, not a sequence every job passes through. "Evidence blocked" (an existing
+bucket, previously only in the folded list) replaced "Ready to invoice", which already has a KPI.
+
+**Rows.** Job references are never truncated at realistic lengths. Below 380 px the row action
+wraps under the content. Below 440 px the action button's icon is hidden (the label is kept). Rows
+are 4 px tighter.
+
+**Motion (emil-design-eng).** Press is `scale(.97)`, 100 ms in and 160 ms out, with
+`cubic-bezier(.23,1,.32,1)`. That is CSS easing, not spring physics. The entrance is 240 ms
+(was 320). The disclosure chevron is 200 ms. Reduced motion: no transforms. No haptics are claimed.
+
+**Known underlying defects (not fixed here: logic, out of UI scope).**
+1. `safeCount` / `countPricedCandidates` return 0 on a query error, so bucket zeros can't be told
+   apart from failures.
+2. `useAdminJobQueueKpis` ignores the `error` field of its four count requests, with the same effect.
+3. `completed_not_invoiced` is a POD-PDF proxy, not an invoice check.
+4. `ready_to_invoice` does not exclude already-invoiced jobs.
+5. `failed_uploads` is hard-coded to 0.
+
+**Verification (this pass).**
+
+- `typecheck` ✓, `build` ✓, full `npm test` ✓ (see the commit).
+- `admin-home-ui.test.tsx`: 9 tests (error state, truthful labels, dash for failed uploads).
+- Browser QA: 56/56. That covers 30 navigation targets, roles, the Assign modal, banner states,
+  Review → scroll and focus, the first row above the dock at 390 and 430, no clipped figures or
+  headings at 320/390 (busy and worst case), no truncated references, 44 px targets, keyboard,
+  reduced motion, and axe WCAG 2.1 AA in light and dark.
+- **Not verified:** physical iPhone (Safari and the installed PWA), VoiceOver, OS text size.
+
+Screenshots: `screenshots/` holds first screens. `screenshots/full/` holds full pages.
+`screenshots/compare/` holds `ed9e69b` vs now and `main` vs now, at identical viewport and DPR.

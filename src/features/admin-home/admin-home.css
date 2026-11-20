@@ -1,0 +1,187 @@
+/*
+ * Admin Home — scoped surface, material and motion tokens.
+ * Everything is namespaced under .ah-root so no other route is affected.
+ * Colours reuse the app's HSL tokens (index.css) where one exists; the few
+ * home-only values below each have a light and a dark definition.
+ */
+
+.ah-root {
+  --ah-page: 216 33% 97%;
+  --ah-line: 216 24% 90%;
+  --ah-hairline: 216 24% 93%;
+  --ah-navy: 222 76% 17%;
+  --ah-navy-2: 220 78% 30%;
+  --ah-ink-soft: 216 18% 34%;
+  --ah-shadow: 220 43% 11%;
+  /* Safe-area strip: matches html background (#0b1c3f) so the white
+     black-translucent status bar text stays legible in the installed PWA. */
+  --ah-statusbar: 221 70% 15%;
+
+  background-color: hsl(var(--ah-page));
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  -webkit-text-size-adjust: 100%;
+}
+
+.dark .ah-root {
+  --ah-page: var(--background);
+  --ah-line: 217 26% 20%;
+  --ah-hairline: 217 26% 17%;
+  --ah-navy: 221 70% 22%;
+  --ah-navy-2: 219 72% 34%;
+  --ah-ink-soft: 215 20% 72%;
+  --ah-shadow: 0 0% 0%;
+}
+
+/* Numbers: tabular figures, slightly tightened for large sizes. */
+.ah-num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "case" 1;
+}
+
+/* ── Surfaces ─────────────────────────────────────────────────────── */
+
+.ah-card {
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--ah-line) / 0.85);
+  border-radius: 20px;
+  box-shadow:
+    0 1px 1px hsl(var(--ah-shadow) / 0.03),
+    0 2px 6px -2px hsl(var(--ah-shadow) / 0.05),
+    0 12px 28px -16px hsl(var(--ah-shadow) / 0.14);
+}
+
+.dark .ah-card {
+  box-shadow: 0 1px 0 hsl(0 0% 100% / 0.03) inset;
+}
+
+.ah-divide > * + * {
+  border-top: 1px solid hsl(var(--ah-hairline));
+}
+
+/* Navy attention banner: one restrained diagonal shift, no glow. */
+.ah-banner {
+  color: #fff;
+  border-radius: 22px;
+  background-image: linear-gradient(118deg, hsl(var(--ah-navy)) 0%, hsl(var(--ah-navy-2)) 100%);
+  box-shadow:
+    0 1px 0 hsl(0 0% 100% / 0.08) inset,
+    0 14px 30px -18px hsl(222 80% 20% / 0.55);
+}
+
+/* Floating dock (bottom navigation, home only). Solid fallback first;
+   translucency only where backdrop-filter is supported. */
+.ah-dock {
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--ah-line) / 0.9);
+  border-radius: 26px;
+  box-shadow:
+    0 1px 2px hsl(var(--ah-shadow) / 0.06),
+    0 16px 36px -14px hsl(var(--ah-shadow) / 0.22);
+}
+
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .ah-dock {
+    background-color: hsl(var(--card) / 0.86);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+  }
+}
+
+.ah-statusbar {
+  height: env(safe-area-inset-top, 0px);
+  background-color: hsl(var(--ah-statusbar));
+}
+
+/* ── Interaction ──────────────────────────────────────────────────── */
+
+/* Press feedback (emil-design-eng): scale(0.97) on :active, 160 ms with a
+   strong ease-out. This is CSS easing, not spring physics; transitions
+   retarget from the current value, so a re-press mid-flight stays smooth. */
+.ah-press {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+  transition:
+    transform 160ms cubic-bezier(0.23, 1, 0.32, 1),
+    background-color 160ms ease,
+    box-shadow 200ms ease,
+    border-color 160ms ease;
+}
+
+.ah-press:active {
+  transform: scale(0.97);
+  transition-duration: 100ms, 100ms, 200ms, 160ms;
+}
+
+/* Rows inside a card: tint, no scale (scaling a full-width row reads as jitter). */
+.ah-row {
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+  transition: background-color 160ms ease;
+}
+
+.ah-row:active {
+  background-color: hsl(var(--muted) / 0.7);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ah-row:hover {
+    background-color: hsl(var(--muted) / 0.5);
+  }
+  .ah-lift:hover {
+    border-color: hsl(var(--ah-line));
+    box-shadow:
+      0 1px 1px hsl(var(--ah-shadow) / 0.03),
+      0 4px 10px -4px hsl(var(--ah-shadow) / 0.08),
+      0 18px 36px -18px hsl(var(--ah-shadow) / 0.2);
+  }
+}
+
+/* Disclosure chevron for <details>. */
+.ah-details > summary {
+  list-style: none;
+}
+.ah-details > summary::-webkit-details-marker {
+  display: none;
+}
+.ah-details .ah-chevron {
+  transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.ah-details[open] .ah-chevron {
+  transform: rotate(90deg);
+}
+
+/* One-time entrance for the page body (opacity + 6px, 240 ms). Runs once per
+   mount; never on refetch. */
+@keyframes ah-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.ah-enter {
+  animation: ah-enter 240ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ah-press,
+  .ah-press:active {
+    transform: none;
+    transition: background-color 160ms ease, box-shadow 200ms ease;
+  }
+  .ah-details .ah-chevron {
+    transition: none;
+  }
+  .ah-enter {
+    animation: ah-fade 200ms ease both;
+  }
+}
+
+@keyframes ah-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
