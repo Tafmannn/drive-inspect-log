@@ -95,6 +95,50 @@ describe("PullToRefresh gesture classification", () => {
     });
     expect(onRefresh).not.toHaveBeenCalled();
   });
+
+  it("holds the indicator open while refreshing, then closes it", async () => {
+    let finish!: () => void;
+    const onRefresh = vi.fn(() => new Promise<void>((r) => { finish = r; }));
+    const utils = render(<PullToRefresh onRefresh={onRefresh}><div data-testid="list" /></PullToRefresh>);
+    const surface = utils.getByTestId("list").parentElement!;
+    const indicator = utils.container.querySelector("[data-ptr-indicator]") as HTMLElement;
+    await act(async () => gesture(surface, straightDown));
+    expect(indicator.style.opacity).toBe("1");
+    expect(indicator.querySelector(".animate-spin")).not.toBeNull();
+    // A second pull while refreshing must not start another refresh.
+    await act(async () => gesture(surface, straightDown));
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+    await act(async () => { finish(); });
+    expect(indicator.style.opacity).toBe("0");
+  });
+
+  it("closes cleanly when the refresh fails (no unhandled rejection)", async () => {
+    const onRefresh = vi.fn(() => Promise.reject(new Error("offline")));
+    const utils = render(<PullToRefresh onRefresh={onRefresh}><div data-testid="list" /></PullToRefresh>);
+    const surface = utils.getByTestId("list").parentElement!;
+    const indicator = utils.container.querySelector("[data-ptr-indicator]") as HTMLElement;
+    await act(async () => gesture(surface, straightDown));
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+    expect(indicator.style.opacity).toBe("0");
+  });
+
+  it("does not refresh on a short pull released before the threshold", async () => {
+    const { onRefresh, surface, indicator } = renderPtr();
+    await act(async () => gesture(surface, [[[200, 100]], [[200, 130]], [[200, 160]]]));
+    expect(onRefresh).not.toHaveBeenCalled();
+    expect(indicator.style.opacity).toBe("0");
+  });
+
+  it("ignores an upward swipe and does nothing when disabled", async () => {
+    const { onRefresh, surface } = renderPtr();
+    await act(async () => gesture(surface, Array.from({ length: 8 }, (_, i) => [[200, 400 - i * 30]] as Pt[])));
+    expect(onRefresh).not.toHaveBeenCalled();
+
+    const disabledRefresh = vi.fn(() => Promise.resolve());
+    const utils = render(<PullToRefresh disabled onRefresh={disabledRefresh}><div data-testid="off" /></PullToRefresh>);
+    await act(async () => gesture(utils.getByTestId("off").parentElement!, straightDown));
+    expect(disabledRefresh).not.toHaveBeenCalled();
+  });
 });
 
 // ── Inspection draft restore ────────────────────────────────────────────
@@ -126,6 +170,10 @@ describe("decideDraftRestore", () => {
     expect(decideDraftRestore({ draft: null, sessionActive: true, resumedAfterRestart: false, now })).toBe("fresh");
     const empty = { data: { notes: "", odometer: "" }, savedAt: old.savedAt };
     expect(decideDraftRestore({ draft: empty, sessionActive: false, resumedAfterRestart: false, now })).toBe("fresh");
+  });
+
+  it("treats a draft with no saved time as old (asks first)", () => {
+    expect(decideDraftRestore({ draft: { data: { notes: "x" } }, sessionActive: false, resumedAfterRestart: false, now })).toBe("prompt");
   });
 });
 
@@ -179,6 +227,67 @@ describe("ScrollToTop with an inner scroll root", () => {
     await act(async () => { fireEvent.click(utils.getByText("back")); });
     flushFrames();
     expect(main.scrollTop).toBe(900);
+  });
+
+  function renderShell() {
+    return render(
+      <MemoryRouter initialEntries={["/control"]}>
+        <ScrollToTop />
+        <Routes>
+          <Route path="/control/*" element={<Shell />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+  }
+
+  it("restores the window offset on Back for document-scrolled pages", async () => {
+    const utils = renderShell();
+    Object.defineProperty(window, "scrollY", { value: 1200, configurable: true, writable: true });
+    fireEvent.scroll(document);
+    // Scrolls of unrelated elements are not recorded as the page position.
+    const other = document.createElement("div");
+    document.body.appendChild(other);
+    fireEvent.scroll(other);
+
+    await act(async () => { fireEvent.click(utils.getByText("push")); });
+    flushFrames();
+    window.scrollY = 0;
+    vi.mocked(window.scrollTo).mockClear();
+
+    await act(async () => { fireEvent.click(utils.getByText("back")); });
+    flushFrames(1);
+    expect(window.scrollTo).toHaveBeenCalledWith({ top: 1200, left: 0, behavior: "auto" });
+    other.remove();
+  });
+
+  it("stops restoring as soon as the user touches the screen", async () => {
+    const utils = renderShell();
+    const main = utils.getByTestId("main");
+    main.scrollTop = 900;
+    fireEvent.scroll(main);
+    await act(async () => { fireEvent.click(utils.getByText("push")); });
+    flushFrames();
+
+    await act(async () => { fireEvent.click(utils.getByText("back")); });
+    // The user grabs the list before the restore has settled.
+    fireEvent.touchStart(window);
+    main.scrollTop = 50;
+    flushFrames();
+    expect(main.scrollTop).toBe(50);
+  });
+
+  it("keeps waiting while the scroll root is hidden behind Suspense", async () => {
+    let hidden = true;
+    Object.defineProperty(HTMLElement.prototype, "clientHeight", { configurable: true, get() { return this.hasAttribute?.("data-scroll-root") && !hidden ? 600 : 0; } });
+    const utils = renderShell();
+    const main = utils.getByTestId("main");
+    await act(async () => { fireEvent.click(utils.getByText("push")); });
+    flushFrames(3);
+    expect(frames.length).toBeGreaterThan(0); // still settling, not given up
+    hidden = false;
+    main.scrollTop = 300; // old offset revealed with the page
+    flushFrames();
+    expect(main.scrollTop).toBe(0);
   });
 });
 

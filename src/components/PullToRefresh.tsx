@@ -78,7 +78,25 @@ export function PullToRefresh({ onRefresh, children, disabled }: PullToRefreshPr
     setPullBoth(Math.max(0, Math.min(dy * RESISTANCE, MAX_PULL)));
   };
 
-  const onTouchEnd = async () => {
+  // Runs the refresh with the indicator held open. A failed refresh must not
+  // become an unhandled rejection: the list keeps its data and shows its own
+  // error/offline state, so the indicator simply closes.
+  const runRefresh = async () => {
+    setRefreshing(true);
+    setPullBoth(TRIGGER_DISTANCE);
+    try {
+      await onRefresh();
+    } catch {
+      /* surfaced by the list's own error state */
+    } finally {
+      setRefreshing(false);
+      setPullBoth(0);
+    }
+  };
+
+  // Synchronous on purpose: React ignores a handler's return value, so an
+  // async handler here would hand it a promise nobody awaits (Sonar S6544).
+  const onTouchEnd = () => {
     const wasPulling = phase.current === "pulling";
     phase.current = "idle";
     if (!wasPulling || refreshing) {
@@ -86,14 +104,7 @@ export function PullToRefresh({ onRefresh, children, disabled }: PullToRefreshPr
       return;
     }
     if (pullRef.current >= TRIGGER_DISTANCE) {
-      setRefreshing(true);
-      setPullBoth(TRIGGER_DISTANCE);
-      try {
-        await onRefresh();
-      } finally {
-        setRefreshing(false);
-        setPullBoth(0);
-      }
+      void runRefresh();
     } else {
       setPullBoth(0);
     }
@@ -108,6 +119,8 @@ export function PullToRefresh({ onRefresh, children, disabled }: PullToRefreshPr
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   // Indicator rests just above the content and slides down with the pull.
   const offset = (refreshing ? TRIGGER_DISTANCE : pull) - INDICATOR;
+  // Fades in with the pull; fully visible while refreshing; 0 at rest.
+  const indicatorOpacity = refreshing ? 1 : Math.min(1, pull / TRIGGER_DISTANCE);
 
   return (
     <div
@@ -123,7 +136,7 @@ export function PullToRefresh({ onRefresh, children, disabled }: PullToRefreshPr
         data-ptr-indicator
         style={{
           transform: `translate3d(0, ${offset}px, 0)`,
-          opacity: active ? Math.min(1, pull / TRIGGER_DISTANCE + (refreshing ? 1 : 0)) : 0,
+          opacity: indicatorOpacity,
           transition: tracking || reduceMotion ? "none" : "transform 200ms ease-out, opacity 200ms ease-out",
         }}
       >
