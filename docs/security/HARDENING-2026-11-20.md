@@ -4,15 +4,15 @@ Resume point for the hardening pass. Prod = `lynkvfduzqdyvlzgriyh`, staging = `m
 
 | ID | Sev | Evidence | Root cause | Fix | Test | Status |
 |----|-----|----------|------------|-----|------|--------|
-| H1 | P0 | Live `assign-driver` v94 = repo code; upserts `role:'driver'` with service role | Service role skips `guard_user_profile_privileged_columns`; no target check | `_shared/assignDriverPolicy.ts` guard before any write; audit; revert org on Auth failure | `src/test/assign-driver-policy.test.ts` (12) | Fixed on branch, **not deployed** |
-| H2 | P1 | `pg_policies`: "Org members can manage job_activity_log/deviation log" FOR ALL | Over-broad legacy policy; drivers can UPDATE/DELETE audit trail | Migration `20261121130000`: select+insert only, revoke UPDATE/DELETE | Staging 20 Nov: 15/15 role-simulated checks pass (rolled-back fixtures) | Applied on staging; prod pending |
-| H3 | P2 | `allocate_invoice_number` only checks org membership | Drivers can burn invoice numbers | Same migration: require admin, like credit notes | Same staging run | Applied on staging; prod pending |
-| H4 | P3 | Advisor: anon EXECUTE on `enqueue_customer_notification()` | Default PUBLIC grant on trigger fn (not callable as RPC) | Same migration: revoke (guarded) | Same | Applied on staging; prod pending |
+| H1 | P0 | Live `assign-driver` v94 = repo code; upserts `role:'driver'` with service role | Service role skips `guard_user_profile_privileged_columns`; no target check | `_shared/assignDriverPolicy.ts` guard before any write; audit; revert org on Auth failure | `src/test/assign-driver-policy.test.ts` (12) | **Deployed** v97 (20 Nov 14:53 UTC, PR #143); live source verified, boots clean |
+| H2 | P1 | `pg_policies`: "Org members can manage job_activity_log/deviation log" FOR ALL | Over-broad legacy policy; drivers can UPDATE/DELETE audit trail | Migration `20261121130000`: select+insert only, revoke UPDATE/DELETE | Staging 20 Nov: 15/15 role-simulated checks pass (rolled-back fixtures) | Applied on staging and prod (by hand, 20 Nov) |
+| H3 | P2 | `allocate_invoice_number` only checks org membership | Drivers can burn invoice numbers | Same migration: require admin, like credit notes | Same staging run | Applied on staging and prod (by hand, 20 Nov) |
+| H4 | P3 | Advisor: anon EXECUTE on `enqueue_customer_notification()` | Default PUBLIC grant on trigger fn (not callable as RPC) | Same migration: revoke (guarded) | Same | Applied on staging and prod (by hand, 20 Nov) |
 | H5 | P1 | Staging max migration 20260713223138 (73) vs prod 107 | Staging not kept in step | Replay repo migrations onto staging | — | Open |
 | H6 | P2 | Advisor: leaked-password protection off | Auth setting | Enable in Dashboard → Auth → Passwords (owner) | — | Open, owner action |
-| H7 | P1 | `request-password-reset` (no auth) used `APP_URL \|\| Origin` for the recovery redirect; prod app is on `*.vercel.app` | Attacker-set Origin trusted; only Supabase's redirect allow-list stood in the way | `_shared/appOrigin.ts`: Origin only if explicitly allowed (`APP_ALLOWED_ORIGINS`, default prod app). Also invites, notify-customers, send-pod-email | `src/test/app-origin.test.ts` (8) | Fixed on branch |
-| H8 | P2 | `user-lifecycle set_role` accepted any role string; wrote Auth before DB, ignored Auth error | Missing allow-list; wrong write order | Staff roles only; DB first, revert on Auth failure | `edge-admin-active-gate.test.ts` (+2) | Fixed on branch |
-| H9 | P3 | `vehicle-lookup` had no rate limit (other lookups do) | Omission | Per-IP limiter | — | Fixed on branch |
+| H7 | P1 | `request-password-reset` (no auth) used `APP_URL \|\| Origin` for the recovery redirect; prod app is on `*.vercel.app` | Attacker-set Origin trusted; only Supabase's redirect allow-list stood in the way | `_shared/appOrigin.ts`: Origin only if explicitly allowed (`APP_ALLOWED_ORIGINS`, default prod app). Also invites, notify-customers, send-pod-email | `src/test/app-origin.test.ts` (8) | **Deployed** request-password-reset v21; portal-access v20 auto-deployed. notify-customers / send-pod-email still old |
+| H8 | P2 | `user-lifecycle set_role` accepted any role string; wrote Auth before DB, ignored Auth error | Missing allow-list; wrong write order | Staff roles only; DB first, revert on Auth failure | `edge-admin-active-gate.test.ts` (+2) | Merged (#143); user-lifecycle still v75 (old) |
+| H9 | P3 | `vehicle-lookup` had no rate limit (other lookups do) | Omission | Per-IP limiter | — | Merged (#143); vehicle-lookup still v112 (old) |
 | H10 | P3 | `authenticated` held TRUNCATE on both log tables | Default grants | Revoked in 20261121130000 | — | In migration; prod needs the one-line revoke |
 | — | info | Edge auth review | gcs-upload/proxy, resolve-signature-url → `callerCanAccessPath`; send-push own-job check; get-org-users/send-invoice-email org-pinned; portal-evidence ownership via `portal_get_job` as caller; promote-admin & google-sheets-sync return 410 | — | — | Reviewed OK |
 | — | info | `qr_lookup`/`qr_confirm` anon | Intentional; 192-bit token, 48h expiry, single use | None | — | Accepted |
@@ -27,3 +27,9 @@ Run as a DO block with temporary org/users/jobs, ended by RAISE so all fixtures 
 Driver: read own log ✓, insert own activity/deviation ✓, UPDATE/DELETE either log → 42501, insert into other org → 42501, allocate_invoice_number → 42501.
 Admin: allocate own org ✓ (AX26-1001), other org → 42501, read other org = 0 rows, UPDATE log → 42501.
 Anon: read log → 42501, allocate → 42501.
+
+## Status after PR #143 (merged 96fec85, 20 Nov 2026)
+- Prod schema_migrations does not yet record 20261121120000 (job_pricing_drop_columns, #142) or 20261121130000 (this work, already applied by hand; idempotent).
+- Prod still needs: `REVOKE TRUNCATE ON public.job_activity_log, public.job_deviation_log FROM anon, authenticated;`
+- Redeploy outstanding (lower severity): user-lifecycle, notify-customers, send-pod-email, vehicle-lookup.
+- Not yet audited: evidence/offline pipeline (Phase 3), admin UI actions (Phase 5), performance (Phase 7).
