@@ -27,3 +27,4 @@ Functions in `supabase/functions`), deployed via Lovable/Vercel. Production Supa
 - `prospecting` — third-party PILOT (MIT, pinned; see its PROVENANCE.md); context in `.claude/product-marketing.md`.
 - `ui-ux-pro-max` — UI design guidance.
 - `mobile-native`, `apple-design`, `animation-performance` — third-party (emilkowalski/skills, pinned in `skills-lock.json`): mobile web polish, Apple-style motion, animation perf.
+- Design-engineering toolkit (more emilkowalski skills, Motion AI Kit `motion`, plugins `frontend-design` and `dashboard-design`): see `.claude/design-engineering.md` for which skill to use when and the Axentra visual standards. Load only the skills a task needs.
