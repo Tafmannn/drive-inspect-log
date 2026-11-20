@@ -21,6 +21,7 @@ import {
   type StatusEvent,
 } from "../_shared/customerStatusEmail.ts";
 import { resolveLogoUrl } from "../_shared/podEmail.ts";
+import { pickAppOrigin } from "../_shared/appOrigin.ts";
 
 const BATCH = 20;
 const MAX_ATTEMPTS = 5;
@@ -37,15 +38,7 @@ interface QueueRow {
 }
 
 function appBaseUrl(req: Request): string | null {
-  const candidate = Deno.env.get("APP_URL") || req.headers.get("origin") || "";
-  try {
-    const u = new URL(candidate);
-    if (u.protocol === "https:") return u.origin;
-    if (u.protocol === "http:" && (u.hostname === "localhost" || u.hostname === "127.0.0.1")) return u.origin;
-    return null;
-  } catch {
-    return null;
-  }
+  return pickAppOrigin(Deno.env.get("APP_URL"), Deno.env.get("APP_ALLOWED_ORIGINS"), req.headers.get("origin"));
 }
 
 function place(city: string | null, postcode: string | null): string | null {

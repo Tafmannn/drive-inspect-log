@@ -4,6 +4,8 @@
 // internal-user auth emails sent via Resend, replacing Supabase's generic
 // default templates.
 
+import { pickAppOrigin } from "./appOrigin.ts";
+
 export function escapeHtml(s: string): string {
   return String(s)
     .replace(/&/g, "&amp;")
@@ -14,20 +16,17 @@ export function escapeHtml(s: string): string {
 
 /**
  * The page an auth action link should land on after Supabase verifies the
- * token. Prefers an explicit APP_URL secret; otherwise falls back to the
- * calling app's Origin header. Supabase Auth only ever redirects to URLs on
- * its allow-list, so a forged Origin can't leak the token to an
- * attacker-controlled host — the redirect would just fall back to the Site URL.
+ * token: APP_URL, or the request Origin only if it is explicitly allowed
+ * (APP_ALLOWED_ORIGINS, default the production app). Never an arbitrary
+ * Origin — see appOrigin.ts. undefined lets Supabase use its Site URL.
  */
 export function resolveRedirectUrl(req: Request, path: string): string | undefined {
-  const candidate = Deno.env.get("APP_URL") || req.headers.get("origin") || "";
-  try {
-    const u = new URL(candidate);
-    if (u.protocol !== "https:" && u.protocol !== "http:") return undefined;
-    return `${u.origin}${path}`;
-  } catch {
-    return undefined;
-  }
+  const origin = pickAppOrigin(
+    Deno.env.get("APP_URL"),
+    Deno.env.get("APP_ALLOWED_ORIGINS"),
+    req.headers.get("origin"),
+  );
+  return origin ? `${origin}${path}` : undefined;
 }
 
 export function renderActionEmailHtml(opts: {
