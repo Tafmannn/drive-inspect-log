@@ -54,7 +54,7 @@ async function safeCount(query: any): Promise<number> {
 
 // The price now lives in job_pricing, so "has a price" cannot be filtered inside the jobs query:
 // fetch the candidate ids, then count those whose pricing row has a total above zero.
-async function countPricedCandidates(
+export async function countPricedCandidates(
   query: PromiseLike<{ data: { id: string }[] | null; error: { message: string } | null }>,
 ): Promise<number> {
   const { data, error } = await query;
