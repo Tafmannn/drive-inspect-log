@@ -16,6 +16,8 @@ const h = vi.hoisted(() => ({
   rendered: [] as unknown[],
   saved: [] as string[],
   toasts: [] as { title?: string }[],
+  ctx: undefined as unknown,
+  jobs: [] as unknown[],
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -25,6 +27,8 @@ vi.mock("@/hooks/use-toast", () => ({ toast: (t: { title?: string }) => h.toasts
 vi.mock("@/features/portal/api", () => ({
   usePortalInvoice: () => ({ data: h.invoice, isLoading: h.loading, error: h.error }),
   usePortalInvoices: () => ({ data: h.list, isLoading: h.loading, error: h.error }),
+  usePortalContext: () => ({ data: h.ctx }),
+  usePortalJobs: () => ({ data: h.jobs }),
 }));
 vi.mock("@/lib/invoicePdf", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/invoicePdf")>()),
@@ -72,6 +76,8 @@ beforeEach(() => {
   h.rendered = [];
   h.saved = [];
   h.toasts = [];
+  h.ctx = undefined;
+  h.jobs = [];
   // capture the browser download triggered through an <a download>
   URL.createObjectURL = vi.fn(() => "blob:x");
   URL.revokeObjectURL = vi.fn();
@@ -183,7 +189,7 @@ describe("PortalInvoices", () => {
     sent_at: "2026-11-14T10:00:00Z", status: "sent", document_type: "invoice", ...over,
   });
 
-  it("labels paid, cancelled and credit-note rows; a plain sent invoice has no label", () => {
+  it("labels every row: paid, cancelled, credit note, and a sent invoice with no due date as awaiting payment", () => {
     h.list = [
       row({ id: "1", invoice_number: "AX26-1" }),
       row({ id: "2", invoice_number: "AX26-2", status: "paid" }),
@@ -192,7 +198,7 @@ describe("PortalInvoices", () => {
     ];
     render(<MemoryRouter><PortalInvoices /></MemoryRouter>);
     const label = (n: string) => screen.getByText(n).closest("p")!.textContent!.replace(n, "");
-    expect([label("AX26-1"), label("AX26-2"), label("AX26-3"), label("CN26-0001")]).toEqual(["", "Paid", "Cancelled", "Credit note"]);
+    expect([label("AX26-1"), label("AX26-2"), label("AX26-3"), label("CN26-0001")]).toEqual(["Awaiting payment", "Paid", "Cancelled", "Credit note"]);
   });
 
   it("shows an empty state and a load error", () => {

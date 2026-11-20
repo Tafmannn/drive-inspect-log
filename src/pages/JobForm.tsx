@@ -25,7 +25,7 @@ import { isFeatureEnabled } from "@/lib/featureFlags";
 import { saveDraft, loadDraft, clearDraft, draftKey } from "@/lib/autosave";
 import { hapticSuccess, hapticError } from "@/lib/haptics";
 import { notifyJobAssigned } from "@/lib/pushApi";
-import { lookupPostcode, type AddressSuggestion } from "@/lib/postcodeApi";
+import { lookupPostcodeDetailed, postcodeLookupMessage, type AddressSuggestion } from "@/lib/postcodeApi";
 import { BusinessSearchInput } from "@/components/BusinessSearchInput";
 import { AddressCheck } from "@/components/AddressCheck";
 import { AddressSearchInput } from "@/components/AddressSearchInput";
@@ -309,12 +309,10 @@ export const JobForm = () => {
     setError("");
     setSuggestions([]);
     try {
-      const results = await lookupPostcode(pc);
-      if (results.length > 0) {
-        setSuggestions(results);
-      } else {
-        setError("No addresses found. Please enter the address manually.");
-      }
+      const outcome = await lookupPostcodeDetailed(pc);
+      if (outcome.results.length > 0) setSuggestions(outcome.results);
+      // Says what happened: no match, lookup limited, or lookup unreachable.
+      setError(postcodeLookupMessage(outcome));
     } catch {
       setError("Couldn't fetch addresses. Please enter the address manually.");
     } finally {
@@ -347,14 +345,17 @@ export const JobForm = () => {
       }
     };
 
-    const parts = suggestion.line1.match(/^(\d+\w?)\s+(.+)$/);
-    if (parts) {
-      setVal(`${side}_address_line1`, parts[1]);
-      setVal(`${side}_address_line2`, parts[2]);
-    } else {
-      setVal(`${side}_address_line1`, suggestion.line1);
-      setVal(`${side}_address_line2`, "");
-      if (suggestion.line1) focusLine1AtStart(side);
+    // An area-only suggestion (no street) must not wipe a street the user already typed.
+    if (suggestion.line1) {
+      const parts = suggestion.line1.match(/^(\d+\w?)\s+(.+)$/);
+      if (parts) {
+        setVal(`${side}_address_line1`, parts[1]);
+        setVal(`${side}_address_line2`, parts[2]);
+      } else {
+        setVal(`${side}_address_line1`, suggestion.line1);
+        setVal(`${side}_address_line2`, "");
+        focusLine1AtStart(side);
+      }
     }
     setVal(`${side}_city`, suggestion.town);
     setVal(`${side}_postcode`, suggestion.postcode);
