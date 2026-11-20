@@ -48,20 +48,18 @@ export const Expenses = () => {
     useJobExpenses(scopedJobId);
 
   const isDriverOnly = gate.isDriverOnly;
-  const myDriverId = gate.driverProfileId;
 
-  // Global list. For a driver this is scoped to THEIR OWN expenses via an
-  // explicit driver_id filter — the expenses RLS policy is org-wide, so
-  // without this a driver would see every colleague's spend. Kept disabled
-  // until the driver's id is known.
-  const globalFilters =
-    isScoped || (isDriverOnly && !myDriverId)
-      ? undefined
-      : {
-          dateFrom: getDateFrom(dateRange),
-          category: categoryFilter !== "all" ? categoryFilter : undefined,
-          driverId: isDriverOnly ? myDriverId ?? undefined : undefined,
-        };
+  // Global list. A driver sees only the expenses on jobs assigned to them: the
+  // expenses RLS policy (expenses_select_scoped, via driver_owns_job) enforces that
+  // in the database, so no client-side filter is needed. This used to filter on
+  // expenses.driver_id, but nothing ever sets that column (every expense has it
+  // NULL), so every driver's list was empty. See src/test/expenses-driver-view.test.tsx.
+  const globalFilters = isScoped
+    ? undefined
+    : {
+        dateFrom: getDateFrom(dateRange),
+        category: categoryFilter !== "all" ? categoryFilter : undefined,
+      };
   const { data: globalExpenses, isLoading: globalLoading, isError: globalError } =
     useExpenses(globalFilters);
   const { data: totals } = useExpenseTotals();
