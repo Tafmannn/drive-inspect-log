@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- chainable database stub */
 /**
  * Everything that shows a job price reads it from job_pricing (phase 2 of docs/security/job-pricing-split.md):
  * the job API, the JSON backup, the export, the operations bucket count and the MCP tools. The database is a
