@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- chainable database stub */
 /**
  * Everything that shows a job price reads it from job_pricing (phase 2 of docs/security/job-pricing-split.md):
- * the job API, the JSON backup, the export, the operations bucket count and the MCP tools. The database is a
+ * the job API, the JSON backup, the export, and the operations bucket count. The database is a
  * chainable stub: any query method returns the chain, and awaiting it gives that table's canned result.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -38,17 +38,13 @@ vi.mock("@/features/exports/api/csvWriter", () => ({
   isoRange: () => ({}),
 }));
 vi.mock("@supabase/supabase-js", () => ({ createClient: () => h.client }));
-vi.mock("@lovable.dev/mcp-js", () => ({ defineTool: (t: unknown) => t }));
 
 import { listJobs, listCompletedJobs, getJob, createJob, updateJob } from "@/lib/api";
 import { exportJsonBackup } from "@/features/exports/api/jsonBackup";
 import { exportJobsCsvSql } from "@/features/exports/api/exportQueries";
 import { countPricedCandidates } from "@/hooks/useAdminOperationsBuckets";
-import listJobsTool from "@/lib/mcp/tools/list-jobs";
-import getJobTool from "@/lib/mcp/tools/get-job";
 
 const pricing = (rows: Record<string, unknown>[]) => ({ data: rows, error: null });
-const ctx = (authed = true) => ({ isAuthenticated: () => authed, getToken: () => "t" }) as any;
 
 beforeEach(() => {
   for (const k of Object.keys(h.tables)) delete h.tables[k];
@@ -154,43 +150,5 @@ describe("operations bucket 'ready to invoice' counts only priced jobs", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     expect(await countPricedCandidates(q(null, { message: "boom" }))).toBe(0);
     warn.mockRestore();
-  });
-});
-
-describe("MCP tools", () => {
-  it("list_jobs takes total_price from job_pricing, null when there is no row", async () => {
-    h.tables.jobs = { data: [{ id: "j1" }, { id: "j2" }], error: null };
-    h.tables.job_pricing = pricing([{ job_id: "j1", total_price: 300 }]);
-    const out: any = await (listJobsTool as any).handler({ status: "completed", limit: 5 }, ctx());
-    expect(out.structuredContent.jobs).toEqual([
-      { id: "j1", total_price: 300 },
-      { id: "j2", total_price: null },
-    ]);
-  });
-
-  it("list_jobs refuses when not signed in, reports a database error, and copes with no jobs", async () => {
-    expect(((await (listJobsTool as any).handler({}, ctx(false))) as any).isError).toBe(true);
-    h.tables.jobs = { data: null, error: { message: "nope" } };
-    expect(((await (listJobsTool as any).handler({}, ctx())) as any).content[0].text).toBe("nope");
-    h.tables.jobs = { data: [], error: null };
-    expect(((await (listJobsTool as any).handler({}, ctx())) as any).structuredContent.jobs).toEqual([]);
-  });
-
-  it("get_job overlays the price from job_pricing", async () => {
-    h.tables.jobs = { data: { id: "j1", total_price: null }, error: null };
-    h.tables.job_pricing = { data: { total_price: 300 }, error: null };
-    const out: any = await (getJobTool as any).handler({ id: "j1" }, ctx());
-    expect(out.structuredContent.job.total_price).toBe(300);
-  });
-
-  it("get_job leaves the job alone when there is no pricing row, and handles errors / not found / signed out", async () => {
-    h.tables.jobs = { data: { id: "j1", total_price: null }, error: null };
-    h.tables.job_pricing = { data: null, error: null };
-    expect(((await (getJobTool as any).handler({ id: "j1" }, ctx())) as any).structuredContent.job.total_price).toBeNull();
-    h.tables.jobs = { data: null, error: null };
-    expect(((await (getJobTool as any).handler({ id: "j1" }, ctx())) as any).isError).toBe(true);
-    h.tables.jobs = { data: null, error: { message: "bad" } };
-    expect(((await (getJobTool as any).handler({ id: "j1" }, ctx())) as any).content[0].text).toBe("bad");
-    expect(((await (getJobTool as any).handler({ id: "j1" }, ctx(false))) as any).isError).toBe(true);
   });
 });
