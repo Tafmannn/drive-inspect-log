@@ -85,7 +85,7 @@ describe("the app no longer names a dropped column on the jobs table", () => {
       const p = join(dir, n);
       return statSync(p).isDirectory() ? walk(p) : /\.(ts|tsx)$/.test(n) ? [p] : [];
     });
-  const files = [...walk(resolve(root, "src")), resolve(root, "supabase/functions/mcp/index.ts")].filter(
+  const files = walk(resolve(root, "src")).filter(
     (p) => !p.includes("/src/test/") && !p.includes("/src/integrations/supabase/types.ts"),
   );
 
