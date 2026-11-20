@@ -1,4 +1,4 @@
--- Rollback for 20261121150000_evidence_write_lockdown.sql (restores the previous, broader access).
+-- Rollback for 20261121160000_evidence_write_lockdown.sql (restores the previous, broader access).
 DROP TRIGGER IF EXISTS trg_photos_guard_identity ON public.photos;
 DROP FUNCTION IF EXISTS public.guard_photo_identity_columns();
 

@@ -1,0 +1,36 @@
+# Manually bring the staging database's migrations up to date with this repo.
+# Dry run by default; tick "apply" to actually apply. Never touches production
+# (the script refuses a URL containing the production project ref).
+name: Sync staging migrations
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Apply the missing migrations (leave unticked for a dry run)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-staging
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Sync
+        env:
+          STAGING_DB_URL: ${{ secrets.STAGING_DB_URL }}
+        run: |
+          if [ "${{ inputs.apply }}" = "true" ]; then
+            scripts/sync-staging-migrations.sh --apply
+          else
+            scripts/sync-staging-migrations.sh
+          fi
