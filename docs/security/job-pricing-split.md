@@ -55,3 +55,12 @@ Drivers' reads get no pricing rows (row-level security), so their screens are un
   column is a no-op, which is the safe direction.
 - Rollback drops the seal first, copies the values back, then restores the phase 1 mirror byte for byte
   (`src/test/job-pricing-seal.test.ts` compares it to the phase 1 definition).
+
+## Phase 4 as built (migration `20261121120000_job_pricing_drop_columns.sql`)
+Drops the seven (empty) columns from `jobs` and the seal triggers that guarded them. **Deploy the app first**: from this
+release no select, insert or update names those columns on `jobs` (`omitPricingFields` keeps price keys out of jobs
+writes; `saveJobPricing` writes `job_pricing`; `withPricing` adds the price fields to jobs read for display). Reading
+`job_pricing` now fails loudly instead of falling back, because the old values no longer exist to fall back to.
+- Aborts, changing nothing, if any job still holds a price, or an index/constraint uses a column. No CASCADE.
+- Rollback re-adds the empty columns with their original types and restores the phase 3 seal (the state after phase 3).
+- An old browser tab that still writes a price key to `jobs` will get a "column does not exist" error until it is reloaded.

@@ -37,7 +37,7 @@ export default defineTool({
     let q = client
       .from("jobs")
       .select(
-        "id, external_job_number, status, driver_name, pickup_city, pickup_postcode, delivery_city, delivery_postcode, job_date, total_price, created_at",
+        "id, external_job_number, status, driver_name, pickup_city, pickup_postcode, delivery_city, delivery_postcode, job_date, created_at",
       )
       .order("created_at", { ascending: false })
       .limit(cap);
@@ -54,7 +54,7 @@ export default defineTool({
         .select("job_id, total_price")
         .in("job_id", rows.map((r) => r.id));
       const byJob = new Map((pricing ?? []).map((p: any) => [p.job_id, p.total_price]));
-      for (const r of rows) if (byJob.has(r.id)) r.total_price = byJob.get(r.id) as number | null;
+      for (const r of rows) r.total_price = (byJob.get(r.id) as number | null | undefined) ?? null;
     }
     return {
       content: [{ type: "text", text: JSON.stringify(rows) }],

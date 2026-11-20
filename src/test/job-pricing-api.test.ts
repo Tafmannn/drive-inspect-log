@@ -30,6 +30,7 @@ vi.mock("@/lib/orgHelper", () => ({ getOrgId: async () => "org-1" }));
 
 import {
   pickPricingFields,
+  omitPricingFields,
   saveJobPricing,
   fetchPricingByJobId,
   mergePricing,
@@ -66,10 +67,19 @@ describe("job pricing api", () => {
     expect(a).toMatchObject({ id: "a", name: "x", total_price: 100, rate_per_mile: 1.5, caz_ulez_cost: null });
   });
 
-  it("leaves a job alone when it has no pricing row (a driver)", async () => {
+  it("gives a job with no pricing row (a driver) null for every pricing field", async () => {
     respond = () => ({ data: [], error: null });
-    const job = { id: "a", total_price: null };
-    expect(await withPricingOne(job)).toEqual(job);
+    expect(await withPricingOne({ id: "a", name: "x" })).toEqual({
+      id: "a",
+      name: "x",
+      total_price: null,
+      rate_per_mile: null,
+      admin_rate: null,
+      caz_ulez_cost: null,
+      pricing_metadata: null,
+      pricing_suggestion_used_at: null,
+      pricing_suggestion_used_by: null,
+    });
   });
 
   it("mergePricing does not mutate its input", () => {
@@ -79,13 +89,15 @@ describe("job pricing api", () => {
     expect(job.total_price).toBe(1);
   });
 
-  it("falls back to the job's own values when the lookup fails", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  it("fails loudly when the lookup fails, rather than showing a blank price", async () => {
     respond = () => ({ data: null, error: { message: "relation does not exist" } });
-    const job = { id: "a", total_price: 7 };
-    expect(await withPricingOne(job)).toEqual(job);
-    expect(warn).toHaveBeenCalled();
-    warn.mockRestore();
+    await expect(withPricingOne({ id: "a" })).rejects.toEqual({ message: "relation does not exist" });
+  });
+
+  it("omitPricingFields removes the seven pricing keys and keeps the rest", () => {
+    expect(
+      omitPricingFields({ total_price: 1, rate_per_mile: 2, admin_rate: 3, caz_ulez_cost: 4, pricing_metadata: {}, pricing_suggestion_used_at: "t", pricing_suggestion_used_by: "u", status: "x", caz_ulez_flag: "f" }),
+    ).toEqual({ status: "x", caz_ulez_flag: "f" });
   });
 
   it("pickPricingFields keeps only the seven pricing keys and drops undefined", () => {

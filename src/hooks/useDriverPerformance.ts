@@ -46,7 +46,7 @@ export function useDriverPerformance(driverIds: string[] | undefined) {
       const jobsRes = await supabase
         .from("jobs")
         .select(
-          "id, driver_id, status, total_price, completed_at, created_at, updated_at, pickup_time_to, delivery_time_to",
+          "id, driver_id, status, completed_at, created_at, updated_at, pickup_time_to, delivery_time_to",
         )
         .in("driver_id", ids)
         .gte("updated_at", sinceIso)

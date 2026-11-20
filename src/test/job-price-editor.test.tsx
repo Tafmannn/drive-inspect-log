@@ -1,6 +1,6 @@
 /**
- * Saving a price in the editor writes the job (still kept in step) and then job_pricing explicitly, which is
- * what lets a price be cleared once the old columns are sealed.
+ * Saving a price in the editor writes job_pricing only (the price columns are gone from jobs).
+ * A failed save is reported and not swallowed.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
@@ -35,12 +35,12 @@ beforeEach(() => {
 });
 
 describe("JobPriceEditor save", () => {
-  it("writes the job, then job_pricing with the new values", async () => {
+  it("writes job_pricing with the new values and never touches the jobs table", async () => {
     render(ui());
     fireEvent.change(screen.getByLabelText(/Job price/), { target: { value: "250" } });
     fireEvent.click(screen.getByRole("button", { name: /Save price/ }));
     await waitFor(() => expect(h.saved).toHaveBeenCalledWith("j1", { total_price: 250, rate_per_mile: null }));
-    expect(h.jobUpdate).toHaveBeenCalledWith({ total_price: 250, rate_per_mile: null });
+    expect(h.jobUpdate).not.toHaveBeenCalled();
   });
 
   it("clearing the price writes NULL to job_pricing", async () => {
@@ -50,12 +50,11 @@ describe("JobPriceEditor save", () => {
     await waitFor(() => expect(h.saved).toHaveBeenCalledWith("j1", { total_price: null, rate_per_mile: null }));
   });
 
-  it("does not write job_pricing if the job update failed, and says so", async () => {
-    h.jobError = { message: "denied" };
+  it("reports a failed save", async () => {
+    h.saved.mockRejectedValue(new Error("denied"));
     render(ui());
     fireEvent.change(screen.getByLabelText(/Job price/), { target: { value: "5" } });
     fireEvent.click(screen.getByRole("button", { name: /Save price/ }));
     await waitFor(() => expect(h.toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Could not update price" })));
-    expect(h.saved).not.toHaveBeenCalled();
   });
 });

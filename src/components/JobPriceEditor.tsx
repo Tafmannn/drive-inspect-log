@@ -1,6 +1,6 @@
 /**
  * JobPriceEditor — Admin-only inline editor for the final job price
- * (jobs.total_price) and the per-job rate-per-mile override.
+ * (job_pricing.total_price) and the per-job rate-per-mile override.
  *
  * - Visible only to admins / super admins.
  * - Writes directly to the `jobs` table (RLS already restricts org).
@@ -68,14 +68,6 @@ export function JobPriceEditor({
   const handleSave = async () => {
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from("jobs")
-        .update({
-          total_price: parseNumOrNull(price),
-          rate_per_mile: parseNumOrNull(rate),
-        })
-        .eq("id", jobId);
-      if (error) throw error;
       await saveJobPricing(jobId, {
         total_price: parseNumOrNull(price),
         rate_per_mile: parseNumOrNull(rate),

@@ -57,7 +57,7 @@ var list_jobs_default = defineTool2({
     const cap = Math.min(Math.max(limit ?? 20, 1), 100);
     const client = supabaseForUser(ctx);
     let q = client.from("jobs").select(
-      "id, external_job_number, status, driver_name, pickup_city, pickup_postcode, delivery_city, delivery_postcode, job_date, total_price, created_at"
+      "id, external_job_number, status, driver_name, pickup_city, pickup_postcode, delivery_city, delivery_postcode, job_date, created_at"
     ).order("created_at", { ascending: false }).limit(cap);
     if (status) q = q.eq("status", status);
     const { data, error } = await q;
@@ -68,7 +68,7 @@ var list_jobs_default = defineTool2({
     if (rows.length > 0) {
       const { data: pricing } = await client.from("job_pricing").select("job_id, total_price").in("job_id", rows.map((r) => r.id));
       const byJob = new Map((pricing ?? []).map((p) => [p.job_id, p.total_price]));
-      for (const r of rows) if (byJob.has(r.id)) r.total_price = byJob.get(r.id);
+      for (const r of rows) r.total_price = byJob.get(r.id) ?? null;
     }
     return {
       content: [{ type: "text", text: JSON.stringify(rows) }],
@@ -101,7 +101,7 @@ var get_job_default = defineTool3({
     if (!ctx.isAuthenticated()) {
       return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
     }
-    const JOB_COLUMNS = "id, external_job_number, status, job_type, job_date, priority, driver_name, driver_id, vehicle_reg, vehicle_make, vehicle_model, vehicle_colour, vehicle_year, vehicle_type, vehicle_fuel_type, pickup_company, pickup_city, pickup_postcode, pickup_contact_name, pickup_contact_phone, pickup_time_from, pickup_time_to, pickup_notes, delivery_company, delivery_city, delivery_postcode, delivery_contact_name, delivery_contact_phone, delivery_time_from, delivery_time_to, delivery_notes, client_name, client_company, distance_miles, total_price, has_pickup_inspection, has_delivery_inspection, created_at, updated_at, completed_at";
+    const JOB_COLUMNS = "id, external_job_number, status, job_type, job_date, priority, driver_name, driver_id, vehicle_reg, vehicle_make, vehicle_model, vehicle_colour, vehicle_year, vehicle_type, vehicle_fuel_type, pickup_company, pickup_city, pickup_postcode, pickup_contact_name, pickup_contact_phone, pickup_time_from, pickup_time_to, pickup_notes, delivery_company, delivery_city, delivery_postcode, delivery_contact_name, delivery_contact_phone, delivery_time_from, delivery_time_to, delivery_notes, client_name, client_company, distance_miles, has_pickup_inspection, has_delivery_inspection, created_at, updated_at, completed_at";
     const client = supabaseForUser2(ctx);
     const { data, error } = await client.from("jobs").select(JOB_COLUMNS).eq("id", id).maybeSingle();
     if (error) {
@@ -111,7 +111,7 @@ var get_job_default = defineTool3({
       return { content: [{ type: "text", text: "Job not found or not accessible." }], isError: true };
     }
     const { data: pricing } = await client.from("job_pricing").select("total_price").eq("job_id", id).maybeSingle();
-    const job = pricing ? { ...data, total_price: pricing.total_price } : data;
+    const job = { ...data, total_price: pricing?.total_price ?? null };
     return {
       content: [{ type: "text", text: JSON.stringify(job) }],
       structuredContent: { job }

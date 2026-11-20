@@ -1553,9 +1553,7 @@ export type Database = {
       }
       jobs: {
         Row: {
-          admin_rate: number | null
           cancellation_reason: string | null
-          caz_ulez_cost: number | null
           caz_ulez_flag: string | null
           client_company: string | null
           client_email: string | null
@@ -1611,12 +1609,8 @@ export type Database = {
           pickup_time_from: string | null
           pickup_time_to: string | null
           pod_pdf_url: string | null
-          pricing_metadata: Json | null
-          pricing_suggestion_used_at: string | null
-          pricing_suggestion_used_by: string | null
           priority: string | null
           promise_by_time: string | null
-          rate_per_mile: number | null
           route_distance_miles: number | null
           route_eta_minutes: number | null
           route_order: number | null
@@ -1625,7 +1619,6 @@ export type Database = {
           sort_order: number | null
           status: string
           sync_to_map: boolean | null
-          total_price: number | null
           updated_at: string
           vehicle_colour: string
           vehicle_fuel_type: string | null
@@ -1636,9 +1629,7 @@ export type Database = {
           vehicle_year: string | null
         }
         Insert: {
-          admin_rate?: number | null
           cancellation_reason?: string | null
-          caz_ulez_cost?: number | null
           caz_ulez_flag?: string | null
           client_company?: string | null
           client_email?: string | null
@@ -1694,12 +1685,8 @@ export type Database = {
           pickup_time_from?: string | null
           pickup_time_to?: string | null
           pod_pdf_url?: string | null
-          pricing_metadata?: Json | null
-          pricing_suggestion_used_at?: string | null
-          pricing_suggestion_used_by?: string | null
           priority?: string | null
           promise_by_time?: string | null
-          rate_per_mile?: number | null
           route_distance_miles?: number | null
           route_eta_minutes?: number | null
           route_order?: number | null
@@ -1708,7 +1695,6 @@ export type Database = {
           sort_order?: number | null
           status?: string
           sync_to_map?: boolean | null
-          total_price?: number | null
           updated_at?: string
           vehicle_colour: string
           vehicle_fuel_type?: string | null
@@ -1719,9 +1705,7 @@ export type Database = {
           vehicle_year?: string | null
         }
         Update: {
-          admin_rate?: number | null
           cancellation_reason?: string | null
-          caz_ulez_cost?: number | null
           caz_ulez_flag?: string | null
           client_company?: string | null
           client_email?: string | null
@@ -1777,12 +1761,8 @@ export type Database = {
           pickup_time_from?: string | null
           pickup_time_to?: string | null
           pod_pdf_url?: string | null
-          pricing_metadata?: Json | null
-          pricing_suggestion_used_at?: string | null
-          pricing_suggestion_used_by?: string | null
           priority?: string | null
           promise_by_time?: string | null
-          rate_per_mile?: number | null
           route_distance_miles?: number | null
           route_eta_minutes?: number | null
           route_order?: number | null
@@ -1791,7 +1771,6 @@ export type Database = {
           sort_order?: number | null
           status?: string
           sync_to_map?: boolean | null
-          total_price?: number | null
           updated_at?: string
           vehicle_colour?: string
           vehicle_fuel_type?: string | null
