@@ -783,6 +783,10 @@ serve(async (req) => {
       if (!user_id || !newRole) {
         return json({ error: "USER_ID_AND_ROLE_REQUIRED" }, 400);
       }
+      // Only staff roles; portal (client) identities belong to portal-access.
+      if (!["driver", "admin", "super_admin"].includes(newRole)) {
+        return json({ error: "INVALID_ROLE" }, 400);
+      }
 
       // Prevent self-demotion / self-role-modification
       if (user_id === caller.id) {
@@ -822,7 +826,15 @@ serve(async (req) => {
       const { data: authUser } = await admin.auth.admin.getUserById(user_id);
       if (!authUser?.user) return json({ error: "AUTH_USER_NOT_FOUND" }, 404);
 
-      await admin.auth.admin.updateUserById(user_id, {
+      // DB first (authoritative, and its constraints/guards can still say no),
+      // then Auth metadata; undo the DB write if Auth fails so they agree.
+      const { error: updateError } = await admin
+        .from("user_profiles")
+        .update({ role: newRole })
+        .eq("auth_user_id", user_id);
+      if (updateError) return json({ error: "ROLE_UPDATE_FAILED" }, 500);
+
+      const { error: authErr } = await admin.auth.admin.updateUserById(user_id, {
         app_metadata: {
           ...authUser.user.app_metadata,
           role: newRole,
@@ -833,13 +845,10 @@ serve(async (req) => {
           role: newRole,
         },
       });
-
-      const { error: updateError } = await admin
-        .from("user_profiles")
-        .update({ role: newRole })
-        .eq("auth_user_id", user_id);
-
-      if (updateError) return json({ error: updateError.message }, 500);
+      if (authErr) {
+        await admin.from("user_profiles").update({ role: current.role }).eq("auth_user_id", user_id);
+        return json({ error: "AUTH_UPDATE_FAILED" }, 500);
+      }
 
       await writeAudit(admin, caller, "set_role", {
         target_user_id: user_id,

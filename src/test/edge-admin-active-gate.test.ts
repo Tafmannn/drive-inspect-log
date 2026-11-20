@@ -66,3 +66,18 @@ describe("user-lifecycle: only a super admin can manage a super admin", () => {
     expect(src).toMatch(/CANNOT_ESCALATE_BEYOND_OWN_ROLE/);
   });
 });
+
+describe("user-lifecycle set_role write safety", () => {
+  const src = readFileSync("supabase/functions/user-lifecycle/index.ts", "utf8");
+  const start = src.indexOf('if (action === "set_role")');
+  const block = src.slice(start, src.indexOf('if (action === "sync_role_from_db")'));
+
+  it("only accepts staff roles", () => {
+    expect(block).toMatch(/\["driver", "admin", "super_admin"\]\.includes\(newRole\)/);
+  });
+
+  it("writes the profile before Auth and reverts it if Auth fails", () => {
+    expect(block.indexOf('.update({ role: newRole })')).toBeLessThan(block.indexOf("updateUserById("));
+    expect(block).toMatch(/update\(\{ role: current\.role \}\)/);
+  });
+});
