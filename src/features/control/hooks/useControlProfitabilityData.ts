@@ -135,7 +135,7 @@ export function useProfitabilityData(period: ProfitabilityPeriod) {
 
       let jobsQ = supabase
         .from("jobs")
-        .select("id, external_job_number, vehicle_reg, client_name, client_company, driver_id, driver_name, total_price, route_distance_miles, completed_at")
+        .select("id, external_job_number, vehicle_reg, client_name, client_company, driver_id, driver_name, route_distance_miles, completed_at")
         .eq("status", "completed")
         .eq("is_hidden", false)
         .not("completed_at", "is", null);

@@ -33,7 +33,7 @@ export default defineTool({
       "pickup_company, pickup_city, pickup_postcode, pickup_contact_name, pickup_contact_phone, pickup_time_from, pickup_time_to, pickup_notes, " +
       "delivery_company, delivery_city, delivery_postcode, delivery_contact_name, delivery_contact_phone, delivery_time_from, delivery_time_to, delivery_notes, " +
       "client_name, client_company, " +
-      "distance_miles, total_price, " +
+      "distance_miles, " +
       "has_pickup_inspection, has_delivery_inspection, " +
       "created_at, updated_at, completed_at";
     const client = supabaseForUser(ctx);
@@ -54,7 +54,7 @@ export default defineTool({
       .select("total_price")
       .eq("job_id", id)
       .maybeSingle();
-    const job = pricing ? { ...(data as object), total_price: pricing.total_price } : data;
+    const job = { ...(data as object), total_price: pricing?.total_price ?? null };
     return {
       content: [{ type: "text", text: JSON.stringify(job) }],
       structuredContent: { job },
