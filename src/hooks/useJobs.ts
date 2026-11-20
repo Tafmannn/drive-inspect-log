@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as api from "@/lib/api";
+import { superAdminOverrideStatus } from "@/lib/jobStatusOverrideApi";
 import { getPendingJobCount } from "@/lib/pendingUploads";
 import { useEvidenceQueueVersion } from "@/lib/evidenceQueueBus";
 import { supabase } from "@/integrations/supabase/client";
@@ -135,6 +136,17 @@ export function useAdminChangeStatus() {
   return useMutation({
     mutationFn: ({ jobId, newStatus, notes }: { jobId: string; newStatus: string; notes?: string }) =>
       api.adminChangeStatus(jobId, newStatus, notes),
+    onSuccess: (_data, vars) => {
+      invalidateForEvent(qc, "job_status_changed", [["job", vars.jobId]]);
+    },
+  });
+}
+
+export function useSuperAdminOverrideStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ jobId, newStatus, reason }: { jobId: string; newStatus: string; reason: string }) =>
+      superAdminOverrideStatus(jobId, newStatus, reason),
     onSuccess: (_data, vars) => {
       invalidateForEvent(qc, "job_status_changed", [["job", vars.jobId]]);
     },

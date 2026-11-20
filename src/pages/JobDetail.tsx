@@ -52,6 +52,7 @@ import { PricingAuditTimeline } from "@/components/PricingAuditTimeline";
 import { JobPriceEditor } from "@/components/JobPriceEditor";
 import { RoleScope, EvidenceHealthBanner, JobHeaderCard } from "@/components/ui-kit";
 import { JobAdminControls } from "@/features/jobs/components/JobAdminControls";
+import { SuperAdminStatusOverride } from "@/features/jobs/components/SuperAdminStatusOverride";
 import { evaluateEvidenceHealth } from "@/lib/evidenceHealth";
 import { useEvidenceOverrides } from "@/hooks/useEvidenceOverrides";
 
@@ -556,6 +557,7 @@ export const JobDetail = () => {
               onChangeStatus={handleChangeStatus}
               onDelete={handleDeleteJob}
             />
+            <SuperAdminStatusOverride jobId={job.id} jobStatus={job.status} />
           </RoleScope>
 
           {/* Admin Photos Section */}

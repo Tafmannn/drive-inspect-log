@@ -53,6 +53,7 @@ vi.mock("@/components/QrDisplayModal", () => ({ QrDisplayModal: () => null }));
 vi.mock("@/components/EvidenceStatusBadges", () => ({ EvidenceStatusBadges: () => null }));
 vi.mock("@/components/PricingSuggestionPanel", () => ({ PricingSuggestionPanel: () => null }));
 vi.mock("@/components/PricingAuditTimeline", () => ({ PricingAuditTimeline: () => null }));
+vi.mock("@/features/jobs/components/SuperAdminStatusOverride", () => ({ SuperAdminStatusOverride: () => null }));
 vi.mock("@/features/jobs/components/JobAdminControls", () => ({
   JobAdminControls: () => null,
 }));
