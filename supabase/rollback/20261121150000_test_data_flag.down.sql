@@ -1,4 +1,4 @@
--- Rollback for 20261121140000_test_data_flag.sql.
+-- Rollback for 20261121150000_test_data_flag.sql.
 -- Removes the inheritance triggers, the function and the three is_test columns. WARNING: dropping the columns
 -- discards which records were marked as test data (the records themselves are untouched). Export first if you need
 -- the list: SELECT id FROM public.jobs WHERE is_test.

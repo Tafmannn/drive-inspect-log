@@ -9,8 +9,8 @@ import { resolve } from "node:path";
 
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), "utf8");
 const code = (s: string) => s.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
-const up = code(read("supabase/migrations/20261121140000_test_data_flag.sql"));
-const down = code(read("supabase/rollback/20261121140000_test_data_flag.down.sql"));
+const up = code(read("supabase/migrations/20261121150000_test_data_flag.sql"));
+const down = code(read("supabase/rollback/20261121150000_test_data_flag.down.sql"));
 
 describe("migration", () => {
   it("adds is_test to jobs, invoices and expenses as NOT NULL DEFAULT false", () => {
