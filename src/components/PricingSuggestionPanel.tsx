@@ -20,7 +20,8 @@ import { Sparkles, Loader2, Check } from "lucide-react";
 import { suggestJobPrice, type PricingInputs, type PricingSuggestion } from "@/lib/pricingBrain";
 import { loadPricingDefaults } from "@/lib/pricingDefaults";
 import { computePriceDelta } from "@/lib/pricingDelta";
-import { getActiveClientRateCard, type ClientRateCard } from "@/lib/clientApi";
+import { getActiveClientRateCard, getClientFuelPolicy, type ClientRateCard } from "@/lib/clientApi";
+import { DEFAULT_FUEL_POLICY, type FuelPolicy } from "@/lib/fuelPolicy";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
@@ -51,6 +52,7 @@ export function PricingSuggestionPanel(props: PricingSuggestionPanelProps) {
   const { isAdmin, isSuperAdmin, user } = useAuth();
   const [suggestion, setSuggestion] = useState<PricingSuggestion | null>(null);
   const [rateCard, setRateCard] = useState<ClientRateCard | null>(null);
+  const [fuelPolicy, setFuelPolicy] = useState<FuelPolicy>(DEFAULT_FUEL_POLICY);
   const [computing, setComputing] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -75,6 +77,26 @@ export function PricingSuggestionPanel(props: PricingSuggestionPanelProps) {
     };
   }, [clientId]);
 
+  // How this client handles fuel (billed on top, or inside the price). Admin-only table;
+  // falls back to the default, 'recharged', on any error.
+  useEffect(() => {
+    let cancelled = false;
+    if (!clientId) {
+      setFuelPolicy(DEFAULT_FUEL_POLICY);
+      return;
+    }
+    getClientFuelPolicy(clientId)
+      .then((p) => {
+        if (!cancelled) setFuelPolicy(p);
+      })
+      .catch(() => {
+        if (!cancelled) setFuelPolicy(DEFAULT_FUEL_POLICY);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [clientId]);
+
   useEffect(() => {
     let cancelled = false;
     setComputing(true);
@@ -83,6 +105,7 @@ export function PricingSuggestionPanel(props: PricingSuggestionPanelProps) {
         if (cancelled) return;
         const finalInputs: PricingInputs = {
           ...props.inputs,
+          fuelPolicy,
           minimumCharge: props.inputs.minimumChargeOverride ?? defs.MIN_CHARGE,
           ratePerMile: props.inputs.ratePerMileOverride ?? defs.MIN_RATE_PER_MILE,
           clientRateCard: rateCard
@@ -104,7 +127,7 @@ export function PricingSuggestionPanel(props: PricingSuggestionPanelProps) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inputsKey, rateCard]);
+  }, [inputsKey, rateCard, fuelPolicy]);
 
   if (!isAdmin && !isSuperAdmin) return null;
 

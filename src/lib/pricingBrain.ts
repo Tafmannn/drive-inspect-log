@@ -25,6 +25,8 @@
  * No DB writes. No side effects.
  */
 
+import { fuelPolicyPricingNote, type FuelPolicy } from "@/lib/fuelPolicy";
+
 export type PricingConfidence = "low" | "medium" | "high";
 
 export interface PricingInputs {
@@ -40,10 +42,20 @@ export interface PricingInputs {
   /** Minimum charge floor. Defaults to MIN_CHARGE if not provided. */
   minimumCharge?: number | null;
 
-  /** Estimated fuel cost (£). Optional add-on. */
+  /**
+   * The client's fuel policy. 'recharged' (the default): fuel is billed on the invoice, so
+   * it is not in this price. 'included': the quote covers fuel, so the rate has to. Only
+   * used to say which case applies — it never changes the number.
+   */
+  fuelPolicy?: FuelPolicy | null;
+
+  /**
+   * Estimated fuel cost (£). Optional add-on, added to the price only when supplied.
+   * Leaving it out is normal and is NOT reported as a missing input.
+   */
   fuelEstimate?: number | null;
 
-  /** Estimated return travel / public transport cost (£). Optional add-on. */
+  /** Estimated return travel / public transport cost (£). Optional add-on (same rule). */
   returnTravelEstimate?: number | null;
 
   /**
@@ -154,6 +166,7 @@ export function suggestJobPrice(inputs: PricingInputs): PricingSuggestion {
         : PRICING_DEFAULTS.MIN_CHARGE;
     const price = Math.max(card.agreedPrice, min);
     reasons.push("Client rate card flat price applied");
+    reasons.push(fuelPolicyPricingNote(inputs.fuelPolicy));
     if (price > card.agreedPrice) reasons.push("Floored to minimum charge");
     return {
       suggestedPrice: round2(price),
@@ -213,15 +226,14 @@ export function suggestJobPrice(inputs: PricingInputs): PricingSuggestion {
     breakdown.fuel = round2(inputs.fuelEstimate);
     reasons.push(`Fuel estimate £${inputs.fuelEstimate.toFixed(2)}`);
   } else {
-    missingInputs.push("fuel_estimate");
+    // No estimate is normal: say how fuel is handled for this client instead.
+    reasons.push(fuelPolicyPricingNote(inputs.fuelPolicy));
   }
 
   if (isPositiveNumber(inputs.returnTravelEstimate)) {
     addOns += inputs.returnTravelEstimate;
     breakdown.returnTravel = round2(inputs.returnTravelEstimate);
     reasons.push(`Return travel £${inputs.returnTravelEstimate.toFixed(2)}`);
-  } else {
-    missingInputs.push("return_travel_estimate");
   }
 
   if (inputs.cazRisk && inputs.cazRisk.zoneCount > 0 && isPositiveNumber(inputs.cazRisk.estimatedCost)) {

@@ -194,6 +194,7 @@ export type Database = {
           created_at: string
           credit_limit: number | null
           email: string | null
+          fuel_policy: string
           handover_requirements: string | null
           id: string
           is_active: boolean
@@ -229,6 +230,7 @@ export type Database = {
           created_at?: string
           credit_limit?: number | null
           email?: string | null
+          fuel_policy?: string
           handover_requirements?: string | null
           id?: string
           is_active?: boolean
@@ -264,6 +266,7 @@ export type Database = {
           created_at?: string
           credit_limit?: number | null
           email?: string | null
+          fuel_policy?: string
           handover_requirements?: string | null
           id?: string
           is_active?: boolean

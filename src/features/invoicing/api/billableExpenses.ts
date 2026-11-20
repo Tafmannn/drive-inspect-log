@@ -51,5 +51,5 @@ export async function fetchBillableExpenses(jobIds: string[]): Promise<BillableE
     }));
 }
 
-/** Categories ticked by default in the picker. */
-export const DEFAULT_RECHARGE_CATEGORIES = ["Fuel"];
+// Which categories are ticked by default depends on the client's fuel policy:
+// see rechargeCategoriesFor() in src/lib/fuelPolicy.ts.

@@ -23,6 +23,7 @@ if (typeof globalThis.ResizeObserver === "undefined") {
 const state = vi.hoisted(() => ({
   vatRegistered: false,
   poRequired: false,
+  fuelPolicy: "recharged" as "recharged" | "included" | undefined,
   mutateAsync: null as unknown as ReturnType<typeof import("vitest").vi.fn>,
 }));
 
@@ -65,7 +66,7 @@ vi.mock("@/hooks/useClients", () => ({
       {
         id: "client-1", org_id: "org-1", name: "Chris", company: "CJE Transport", email: "c@cje.example",
         phone: null, address: null, notes: null, is_active: true, created_at: "", updated_at: "",
-        payment_terms: "Net 30", po_required: state.poRequired,
+        payment_terms: "Net 30", po_required: state.poRequired, fuel_policy: state.fuelPolicy,
       },
     ],
   }),
@@ -134,6 +135,7 @@ function pickClientAndAllJobs() {
 beforeEach(() => {
   state.vatRegistered = false;
   state.poRequired = false;
+  state.fuelPolicy = "recharged";
   state.mutateAsync = vi.fn(async (input: { jobs: EligibleJob[]; expenses: BillableExpense[]; vatRegistered: boolean; vatRate: number }) => ({
     invoiceId: "inv-1",
     invoiceNumber: "AX26-1007",
@@ -163,6 +165,51 @@ describe("InvoicePrepScreen", () => {
     expect(picker.getByText("No receipt")).toBeTruthy();
     expect(picker.getByText("2 of 3 expenses selected")).toBeTruthy();
     expect(picker.getByText("Recharging £99.26")).toBeTruthy();
+  });
+
+  it("a client who pays fuel separately gets no fuel note", () => {
+    renderScreen();
+    pickClientAndAllJobs();
+    expect(screen.queryByText(/is included in .*price/)).toBeNull();
+  });
+
+  it("a client whose price includes fuel: nothing is pre-ticked, and a note says why", () => {
+    state.fuelPolicy = "included";
+    renderScreen();
+    pickClientAndAllJobs();
+
+    const picker = within(screen.getByLabelText("3. Rechargeable Expenses"));
+    expect(picker.getAllByRole("checkbox").map((b) => b.getAttribute("aria-checked"))).toEqual(["false", "false", "false"]);
+    expect(picker.getByText("0 of 3 expenses selected")).toBeTruthy();
+    expect(screen.getByText(/Fuel is included in CJE Transport's price, so it is not ticked/)).toBeTruthy();
+  });
+
+  it("fuel-included client: the invoice is created with no expenses, unless the admin ticks fuel", async () => {
+    state.fuelPolicy = "included";
+    renderScreen();
+    pickClientAndAllJobs();
+    fireEvent.click(screen.getByRole("button", { name: /Create Invoice/ }));
+    await waitFor(() => expect(state.mutateAsync).toHaveBeenCalledTimes(1));
+    expect(state.mutateAsync.mock.calls[0][0].expenses).toEqual([]);
+  });
+
+  it("fuel-included client: the admin can still tick one fuel receipt for a one-off recharge", async () => {
+    state.fuelPolicy = "included";
+    renderScreen();
+    pickClientAndAllJobs();
+    const picker = within(screen.getByLabelText("3. Rechargeable Expenses"));
+    fireEvent.click(picker.getAllByRole("checkbox")[0]);
+    fireEvent.click(screen.getByRole("button", { name: /Create Invoice/ }));
+    await waitFor(() => expect(state.mutateAsync).toHaveBeenCalled());
+    expect(state.mutateAsync.mock.calls[0][0].expenses.map((e: BillableExpense) => e.id)).toEqual(["e-fuel"]);
+  });
+
+  it("a client with no fuel setting behaves as before: fuel is ticked", () => {
+    state.fuelPolicy = undefined;
+    renderScreen();
+    pickClientAndAllJobs();
+    const picker = within(screen.getByLabelText("3. Rechargeable Expenses"));
+    expect(picker.getAllByRole("checkbox").map((b) => b.getAttribute("aria-checked"))).toEqual(["true", "false", "true"]);
   });
 
   it("VAT off: no VAT anywhere, totals are transport + ticked expenses", () => {

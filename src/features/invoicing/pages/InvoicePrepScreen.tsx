@@ -49,7 +49,7 @@ import { useBillableExpenses, useOrgInvoiceSettings } from "../hooks/useInvoiceS
 import { useInvoiceActions } from "../hooks/useInvoiceActions";
 import { ExpensePicker } from "../components/ExpensePicker";
 import { InvoiceList, InvoiceStatusBadge } from "../components/InvoiceList";
-import { DEFAULT_RECHARGE_CATEGORIES } from "../api/billableExpenses";
+import { fuelPolicyInvoiceNote, rechargeCategoriesFor } from "@/lib/fuelPolicy";
 import { loadReceiptImage } from "../api/receiptImages";
 import { receiptCaption, receiptFileRef, settingsToPdfFields } from "../api/invoiceDocument";
 import { downloadBlob } from "../api/receiptExport";
@@ -197,18 +197,25 @@ export function InvoicePrepScreen() {
   const selectedJobIdList = useMemo(() => selectedJobs.map((j) => j.id), [selectedJobs]);
 
   // Expenses that can be recharged for the selected jobs. Fuel is ticked by
-  // default; an explicit tick/untick by the admin always wins.
+  // default only for clients who pay fuel separately (clients.fuel_policy =
+  // 'recharged', the default); an explicit tick/untick by the admin always wins.
+  const clientFuelPolicy = selectedClient?.fuel_policy;
+  const rechargeDefaults = useMemo(() => rechargeCategoriesFor(clientFuelPolicy), [clientFuelPolicy]);
+  const fuelNote = useMemo(
+    () => fuelPolicyInvoiceNote(clientFuelPolicy, selectedClient?.company || selectedClient?.name || "this client"),
+    [clientFuelPolicy, selectedClient?.company, selectedClient?.name],
+  );
   const { data: billableExpenses, isLoading: expensesLoading } = useBillableExpenses(selectedJobIdList);
   const [expenseOverrides, setExpenseOverrides] = useState<Map<string, boolean>>(new Map());
   const expenses = useMemo(() => billableExpenses ?? [], [billableExpenses]);
   const selectedExpenseIds = useMemo(() => {
     const ids = new Set<string>();
     for (const e of expenses) {
-      const picked = expenseOverrides.get(e.id) ?? DEFAULT_RECHARGE_CATEGORIES.includes(e.category);
+      const picked = expenseOverrides.get(e.id) ?? rechargeDefaults.includes(e.category);
       if (picked) ids.add(e.id);
     }
     return ids;
-  }, [expenses, expenseOverrides]);
+  }, [expenses, expenseOverrides, rechargeDefaults]);
   const selectedExpenses = useMemo(
     () => expenses.filter((e) => selectedExpenseIds.has(e.id)),
     [expenses, selectedExpenseIds]
@@ -777,6 +784,11 @@ export function InvoicePrepScreen() {
             description="Tick the expenses to bill on this invoice. Only ticked expenses and their receipts are included."
             flush
           >
+            {fuelNote && (
+              <div className="p-3 pb-0">
+                <WarningCallout severity="info">{fuelNote}</WarningCallout>
+              </div>
+            )}
             <ExpensePicker
               jobs={selectedJobs}
               expenses={expenses}
