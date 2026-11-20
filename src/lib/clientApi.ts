@@ -1,6 +1,7 @@
 // Client profile CRUD API
 import { supabase } from "@/integrations/supabase/client";
 import { getOrgId } from "./orgHelper";
+import { normaliseFuelPolicy, type FuelPolicy } from "./fuelPolicy";
 
 export interface Client {
   id: string;
@@ -20,6 +21,8 @@ export interface Client {
   payment_terms?: string | null;
   /** When true, an invoice for this client cannot be created without a PO / reference. */
   po_required?: boolean;
+  /** Does the client pay fuel on top ('recharged', the default) or is it in the price ('included')? */
+  fuel_policy?: FuelPolicy | null;
 }
 
 /**
@@ -91,6 +94,22 @@ export async function getActiveClientRateCard(
     waitingRatePerHour: row.waiting_rate_per_hour,
     notes: row.rate_card_notes,
   };
+}
+
+/**
+ * A client's fuel policy. Admin-only (`clients` cannot be read by drivers); on any error
+ * or when there is no client it falls back to the default, 'recharged', which is how
+ * invoicing behaved before the setting existed.
+ */
+export async function getClientFuelPolicy(clientId: string | null | undefined): Promise<FuelPolicy> {
+  if (!clientId) return normaliseFuelPolicy(null);
+  const { data, error } = await supabase
+    .from("clients")
+    .select("fuel_policy")
+    .eq("id", clientId)
+    .maybeSingle();
+  if (error || !data) return normaliseFuelPolicy(null);
+  return normaliseFuelPolicy((data as { fuel_policy?: string | null }).fuel_policy);
 }
 
 /**

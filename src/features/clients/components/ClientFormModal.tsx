@@ -11,6 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { useCreateClient, useUpdateClient } from "@/hooks/useClients";
 import {
@@ -19,6 +22,10 @@ import {
   upsertClientRateCard,
 } from "@/lib/clientApi";
 import { useAuth } from "@/context/AuthContext";
+import {
+  DEFAULT_FUEL_POLICY, FUEL_POLICIES, FUEL_POLICY_HELP, FUEL_POLICY_LABEL,
+  normaliseFuelPolicy, type FuelPolicy,
+} from "@/lib/fuelPolicy";
 import { Loader2, Tag } from "lucide-react";
 import {
   SectionCard,
@@ -59,6 +66,7 @@ export function ClientFormModal({ open, onOpenChange, client, initialCompany, on
     notes: "",
     payment_terms: "",
     po_required: false,
+    fuel_policy: DEFAULT_FUEL_POLICY as FuelPolicy,
     rate_card_active: false,
     rate_per_mile: "",
     minimum_charge: "",
@@ -82,6 +90,7 @@ export function ClientFormModal({ open, onOpenChange, client, initialCompany, on
         notes: client.notes ?? "",
         payment_terms: client.payment_terms ?? "",
         po_required: client.po_required === true,
+        fuel_policy: normaliseFuelPolicy(client.fuel_policy),
       }));
       // Load rate card from admin-only table. Drivers will get null via RLS.
       if (canEditRateCard) {
@@ -107,7 +116,7 @@ export function ClientFormModal({ open, onOpenChange, client, initialCompany, on
       setForm({
         name: "", company: initialCompany ?? "", billing_email: "", client_type: "",
         email: "", phone: "", address: "", notes: "",
-        payment_terms: "", po_required: false,
+        payment_terms: "", po_required: false, fuel_policy: DEFAULT_FUEL_POLICY,
         rate_card_active: false, rate_per_mile: "", minimum_charge: "",
         agreed_price: "", waiting_rate_per_hour: "", rate_card_notes: "",
       });
@@ -163,6 +172,7 @@ export function ClientFormModal({ open, onOpenChange, client, initialCompany, on
       notes: form.notes.trim() || null,
       payment_terms: form.payment_terms || null,
       po_required: form.po_required,
+      fuel_policy: form.fuel_policy,
       is_active: true,
     };
 
@@ -343,6 +353,24 @@ export function ClientFormModal({ open, onOpenChange, client, initialCompany, on
               placeholder="Internal notes..."
               rows={2}
             />
+          </div>
+
+          <div className="space-y-1.5" data-testid="client-fuel-policy">
+            <Label htmlFor="client-fuel-policy" className="text-xs">Fuel</Label>
+            <Select
+              value={form.fuel_policy}
+              onValueChange={(v) => setForm((f) => ({ ...f, fuel_policy: normaliseFuelPolicy(v) }))}
+            >
+              <SelectTrigger id="client-fuel-policy">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {FUEL_POLICIES.map((p) => (
+                  <SelectItem key={p} value={p}>{FUEL_POLICY_LABEL[p]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">{FUEL_POLICY_HELP[form.fuel_policy]}</p>
           </div>
 
           {canEditRateCard && (
