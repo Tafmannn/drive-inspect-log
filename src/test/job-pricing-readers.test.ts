@@ -8,18 +8,22 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const h = vi.hoisted(() => {
   const tables: Record<string, unknown> = {};
-  const chain = (result: unknown): any => {
+  const calls: { table: string; method: string; args: unknown[] }[] = [];
+  const chain = (result: unknown, table = ""): any => {
     const c: any = new Proxy(function () {}, {
-      get: (_t, prop) => (prop === "then" ? (res: any, rej: any) => Promise.resolve(result).then(res, rej) : () => c),
+      get: (_t, prop) =>
+        prop === "then"
+          ? (res: any, rej: any) => Promise.resolve(result).then(res, rej)
+          : (...args: unknown[]) => (calls.push({ table, method: String(prop), args }), c),
       apply: () => c,
     });
     return c;
   };
   const client = {
-    from: (t: string) => chain(tables[t] ?? { data: [], error: null }),
+    from: (t: string) => chain(tables[t] ?? { data: [], error: null }, t),
     rpc: () => chain({ data: "AX-1", error: null }),
   };
-  return { tables, chain, client, downloaded: [] as unknown[], csv: [] as unknown[][] };
+  return { tables, calls, chain, client, downloaded: [] as unknown[], csv: [] as unknown[][] };
 });
 const { chain, client } = h;
 
@@ -48,6 +52,7 @@ const ctx = (authed = true) => ({ isAuthenticated: () => authed, getToken: () =>
 
 beforeEach(() => {
   for (const k of Object.keys(h.tables)) delete h.tables[k];
+  h.calls.length = 0;
   h.downloaded.length = 0;
   h.csv.length = 0;
   process.env.SUPABASE_URL = "http://x";
@@ -75,15 +80,30 @@ describe("job API puts the price from job_pricing onto each job", () => {
     expect((await getJob("j1")).rate_per_mile).toBe(1.5);
   });
 
-  it("createJob writes the price to job_pricing and returns it", async () => {
+  const jobsWrites = (method: "insert" | "update") =>
+    h.calls.filter((c) => c.table === "jobs" && c.method === method).map((c) => c.args[0] as Record<string, unknown>);
+  const pricingWrites = () => h.calls.filter((c) => c.table === "job_pricing" && c.method === "upsert").map((c) => c.args[0]);
+
+  it("createJob keeps the price off the jobs row, writes it to job_pricing and returns it", async () => {
     h.tables.jobs = { data: { id: "j1" }, error: null };
-    const job = await createJob({ vehicle_reg: "AB1", total_price: 250, external_job_number: "X" } as any);
+    const job = await createJob({ vehicle_reg: "AB1", total_price: 250, caz_ulez_cost: 12, external_job_number: "X" } as any);
     expect(job.total_price).toBe(250);
+    expect(jobsWrites("insert")[0]).toEqual({ vehicle_reg: "AB1", external_job_number: "X", org_id: "org-1" });
+    expect(pricingWrites()[0]).toEqual({ job_id: "j1", org_id: "org-1", total_price: 250, caz_ulez_cost: 12 });
   });
 
-  it("updateJob returns the priced job", async () => {
+  it("updateJob splits a mixed edit: job fields to jobs, price to job_pricing", async () => {
     h.tables.jobs = { data: { id: "j1" }, error: null };
-    expect((await updateJob("j1", { total_price: 250 })).total_price).toBe(250);
+    expect((await updateJob("j1", { total_price: 250, vehicle_reg: "ZZ9" })).total_price).toBe(250);
+    expect(jobsWrites("update")[0]).toEqual({ vehicle_reg: "ZZ9" });
+    expect(pricingWrites()[0]).toEqual({ job_id: "j1", org_id: "org-1", total_price: 250 });
+  });
+
+  it("a price-only updateJob does not write the jobs table at all", async () => {
+    h.tables.jobs = { data: { id: "j1" }, error: null };
+    await updateJob("j1", { total_price: null });
+    expect(jobsWrites("update")).toHaveLength(0);
+    expect(pricingWrites()[0]).toEqual({ job_id: "j1", org_id: "org-1", total_price: null });
   });
 
   it("a driver (no pricing rows) gets the job untouched", async () => {
@@ -138,13 +158,13 @@ describe("operations bucket 'ready to invoice' counts only priced jobs", () => {
 });
 
 describe("MCP tools", () => {
-  it("list_jobs takes total_price from job_pricing when a row exists", async () => {
-    h.tables.jobs = { data: [{ id: "j1", total_price: null }, { id: "j2", total_price: 5 }], error: null };
+  it("list_jobs takes total_price from job_pricing, null when there is no row", async () => {
+    h.tables.jobs = { data: [{ id: "j1" }, { id: "j2" }], error: null };
     h.tables.job_pricing = pricing([{ job_id: "j1", total_price: 300 }]);
     const out: any = await (listJobsTool as any).handler({ status: "completed", limit: 5 }, ctx());
     expect(out.structuredContent.jobs).toEqual([
       { id: "j1", total_price: 300 },
-      { id: "j2", total_price: 5 },
+      { id: "j2", total_price: null },
     ]);
   });
 

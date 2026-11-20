@@ -109,7 +109,7 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
         // Completed work inside the billing lookback, for unpriced /
         // unlinked / uninvoiced checks.
         supabase.from("jobs")
-          .select("id, org_id, external_job_number, vehicle_reg, status, completed_at, total_price, client_id")
+          .select("id, org_id, external_job_number, vehicle_reg, status, completed_at, client_id")
           .eq("is_hidden", false)
           .in("status", ["completed", "closed"])
           .gte("completed_at", new Date(Date.now() - ATTENTION_THRESHOLDS.billingLookbackDays * 86400_000).toISOString())

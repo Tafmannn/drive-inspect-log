@@ -9,9 +9,9 @@
  *   - Suggested price is NEVER applied to invoice totals.
  *   - Only admins see this panel.
  *   - When admin clicks "Use suggested price":
- *       1. copies suggestedPrice into jobs.total_price
+ *       1. copies suggestedPrice into job_pricing.total_price
  *       2. saves a row to pricing_snapshots (audit trail)
- *       3. saves pricing metadata onto jobs.pricing_metadata
+ *       3. saves pricing metadata onto job_pricing.pricing_metadata
  *       4. snapshot.is_final_invoice_price stays false
  */
 import { useEffect, useMemo, useState } from "react";
@@ -168,16 +168,6 @@ export function PricingSuggestionPanel(props: PricingSuggestionPanelProps) {
         breakdown: suggestion.breakdown,
         is_final_invoice_price: false as const,
       };
-      const { error: jobErr } = await supabase
-        .from("jobs")
-        .update({
-          total_price: suggestion.suggestedPrice,
-          pricing_metadata: metadata,
-          pricing_suggestion_used_at: metadata.accepted_at,
-          pricing_suggestion_used_by: user?.id ?? null,
-        })
-        .eq("id", props.jobId);
-      if (jobErr) throw jobErr;
       await saveJobPricing(props.jobId, {
         total_price: suggestion.suggestedPrice,
         pricing_metadata: metadata,

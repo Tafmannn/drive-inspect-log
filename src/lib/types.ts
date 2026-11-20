@@ -90,10 +90,10 @@ export interface Job {
   promise_by_time: string | null;
   earliest_delivery_date: string | null;
   distance_miles: number | null;
-  rate_per_mile: number | null;
-  total_price: number | null;
+  rate_per_mile?: number | null;
+  total_price?: number | null;
   caz_ulez_flag: string | null;
-  caz_ulez_cost: number | null;
+  caz_ulez_cost?: number | null;
   other_expenses: number | null;
   driver_id: string | null;
   driver_name: string | null;
