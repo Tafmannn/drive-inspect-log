@@ -26,3 +26,4 @@ Functions in `supabase/functions`), deployed via Lovable/Vercel. Production Supa
 - `axentra-weekly-numbers` — read-only weekly KPIs via Supabase MCP (`weekly.sql`).
 - `prospecting` — third-party PILOT (MIT, pinned; see its PROVENANCE.md); context in `.claude/product-marketing.md`.
 - `ui-ux-pro-max` — UI design guidance.
+- `mobile-native`, `apple-design`, `animation-performance` — third-party (emilkowalski/skills, pinned in `skills-lock.json`): mobile web polish, Apple-style motion, animation perf.
