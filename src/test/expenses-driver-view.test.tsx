@@ -3,9 +3,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
-// Capture the filters passed to useExpenses so we can assert the driver view is
-// scoped by driver_id (the expenses RLS is org-wide, so this filter is the ONLY
-// thing stopping a driver from seeing the whole org's spend).
+// Capture the filters passed to useExpenses. A driver's list is kept private by the
+// database (expenses_select_scoped: only expenses on jobs assigned to them), not by a
+// client-side filter. The page used to filter on expenses.driver_id, a column nothing
+// ever sets, so every driver saw an empty list. These tests pin the fixed behaviour.
 const useExpensesSpy = vi.fn();
 vi.mock("@/hooks/useExpenses", () => ({
   useExpenses: (filters: unknown) => {
@@ -22,7 +23,7 @@ vi.mock("@/hooks/useExpenses", () => ({
 }));
 vi.mock("@/hooks/useJobs", () => ({ useJob: () => ({ data: null }) }));
 
-let mockGate = { isDriverOnly: true, driverProfileId: "driver-1" };
+let mockGate: { isDriverOnly: boolean; driverProfileId: string | null } = { isDriverOnly: true, driverProfileId: "driver-1" };
 vi.mock("@/hooks/useDriverGate", () => ({ useDriverGate: () => mockGate }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ isAdmin: false, isSuperAdmin: false }) }));
 
@@ -42,7 +43,7 @@ describe("Expenses — driver view", () => {
     mockGate = { isDriverOnly: true, driverProfileId: "driver-1" };
   });
 
-  it("shows the driver their own expenses instead of the old dead-end", () => {
+  it("shows the driver their expenses instead of the old dead-end", () => {
     renderExpenses();
     // Appears in both the "Your spend" tile and the expense row.
     expect(screen.getAllByText("£12.50").length).toBeGreaterThanOrEqual(1);
@@ -50,20 +51,28 @@ describe("Expenses — driver view", () => {
     expect(screen.queryByText(/open a job to view or add expenses/i)).toBeNull();
   });
 
-  it("scopes the query to the signed-in driver (driver_id filter)", () => {
+  it("does NOT filter on driver_id (nothing sets it, so it emptied every driver's list)", () => {
     renderExpenses();
     const calledWith = useExpensesSpy.mock.calls.map((c) => c[0]);
-    // At least one call must carry the driver's id; none may omit it while enabled.
-    expect(calledWith.some((f) => f && f.driverId === "driver-1")).toBe(true);
-    expect(calledWith.every((f) => f === undefined || f.driverId === "driver-1")).toBe(true);
+    expect(calledWith.length).toBeGreaterThan(0);
+    for (const f of calledWith) {
+      expect(f).toBeDefined(); // the query runs
+      expect(f).not.toHaveProperty("driverId");
+    }
   });
 
-  it("does not run an unscoped query before the driver id is known", () => {
-    mockGate = { isDriverOnly: true, driverProfileId: null } as any;
+  it("loads straight away, without waiting for the driver profile to be found", () => {
+    mockGate = { isDriverOnly: true, driverProfileId: null };
     renderExpenses();
-    // With no driver id, the query is disabled (filters === undefined), never
-    // an org-wide fetch.
     const calledWith = useExpensesSpy.mock.calls.map((c) => c[0]);
-    expect(calledWith.every((f) => f === undefined)).toBe(true);
+    expect(calledWith.every((f) => f !== undefined)).toBe(true);
+    expect(screen.getAllByText("£12.50").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("still applies the date range, and no category until one is chosen", () => {
+    renderExpenses();
+    const f = useExpensesSpy.mock.calls[0][0] as { dateFrom?: string; category?: string };
+    expect(f.dateFrom).toMatch(/^\d{4}-\d{2}-\d{2}/);
+    expect(f.category).toBeUndefined();
   });
 });

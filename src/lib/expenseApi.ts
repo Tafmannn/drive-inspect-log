@@ -88,10 +88,10 @@ export async function listExpenses(filters?: {
   dateFrom?: string;
   dateTo?: string;
   /**
-   * Narrow to a single driver's own expenses. The `expenses` RLS policy is
-   * org-scoped (any org member can read all org expenses), so a driver's
-   * "my expenses" view MUST pass this explicitly — otherwise it would show
-   * the whole org's spend.
+   * Narrow to one driver's expenses (the `driver_id` column). Not needed to keep a
+   * driver's list private: the `expenses` RLS policy already limits a driver to
+   * expenses on jobs assigned to them. NOTE: nothing sets `driver_id` today, so this
+   * returns nothing for existing expenses; don't use it for a driver's own list.
    */
   driverId?: string;
 }): Promise<ExpenseWithJob[]> {
