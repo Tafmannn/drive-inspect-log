@@ -21,6 +21,6 @@ describe("one live invoice per job — migration contract", () => {
   });
   it("legacy invoice page handles the 23505 refusal", () => {
     const page = readFileSync("src/pages/InvoiceGenerator.tsx", "utf8");
-    expect(page).toMatch(/code === "23505"/);
+    expect(page).toContain("isAlreadyInvoicedError(error)");
   });
 });

@@ -4,6 +4,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const mockUpload = vi.fn();
 const mockInsertPhoto = vi.fn();
 const mockJobsSelect = vi.fn();
+const mockJobsIn = vi.fn();
 
 vi.mock("@/lib/storage", () => ({
   storageService: {
@@ -32,10 +33,8 @@ vi.mock("@/integrations/supabase/client", () => ({
             eq: () => ({
               maybeSingle: async () => mockJobsSelect(),
             }),
-            in: () => ({
-              // purgeStaleRunUploads path
-              then: undefined,
-            }),
+            // purgeStaleRunUploads path
+            in: async () => mockJobsIn(),
           }),
         };
       }
@@ -60,7 +59,7 @@ import {
   __testing__,
 } from "@/lib/pendingUploads";
 import { clear } from "idb-keyval";
-import { classifyRunCheck as __classify } from "@/lib/pendingUploads";
+import { classifyRunCheck as __classify, purgeStaleRunUploads as __purge } from "@/lib/pendingUploads";
 
 function makeFile(name = "test.jpg"): File {
   const bytes = new Uint8Array([
@@ -78,6 +77,8 @@ beforeEach(async () => {
   mockJobsSelect.mockReset();
   // Default: no current run known → run-id guard does not purge.
   mockJobsSelect.mockResolvedValue({ data: { current_run_id: null } });
+  mockJobsIn.mockReset();
+  mockJobsIn.mockResolvedValue({ data: [], error: null });
 });
 
 // ─── Staging contract ────────────────────────────────────────────────
@@ -610,5 +611,23 @@ describe("pendingUploads — run guard keeps evidence it cannot prove stale", ()
 
     expect(await retryUpload(item.id)).toBe(true);
     expect(mockUpload).toHaveBeenCalledTimes(1);
+  });
+
+  it("bulk purge: keeps photos for jobs it can't see, purges a visible job on another run", async () => {
+    const item = await queued();
+    mockJobsIn.mockResolvedValue({ data: [], error: null });
+    expect(await __purge()).toBe(0);
+    expect(await getAllPendingUploads()).toHaveLength(1);
+
+    mockJobsIn.mockResolvedValue({ data: [{ id: "job-run", current_run_id: "run-2222" }], error: null });
+    expect(await __purge()).toBe(1);
+    expect((await getAllPendingUploads()).find((u) => u.id === item.id)).toBeUndefined();
+  });
+
+  it("bulk purge: same run is kept", async () => {
+    await queued();
+    mockJobsIn.mockResolvedValue({ data: [{ id: "job-run", current_run_id: RUN }], error: null });
+    expect(await __purge()).toBe(0);
+    expect(await getAllPendingUploads()).toHaveLength(1);
   });
 });

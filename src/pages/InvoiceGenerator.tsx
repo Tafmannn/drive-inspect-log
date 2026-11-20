@@ -18,7 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { withPricingOne } from "@/lib/jobPricingApi";
 import { getOrgId } from "@/lib/orgHelper";
 import { downloadInvoicePdf, type InvoiceLineItem, type InvoiceData } from "@/lib/invoicePdf";
-import { findAlreadyInvoicedJobs } from "@/features/invoicing/api/createInvoice";
+import { findAlreadyInvoicedJobs, isAlreadyInvoicedError } from "@/features/invoicing/api/createInvoice";
 import { useOrgInvoiceSettings } from "@/features/invoicing/hooks/useInvoiceSettings";
 import { settingsToPdfFields } from "@/features/invoicing/api/invoiceDocument";
 import {
@@ -299,19 +299,11 @@ export function InvoiceGenerator() {
         status: "draft",
       } as any);
 
-      if (error) {
-        // 23505: the database's one-live-invoice-per-job guard caught a job
-        // that was invoiced elsewhere after the check above ran.
-        if ((error as { code?: string }).code === "23505") {
-          toast({
-            title: "Already invoiced",
-            description: "This job was just invoiced elsewhere. Nothing was saved — check the client's invoice history.",
-            variant: "destructive",
-          });
-          return;
-        }
-        throw error;
+      if (isAlreadyInvoicedError(error)) {
+        toast({ title: "Already invoiced", description: "This job was just invoiced elsewhere. Nothing was saved.", variant: "destructive" });
+        return;
       }
+      if (error) throw error;
       toast({ title: "Invoice saved ✓", description: `${inv.invoiceNumber} saved as draft` });
     } catch (e) {
       toast({ title: "Save failed", description: String(e), variant: "destructive" });
