@@ -15,11 +15,13 @@ Resume point for the hardening pass. Prod = `lynkvfduzqdyvlzgriyh`, staging = `m
 | H9 | P3 | `vehicle-lookup` had no rate limit (other lookups do) | Omission | Per-IP limiter | — | Merged (#143); vehicle-lookup still v112 (old) |
 | H10 | P3 | `authenticated` held TRUNCATE on both log tables | Default grants | Revoked in 20261121130000 | — | In migration; prod needs the one-line revoke |
 | — | info | Edge auth review | gcs-upload/proxy, resolve-signature-url → `callerCanAccessPath`; send-push own-job check; get-org-users/send-invoice-email org-pinned; portal-evidence ownership via `portal_get_job` as caller; promote-admin & google-sheets-sync return 410 | — | — | Reviewed OK |
-| E1 | P1 | `purgeStaleRunUploads` / `retryUpload` purged queued photos when the job row came back empty; drivers only read jobs assigned to them; `stale_run_purged` is hidden from Attention | "No row" treated as "different run" (current_run_id is never null in prod) | `classifyRunCheck()`: purge only a visible job on another run; otherwise keep as blocked + `run_job_not_visible` log | `pending-uploads.test.ts` (+4; reassigned case fails on old code) | Fixed on branch |
+| E1 | P1 | `purgeStaleRunUploads` / `retryUpload` purged queued photos when the job row came back empty; drivers only read jobs assigned to them; `stale_run_purged` is hidden from Attention | "No row" treated as "different run" (current_run_id is never null in prod) | `classifyRunCheck()`: purge only a visible job on another run; otherwise keep as blocked + `run_job_not_visible` log | `pending-uploads.test.ts` (+4; reassigned case fails on old code) | **Merged #144** (ships with frontend deploy) |
 | E2 | P2 | Queue drain only logs when 0 photos promoted; partial loss undetected | No expected-count stored | Recommendation: store expected photo count; refuse RPC if staged count is short (care with crash-replay) | — | Open |
-| F2 | P1 | Legacy `/invoice/new/:jobId` writes invoices.job_id only; DB unique index covers invoice_items only | Two invoice formats, one guarded | Migration 20261121140000: trigger enforces one live invoice per job across both, advisory lock, 23505 | `one-live-invoice-per-job.test.ts` (4) | Branch; **needs applying to prod** |
-| F3 | P1 | 43/50 unpriced completed jobs older than the 180-day billing lookback appear nowhere | Lookback hides them by design; no fallback | One summary exception per org | `attention-stale-unpriced.test.ts` (3) | Fixed on branch |
+| F2 | P1 | Legacy `/invoice/new/:jobId` writes invoices.job_id only; DB unique index covers invoice_items only | Two invoice formats, one guarded | Migration 20261121140000: trigger enforces one live invoice per job across both, advisory lock, 23505 | `one-live-invoice-per-job.test.ts` (4) + prod rolled-back test 10/10 | **Merged #144; applied to prod 20 Nov, verified** |
+| F3 | P1 | 43/50 unpriced completed jobs older than the 180-day billing lookback appear nowhere | Lookback hides them by design; no fallback | One summary exception per org | `attention-stale-unpriced.test.ts` (3) | **Merged #144** (ships with frontend deploy) |
 | F4 | info | AX26-1001 (£240) & AX26-1002 (£300) drafts have 0 invoice_items | Legacy page stores lines as JSON — not a failed rollback | None; owner to issue or cancel | — | Owner decision |
+| S1 | P1 | photos/inspections/damage_items/evidence_items/qr_confirmations: org-wide UPDATE/DELETE policies + full grants incl. TRUNCATE, no guard triggers; any org member could read all QR tokens and mark a handover confirmed | Over-broad legacy policies/grants | Migration 20261121150000: revoke DELETE/TRUNCATE, revoke UPDATE on evidence_items/qr, scoped QR select/insert (no pre-confirmed), photo job/org/run guard | `evidence-write-lockdown.test.ts` (5) + prod rolled-back test 17/17 | **Merged #147; applied to prod 20 Nov, verified** |
+| — | info | Phase 5 sweep: unchecked client writes / silent 0-row updates | organisations writes are super-admin-only routes matching RLS; remaining unchecked writes are best-effort logs/caches | — | — | Reviewed OK |
 | — | info | `qr_lookup`/`qr_confirm` anon | Intentional; 192-bit token, 48h expiry, single use | None | — | Accepted |
 | — | info | Repo vs prod migration history | PR #123 | Identical (verified 20 Nov) | — | Verified |
 | F1 | P1 data | 49/67 completed jobs have no `job_pricing` total; 7 draft invoices, 0 sent; 0 jobs on 2+ live invoices | Historical data entry | Owner to price/issue; software must not guess | — | Open, owner action |
@@ -35,6 +37,17 @@ Anon: read log → 42501, allocate → 42501.
 
 ## Status after PR #143 (merged 96fec85, 20 Nov 2026)
 - Prod schema_migrations does not yet record 20261121120000 (job_pricing_drop_columns, #142) or 20261121130000 (this work, already applied by hand; idempotent).
-- Prod still needs: `REVOKE TRUNCATE ON public.job_activity_log, public.job_deviation_log FROM anon, authenticated;`
+- TRUNCATE revoke on log tables: applied 20 Nov (verified).
 - Redeploy outstanding (lower severity): user-lifecycle, notify-customers, send-pod-email, vehicle-lookup.
-- Not yet audited: evidence/offline pipeline (Phase 3), admin UI actions (Phase 5), performance (Phase 7).
+- Phases 3–5 audited (see E1–E2, F2–F4, S1). Not yet: performance advisors (Phase 7), physical-iPhone acceptance.
+
+## Manual iPhone acceptance checklist (cannot be verified in CI/emulation)
+Run on a real iPhone (Safari and home-screen PWA), signed in as a test driver on a test job:
+1. Airplane mode → capture all collection photos + a damage item + signatures → Submit → "saved offline" shown → reconnect → inspection and every photo appear for admin; Pending Uploads empty.
+2. Mid-inspection: lock phone 10 min / switch apps / rotate → return → draft, photos and signature strokes intact.
+3. Submit offline, then have an admin reassign the job before reconnecting → photos stay on the phone as "blocked" with the "no longer assigned" message; nothing silently disappears. Reassign back → they upload.
+4. Kill Safari during upload → reopen → uploads resume; no duplicate photos on the job.
+5. Deny then allow camera permission mid-flow → capture still works; no lost photos.
+6. Weak signal (Settings → Developer → Network Link Conditioner "Very Bad Network" or rural test) → submit → no false "submitted" while photos are still pending.
+7. Customer QR handover: scan from a second phone, confirm → driver/admin see confirmation; a reused/expired QR shows invalid.
+8. POD PDF opens with every photo and both signatures.
