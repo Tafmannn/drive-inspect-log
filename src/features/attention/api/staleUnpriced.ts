@@ -20,6 +20,7 @@ export async function fetchStaleCompletedJobs(nowMs: number = Date.now()): Promi
     .from("jobs")
     .select("id, org_id, completed_at")
     .eq("is_hidden", false)
+    .eq("is_test", false) // test data never raises billing alerts (#146)
     .in("status", ["completed", "closed"])
     .lt("completed_at", cutoff)
     .limit(2000);
