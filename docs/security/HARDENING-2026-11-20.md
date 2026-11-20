@@ -10,6 +10,11 @@ Resume point for the hardening pass. Prod = `lynkvfduzqdyvlzgriyh`, staging = `m
 | H4 | P3 | Advisor: anon EXECUTE on `enqueue_customer_notification()` | Default PUBLIC grant on trigger fn (not callable as RPC) | Same migration: revoke (guarded) | Same | Applied on staging; prod pending |
 | H5 | P1 | Staging max migration 20260713223138 (73) vs prod 107 | Staging not kept in step | Replay repo migrations onto staging | — | Open |
 | H6 | P2 | Advisor: leaked-password protection off | Auth setting | Enable in Dashboard → Auth → Passwords (owner) | — | Open, owner action |
+| H7 | P1 | `request-password-reset` (no auth) used `APP_URL \|\| Origin` for the recovery redirect; prod app is on `*.vercel.app` | Attacker-set Origin trusted; only Supabase's redirect allow-list stood in the way | `_shared/appOrigin.ts`: Origin only if explicitly allowed (`APP_ALLOWED_ORIGINS`, default prod app). Also invites, notify-customers, send-pod-email | `src/test/app-origin.test.ts` (8) | Fixed on branch |
+| H8 | P2 | `user-lifecycle set_role` accepted any role string; wrote Auth before DB, ignored Auth error | Missing allow-list; wrong write order | Staff roles only; DB first, revert on Auth failure | `edge-admin-active-gate.test.ts` (+2) | Fixed on branch |
+| H9 | P3 | `vehicle-lookup` had no rate limit (other lookups do) | Omission | Per-IP limiter | — | Fixed on branch |
+| H10 | P3 | `authenticated` held TRUNCATE on both log tables | Default grants | Revoked in 20261121130000 | — | In migration; prod needs the one-line revoke |
+| — | info | Edge auth review | gcs-upload/proxy, resolve-signature-url → `callerCanAccessPath`; send-push own-job check; get-org-users/send-invoice-email org-pinned; portal-evidence ownership via `portal_get_job` as caller; promote-admin & google-sheets-sync return 410 | — | — | Reviewed OK |
 | — | info | `qr_lookup`/`qr_confirm` anon | Intentional; 192-bit token, 48h expiry, single use | None | — | Accepted |
 | — | info | Repo vs prod migration history | PR #123 | Identical (verified 20 Nov) | — | Verified |
 | F1 | P1 data | 49/67 completed jobs have no `job_pricing` total; 7 draft invoices, 0 sent; 0 jobs on 2+ live invoices | Historical data entry | Owner to price/issue; software must not guess | — | Open, owner action |
