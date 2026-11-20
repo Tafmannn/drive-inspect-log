@@ -39,9 +39,23 @@ export interface OfferInput {
   loaded: {
     minutes: number | null;
     miles?: number | null;
-    /** Fuel we pay for and cannot recharge, £. Required unless fuelPaidByClient. */
+    /**
+     * Fuel we pay for and cannot recharge, £. Required unless the client pays fuel
+     * (`fuelPaidByClient: true`, or `fuelPolicy: "recharged"`).
+     */
     fuelCost?: number | null;
     fuelPaidByClient?: boolean;
+    /**
+     * The client's fuel policy (`clients.fuel_policy`). Look it up; never guess it.
+     *   "recharged": the client pays fuel on top, so it is not our cost
+     *                (same as `fuelPaidByClient: true`).
+     *   "included":  the price already covers fuel, so it IS our cost and `fuelCost`
+     *                is required.
+     * Leave it out when the client is not known: `fuelCost` or `fuelPaidByClient` is
+     * then required, as before. An explicit `fuelPaidByClient` always wins (a one-off
+     * recharge); a `fuelPaidByClient: true` on a fuel-included client is flagged.
+     */
+    fuelPolicy?: "recharged" | "included" | null;
   };
   /**
    * Getting home / back to base after delivery. Set to null ONLY when the
@@ -119,7 +133,19 @@ function collect(o: OfferInput, label: string): Parts {
   deadMinutes += posMin;
 
   minutes += need(o.loaded?.minutes, "loaded.minutes");
-  if (!o.loaded?.fuelPaidByClient) costsExFee += need(o.loaded?.fuelCost, "loaded.fuelCost (or fuelPaidByClient: true)");
+  const fuelPolicy = o.loaded?.fuelPolicy ?? null;
+  const fuelPaidByClient = o.loaded?.fuelPaidByClient ?? fuelPolicy === "recharged";
+  if (o.loaded?.fuelPaidByClient === true && fuelPolicy === "included") {
+    warnings.push(`${label}fuel is marked client-paid, but this client's price includes fuel — check this is a one-off recharge`);
+  }
+  if (!fuelPaidByClient) {
+    costsExFee += need(
+      o.loaded?.fuelCost,
+      fuelPolicy === "included"
+        ? "loaded.fuelCost (this client's price includes fuel, so it is our cost)"
+        : "loaded.fuelCost (or fuelPaidByClient: true)",
+    );
+  }
 
   if (o.returnLeg) {
     const retMin = need(o.returnLeg.minutes, "returnLeg.minutes");

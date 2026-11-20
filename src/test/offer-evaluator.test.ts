@@ -76,6 +76,56 @@ describe("evaluateOffer", () => {
     ]));
   });
 
+  describe("client fuel policy", () => {
+    const withFuel = (loaded: OfferInput["loaded"]) => evaluateOffer(offer({ loaded }), policy);
+
+    it("'recharged': the client pays fuel, so it is not our cost (same as fuelPaidByClient)", () => {
+      const e = withFuel({ minutes: 120, fuelPolicy: "recharged" });
+      expect(e.missing).toEqual([]);
+      expect(e.directCosts).toBe(70); // positioning 25 + return 45, no fuel
+      expect(e.directCosts).toBe(withFuel({ minutes: 120, fuelPaidByClient: true }).directCosts);
+    });
+
+    it("'included': the price covers fuel, so fuel IS our cost and must be given", () => {
+      const e = withFuel({ minutes: 120, fuelPolicy: "included" });
+      expect(e.verdict).toBe("insufficient_data");
+      expect(e.missing).toEqual(["loaded.fuelCost (this client's price includes fuel, so it is our cost)"]);
+    });
+
+    it("'included' with a fuel cost: counted against the contribution", () => {
+      const recharged = withFuel({ minutes: 120, fuelPolicy: "recharged" });
+      const included = withFuel({ minutes: 120, fuelPolicy: "included", fuelCost: 30 });
+      expect(included.missing).toEqual([]);
+      expect(included.directCosts).toBe(100);
+      expect(included.contribution).toBe((recharged.contribution as number) - 30);
+    });
+
+    it("no policy given: asks as before, never assuming either way", () => {
+      const e = withFuel({ minutes: 120 });
+      expect(e.missing).toEqual(["loaded.fuelCost (or fuelPaidByClient: true)"]);
+      expect(withFuel({ minutes: 120, fuelPolicy: null }).missing).toEqual(["loaded.fuelCost (or fuelPaidByClient: true)"]);
+    });
+
+    it("an explicit fuelPaidByClient wins over the policy, and a recharge on a fuel-included client is flagged", () => {
+      const oneOff = withFuel({ minutes: 120, fuelPolicy: "included", fuelPaidByClient: true });
+      expect(oneOff.missing).toEqual([]);
+      expect(oneOff.directCosts).toBe(70);
+      expect(oneOff.warnings.join(" ")).toMatch(/marked client-paid, but this client's price includes fuel/);
+
+      const notPaid = withFuel({ minutes: 120, fuelPolicy: "recharged", fuelPaidByClient: false });
+      expect(notPaid.missing).toEqual(["loaded.fuelCost (or fuelPaidByClient: true)"]);
+    });
+
+    it("works the same inside a chain, naming the job that needs a fuel cost", () => {
+      const chain = evaluateChain([
+        offer({ ref: "A", returnLeg: null, loaded: { minutes: 60, fuelPolicy: "recharged" } }),
+        offer({ ref: "B", loaded: { minutes: 60, fuelPolicy: "included" } }),
+      ], policy);
+      expect(chain.missing.join(" ")).toMatch(/B.*loaded\.fuelCost \(this client's price includes fuel/);
+      expect(chain.missing.join(" ")).not.toMatch(/A.*loaded\.fuelCost/);
+    });
+  });
+
   it("with no price yet, still returns break-even and target price to quote from", () => {
     const e = evaluateOffer(offer({ offeredPrice: null }), policy);
     expect(e.verdict).toBe("insufficient_data");

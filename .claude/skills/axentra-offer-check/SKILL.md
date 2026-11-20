@@ -13,10 +13,11 @@ Deterministic calculator: `src/lib/offerEvaluator.ts` (tested in `src/test/offer
    - `offeredPrice` (£ as offered, before platform fee) — or omit to get a quote price.
    - `startConfirmed`: true only if positioning starts from the driver's **last confirmed location** (where they actually are or will be after a booked job), not a guess.
    - `positioning` {minutes, cost}: door-to-door from that location to collection (trains, buses, taxis).
-   - `loaded` {minutes, fuelCost | fuelPaidByClient:true}: driving the customer vehicle.
+   - `loaded` {minutes, fuelPolicy | fuelCost | fuelPaidByClient:true}: driving the customer vehicle. **Fuel depends on the client** (see "Fuel" below).
    - `returnLeg` {minutes, cost}: home after delivery. `null` only for a job followed by another in the same chain.
    - `inspectionMinutes` (appraisals can be long), optional `waitingMinutes`, `tollsAndZoneCharges` (CAZ/ULEZ/tolls not recharged), `driverCost` (subcontract pay), `platformFeeFraction`.
    - If the user gives only estimates, keep them, set `startConfirmed:false` where relevant, and say the figures are estimates.
+   - **Fuel.** Each client is set to either `recharged` (the client pays fuel on top, so it is not our cost) or `included` (the price already covers fuel, so it IS our cost). Look it up read-only, never guess it: `select name, company, fuel_policy from clients where company ilike '%<name>%' or name ilike '%<name>%'` (Supabase SQL, read-only). Then pass `loaded.fuelPolicy: "recharged"` or `"included"`. For `included`, ask for the fuel cost and pass `loaded.fuelCost`. If the client is not in the system (a new customer or a platform job with no client record), ask the user which applies; do not assume. `fuelPaidByClient: true` still works as an explicit "this one is recharged"; if it contradicts an `included` client the script warns, so repeat that warning.
 2. **Write the JSON** (one object, or an array for a chain in driving order) to the scratchpad and run:
    `npx vite-node scripts/offer-check.ts -- <file.json>` (add `--json` for machine-readable output).
 3. **Report** in 3–5 lines: verdict, contribution and £/hour vs target, dead-time share, and the **target price** to counter with when the verdict is NEGOTIATE. Repeat any `Missing:` and `Warnings:` lines verbatim. If PROVISIONAL, say it must not be treated as a firm plan.
