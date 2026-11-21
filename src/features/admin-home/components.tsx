@@ -113,7 +113,8 @@ export function KpiTile({
   label, value, icon: Icon, tone, attention, loading, onClick,
 }: {
   label: string;
-  value: number;
+  /** `null` = the count could not be loaded; shown as "—", never as 0. */
+  value: number | null;
   icon: LucideIcon;
   /** Colour of the icon when the value is non-zero. */
   tone: Tone;
@@ -122,14 +123,14 @@ export function KpiTile({
   loading?: boolean;
   onClick: () => void;
 }) {
-  const active = !loading && value > 0;
-  const figure = kpiFigure(value);
+  const active = !loading && value !== null && value > 0;
+  const figure = value === null ? "—" : kpiFigure(value);
   const size = figure.length <= 4 ? "text-[28px]" : figure.length <= 6 ? "text-[24px]" : "text-[21px]";
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label={`${label}: ${loading ? "loading" : value.toLocaleString("en-GB")}`}
+      aria-label={`${label}: ${loading ? "loading" : value === null ? "unavailable" : value.toLocaleString("en-GB")}`}
       className={cn(
         "ah-card ah-press ah-lift group flex min-h-[84px] min-w-0 flex-col justify-between gap-1.5 rounded-[18px] px-3.5 pb-3 pt-2.5 text-left sm:px-4",
         active && attention && TILE_TINT[tone],
@@ -245,7 +246,8 @@ export function BannerSkeleton() {
 export interface QueueStat {
   key: string;
   label: string;
-  value: number;
+  /** `null` = the count could not be loaded; shown as "—". */
+  value: number | null;
   /** Colour the value when non-zero (only for problem queues). */
   tone?: "danger";
   onClick?: () => void;
@@ -258,7 +260,8 @@ export interface QueueStat {
  */
 export function QueueStrip({ stats, loading }: { stats: QueueStat[]; loading?: boolean }) {
   // One size for the whole row, chosen by the longest figure, so values align.
-  const longest = Math.max(...stats.map((x) => x.value.toLocaleString("en-GB").length));
+  const shown = (v: number | null) => (v === null ? "—" : v.toLocaleString("en-GB"));
+  const longest = Math.max(...stats.map((x) => shown(x.value).length));
   const figureSize = longest <= 4 ? "text-[22px]" : "text-[18px]";
   return (
     <ul
@@ -266,14 +269,14 @@ export function QueueStrip({ stats, loading }: { stats: QueueStat[]; loading?: b
       style={{ gridTemplateColumns: `repeat(${stats.length}, minmax(0, 1fr))` }}
     >
       {stats.map((s) => {
-        const active = !loading && s.value > 0;
+        const active = !loading && s.value !== null && s.value > 0;
         return (
           <li key={s.key} className="min-w-0">
             <button
               type="button"
               onClick={s.onClick}
               disabled={!s.onClick}
-              aria-label={`${s.label}: ${loading ? "loading" : s.value.toLocaleString("en-GB")}`}
+              aria-label={`${s.label}: ${loading ? "loading" : s.value === null ? "unavailable" : s.value.toLocaleString("en-GB")}`}
               className="ah-row flex min-h-[64px] w-full flex-col items-start justify-start rounded-xl px-2.5 py-1.5 text-left disabled:cursor-default"
             >
               {loading ? (
@@ -287,7 +290,7 @@ export function QueueStrip({ stats, loading }: { stats: QueueStat[]; loading?: b
                     active && s.tone === "danger" ? "text-destructive" : active ? "text-foreground" : "text-foreground/45",
                   )}
                 >
-                  {s.value.toLocaleString("en-GB")}
+                  {shown(s.value)}
                 </span>
               )}
               <span aria-hidden className="text-[13px] font-medium leading-[17px] text-[hsl(var(--ah-ink-soft))]">{s.label}</span>
@@ -306,7 +309,8 @@ export function CountRow({
 }: {
   icon: LucideIcon;
   label: string;
-  value?: number;
+  /** `null` = the count could not be loaded; shown as "—". Omit for link rows. */
+  value?: number | null;
   /** Shown instead of a number when no trustworthy count exists (e.g. "—"). */
   valueText?: string;
   tone: Tone;
@@ -322,10 +326,12 @@ export function CountRow({
         <span className="block text-[15px] leading-5 text-foreground line-clamp-2">{label}</span>
         {hint && <span className="block line-clamp-2 text-[13px] leading-[18px] text-muted-foreground">{hint}</span>}
       </span>
-      {valueText !== undefined && (
-        <span className="shrink-0 text-[16px] font-semibold leading-5 text-muted-foreground">{valueText}</span>
+      {(valueText !== undefined || (value === null && !loading)) && (
+        <span className="shrink-0 text-[16px] font-semibold leading-5 text-muted-foreground" aria-label={value === null ? "unavailable" : undefined}>
+          {valueText ?? "—"}
+        </span>
       )}
-      {valueText === undefined && value !== undefined &&
+      {valueText === undefined && value !== undefined && (value !== null || loading) &&
         (loading ? (
           <Skeleton className="h-5 w-7 rounded" />
         ) : (

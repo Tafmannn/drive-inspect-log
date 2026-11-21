@@ -7,7 +7,7 @@
  * data is read or written. Run with VITE_ENABLE_AUTH=false so AuthProvider
  * uses the dev user path (overrideRoles).
  *
- *   ?fixture=busy | calm | invoicing | worst | loading
+ *   ?fixture=busy | calm | invoicing | worst | unavailable | loading
  *   ?role=ADMIN | SUPERADMIN
  *   ?theme=dark
  *
@@ -83,7 +83,7 @@ const exceptionsBusy = [{
 
 const zeroBuckets = {
   todays_active: 0, needs_driver_action: 0, needs_admin_review: 0, blocked_evidence: 0,
-  ready_to_close: 0, ready_to_invoice: 0, completed_not_invoiced: 0, failed_uploads: 0, cancelled_archived: 0,
+  ready_to_close: 0, ready_to_invoice: 0, completed_not_invoiced: 0, failed_uploads: null, cancelled_archived: 0,
 };
 
 const fixtures: Record<string, Record<string, unknown> | null> = {
@@ -118,6 +118,15 @@ const fixtures: Record<string, Record<string, unknown> | null> = {
     compliance: { pendingReview: 1204, missingDocs: 987, expiredLicences: 45 },
     buckets: { ...zeroBuckets, todays_active: 9999, needs_driver_action: 12345, needs_admin_review: 1203, blocked_evidence: 345, ready_to_close: 858, ready_to_invoice: 99999, completed_not_invoiced: 123456, cancelled_archived: 4100 },
     attention: { exceptions: [{ ...exceptionsBusy[0], title: "Delivery inspection photos failed to upload after three retries on a weak mobile connection" }] },
+  },
+  // Some counts failed to load: the hooks return null, the UI must show "—".
+  unavailable: {
+    queues: queuesFrom({ unassigned: [], stale: [], review: [], inProgress: busyRows.inProgress, completed: busyRows.completed }),
+    kpis: { active: 6, podReview: null, unassigned: null, stale: 0 },
+    evidence: 0,
+    compliance: { pendingReview: 0, missingDocs: 0, expiredLicences: 0 },
+    buckets: { ...zeroBuckets, needs_driver_action: 6, needs_admin_review: null, ready_to_close: null, ready_to_invoice: null, completed_not_invoiced: null, cancelled_archived: 41 },
+    attention: { exceptions: [] },
   },
   loading: null,
 };

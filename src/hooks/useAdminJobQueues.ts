@@ -105,11 +105,20 @@ export function useAdminJobQueueKpis() {
         supabase.from("jobs").select("id", { count: "exact", head: true })
           .eq("is_hidden", false).in("status", ACTIVE_STATUSES as string[]).lt("updated_at", staleThreshold),
       ]);
+      // A failed count is `null` (unknown), never 0: a silent zero would
+      // read as "nothing unassigned / nothing to review".
+      const n = (label: string, r: { count: number | null; error: { message: string } | null }): number | null => {
+        if (r.error) {
+          console.warn(`[kpis] ${label} count failed`, r.error.message);
+          return null;
+        }
+        return r.count ?? 0;
+      };
       return {
-        active: activeRes.count ?? 0,
-        podReview: podRes.count ?? 0,
-        unassigned: unassignedRes.count ?? 0,
-        stale: staleRes.count ?? 0,
+        active: n("active", activeRes),
+        podReview: n("podReview", podRes),
+        unassigned: n("unassigned", unassignedRes),
+        stale: n("stale", staleRes),
       };
     },
     staleTime: 30_000,

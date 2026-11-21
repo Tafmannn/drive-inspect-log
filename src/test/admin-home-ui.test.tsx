@@ -16,8 +16,8 @@ const job = (id: string, status: string, driver: string | null, h = 2) => ({
 });
 
 let queues: Record<string, unknown[]>;
-let kpis: Record<string, number>;
-let buckets: Record<string, number>;
+let kpis: Record<string, number | null>;
+let buckets: Record<string, number | null>;
 let exceptions: unknown[];
 let queuesError = false;
 const refetchQueues = vi.fn();
@@ -63,7 +63,7 @@ function renderBody() {
 
 const zero = {
   todays_active: 0, needs_driver_action: 0, needs_admin_review: 0, blocked_evidence: 0, ready_to_close: 0,
-  ready_to_invoice: 0, completed_not_invoiced: 0, failed_uploads: 0, cancelled_archived: 0,
+  ready_to_invoice: 0, completed_not_invoiced: 0, failed_uploads: null, cancelled_archived: 0,
 };
 const emptyQueues = { needsAttention: [], unassigned: [], inProgress: [], review: [], completed: [], missingEvidence: [] };
 
@@ -99,10 +99,10 @@ describe("Admin Home UI", () => {
     expect(screen.getByText("2 PODs to review")).toBeTruthy();
   });
 
-  it("describes the POD-PDF proxy accurately and keeps its destination", () => {
+  it("raises the not-invoiced banner (invoice-checked count) and keeps its destination", () => {
     buckets = { ...zero, completed_not_invoiced: 68 };
     renderBody();
-    expect(screen.getByText("68 completed jobs have no POD PDF on file.")).toBeTruthy();
+    expect(screen.getByText("68 completed jobs are not yet invoiced.")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /Invoice prep/ }));
     expect(screen.getByTestId("landed").textContent).toBe("/control/invoice-prep");
   });
@@ -129,11 +129,21 @@ describe("Admin Home UI", () => {
     expect(container.textContent).not.toMatch(/£|\+\d+%/);
   });
 
-  it("never labels proxy counts as confirmed invoicing totals", () => {
-    buckets = { ...zero, completed_not_invoiced: 68, ready_to_invoice: 3 };
-    const { container } = renderBody();
-    expect(container.textContent).not.toMatch(/not (yet )?invoiced|ready to invoice/i);
-    expect(screen.getAllByText("Invoice candidates").length).toBeGreaterThan(0);
+  it("shows unknown counts as a dash, never as 0, and raises no banner from them", () => {
+    kpis = { active: 5, podReview: null, unassigned: null, stale: 0 };
+    buckets = { ...zero, ready_to_invoice: null, completed_not_invoiced: null, needs_admin_review: null };
+    renderBody();
+    expect(screen.getByRole("button", { name: "Unassigned: unavailable" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Ready to invoice: unavailable" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Admin review: unavailable" })).toBeTruthy();
+    expect(screen.queryByText(/not yet invoiced/)).toBeNull();
+  });
+
+  it("does not reassure ('Action queue is empty') while some counts are unknown", () => {
+    kpis = { active: 5, podReview: 0, unassigned: null, stale: 0 };
+    renderBody();
+    expect(screen.getByText("Some counts didn’t load")).toBeTruthy();
+    expect(screen.queryByText("Action queue is empty")).toBeNull();
   });
 
   it("shows a dash, not a fake zero, for the uncounted failed-uploads bucket", () => {
