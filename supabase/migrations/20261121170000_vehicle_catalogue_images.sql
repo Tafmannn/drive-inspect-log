@@ -3,7 +3,7 @@
 
 create extension if not exists btree_gist with schema extensions;
 
-create table public.vehicle_catalogue_images (
+create table if not exists public.vehicle_catalogue_images (
   id uuid primary key default gen_random_uuid(),
   make text not null check (length(trim(make)) > 0),
   model text not null check (length(trim(model)) > 0),
@@ -25,18 +25,22 @@ create table public.vehicle_catalogue_images (
   )
 );
 
-create index vehicle_catalogue_images_lookup_idx
+create index if not exists vehicle_catalogue_images_lookup_idx
   on public.vehicle_catalogue_images (lower(make), lower(model), year_from, year_to);
 
 alter table public.vehicle_catalogue_images enable row level security;
 
+drop policy if exists "catalogue images readable by signed-in users" on public.vehicle_catalogue_images;
 create policy "catalogue images readable by signed-in users"
   on public.vehicle_catalogue_images for select to authenticated using (true);
+drop policy if exists "catalogue images insert by super admin" on public.vehicle_catalogue_images;
 create policy "catalogue images insert by super admin"
   on public.vehicle_catalogue_images for insert to authenticated with check (public.is_super_admin());
+drop policy if exists "catalogue images update by super admin" on public.vehicle_catalogue_images;
 create policy "catalogue images update by super admin"
   on public.vehicle_catalogue_images for update to authenticated
   using (public.is_super_admin()) with check (public.is_super_admin());
+drop policy if exists "catalogue images delete by super admin" on public.vehicle_catalogue_images;
 create policy "catalogue images delete by super admin"
   on public.vehicle_catalogue_images for delete to authenticated using (public.is_super_admin());
 
@@ -64,16 +68,20 @@ insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_typ
 values ('vehicle-images', 'vehicle-images', true, 10485760, array['image/png', 'image/webp'])
 on conflict (id) do nothing;
 
+drop policy if exists "vehicle-images super admin read" on storage.objects;
 create policy "vehicle-images super admin read"
   on storage.objects for select to authenticated
   using (bucket_id = 'vehicle-images' and public.is_super_admin());
+drop policy if exists "vehicle-images super admin insert" on storage.objects;
 create policy "vehicle-images super admin insert"
   on storage.objects for insert to authenticated
   with check (bucket_id = 'vehicle-images' and public.is_super_admin());
+drop policy if exists "vehicle-images super admin update" on storage.objects;
 create policy "vehicle-images super admin update"
   on storage.objects for update to authenticated
   using (bucket_id = 'vehicle-images' and public.is_super_admin())
   with check (bucket_id = 'vehicle-images' and public.is_super_admin());
+drop policy if exists "vehicle-images super admin delete" on storage.objects;
 create policy "vehicle-images super admin delete"
   on storage.objects for delete to authenticated
   using (bucket_id = 'vehicle-images' and public.is_super_admin());

@@ -8,8 +8,10 @@ create table if not exists public.vehicle_make_aliases (
   created_at timestamptz not null default now()
 );
 alter table public.vehicle_make_aliases enable row level security;
+drop policy if exists "make aliases readable by signed-in users" on public.vehicle_make_aliases;
 create policy "make aliases readable by signed-in users"
   on public.vehicle_make_aliases for select to authenticated using (true);
+drop policy if exists "make aliases managed by super admin" on public.vehicle_make_aliases;
 create policy "make aliases managed by super admin"
   on public.vehicle_make_aliases for all to authenticated
   using (public.is_super_admin()) with check (public.is_super_admin());

@@ -78,8 +78,9 @@ describe("JobHeaderCard vehicle image", () => {
       />,
     );
     expect(screen.getByTestId("vehicle-catalogue-image")).toBeTruthy();
-    const img = screen.getByAltText("BMW X5 illustration") as HTMLImageElement;
-    expect(img.src).toContain("/storage/v1/object/public/vehicle-images/bmw-x5-2019-2023-black.png");
+    // setup.ts patches HTMLImageElement#src, so read the attribute React set.
+    const img = screen.getByAltText("BMW X5 illustration");
+    expect(img.getAttribute("src")).toContain("/storage/v1/object/public/vehicle-images/bmw-x5-2019-2023-black.png");
   });
 
   it("omits the panel when there is no image", () => {
