@@ -81,6 +81,7 @@ const SuperAdminAudit = lazyNamed(() => import("./pages/SuperAdminPages"), "Supe
 const SuperAdminErrors = lazyNamed(() => import("./pages/SuperAdminPages"), "SuperAdminErrors");
 const SuperAdminAttention = lazyNamed(() => import("./pages/SuperAdminPages"), "SuperAdminAttention");
 const SuperAdminSettings = lazyNamed(() => import("./pages/SuperAdminPages"), "SuperAdminSettings");
+const VehicleImageLibrary = lazyNamed(() => import("@/features/vehicleCatalogue/pages/VehicleImageLibrary"), "VehicleImageLibrary");
 const InvoiceGenerator = lazyNamed(() => import("./pages/InvoiceGenerator"), "InvoiceGenerator");
 const DriverOnboardingWizard = lazy(() => import("./features/onboarding/pages/DriverOnboardingWizard"));
 const ClientOnboardingWizard = lazy(() => import("./features/onboarding/pages/ClientOnboardingWizard"));
@@ -341,6 +342,7 @@ const App = () => {
                 <Route path="/super-admin/errors" element={<ProtectedRoute><SuperAdminRoute><SuperAdminErrors /></SuperAdminRoute></ProtectedRoute>} />
                 <Route path="/super-admin/attention" element={<ProtectedRoute><SuperAdminRoute><SuperAdminAttention /></SuperAdminRoute></ProtectedRoute>} />
                 <Route path="/super-admin/settings" element={<ProtectedRoute><SuperAdminRoute><SuperAdminSettings /></SuperAdminRoute></ProtectedRoute>} />
+                <Route path="/super-admin/vehicle-images" element={<ProtectedRoute><SuperAdminRoute><VehicleImageLibrary /></SuperAdminRoute></ProtectedRoute>} />
                 <Route path="/invoice/new" element={<ProtectedRoute><AdminRoute><InvoiceGenerator /></AdminRoute></ProtectedRoute>} />
                 <Route path="/invoice/new/:jobId" element={<ProtectedRoute><AdminRoute><InvoiceGenerator /></AdminRoute></ProtectedRoute>} />
 
