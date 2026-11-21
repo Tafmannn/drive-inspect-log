@@ -116,7 +116,7 @@ export function VehicleImageLibrary() {
     if (!list?.length) return;
     const added: PendingRow[] = Array.from(list).map((file) => {
       const res = parseVehicleImageName(file.name);
-      let problem: string | null = res.ok ? null : res.error;
+      let problem: string | null = "error" in res ? res.error : null;
       if (!problem && !/^image\/(png|webp)$/.test(file.type)) problem = "File must be a PNG or WebP image";
       if (!problem && file.size > MAX_BYTES) problem = "File is larger than 10 MB";
       return {

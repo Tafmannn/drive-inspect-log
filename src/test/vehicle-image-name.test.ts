@@ -3,7 +3,8 @@ import { findOverlaps, parseVehicleImageName } from "@/features/vehicleCatalogue
 
 const ok = (name: string) => {
   const r = parseVehicleImageName(name);
-  if (!r.ok) throw new Error(r.error);
+  if ("error" in r) throw new Error(r.error);
+  if (!r.ok) throw new Error("unparsed");
   return r.value;
 };
 
