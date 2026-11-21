@@ -351,6 +351,7 @@ export const JobDetail = () => {
           model={job.vehicle_model}
           colour={job.vehicle_colour}
           year={job.vehicle_year}
+          vehicleImagePath={job.catalogue_image_path}
           client={job.client_company || job.client_name}
           clientEmail={job.client_email}
           rightSlot={<EvidenceStatusBadges jobId={job.id} />}

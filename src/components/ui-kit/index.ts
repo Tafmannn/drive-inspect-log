@@ -19,3 +19,4 @@ export { RoleScope } from "./RoleScope";
 export { EvidenceHealthBanner } from "./EvidenceHealthBanner";
 export type { EvidenceLevel } from "./EvidenceHealthBanner";
 export { JobHeaderCard } from "./JobHeaderCard";
+export { VehicleCatalogueImage } from "./VehicleCatalogueImage";

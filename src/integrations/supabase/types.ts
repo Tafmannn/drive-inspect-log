@@ -1559,6 +1559,7 @@ export type Database = {
       }
       jobs: {
         Row: {
+          catalogue_image_path: string | null
           is_test: boolean
           cancellation_reason: string | null
           caz_ulez_flag: string | null
@@ -1636,6 +1637,7 @@ export type Database = {
           vehicle_year: string | null
         }
         Insert: {
+          catalogue_image_path?: string | null
           is_test?: boolean
           cancellation_reason?: string | null
           caz_ulez_flag?: string | null
@@ -1713,6 +1715,7 @@ export type Database = {
           vehicle_year?: string | null
         }
         Update: {
+          catalogue_image_path?: string | null
           is_test?: boolean
           cancellation_reason?: string | null
           caz_ulez_flag?: string | null

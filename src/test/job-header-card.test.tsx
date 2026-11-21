@@ -64,3 +64,33 @@ describe("JobHeaderCard", () => {
     expect(screen.getByTestId("progress")).toBeTruthy();
   });
 });
+
+describe("JobHeaderCard vehicle image", () => {
+  it("renders the catalogue image panel when a path is provided", () => {
+    render(
+      <JobHeaderCard
+        jobRef="AX1"
+        vehicleReg="AB12 CDE"
+        status={status}
+        make="BMW"
+        model="X5"
+        vehicleImagePath="bmw-x5-2019-2023-black.png"
+      />,
+    );
+    expect(screen.getByTestId("vehicle-catalogue-image")).toBeTruthy();
+    const img = screen.getByAltText("BMW X5 illustration") as HTMLImageElement;
+    expect(img.src).toContain("/storage/v1/object/public/vehicle-images/bmw-x5-2019-2023-black.png");
+  });
+
+  it("omits the panel when there is no image", () => {
+    render(<JobHeaderCard jobRef="AX1" vehicleReg="AB12 CDE" status={status} make="BMW" model="X5" />);
+    expect(screen.queryByTestId("vehicle-catalogue-image")).toBeNull();
+  });
+
+  it("rejects unsafe paths", () => {
+    render(
+      <JobHeaderCard jobRef="AX1" vehicleReg="AB12 CDE" status={status} vehicleImagePath="../secret/x.png" />,
+    );
+    expect(screen.queryByTestId("vehicle-catalogue-image")).toBeNull();
+  });
+});

@@ -12,6 +12,7 @@ import type { ReactNode } from "react";
 import { Building } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { UKPlate } from "@/components/UKPlate";
+import { VehicleCatalogueImage } from "./VehicleCatalogueImage";
 
 interface JobHeaderCardProps {
   /** External job number or short id, e.g. "AX1234". */
@@ -36,6 +37,8 @@ interface JobHeaderCardProps {
   client?: string | null;
   /** Optional client email appended after a separator. */
   clientEmail?: string | null;
+  /** Catalogue artwork file (jobs.catalogue_image_path). Panel is hidden when absent. */
+  vehicleImagePath?: string | null;
   /** UKPlate variant — "front" (default) or "rear". */
   plateVariant?: "front" | "rear";
   /** Right-aligned slot inside the header row (e.g. EvidenceStatusBadges). */
@@ -56,12 +59,19 @@ export function JobHeaderCard({
   client,
   clientEmail,
   plateVariant,
+  vehicleImagePath,
   rightSlot,
   children,
   className,
 }: JobHeaderCardProps) {
   return (
     <Card className={`p-4 rounded-xl bg-card border border-border shadow-sm space-y-2 ${className ?? ""}`}>
+      <VehicleCatalogueImage
+        key={vehicleImagePath ?? "none"}
+        path={vehicleImagePath}
+        label={[make, model].filter(Boolean).join(" ")}
+        className="-mx-1 -mt-1 mb-2"
+      />
       <div className="flex items-center justify-between mb-1">
         <span
           style={{ backgroundColor: status.backgroundColor, color: status.color }}
