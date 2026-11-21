@@ -2544,6 +2544,66 @@ export type Database = {
           },
         ]
       }
+      vehicle_catalogue_images: {
+        Row: {
+          body_type: string | null
+          colour: string
+          created_at: string
+          created_by: string | null
+          generation: string | null
+          id: string
+          image_path: string
+          make: string
+          model: string
+          year_from: number
+          year_to: number
+        }
+        Insert: {
+          body_type?: string | null
+          colour: string
+          created_at?: string
+          created_by?: string | null
+          generation?: string | null
+          id?: string
+          image_path: string
+          make: string
+          model: string
+          year_from: number
+          year_to: number
+        }
+        Update: {
+          body_type?: string | null
+          colour?: string
+          created_at?: string
+          created_by?: string | null
+          generation?: string | null
+          id?: string
+          image_path?: string
+          make?: string
+          model?: string
+          year_from?: number
+          year_to?: number
+        }
+        Relationships: []
+      }
+      vehicle_make_aliases: {
+        Row: {
+          alias: string
+          created_at: string
+          make: string
+        }
+        Insert: {
+          alias: string
+          created_at?: string
+          make: string
+        }
+        Update: {
+          alias?: string
+          created_at?: string
+          make?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       active_driver_profiles: {
