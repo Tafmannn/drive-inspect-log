@@ -92,7 +92,7 @@ const fixtures: Record<string, Record<string, unknown> | null> = {
     kpis: { active: 14, podReview: 2, unassigned: 1, stale: 1 },
     evidence: 1,
     compliance: { pendingReview: 2, missingDocs: 1, expiredLicences: 0 },
-    buckets: { ...zeroBuckets, todays_active: 9, needs_driver_action: 12, needs_admin_review: 2, blocked_evidence: 1, ready_to_close: 1, ready_to_invoice: 3, completed_not_invoiced: 68, cancelled_archived: 41 },
+    buckets: { ...zeroBuckets, todays_active: 9, needs_driver_action: 12, needs_admin_review: 2, blocked_evidence: 1, ready_to_close: 1, ready_to_invoice: 3, completed_not_invoiced: 4, cancelled_archived: 41 },
     attention: { exceptions: exceptionsBusy },
   },
   invoicing: {
@@ -100,7 +100,7 @@ const fixtures: Record<string, Record<string, unknown> | null> = {
     kpis: { active: 6, podReview: 0, unassigned: 0, stale: 0 },
     evidence: 0,
     compliance: { pendingReview: 0, missingDocs: 0, expiredLicences: 0 },
-    buckets: { ...zeroBuckets, todays_active: 4, needs_driver_action: 6, ready_to_invoice: 3, completed_not_invoiced: 68, cancelled_archived: 41 },
+    buckets: { ...zeroBuckets, todays_active: 4, needs_driver_action: 6, ready_to_invoice: 3, completed_not_invoiced: 4, cancelled_archived: 41 },
     attention: { exceptions: [] },
   },
   calm: {

@@ -26,6 +26,7 @@ import { useDashboardCounts } from "@/hooks/useJobs";
 import { useDriverGate } from "@/hooks/useDriverGate";
 import { useAuth } from "@/context/AuthContext";
 import { HomeHeader } from "@/features/admin-home/HomeHeader";
+import { adminGreeting } from "@/features/admin-home/greeting";
 import "@/features/admin-home/admin-home.css";
 
 // Admins/super-admins get the operational dashboard body — lazy so its heavy
@@ -73,6 +74,7 @@ export const Dashboard = () => {
   }
 
   const isOps = isAdmin || isSuperAdmin;
+  const opsGreeting = adminGreeting(user?.name);
   const greeting = greetingFor(user?.name);
 
   if (isOps) {
@@ -84,8 +86,8 @@ export const Dashboard = () => {
         <div className="mx-auto max-w-5xl px-4 pb-3 pt-2 sm:px-6 sm:pb-4 lg:px-8">
           <div className="px-0.5">
             <p className="text-[13px] font-medium leading-[18px] text-muted-foreground">{todayLabel()}</p>
-            <h1 className="text-[26px] font-semibold leading-[32px] tracking-[-0.024em] text-foreground min-[380px]:text-[28px] min-[380px]:leading-[34px] sm:text-[32px] sm:leading-[38px]">
-              {greeting}
+            <h1 className="truncate text-[26px] font-semibold leading-[32px] tracking-[-0.024em] text-foreground min-[380px]:text-[28px] min-[380px]:leading-[34px] sm:text-[32px] sm:leading-[38px]">
+              {opsGreeting}
             </h1>
           </div>
         </div>

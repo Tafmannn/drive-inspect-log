@@ -204,13 +204,12 @@ function useNeedsActionItems() {
 
 const NEEDS_ACTION_ID = "needs-action";
 
-// ── Tier 1: KPI tiles ────────────────────────────────────────────────
+// ── Tier 1: KPI tiles (operational; finance lives in InvoicingCard) ───
 // Labels describe exactly what each count measures (see docs/admin-home).
 
 function KpiTiles() {
   const navigate = useNavigate();
   const { data: kpis, isLoading } = useAdminJobQueueKpis();
-  const { data: buckets, isLoading: bucketsLoading } = useAdminOperationsBuckets();
 
   return (
     <div className="grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-4">
@@ -241,12 +240,13 @@ function KpiTiles() {
         onClick={() => navigate("/control/pod-review")}
       />
       <KpiTile
-        label="Ready to invoice"
-        value={buckets?.ready_to_invoice ?? null}
-        icon={FileText}
-        tone="info"
-        loading={bucketsLoading}
-        onClick={() => navigate(BUCKET_DEFS.ready_to_invoice.defaultRoute!)}
+        label="Stale jobs"
+        value={kpis?.stale ?? null}
+        icon={Clock}
+        tone="warning"
+        attention
+        loading={isLoading}
+        onClick={() => navigate("/control/jobs?view=stale")}
       />
     </div>
   );
@@ -259,7 +259,6 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 const timeFmt = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit" });
 
 function AttentionSummary() {
-  const navigate = useNavigate();
   const { items, loading, failed, retry, updatedAt } = useNeedsActionItems();
   const bucketsQuery = useAdminOperationsBuckets();
   const kpisQuery = useAdminJobQueueKpis();
@@ -316,20 +315,8 @@ function AttentionSummary() {
     );
   }
 
-  // completed_not_invoiced = completed jobs with no non-cancelled invoice
-  // (duplicate-invoice guard). null (unknown) never raises this banner.
-  const notInvoiced = buckets?.completed_not_invoiced ?? 0;
-  if (notInvoiced > 0) {
-    return (
-      <AttentionBanner
-        icon={FileWarning}
-        title="Needs your attention"
-        message={`${notInvoiced.toLocaleString("en-GB")} completed ${notInvoiced === 1 ? "job is" : "jobs are"} not yet invoiced.`}
-        actionLabel="Invoice prep"
-        onAction={() => navigate(BUCKET_DEFS.completed_not_invoiced.defaultRoute!)}
-      />
-    );
-  }
+  // The banner summarises the Needs action queue only, so it can never
+  // disagree with it. Invoicing has its own section (InvoicingCard).
 
   // Don't reassure while some counts are unknown.
   if (countsIncomplete) {
@@ -489,60 +476,92 @@ function NeedsActionQueue() {
   );
 }
 
-// ── Job queues (existing bucket counts; independent queues, not a sequence) ──
+// ── Operations: job queues + exceptions (independent counts, not a sequence) ──
 
-function JobQueues() {
+function OperationsCard() {
   const navigate = useNavigate();
   const { data: buckets, isLoading } = useAdminOperationsBuckets();
-  const stats: { key: BucketKey; label: string; tone?: "danger" }[] = [
-    { key: "needs_driver_action", label: "With drivers" },
-    { key: "needs_admin_review", label: "Admin review" },
-    { key: "blocked_evidence", label: "Evidence blocked", tone: "danger" },
-  ];
+  const { data: missingEvidence, isLoading: evidenceLoading } = useAdminMissingEvidence();
+  // Each count matches the list its destination shows. "Missing inspection"
+  // uses the 7-day count (useAdminMissingEvidence) because /control/jobs
+  // ?view=evidence lists that 7-day queue; the all-time bucket
+  // (blocked_evidence) stays under "All operational buckets".
   return (
-    <Card aria-labelledby="queues-title">
+    <Card aria-labelledby="ops-title">
       <SectionHeader
-        id="queues-title"
-        icon={Layers}
-        title="Job queues"
+        id="ops-title"
+        icon={Activity}
+        title="Operations"
         action={{ label: "All jobs", onClick: () => navigate("/control/jobs"), ariaLabel: "Open the full jobs queue" }}
       />
       <QueueStrip
-        loading={isLoading}
-        stats={stats.map((s) => ({
-          key: s.key,
-          label: s.label,
-          tone: s.tone,
-          value: buckets ? buckets[s.key] : null,
-          onClick: () => navigate(BUCKET_DEFS[s.key].defaultRoute!),
-        }))}
+        loading={isLoading || evidenceLoading}
+        stats={[
+          {
+            key: "needs_driver_action",
+            label: "With drivers",
+            hint: "Assigned to delivery",
+            value: buckets ? buckets.needs_driver_action : null,
+            onClick: () => navigate(BUCKET_DEFS.needs_driver_action.defaultRoute!),
+          },
+          {
+            key: "todays_active",
+            label: "Due today",
+            hint: "Job date today",
+            value: buckets ? buckets.todays_active : null,
+            onClick: () => navigate(BUCKET_DEFS.todays_active.defaultRoute!),
+          },
+          {
+            key: "missing_inspection",
+            label: "Missing inspection",
+            hint: "Delivered, last 7 days",
+            tone: "danger",
+            value: missingEvidence ?? null,
+            onClick: () => navigate("/control/jobs?view=evidence"),
+          },
+        ]}
       />
     </Card>
   );
 }
 
-// ── Operations (remaining intervention counts; same routes as before) ─
+// ── Invoicing (counts checked against invoices; see useAdminOperationsBuckets) ──
 
-function OperationsCard() {
+function InvoicingCard() {
   const navigate = useNavigate();
-  const { data: kpis, isLoading } = useAdminJobQueueKpis();
-  const { data: missingEvidence, isLoading: evidenceLoading } = useAdminMissingEvidence();
-  const { data: buckets, isLoading: bucketsLoading } = useAdminOperationsBuckets();
-
+  const { data: buckets, isLoading } = useAdminOperationsBuckets();
+  const ready = buckets?.ready_to_invoice ?? null;
+  const notInvoiced = buckets?.completed_not_invoiced ?? null;
+  // ready_to_invoice is a strict subset of completed_not_invoiced (same live,
+  // completed, uninvoiced base plus client, price and both inspections), so
+  // the difference is the jobs that cannot be invoiced yet. Unknown if either is.
+  const blocked = ready === null || notInvoiced === null ? null : Math.max(notInvoiced - ready, 0);
   return (
-    <Card aria-labelledby="ops-title">
-      <SectionHeader id="ops-title" icon={Activity} title="Operations" />
+    <Card aria-labelledby="invoicing-title">
+      <SectionHeader
+        id="invoicing-title"
+        icon={Receipt}
+        title="Invoicing"
+        action={{ label: "Invoice prep", onClick: () => navigate("/control/invoice-prep"), ariaLabel: "Open invoice preparation" }}
+      />
       <div className="ah-divide pb-1">
-        <CountRow icon={Clock} label="Stale jobs" tone="warning" value={kpis?.stale ?? null} loading={isLoading} onClick={() => navigate("/control/jobs?view=stale")} />
-        <CountRow icon={ImageOff} label="Evidence issues" tone="danger" value={missingEvidence ?? null} loading={evidenceLoading} onClick={() => navigate("/control/jobs?view=evidence")} />
+        <CountRow
+          icon={FileText}
+          label="Ready to invoice"
+          hint="Client, price and both inspections"
+          tone="info"
+          value={ready}
+          loading={isLoading}
+          onClick={() => navigate(BUCKET_DEFS.ready_to_invoice.defaultRoute!)}
+        />
         <CountRow
           icon={FileWarning}
-          label="Completed, not invoiced"
-          hint="Opens invoice prep"
-          tone="info"
-          value={buckets?.completed_not_invoiced ?? null}
-          loading={bucketsLoading}
-          onClick={() => navigate(BUCKET_DEFS.completed_not_invoiced.defaultRoute!)}
+          label="Can’t invoice yet"
+          hint="Completed, but missing a client, price or inspection"
+          tone="warning"
+          value={blocked}
+          loading={isLoading}
+          onClick={() => navigate("/control/clients/link-jobs")}
         />
       </div>
     </Card>
@@ -913,7 +932,7 @@ export function AdminDashboardBody() {
       <div className="flex flex-col gap-3 sm:gap-4 lg:gap-5 lg:grid lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-start">
         <div className="contents lg:flex lg:flex-col lg:gap-5">
           <div className="order-1"><NeedsActionQueue /></div>
-          <div className="order-5">
+          <div className="order-6">
             <QueuePreviewSection
               title="Stale active"
               icon={Clock}
@@ -924,7 +943,7 @@ export function AdminDashboardBody() {
               onViewAll={() => navigate("/control/jobs?view=stale")}
             />
           </div>
-          <div className="order-6">
+          <div className="order-7">
             <QueuePreviewSection
               title="Awaiting review"
               icon={FileSearch}
@@ -935,11 +954,11 @@ export function AdminDashboardBody() {
               onViewAll={() => navigate("/control/pod-review")}
             />
           </div>
-          <div className="order-7"><RecentActivity /></div>
+          <div className="order-5"><RecentActivity /></div>
         </div>
         <div className="contents lg:flex lg:flex-col lg:gap-5">
-          <div className="order-2"><JobQueues /></div>
-          <div className="order-3"><OperationsCard /></div>
+          <div className="order-2"><OperationsCard /></div>
+          <div className="order-3"><InvoicingCard /></div>
           <div className="order-4"><ComplianceCard /></div>
           <div className="order-8"><ManagementRoutes /></div>
         </div>

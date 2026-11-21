@@ -188,3 +188,42 @@ and the banner fallback says "N completed jobs are not yet invoiced." The previe
 
 Screenshots: `screenshots/` holds first screens. `screenshots/full/` holds full pages.
 `screenshots/compare/` holds `ed9e69b` vs now and `main` vs now, at identical viewport and DPR.
+
+## 8. Production refinement (2026-11-21)
+
+### Metric reference (verified against code; live figures from read-only aggregate queries)
+
+| Metric | Source | Definition | Destination |
+|---|---|---|---|
+| Active jobs | `useAdminJobQueueKpis.active` | visible jobs in `ACTIVE_STATUSES` (assigned → delivery in progress) | `/control/jobs?view=active` |
+| Unassigned | `kpis.unassigned` | active, `driver_id` and `driver_name` both null | `/control/jobs?view=unassigned` |
+| POD review | `kpis.podReview` | `pod_ready`, `delivery_complete` | `/control/pod-review` |
+| Stale jobs | `kpis.stale` | active, not updated for 24 h | `/control/jobs?view=stale` |
+| With drivers | bucket `needs_driver_action` | driver statuses (now incl. `pickup_in_progress`) | `/control/jobs?view=active` |
+| Due today | bucket `todays_active` | driver or review status, `job_date` = today | `/control/jobs?view=active` |
+| Missing inspection | `useAdminMissingEvidence` | completed/delivered in the last 7 days with a pickup or delivery inspection flag false, minus admin-dismissed | `/control/jobs?view=evidence` (the same 7-day queue) |
+| Ready to invoice | bucket `ready_to_invoice` | live (`is_test` false), completed/closed, client linked, both inspections, price > 0, no non-cancelled invoice | `/control/invoice-prep` |
+| Can’t invoice yet | `completed_not_invoiced − ready_to_invoice` | live completed jobs not invoiced and missing a client, price or inspection (`ready` is a strict subset) | `/control/clients/link-jobs` |
+| Needs action / banner | Needs Action items | unassigned + stale + high/critical evidence exceptions + POD review backlog | scroll to the queue |
+
+Any count that fails to load is `null` and shown as "—". An unknown count never raises a banner.
+
+### 3 ready vs 60 not invoiced: reconciled (live, 2026-11-21)
+Of 60 completed, uninvoiced visible jobs: **56 were test jobs**, 1 had no client linked, 3 were ready (2 untagged source, 1 Movex).
+`completed_not_invoiced` now excludes test jobs, matching Invoice Prep, `ready_to_invoice` and the weekly unbilled figure.
+On the same data the dashboard now reads: ready 3, can’t invoice yet 1.
+The app has **no platform-specific invoicing rule**: no code reads `job_source`. A Movex job that meets the criteria counts as ready to invoice. If platform jobs are paid by the platform (self-billing), that rule needs defining before the dashboard can exclude them.
+
+### Other changes
+- The attention banner summarises the Needs action queue only. It no longer raises "N not yet invoiced" while the queue is empty. Invoicing has its own section.
+- KPI tiles are operational: Active, Unassigned, POD review, Stale. Ready to invoice moved into Invoicing.
+- The greeting stays on one line: first name capitalised, dropped if it would be too long (`features/admin-home/greeting.ts`).
+- Zero figures use `--muted-foreground` instead of 45% opacity. They measured 2.88:1 in light and 4.32:1 in dark; every home text now meets AA in both themes, by computed ratio.
+- Update prompt (`components/UpdatePrompt.tsx`, `lib/updatePolicy.ts`):
+  - held on job, expense and invoice forms as well as inspections
+  - "Update" refuses to reload while an upload is in flight, and says why
+  - while visible it reserves scroll space (`--update-prompt-space` on `#root`)
+  - "Later" is unchanged (dismissed for the session)
+- RLS is enabled, with policies, on `jobs`, `job_pricing`, `invoices`, `invoice_items`, `user_profiles`, `driver_profiles` and `client_logs` (read-only catalogue check).
+
+Screenshots: `screenshots/refinement-3/` (before = `main` 16c50c6, after = this change; 390 px at 3×).

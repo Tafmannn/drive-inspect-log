@@ -275,6 +275,9 @@ All colors MUST be HSL.
      them (env() is 0 in portrait and on desktop). */
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
+  /* Set by UpdatePrompt only while its banner is visible, so the last card on
+     any page can still be scrolled clear of it. 0 otherwise. */
+  padding-bottom: var(--update-prompt-space, 0px);
 }
 
 /* iOS zooms the page when a text field under 16px gets focus, and keeps that

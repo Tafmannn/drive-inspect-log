@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 const updateServiceWorker = vi.fn();
@@ -19,7 +19,11 @@ vi.mock("virtual:pwa-register/react", () => ({
   }),
 }));
 
+let pending: { status: string }[] = [];
+vi.mock("@/lib/pendingUploads", () => ({ getAllPendingUploads: async () => pending }));
+
 import { UpdatePrompt } from "@/components/UpdatePrompt";
+import { isUpdateHeldOn } from "@/lib/updatePolicy";
 
 function renderAt(path: string) {
   return render(
@@ -30,12 +34,13 @@ function renderAt(path: string) {
 }
 
 describe("UpdatePrompt", () => {
-  it("offers the waiting update with explicit Update / Later actions", () => {
+  it("offers the waiting update with explicit Update / Later actions", async () => {
+    pending = [];
     needRefreshValue = true;
     renderAt("/jobs");
     expect(screen.getByText("Update available")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Update" }));
-    expect(updateServiceWorker).toHaveBeenCalledWith(true);
+    await waitFor(() => expect(updateServiceWorker).toHaveBeenCalledWith(true));
     cleanup();
 
     needRefreshValue = true;
@@ -54,5 +59,35 @@ describe("UpdatePrompt", () => {
     needRefreshValue = false;
     renderAt("/jobs");
     expect(screen.queryByText("Update available")).toBeNull();
+  });
+
+  it("holds the update on screens with unsaved form state", () => {
+    for (const path of ["/jobs/new", "/jobs/abc/edit", "/expenses/new", "/expenses/e1/edit", "/invoice/new", "/inspection/j/pickup"]) {
+      expect(isUpdateHeldOn(path)).toBe(true);
+    }
+    for (const path of ["/", "/jobs", "/jobs/abc", "/control/jobs"]) {
+      expect(isUpdateHeldOn(path)).toBe(false);
+    }
+    needRefreshValue = true;
+    renderAt("/jobs/new");
+    expect(screen.queryByText("Update available")).toBeNull();
+  });
+
+  it("does not reload while an upload is in progress, and says why", async () => {
+    updateServiceWorker.mockClear();
+    pending = [{ status: "pending" }, { status: "uploading" }];
+    needRefreshValue = true;
+    renderAt("/jobs");
+    fireEvent.click(screen.getByRole("button", { name: "Update" }));
+    expect(await screen.findByText(/upload is in progress/i)).toBeTruthy();
+    expect(updateServiceWorker).not.toHaveBeenCalled();
+  });
+
+  it("reserves scroll space while visible and releases it when gone", () => {
+    needRefreshValue = true;
+    const { unmount } = renderAt("/jobs");
+    expect(document.documentElement.style.getPropertyValue("--update-prompt-space")).toMatch(/px$/);
+    unmount();
+    expect(document.documentElement.style.getPropertyValue("--update-prompt-space")).toBe("");
   });
 });
