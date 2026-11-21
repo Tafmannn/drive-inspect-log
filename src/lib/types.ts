@@ -63,6 +63,8 @@ export interface Job {
   vehicle_year: string | null;
   vehicle_type: string | null;
   vehicle_fuel_type: string | null;
+  /** Catalogue artwork file in the public `vehicle-images` bucket, set by a DB trigger from make/model/year/colour. */
+  catalogue_image_path?: string | null;
   pickup_contact_name: string;
   pickup_contact_phone: string;
   pickup_contact_email: string | null;
