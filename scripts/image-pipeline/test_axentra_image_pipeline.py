@@ -103,6 +103,23 @@ class Filenames(unittest.TestCase):
             self.assertFalse(P.valid_output_name(n, self.ids)[0], n)
 
 
+class Thumbnails(unittest.TestCase):
+    def test_original_to_thumb(self):
+        self.assertEqual(P.thumb_url("https://upload.wikimedia.org/wikipedia/commons/b/be/A_%28287%29.jpg", 1920, 2456),
+                         "https://upload.wikimedia.org/wikipedia/commons/thumb/b/be/A_%28287%29.jpg/1920px-A_%28287%29.jpg")
+
+    def test_existing_thumb_rewritten_and_query_dropped(self):
+        u = "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5c/B.jpg/3840px-B.jpg?utm_source=x"
+        self.assertEqual(P.thumb_url(u, 1920, 3840), "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5c/B.jpg/1920px-B.jpg")
+
+    def test_small_original_not_upscaled(self):
+        self.assertEqual(P.thumb_url("https://upload.wikimedia.org/wikipedia/commons/d/d3/C.jpg?utm=1", 1920, 1600),
+                         "https://upload.wikimedia.org/wikipedia/commons/d/d3/C.jpg")
+
+    def test_non_commons_untouched(self):
+        self.assertEqual(P.thumb_url("https://upload/a1.jpg", 1920, 3000), "https://upload/a1.jpg")
+
+
 class FitCanvas(unittest.TestCase):
     def test_no_stretch(self):
         from PIL import Image

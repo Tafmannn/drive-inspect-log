@@ -299,6 +299,30 @@ def stage_match(a):
     print(f"{len(rows)} vehicles, {len(cands)} candidates kept -> {work/'candidates.csv'}, {work/'summary.csv'}")
 
 
+def thumb_url(source_url: str, width: int, orig_width: int = 0) -> str:
+    """Wikimedia standard-size thumbnail URL for a Commons file (see https://w.wiki/GHai).
+
+    Wikimedia rate-limits bulk original downloads and asks clients to use thumbnails.
+    Returns the original URL (query string stripped) when the file is not wider than
+    `width`, because Commons will not upscale. Accepts original or existing thumb URLs.
+    """
+    u = urllib.parse.urlparse(source_url)
+    parts = u.path.split("/")
+    if "commons" not in parts:
+        return source_url
+    i = parts.index("commons")
+    rest = parts[i + 1:]
+    if rest and rest[0] == "thumb":
+        rest = rest[1:4]  # a/ab/Name.ext (drop the NNNpx-Name segment)
+    if len(rest) < 3:
+        return source_url
+    name = rest[2]
+    base = "https://upload.wikimedia.org/wikipedia/commons/"
+    if 0 < orig_width <= width:
+        return base + "/".join(rest[:3])
+    return base + "thumb/" + "/".join(rest[:3]) + f"/{width}px-{name}"
+
+
 def stage_download(a):
     work = Path(a.work); cpath = work / "candidates.csv"
     cands = read_csv(cpath); n = 0
@@ -310,19 +334,30 @@ def stage_download(a):
         if dest.exists() and dest.stat().st_size > 0:
             c["status"] = READY_FOR_VISUAL_REVIEW; continue
         try:
-            data = http_get(c["source_url"], timeout=120)
-            if c.get("sha256") and hashlib.sha256(data).hexdigest() != c["sha256"].lower():
+            tw = getattr(a, "thumb_width", 0) or 0
+            try: ow = int(float(c.get("width") or 0))
+            except ValueError: ow = 0
+            url = thumb_url(c["source_url"], tw, ow) if tw else c["source_url"]
+            data = http_get(url, timeout=120)
+            is_thumb = "/thumb/" in urllib.parse.urlparse(url).path
+            # The index sha256 is of the original file, so it can only be checked on an original.
+            if not is_thumb and c.get("sha256") and hashlib.sha256(data).hexdigest() != c["sha256"].lower():
                 raise RuntimeError("sha256 mismatch with index")
+            c["download_url"] = url
+            c["download_variant"] = f"wikimedia thumbnail {tw}px (sha256 not checkable)" if is_thumb else "original (sha256 checked)"
             from PIL import Image
             Image.open(io.BytesIO(data)).verify()
             dest.parent.mkdir(parents=True, exist_ok=True); dest.write_bytes(data)
             c["status"] = READY_FOR_VISUAL_REVIEW; c["download_error"] = ""; n += 1
         except Exception as e:
             c["status"] = DOWNLOAD_FAILED; c["download_error"] = str(e)[:200]
-        write_csv(cpath, cands, list(dict.fromkeys([*cands[0], "local_path", "download_error"])))  # resume-safe
+        write_csv(cpath, cands, list(dict.fromkeys([*cands[0], *DL_FIELDS])))  # resume-safe
         time.sleep(a.delay)
-    write_csv(cpath, cands, list(dict.fromkeys([*cands[0], "local_path", "download_error"])))
+    write_csv(cpath, cands, list(dict.fromkeys([*cands[0], *DL_FIELDS])))
     print(f"downloaded {n}; statuses: {count(cands)}")
+
+
+DL_FIELDS = ["local_path", "download_error", "download_url", "download_variant"]
 
 
 def count(rows, k="status"):
@@ -399,7 +434,8 @@ def stage_process(a):
         if not c: continue
         out = work / "processed" / f"{r['illustration_id']}.png"
         try:
-            im = Image.open(c["local_path"]); mods = []
+            im = Image.open(c["local_path"])
+            mods = [f"source: {c['download_variant']}"] if c.get("download_variant") else []
             if remove and a.remove_bg:
                 im = remove(im); mods.append("background removed (rembg)")
             im, s = fit_on_canvas(im)
@@ -523,6 +559,8 @@ def main(argv=None):
     p.add_argument("--limit", type=int)
     p.add_argument("--top", type=int, default=TOP_N)
     p.add_argument("--delay", type=float, default=1.0, help="seconds between downloads")
+    p.add_argument("--thumb-width", type=int, default=0,
+                   help="download Wikimedia standard-size thumbnails of this width (e.g. 1920) instead of originals")
     p.add_argument("--remove-bg", action="store_true", help="use rembg if installed")
     p.add_argument("--force", action="store_true")
     a = p.parse_args(argv)
