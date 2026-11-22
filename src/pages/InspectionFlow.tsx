@@ -7,8 +7,17 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { VehicleDiagram } from "@/components/VehicleDiagram";
-import { VehicleDamageModal } from "@/components/VehicleDamageModal";
+import { DamageInspector } from "@/features/damage/components/DamageInspector";
+import { resolveBodyType, type BodyType } from "@/features/damage/bodyTypes";
+import { useCatalogueBodyType } from "@/features/damage/useCatalogueBodyType";
+import {
+  attachRestoredPhotos,
+  damageClientIds,
+  damageLabel,
+  damagePhotoFiles,
+  sanitiseRestoredDamages,
+  serialiseDamagesForDraft,
+} from "@/features/damage/damageModel";
 import { PhotoLabelModal } from "@/components/PhotoLabelModal";
 import { SignaturePad, type SignaturePadRef } from "@/components/SignaturePad";
 import { signatureDraftKey, clearSignatureDrafts } from "@/lib/signatureDraft";
@@ -56,6 +65,8 @@ import {
   saveStandardPhoto as savePhotoDraftStandard,
   removeStandardPhoto as removePhotoDraftStandard,
   saveAdditionalPhoto as savePhotoDraftAdditional,
+  saveDamagePhoto as savePhotoDraftDamage,
+  removeDamagePhotos as removePhotoDraftDamage,
   removeAdditionalPhoto as removePhotoDraftAdditional,
   clearPhotoDraft,
   storedToFile,
@@ -88,6 +99,11 @@ import {
 
 
 
+const STEP_NAMES: Record<InspectionType, string[]> = {
+  pickup: ["Odometer & Fuel", "Checklist", "Vehicle Damage", "Photos", "Signatures", "Review"],
+  delivery: ["Odometer & Fuel", "Vehicle Damage", "Photos", "Signatures", "Review"],
+};
+
 export const InspectionFlow = () => {
   const navigate = useNavigate();
   const { canUseGallery, user } = useAuth();
@@ -106,6 +122,9 @@ export const InspectionFlow = () => {
 
   const { data: job, isLoading: jobLoading, isError: jobError } = useJob(jobId ?? "");
   const submitMutation = useSubmitInspection();
+  const catalogueBodyType = useCatalogueBodyType(
+    (job as { catalogue_image_path?: string | null } | undefined)?.catalogue_image_path ?? null,
+  );
   const driverGate = useDriverGate();
 
   // ── Evidence v2 (flag-gated capture-time save + background upload) ──
@@ -122,10 +141,7 @@ export const InspectionFlow = () => {
   const v2AdditionalIds = useRef<Map<string, string>>(new Map());
 
   const [currentStep, setCurrentStep] = useState(1);
-  const [showDamageModal, setShowDamageModal] = useState(false);
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
-  const [pendingDamagePosition, setPendingDamagePosition] =
-    useState<{ x: number; y: number } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   // Set only after a submit genuinely succeeded (or was durably queued
   // offline); the overlay shows briefly, then its onDone runs the exact
@@ -186,6 +202,26 @@ export const InspectionFlow = () => {
 
   const totalSteps = getTotalSteps(type);
 
+  // Diagram family: manual choice (this draft) → job's recorded body type →
+  // trusted catalogue entry → ask. Never defaults to "saloon"; the job record
+  // itself is never modified from here.
+  const bodyTypeResolution = useMemo(
+    () =>
+      resolveBodyType({
+        manual: formState.bodyTypeOverride,
+        jobVehicleType: job?.vehicle_type ?? null,
+        catalogueBodyType,
+        make: job?.vehicle_make ?? null,
+        model: job?.vehicle_model ?? null,
+      }),
+    [formState.bodyTypeOverride, job?.vehicle_type, catalogueBodyType, job?.vehicle_make, job?.vehicle_model],
+  );
+  const pickupReferenceDamages = useMemo(() => {
+    if (!job) return [];
+    const pickup = job.inspections?.find((i) => i.type === "pickup" && !(i as { archived_at?: string | null }).archived_at);
+    return pickup ? job.damage_items.filter((d) => d.inspection_id === pickup.id) : [];
+  }, [job]);
+
   // Probe local storage health EARLY — on mount and at the photo step,
   // not just at review. This surfaces blocked Safari / private-mode /
   // quota issues BEFORE the driver invests time capturing photos.
@@ -236,11 +272,23 @@ export const InspectionFlow = () => {
   // ─── AUTOSAVE: save draft on every form change ───
   const dk = jobId ? draftKey(type, jobId) : "";
 
+  /** Restored JSON damages + any close-ups already re-attached from IndexedDB. */
+  const mergeRestoredDamages = (current: DamageItemDraft[], raw: unknown): DamageItemDraft[] => {
+    const restored = sanitiseRestoredDamages(raw);
+    const byId = new Map(current.map((d) => [d.tempId, d]));
+    return restored.map((d) => {
+      const live = byId.get(d.tempId);
+      return live?.photos?.length ? { ...d, photos: live.photos } : d;
+    });
+  };
+
   useEffect(() => {
     if (!dk || !sessionActive.current) return;
     // Only save serializable fields (exclude File objects)
-    const { standardPhotos, additionalPhotos, ...serializable } = formState;
-    const draftPayload = { ...serializable, _currentStep: currentStep };
+    const { standardPhotos, additionalPhotos, damages, ...serializable } = formState;
+    // Damage close-up Files live in IndexedDB (photoDraftStore); the JSON
+    // draft only keeps their ids so they can be re-attached on restore.
+    const draftPayload = { ...serializable, damages: serialiseDamagesForDraft(damages), _currentStep: currentStep };
     const timer = setTimeout(() => saveDraft(dk, draftPayload), 500);
     return () => clearTimeout(timer);
   }, [formState, currentStep, dk]);
@@ -279,7 +327,7 @@ export const InspectionFlow = () => {
     }
     if (decision === "silent" && draft?.data) {
       const { _currentStep, ...fields } = draft.data;
-      setFormState(prev => ({ ...prev, ...fields }));
+      setFormState(prev => ({ ...prev, ...fields, damages: mergeRestoredDamages(prev.damages, fields.damages) }));
       if (typeof _currentStep === "number" && _currentStep >= 1 && _currentStep <= totalSteps) {
         setCurrentStep(_currentStep);
       }
@@ -292,7 +340,7 @@ export const InspectionFlow = () => {
     const draft = loadDraft<Record<string, unknown>>(dk);
     if (draft?.data) {
       const { _currentStep, ...fields } = draft.data;
-      setFormState(prev => ({ ...prev, ...fields }));
+      setFormState(prev => ({ ...prev, ...fields, damages: mergeRestoredDamages(prev.damages, fields.damages) }));
       if (typeof _currentStep === "number" && _currentStep >= 1 && _currentStep <= totalSteps) {
         setCurrentStep(_currentStep);
       }
@@ -345,11 +393,17 @@ export const InspectionFlow = () => {
               previewUrl: URL.createObjectURL(file),
             };
           });
+        const storedDamage = (draft.damagePhotos ?? []).map((p) => ({
+          id: p.id,
+          damageTempId: p.damageTempId,
+          file: storedToFile(p),
+        }));
         return {
           ...prev,
           standardPhotos: nextStandardPhotos,
           standardPhotoUrls: nextStandardUrls,
           additionalPhotos: [...prev.additionalPhotos, ...restoredAdditional],
+          damages: attachRestoredPhotos(prev.damages, storedDamage, (f) => URL.createObjectURL(f)),
         };
       });
 
@@ -447,43 +501,15 @@ export const InspectionFlow = () => {
     [markInProgress]
   );
 
-  const addDamage = (position: { x: number; y: number }) => {
-    setPendingDamagePosition(position);
-    setShowDamageModal(true);
+  // Damage close-ups are persisted to IndexedDB the moment they are taken so
+  // a camera kill / app close never loses them (they used to live only in
+  // memory and came back from the JSON draft as an empty {} object).
+  const persistDamagePhoto = (damageTempId: string, photo: { id: string; file: File }) => {
+    markInProgress();
+    if (jobId) void savePhotoDraftDamage(type, jobId, { id: photo.id, damageTempId, file: photo.file });
   };
-
-  const handleDamageSubmit = (damage: {
-    area: string;
-    location: string;
-    item: string;
-    damageTypes: string[];
-    notes: string;
-    photo?: File;
-  }) => {
-    const pos = pendingDamagePosition || { x: 50, y: 50 };
-    const draft: DamageItemDraft = {
-      tempId: Date.now().toString(),
-      x: pos.x,
-      y: pos.y,
-      area: damage.area,
-      location: damage.location,
-      item: damage.item,
-      damageTypes: damage.damageTypes,
-      notes: damage.notes,
-      photo: damage.photo,
-    };
-    setFormState((prev) => ({
-      ...prev,
-      damages: [...prev.damages, draft],
-    }));
-    setPendingDamagePosition(null);
-  };
-
-  const removeDamage = (tempId: string) => {
-    setFormState((prev) => ({
-      ...prev,
-      damages: prev.damages.filter((d) => d.tempId !== tempId),
-    }));
+  const forgetDamagePhoto = (photoId: string) => {
+    if (jobId) void removePhotoDraftDamage(type, jobId, { photoIds: [photoId] });
   };
 
   const handlePhotoCapture = async (photoKey: string, file: File) => {
@@ -782,6 +808,10 @@ export const InspectionFlow = () => {
         (typeof crypto !== "undefined" && "randomUUID" in crypto)
           ? crypto.randomUUID()
           : `cid-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      // One id per damage, positionally aligned with the RPC's damageItemIds.
+      // Index-aligned with damage_items (one entry per damage, photo or not).
+      const damageClientIdOrderAll: string[] = damageClientIds(formState.damages.length, submissionSessionId);
+      const damageClientId = (i: number) => damageClientIdOrderAll[i];
 
       try {
         // ── PRE-FLIGHT QUOTA ESTIMATE ───────────────────────────────
@@ -790,7 +820,7 @@ export const InspectionFlow = () => {
         // "device full" card instead of failing partway through the
         // loop. Budget ~3 MB per photo (post-compression headroom).
         try {
-          const damageCount = formState.damages.filter((d) => d.photo).length;
+          const damageCount = formState.damages.reduce((n, d) => n + damagePhotoFiles(d).length, 0);
           const stdCount = PHOTO_TYPES_BY_INSPECTION[type].filter(
             (pt) => !!formState.standardPhotos[pt.key],
           ).length;
@@ -823,23 +853,24 @@ export const InspectionFlow = () => {
         const queueRunId: string | null = (job as any)?.current_run_id ?? null;
 
 
-        // Damage photos
+        // Damage photos — every close-up of a damage shares that damage's
+        // clientDamageId, so several photos link to one damage_items row.
         for (let i = 0; i < formState.damages.length; i++) {
-          const d = formState.damages[i];
-          if (!d.photo) continue;
-          const clientPhotoId = newClientId();
-          const clientDamageId = (d as any).clientId ?? `dmg-${i}-${clientPhotoId}`;
-          const item = await stagePendingUpload(d.photo, {
-            submissionSessionId,
-            clientPhotoId,
-            clientDamageId,
-            jobId,
-            inspectionType: type,
-            photoType: "damage_close_up",
-            label: null,
-            runId: queueRunId,
-          });
-          queued.push({ id: item.id, kind: "damage", index: i, clientPhotoId, clientDamageId });
+          const clientDamageId = damageClientId(i);
+          for (const file of damagePhotoFiles(formState.damages[i])) {
+            const clientPhotoId = newClientId();
+            const item = await stagePendingUpload(file, {
+              submissionSessionId,
+              clientPhotoId,
+              clientDamageId,
+              jobId,
+              inspectionType: type,
+              photoType: "damage_close_up",
+              label: null,
+              runId: queueRunId,
+            });
+            queued.push({ id: item.id, kind: "damage", index: i, clientPhotoId, clientDamageId });
+          }
         }
         // Standard photos
         for (const pt of photoTypes) {
@@ -898,10 +929,7 @@ export const InspectionFlow = () => {
       // RPC commits. Signature blobs are stored on the queue entry so
       // the drainer can upload them when connectivity returns.
       const enqueueAndExit = async (reason: "offline" | "network_drop") => {
-        const damageClientIdOrder: string[] = queued
-          .filter((q) => q.kind === "damage")
-          .sort((a, b) => a.index - b.index)
-          .map((q) => q.clientDamageId ?? "");
+        const damageClientIdOrder: string[] = damageClientIdOrderAll;
 
         const driverBlob: Blob | null =
           driverSigUrl ? null : (driverFile ?? null);
@@ -990,10 +1018,7 @@ export const InspectionFlow = () => {
         });
 
         try {
-          const damageClientIdOrder: string[] = queued
-            .filter((q) => q.kind === "damage")
-            .sort((a, b) => a.index - b.index)
-            .map((q) => q.clientDamageId ?? "");
+          const damageClientIdOrder: string[] = damageClientIdOrderAll;
 
           const driverBlob: Blob | null =
             driverSigUrl ? null : (driverFile ?? null);
@@ -1402,46 +1427,27 @@ export const InspectionFlow = () => {
   );
 
   const renderDamageStep = () => (
-    <div className="space-y-4">
-      <h2 className="text-xl font-semibold text-center">
-        {type === "pickup" ? "Pickup" : "Delivery"} Damage
-      </h2>
-      <VehicleDiagram
-        onAddDamage={addDamage}
-        damages={formState.damages.map((d) => ({
-          id: d.tempId,
-          x: d.x,
-          y: d.y,
-          area: d.area,
-          item: d.item,
-          damageTypes: d.damageTypes,
-        }))}
-      />
-      {formState.damages.length > 0 && (
-        <div className="space-y-2">
-          <h3 className="font-medium text-sm">
-            Recorded Damages ({formState.damages.length})
-          </h3>
-          {formState.damages.map((d) => (
-            <div
-              key={d.tempId}
-              className="flex items-center justify-between p-2 bg-muted rounded text-sm"
-            >
-              <span>
-                {d.area} – {d.item}: {d.damageTypes.join(", ")}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => removeDamage(d.tempId)}
-              >
-                <Trash2 className="h-3 w-3" />
-              </Button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+    <DamageInspector
+      inspectionType={type}
+      damages={formState.damages}
+      onDamagesChange={(updater) => {
+        setFormState((prev) => ({ ...prev, damages: updater(prev.damages) }));
+        markInProgress();
+      }}
+      bodyType={bodyTypeResolution}
+      onChooseBodyType={(bt: BodyType) => updateField("bodyTypeOverride", bt)}
+      noDamageConfirmed={formState.damageDeclaration === "none_found"}
+      onNoDamageConfirmedChange={(v) => updateField("damageDeclaration", v ? "none_found" : "")}
+      referenceDamages={type === "delivery" ? pickupReferenceDamages : undefined}
+      captureAttr={captureAttr}
+      onPhotoAdded={persistDamagePhoto}
+      onPhotoRemoved={(_damageId, photo) => forgetDamagePhoto(photo.id)}
+      onDamageDeleted={(d) => {
+        // Keep the IndexedDB copies until the draft is cleared so Undo can
+        // restore the record with its photos; they are dropped on submit/discard.
+        void d;
+      }}
+    />
   );
 
   const renderPhotosStep = () => {
@@ -1730,7 +1736,8 @@ export const InspectionFlow = () => {
               <ul className="list-disc list-inside text-xs text-muted-foreground pl-2">
                 {formState.damages.map((d) => (
                   <li key={d.tempId}>
-                    {d.area} – {d.item}: {d.damageTypes.join(", ")}
+                    {damageLabel(d)}: {d.damageTypes.join(", ")}
+                    {d.severity ? ` (${d.severity})` : ""}
                   </li>
                 ))}
               </ul>
@@ -2220,17 +2227,25 @@ export const InspectionFlow = () => {
         />
       )}
       <AppHeader
-        title={`${
-          type === "pickup" ? "Pickup" : "Delivery"
-        } — Step ${currentStep}/${totalSteps}`}
+        title={`${type === "pickup" ? "Pickup" : "Delivery"} Inspection`}
         showBack
         onBack={() => navigate(`/jobs/${jobId}${window.location.search}`)}
       />
 
-      <div className="px-4 py-2 bg-muted/30">
-        <div className="w-full bg-muted rounded-full h-2">
+      <div className="px-4 pt-3 pb-2">
+        <p className="text-sm font-medium text-muted-foreground">
+          Step {currentStep} of {totalSteps}
+          {STEP_NAMES[type][currentStep - 1] ? ` · ${STEP_NAMES[type][currentStep - 1]}` : ""}
+        </p>
+        <div
+          className="mt-2 w-full bg-muted rounded-full h-1.5"
+          role="progressbar"
+          aria-valuemin={1}
+          aria-valuemax={totalSteps}
+          aria-valuenow={currentStep}
+        >
           <div
-            className="bg-primary h-2 rounded-full transition-all duration-300"
+            className="bg-primary h-1.5 rounded-full transition-[width] duration-300 motion-reduce:transition-none"
             style={{ width: `${(currentStep / totalSteps) * 100}%` }}
           />
         </div>
@@ -2308,12 +2323,6 @@ export const InspectionFlow = () => {
           )}
         </div>
       </div>
-
-      <VehicleDamageModal
-        isOpen={showDamageModal}
-        onClose={() => setShowDamageModal(false)}
-        onSubmit={handleDamageSubmit}
-      />
 
       <Dialog
         open={showConfirmationModal}

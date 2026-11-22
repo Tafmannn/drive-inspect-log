@@ -1,3 +1,4 @@
+import { savedDamageDescription, savedDamageLabel } from "@/features/damage/damageModel";
 import { useState, useEffect } from "react";
 import { resolveMediaUrlAsync } from "@/lib/mediaResolver";
 import { resolveSignatureUrlSimple } from "@/lib/resolveSignatureUrlSimple";
@@ -888,7 +889,7 @@ export const PodReport = () => {
                   {[...pickupDamages, ...deliveryDamages].map((d) => (
                     <div key={d.id} className="flex justify-between text-xs py-0.5">
                       <span className="text-muted-foreground">
-                        {d.area} – {d.item}: {d.damage_types?.join(", ") || "—"}
+                        {savedDamageLabel(d).label}: {savedDamageDescription(d)}
                       </span>
                       {d.notes && (
                         <span className="text-muted-foreground ml-2 italic">

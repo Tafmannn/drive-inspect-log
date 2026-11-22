@@ -59,6 +59,14 @@ function lazyNamed<T extends Record<string, unknown>>(
   return lazy(() => loader().then((m) => ({ default: m[name] as ComponentType })));
 }
 
+// Dev-only QA gallery for the damage diagrams (dead code in production builds).
+const DamageDiagramGallery = import.meta.env.DEV
+  ? lazy(() => import("@/features/damage/pages/DamageDiagramGallery"))
+  : null;
+const DamageInspectorPreview = import.meta.env.DEV
+  ? lazy(() => import("@/features/damage/pages/DamageInspectorPreview"))
+  : null;
+
 // Customer portal — its own chunks; drivers and staff never download them.
 const PortalLayout = lazyNamed(() => import("@/features/portal/components/PortalLayout"), "PortalLayout");
 const PortalJobs = lazy(() => import("@/features/portal/pages/PortalJobs"));
@@ -277,6 +285,12 @@ const App = () => {
               <Routes>
                 {/* ── Public routes ── */}
                 <Route path="/login" element={<Login />} />
+                {DamageDiagramGallery && (
+                  <Route path="/dev/damage-diagrams" element={<DamageDiagramGallery />} />
+                )}
+                {DamageInspectorPreview && (
+                  <Route path="/dev/damage-inspector" element={<DamageInspectorPreview />} />
+                )}
                 <Route path="/index" element={<Navigate to="/" replace />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />

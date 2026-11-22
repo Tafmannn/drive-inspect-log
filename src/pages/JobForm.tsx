@@ -40,6 +40,8 @@ import { PricingSuggestionPanel } from "@/components/PricingSuggestionPanel";
 import { useAuth } from "@/context/AuthContext";
 import { SectionCard, SectionHeader, AdvisoryNote, StatusPill } from "@/components/ui-kit";
 import { PoundSterling, Plus } from "lucide-react";
+import { BODY_TYPES, BODY_TYPE_LABELS, isBodyType } from "@/features/damage/bodyTypes";
+import { inferBodyTypeFromModel } from "@/features/damage/bodyTypeFromModel";
 type ErrorMap = Record<string, string>;
 
 interface JobFormDraft {
@@ -74,6 +76,17 @@ export const JobForm = () => {
   // For custom inputs, we use controlled values to avoid defaultValue conflicts
   const [customMakeValue, setCustomMakeValue] = useState("");
   const [customModelValue, setCustomModelValue] = useState("");
+  // Body type (drives the damage-diagram template). Follows make/model until
+  // the admin chooses explicitly; a value already saved on the job wins.
+  const [bodyType, setBodyType] = useState("");
+  const [bodyTypeTouched, setBodyTypeTouched] = useState(false);
+  // Mirrors bodyTypeTouched synchronously: hydration and the suggestion effect
+  // run in the same commit, so the state value alone would be stale there.
+  const bodyTypeTouchedRef = useRef(false);
+  const markBodyTypeTouched = (v: boolean) => {
+    bodyTypeTouchedRef.current = v;
+    setBodyTypeTouched(v);
+  };
 
   // Driver assignment state
   const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
@@ -223,6 +236,10 @@ export const JobForm = () => {
 
       setCustomMake(isCustomMake);
       setCustomModel(isCustomModel);
+      if (d.vehicle_type) {
+        setBodyType(d.vehicle_type);
+        markBodyTypeTouched(true);
+      }
 
       if (isCustomMake) {
         setCustomMakeValue(d.customMakeValue || restoredMake);
@@ -242,7 +259,7 @@ export const JobForm = () => {
       requestAnimationFrame(() => {
         if (!formRef.current) return;
         const fields = formRef.current.elements;
-        const skipKeys = ["vehicleMake", "vehicleModel", "customMake", "customModel", "customMakeValue", "customModelValue", "vehicle_make", "vehicle_model"];
+        const skipKeys = ["vehicleMake", "vehicleModel", "customMake", "customModel", "customMakeValue", "customModelValue", "vehicle_make", "vehicle_model", "vehicle_type"];
         for (const [key, val] of Object.entries(d)) {
           if (skipKeys.includes(key)) continue;
           const el = fields.namedItem(key);
@@ -460,6 +477,8 @@ export const JobForm = () => {
 
       setVehicleMake(existingJob.vehicle_make);
       setVehicleModel(existingJob.vehicle_model);
+      setBodyType(existingJob.vehicle_type ?? "");
+      markBodyTypeTouched(!!existingJob.vehicle_type);
       setCustomMake(!makeKnown);
       setCustomModel(!modelKnown);
 
@@ -493,6 +512,16 @@ export const JobForm = () => {
   // Compute effective make/model for submission
   const getEffectiveMake = (): string => customMake ? customMakeValue : vehicleMake;
   const getEffectiveModel = (): string => (customModel || customMake) ? customModelValue : vehicleModel;
+
+  const effectiveMakeForBody = customMake ? customMakeValue : vehicleMake;
+  const effectiveModelForBody = (customModel || customMake) ? customModelValue : vehicleModel;
+  const suggestedBody = useMemo(
+    () => inferBodyTypeFromModel(effectiveMakeForBody, effectiveModelForBody),
+    [effectiveMakeForBody, effectiveModelForBody],
+  );
+  useEffect(() => {
+    if (!bodyTypeTouchedRef.current) setBodyType(suggestedBody?.bodyType ?? "");
+  }, [suggestedBody, bodyTypeTouched]);
 
   // ─────────────────────────────────────────────
   // Validation based on FormData (uncontrolled)
@@ -567,6 +596,8 @@ export const JobForm = () => {
       vehicle_model: getStr(data, "vehicle_model"),
       vehicle_colour: getStr(data, "vehicle_colour"),
       vehicle_year: getStr(data, "vehicle_year") || null,
+      // Drives which damage-diagram template the inspection opens with.
+      vehicle_type: getStr(data, "vehicle_type") || null,
 
       pickup_contact_name: getStr(data, "pickup_contact_name"),
       pickup_contact_phone: getStr(data, "pickup_contact_phone"),
@@ -1057,6 +1088,40 @@ export const JobForm = () => {
                   className="mt-1"
                 />
               </div>
+            </div>
+            <div>
+              <Label htmlFor="vehicle_type" className="text-sm font-medium">
+                Body type
+              </Label>
+              <select
+                id="vehicle_type"
+                name="vehicle_type"
+                value={bodyType}
+                onChange={(e) => {
+                  setBodyType(e.target.value);
+                  markBodyTypeTouched(true);
+                  saveDraftFromForm();
+                }}
+                className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-base sm:text-sm"
+              >
+                <option value="">Not set (driver chooses at inspection)</option>
+                {BODY_TYPES.map((bt) => (
+                  <option key={bt} value={bt}>{BODY_TYPE_LABELS[bt]}</option>
+                ))}
+                {existingJob?.vehicle_type && !isBodyType(existingJob.vehicle_type) && (
+                  // keep an imported free-text value instead of silently replacing it
+                  <option value={existingJob.vehicle_type}>{existingJob.vehicle_type} (as imported)</option>
+                )}
+              </select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {!bodyTypeTouched && suggestedBody
+                  ? `Suggested from ${effectiveMakeForBody} ${effectiveModelForBody}. Change it if this vehicle is different.`
+                  : bodyType
+                    ? "Picks the vehicle diagram used for damage recording."
+                    : effectiveModelForBody
+                      ? "This model comes in more than one shape. Choose it, or leave unset and the driver picks at inspection."
+                      : "Fills in from the make and model, or choose it now."}
+              </p>
             </div>
           </div>
 

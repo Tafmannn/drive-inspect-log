@@ -151,6 +151,8 @@ export interface Inspection {
   aerial: string | null;
   customer_paperwork: string | null;
   has_damage: boolean;
+  /** 'none_found' = driver explicitly confirmed no damage; NULL = not stated. */
+  damage_declaration?: "none_found" | "recorded" | null;
   inspected_at: string | null;
   inspected_by_name: string | null;
   customer_name: string | null;
@@ -172,6 +174,13 @@ export interface DamageItem {
   notes: string | null;
   photo_url: string | null;
   created_at: string;
+  /** Damage Inspection V2 (migration 20261122120000). NULL on legacy rows. */
+  panel_id?: string | null;
+  view_id?: string | null;
+  body_type?: string | null;
+  diagram_version?: string | null;
+  severity?: "minor" | "moderate" | "severe" | null;
+  panel_position?: { u: number; v: number } | null;
 }
 
 export interface Photo {
@@ -214,15 +223,41 @@ export interface JobWithRelations extends Job {
 
 export interface DamageItemDraft {
   tempId: string;
+  /** Legacy: position as % of the diagram view (kept for old readers). */
   x: number;
   y: number;
+  /** Legacy free-text columns — still written, derived from panelId in V2. */
   area: string;
   location: string;
   item: string;
   damageTypes: string[];
   notes: string;
+  /** @deprecated single photo (pre-V2 drafts); V2 uses `photos`. */
   photo?: File;
   photoUrl?: string;
+  // ── V2 (all optional so older drafts still load) ──
+  /** Canonical panel id (see features/damage/panels.ts) or "other". */
+  panelId?: string | null;
+  /** Label for panelId "other" (e.g. "Interior – driver seat"). */
+  customLabel?: string | null;
+  viewId?: "top" | "front" | "rear" | "left" | "right" | null;
+  /** Position inside the panel's box on viewId, 0..1. */
+  panelU?: number | null;
+  panelV?: number | null;
+  bodyType?: string | null;
+  diagramVersion?: string | null;
+  severity?: "minor" | "moderate" | "severe" | null;
+  /** Close-up photos for this damage (Files are never JSON-serialised). */
+  photos?: DamagePhotoDraft[];
+  /** Draft-JSON only: ids of `photos`, used to re-attach them from IndexedDB. */
+  photoIds?: string[];
+}
+
+export interface DamagePhotoDraft {
+  /** Stable id — also the key in the IndexedDB photo-draft store. */
+  id: string;
+  file: File;
+  previewUrl: string;
 }
 
 export interface AdditionalPhotoDraft {

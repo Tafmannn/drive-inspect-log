@@ -4,6 +4,8 @@
  * Pure (no jsPDF, no network) so the content rules are unit-tested
  * (src/test/pod-report-model.test.ts); src/lib/podPdfLayout.ts draws it.
  */
+import { isKnownPanel, panelLabel, ukSide } from "@/features/damage/panels";
+import { savedDamageDescription } from "@/features/damage/damageModel";
 import type { JobWithRelations } from "./types";
 import { FUEL_PERCENT_TO_LABEL } from "./types";
 import { getChecklistItems } from "./inspectionFields";
@@ -286,13 +288,20 @@ export function buildPodReportModel(
         }
       : null;
 
-  const damage = (stage: "Collection" | "Delivery") => (d: JobWithRelations["damage_items"][number]): PodDamage => ({
-    stage,
-    location: text(d.area) ?? "—",
-    item: text(d.item) ?? "—",
-    damage: d.damage_types?.length ? d.damage_types.join(", ") : "—",
-    notes: text(d.notes),
-  });
+  // V2 rows carry a stable panel id: report the canonical panel label and
+  // severity so the PDF always agrees with what was tapped. Legacy rows keep
+  // their free-text area/item exactly as before.
+  const damage = (stage: "Collection" | "Delivery") => (d: JobWithRelations["damage_items"][number]): PodDamage => {
+    const v2 = !!d.panel_id;
+    const side = v2 && d.panel_id && isKnownPanel(d.panel_id) ? ukSide(d.panel_id) : null;
+    return {
+      stage,
+      location: v2 ? side ?? text(d.area) ?? "—" : text(d.area) ?? "—",
+      item: v2 ? panelLabel(d.panel_id, d.item) : text(d.item) ?? "—",
+      damage: savedDamageDescription(d),
+      notes: text(d.notes),
+    };
+  };
 
   const photoGroups: PodPhotoGroup[] = [
     { title: "Collection photos", subtitle: formatPodDateTime(pickup?.inspected_at), photos: photos.pickupPhotos },
