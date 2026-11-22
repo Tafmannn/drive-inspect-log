@@ -57,6 +57,7 @@ import type {
 } from "@/lib/types";
 import * as api from "@/lib/api";
 import { PhotoViewer } from "@/components/PhotoViewer";
+import { UKPlate } from "@/components/UKPlate";
 import { EvidenceStatusBadges } from "@/components/EvidenceStatusBadges";
 import { StorageFailureCard } from "@/components/StorageFailureCard";
 import { useAuth } from "@/context/AuthContext";
@@ -151,6 +152,73 @@ function SignerCard({
     </Card>
   );
 }
+
+/**
+ * Large tap-target single choice (replaces bare radio lists on the inspection
+ * steps). A real ARIA radiogroup: selected state is announced and shown by
+ * fill + check, not colour alone. Module-level so its type is stable and the
+ * step's other inputs never remount. Values are passed through unchanged.
+ */
+function ChoiceChips({
+  label, value, options, onChange, idPrefix, required, columns,
+}: {
+  label: string;
+  value: string;
+  options: readonly string[];
+  onChange: (v: string) => void;
+  idPrefix: string;
+  required?: boolean;
+  /** fixed column count for short option sets (e.g. Yes/No/N/A) */
+  columns?: 2 | 3 | 5;
+}) {
+  const grid = columns === 2 ? "grid grid-cols-2" : columns === 3 ? "grid grid-cols-3" : columns === 5 ? "grid grid-cols-5" : "flex flex-wrap";
+  return (
+    <div>
+      <p id={`label-${idPrefix}`} className="mb-2 text-sm font-medium text-foreground">
+        {label}{required ? " *" : ""}
+      </p>
+      <div role="radiogroup" aria-labelledby={`label-${idPrefix}`} className={`${grid} gap-2`}>
+        {options.map((opt) => {
+          const on = value === opt;
+          return (
+            <button
+              key={opt}
+              id={`${idPrefix}-${opt}`}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              onClick={() => onChange(opt)}
+              className={
+                "inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border px-3 text-sm font-medium transition-colors " +
+                (on
+                  ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                  : "border-border bg-background text-foreground hover:bg-muted active:bg-muted")
+              }
+            >
+              {on && <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden />}
+              {opt}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** Card that groups related fields on an inspection step. */
+function StepSection({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
+  return (
+    <Card className="space-y-4 rounded-2xl p-4">
+      <div>
+        <h3 className="text-base font-semibold leading-tight">{title}</h3>
+        {description && <p className="text-[13px] text-muted-foreground">{description}</p>}
+      </div>
+      {children}
+    </Card>
+  );
+}
+
+const YES_NO_NA = ["Yes", "No", "N/A"] as const;
 
 const STEP_NAMES: Record<InspectionType, string[]> = {
   pickup: ["Odometer & Fuel", "Checklist", "Vehicle Damage", "Photos", "Signatures", "Review"],
@@ -1441,41 +1509,37 @@ export const InspectionFlow = () => {
   // which would destroy input focus (keyboard bug) and clear canvas (signature bug).
 
   const renderOdometerFuel = () => (
-    <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-center">
-        Odometer & Fuel Level
-      </h2>
-      <div className="space-y-4">
+    <div className="space-y-4">
+      <StepSection title="Odometer" description="Read the mileage from the dashboard.">
         <div>
-          <Label htmlFor="odometer" className="text-base font-medium">
-            Odometer *
+          <Label htmlFor="odometer" className="text-sm font-medium">
+            Odometer reading *
           </Label>
-          <Input
-            id="odometer"
-            type="number"
-            inputMode="numeric"
-            placeholder="Enter mileage"
-            value={formState.odometer}
-            onChange={(e) => updateField("odometer", e.target.value)}
-            className="mt-1"
-          />
+          <div className="relative mt-1">
+            <Input
+              id="odometer"
+              type="number"
+              inputMode="numeric"
+              placeholder="Enter mileage"
+              value={formState.odometer}
+              onChange={(e) => updateField("odometer", e.target.value)}
+              className="h-12 pr-14 text-lg font-semibold tabular-nums"
+            />
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">miles</span>
+          </div>
         </div>
-        <div>
-          <Label className="text-base font-medium">Fuel Level *</Label>
-          <RadioGroup
-            value={formState.fuelLevel}
-            onValueChange={(v) => updateField("fuelLevel", v)}
-            className="mt-2"
-          >
-            {["Empty", "1/4", "1/2", "3/4", "Full"].map((level) => (
-              <div key={level} className="flex items-center space-x-2">
-                <RadioGroupItem value={level} id={`fuel-${level}`} />
-                <Label htmlFor={`fuel-${level}`}>{level}</Label>
-              </div>
-            ))}
-          </RadioGroup>
-        </div>
-      </div>
+      </StepSection>
+      <StepSection title="Fuel / charge level">
+        <ChoiceChips
+          label="Fuel level"
+          required
+          idPrefix="fuel"
+          columns={5}
+          value={formState.fuelLevel}
+          options={["Empty", "1/4", "1/2", "3/4", "Full"]}
+          onChange={(v) => updateField("fuelLevel", v)}
+        />
+      </StepSection>
     </div>
   );
 
@@ -1515,23 +1579,29 @@ export const InspectionFlow = () => {
     ];
 
     return (
-      <div className="space-y-6">
-        <h2 className="text-xl font-semibold text-center">Photos</h2>
-        <p className="text-center text-muted-foreground text-sm">
-          Capture clear photos at{" "}
-          {type === "pickup" ? "collection" : "delivery"} for your records.
-        </p>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm text-muted-foreground">
+            Clear photos at {type === "pickup" ? "collection" : "delivery"} protect you and the customer.
+          </p>
+          <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs font-semibold tabular-nums" aria-live="polite">
+            {photoTypes.filter((pt) => formState.standardPhotoUrls[pt.key]).length} of {photoTypes.length}
+          </span>
+        </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {photoTypes.map((pt) => (
-            <div key={pt.key} className="space-y-2">
-              <Label className="text-sm font-medium">{pt.label}</Label>
+            <div key={pt.key} className="space-y-1.5">
+              <p className="flex items-center gap-1 text-sm font-medium">
+                {formState.standardPhotoUrls[pt.key] && <CheckCircle2 className="h-4 w-4 text-success" aria-label="Captured" />}
+                {pt.label}
+              </p>
               {formState.standardPhotoUrls[pt.key] ? (
                 <div className="relative">
                   <img
                     src={formState.standardPhotoUrls[pt.key]}
                     alt={pt.label}
-                    className="w-full h-24 object-cover rounded border"
+                    className="aspect-[4/3] w-full rounded-xl border object-cover"
                   />
                   {darkPhotoKeys.has(pt.key) && (
                     <span
@@ -1543,9 +1613,13 @@ export const InspectionFlow = () => {
                   )}
                 </div>
               ) : (
-                <div className="w-full h-24 bg-muted rounded border flex items-center justify-center">
-                  <Camera className="h-6 w-6 text-muted-foreground" />
-                </div>
+                <label
+                  htmlFor={`photo-${pt.key}`}
+                  className="flex aspect-[4/3] w-full cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed text-muted-foreground hover:border-primary hover:text-primary"
+                >
+                  <Camera className="h-6 w-6" />
+                  <span className="text-xs font-medium">Tap to capture</span>
+                </label>
               )}
               <input
                 type="file"
@@ -1559,9 +1633,9 @@ export const InspectionFlow = () => {
                 }}
               />
               <Label htmlFor={`photo-${pt.key}`} className="cursor-pointer">
-                <Button variant="outline" size="sm" className="w-full gap-1" asChild>
+                <Button variant="outline" size="sm" className="h-10 w-full gap-1.5 rounded-xl" asChild>
                   <span>
-                    <Camera className="h-3 w-3" />
+                    <Camera className="h-4 w-4" />
                     {formState.standardPhotoUrls[pt.key] ? "Retake" : "Capture"}
                   </span>
                 </Button>
@@ -1571,17 +1645,20 @@ export const InspectionFlow = () => {
         </div>
 
         {/* Additional labelled photos */}
-        <div className="space-y-3 pt-4 border-t">
-          <h3 className="font-medium text-sm">Additional Photos</h3>
+        <div className="space-y-3 rounded-2xl border bg-card p-4">
+          <div>
+            <h3 className="text-base font-semibold leading-tight">Additional photos</h3>
+            <p className="text-[13px] text-muted-foreground">Anything else worth recording, with a label.</p>
+          </div>
           {formState.additionalPhotos.map((ap) => (
             <div
               key={ap.tempId}
-              className="flex items-center gap-3 p-2 bg-muted rounded"
+              className="flex items-center gap-3 rounded-xl bg-muted p-2"
             >
               <img
                 src={ap.previewUrl}
                 alt={ap.label}
-                className="w-12 h-12 object-cover rounded"
+                className="h-12 w-12 rounded-lg object-cover"
               />
               <span className="text-sm flex-1">
                 {ap.label || "Unlabelled"}
@@ -1589,9 +1666,11 @@ export const InspectionFlow = () => {
               <Button
                 variant="ghost"
                 size="sm"
+                className="h-10 w-10"
+                aria-label={`Remove ${ap.label || "photo"}`}
                 onClick={() => removeAdditionalPhoto(ap.tempId)}
               >
-                <Trash2 className="h-3 w-3" />
+                <Trash2 className="h-4 w-4" />
               </Button>
             </div>
           ))}
@@ -1617,9 +1696,9 @@ export const InspectionFlow = () => {
               }}
             />
             <Label htmlFor="additional-photo-input" className="cursor-pointer w-full">
-              <Button variant="outline" size="sm" className="w-full gap-1" asChild>
+              <Button variant="outline" size="sm" className="h-11 w-full gap-1.5 rounded-xl" asChild>
                 <span>
-                  <Plus className="h-4 w-4" /> Add Photo
+                  <Plus className="h-4 w-4" /> Add photo
                 </span>
               </Button>
             </Label>
@@ -1731,10 +1810,13 @@ export const InspectionFlow = () => {
     const savedPickup = job?.inspections?.find((i) => i.type === "pickup") ?? null;
 
     return (
-      <div className="space-y-6">
-        {/* Header with status pills */}
-        <div className="flex flex-col items-center gap-2">
-          <h2 className="text-xl font-semibold">Review & Submit</h2>
+      <div className="space-y-4">
+        {/* Job + status (the page header already says "Review") */}
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border bg-card p-3">
+          <div className="flex min-w-0 items-center gap-2 text-sm">
+            <span className="truncate font-mono font-medium text-foreground">{jobRef}</span>
+            {job?.vehicle_reg && <UKPlate reg={job.vehicle_reg} />}
+          </div>
           <div className="flex items-center gap-2">
             {isCollected ? (
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-success/20 text-success">
@@ -1753,12 +1835,6 @@ export const InspectionFlow = () => {
           </div>
         </div>
 
-        {/* Job header pill */}
-        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-          <span className="font-mono font-medium text-foreground">{jobRef}</span>
-          <span>–</span>
-          <span className="font-medium text-foreground">{job?.vehicle_reg}</span>
-        </div>
 
         {/* Evidence lifecycle status — surfaces in-flight/failed uploads
             for this job so the driver knows the queue truth at submit time. */}
@@ -1768,8 +1844,8 @@ export const InspectionFlow = () => {
           </div>
         )}
 
-        <Card className="p-6 space-y-3">
-          <h3 className="font-medium">Inspection Summary</h3>
+        <Card className="space-y-3 rounded-2xl p-4">
+          <h3 className="text-base font-semibold">Inspection summary</h3>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Type:</span>
@@ -1785,7 +1861,13 @@ export const InspectionFlow = () => {
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Damages:</span>
-              <span>{formState.damages.length}</span>
+              <span>
+                {formState.damages.length > 0
+                  ? formState.damages.length
+                  : formState.damageDeclaration === "none_found"
+                    ? "None found (confirmed)"
+                    : "Not stated"}
+              </span>
             </div>
             {formState.damages.length > 0 && (
               <ul className="list-disc list-inside text-xs text-muted-foreground pl-2">
@@ -1808,15 +1890,19 @@ export const InspectionFlow = () => {
             <div className="flex justify-between">
               <span className="text-muted-foreground">Driver:</span>
               <span>
-                {formState.driverName || "—"}{" "}
-                {driverSigned ? "✓" : "—"}
+                {formState.driverName || "—"} ·{" "}
+                <span className={driverSigned ? "font-medium text-success" : "font-medium text-destructive"}>
+                  {driverSigned ? "Signed" : "Not signed"}
+                </span>
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Customer:</span>
               <span>
-                {formState.customerName || "—"}{" "}
-                {customerSigned ? "✓" : "—"}
+                {formState.customerName || "—"} ·{" "}
+                <span className={customerSigned ? "font-medium text-success" : "font-medium text-destructive"}>
+                  {customerSigned ? "Signed" : "Not signed"}
+                </span>
               </span>
             </div>
           </div>
@@ -1824,8 +1910,8 @@ export const InspectionFlow = () => {
 
         {/* Current inspection checklist (pickup) */}
         {type === "pickup" && (
-          <Card className="p-6 space-y-3">
-            <h3 className="font-medium">Pickup Checklist</h3>
+          <Card className="space-y-3 rounded-2xl p-4">
+            <h3 className="text-base font-semibold">Pickup checklist</h3>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
               {REVIEW_CHECKLIST.map(({ field, label }) => {
                 const val = formState[field];
@@ -1849,7 +1935,7 @@ export const InspectionFlow = () => {
 
         {/* Saved pickup checklist (shown on delivery review) */}
         {type === "delivery" && savedPickup && (
-          <Card className="p-6 space-y-3">
+          <Card className="space-y-3 rounded-2xl p-4">
             <h3 className="font-medium">Pickup Checklist (from collection)</h3>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
               {[
@@ -1961,150 +2047,59 @@ export const InspectionFlow = () => {
     );
   };
 
-  const renderCollectionChecklist = () => (
-    <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-center">
-        Collection Checklist
-      </h2>
-      <div className="space-y-6">
-        <div>
-          <Label className="text-base font-medium">Vehicle Condition</Label>
-          <RadioGroup
+  const renderCollectionChecklist = () => {
+    const equipment = [
+      { field: "handbook" as const, label: "Handbook" },
+      { field: "serviceBook" as const, label: "Service Book" },
+      { field: "mot" as const, label: "MOT" },
+      { field: "v5" as const, label: "V5" },
+      { field: "parcelShelf" as const, label: "Parcel Shelf" },
+      { field: "spareWheel" as const, label: "Spare Wheel" },
+      { field: "toolKit" as const, label: "Tool Kit" },
+      { field: "tyreInflationKit" as const, label: "Tyre Inflation Kit" },
+      { field: "lockingWheelNut" as const, label: "Locking Wheel Nut" },
+      { field: "satNavWorking" as const, label: "Sat Nav Working" },
+      { field: "evChargingCables" as const, label: "EV Charging Cables" },
+      { field: "aerial" as const, label: "Aerial" },
+      { field: "customerPaperwork" as const, label: "Customer Paperwork" },
+    ];
+    const keys = parseInt(formState.numberOfKeys, 10) || 0;
+    return (
+      <div className="space-y-4">
+        <StepSection title="Conditions" description="How the vehicle and light are at collection.">
+          <ChoiceChips
+            label="Vehicle condition"
+            required
+            idPrefix="vc"
             value={formState.vehicleCondition}
-            onValueChange={(v) => updateField("vehicleCondition", v)}
-            className="mt-2"
-          >
-            {["Clean", "Dirty", "Wet", "Snow Covered", "Iced Over"].map(
-              (c) => (
-                <div key={c} className="flex items-center space-x-2">
-                  <RadioGroupItem value={c} id={`vc-${c}`} />
-                  <Label htmlFor={`vc-${c}`}>{c}</Label>
-                </div>
-              )
-            )}
-          </RadioGroup>
-        </div>
-
-        <div>
-          <Label className="text-base font-medium">Light</Label>
-          <RadioGroup
-            value={formState.lightCondition}
-            onValueChange={(v) => updateField("lightCondition", v)}
-            className="mt-2"
-          >
-            {["Good", "Poor", "Dark", "Artificial", "Raining"].map(
-              (l) => (
-                <div key={l} className="flex items-center space-x-2">
-                  <RadioGroupItem value={l} id={`lc-${l}`} />
-                  <Label htmlFor={`lc-${l}`}>{l}</Label>
-                </div>
-              )
-            )}
-          </RadioGroup>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label className="text-base font-medium">Oil Level</Label>
-            <RadioGroup
-              value={formState.oilLevel}
-              onValueChange={(v) => updateField("oilLevel", v)}
-              className="mt-2"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="Ok" id="oil-ok" />
-                <Label htmlFor="oil-ok">Ok</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="Issue" id="oil-issue" />
-                <Label htmlFor="oil-issue">Issue</Label>
-              </div>
-            </RadioGroup>
-          </div>
-          <div>
-            <Label className="text-base font-medium">Water Level</Label>
-            <RadioGroup
-              value={formState.waterLevel}
-              onValueChange={(v) => updateField("waterLevel", v)}
-              className="mt-2"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="Ok" id="water-ok" />
-                <Label htmlFor="water-ok">Ok</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="Issue" id="water-issue" />
-                <Label htmlFor="water-issue">Issue</Label>
-              </div>
-            </RadioGroup>
-          </div>
-        </div>
-
-        <div>
-          <Label htmlFor="notes" className="text-base font-medium">
-            Notes
-          </Label>
-          <Textarea
-            id="notes"
-            placeholder="Notes"
-            value={formState.notes}
-            onChange={(e) => updateField("notes", e.target.value)}
-            className="mt-1"
+            options={["Clean", "Dirty", "Wet", "Snow Covered", "Iced Over"]}
+            onChange={(v) => updateField("vehicleCondition", v)}
           />
-        </div>
+          <ChoiceChips
+            label="Light"
+            required
+            idPrefix="lc"
+            value={formState.lightCondition}
+            options={["Good", "Poor", "Dark", "Artificial", "Raining"]}
+            onChange={(v) => updateField("lightCondition", v)}
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <ChoiceChips label="Oil level" idPrefix="oil" columns={2} value={formState.oilLevel} options={["Ok", "Issue"]} onChange={(v) => updateField("oilLevel", v)} />
+            <ChoiceChips label="Water level" idPrefix="water" columns={2} value={formState.waterLevel} options={["Ok", "Issue"]} onChange={(v) => updateField("waterLevel", v)} />
+          </div>
+        </StepSection>
 
-        {/* Equipment checklist items */}
-        <div className="space-y-4">
-          <h3 className="font-medium">Equipment</h3>
-          {[
-            { field: "handbook" as const, label: "Handbook" },
-            { field: "serviceBook" as const, label: "Service Book" },
-            { field: "mot" as const, label: "MOT" },
-            { field: "v5" as const, label: "V5" },
-            { field: "parcelShelf" as const, label: "Parcel Shelf" },
-            { field: "spareWheel" as const, label: "Spare Wheel" },
-            { field: "toolKit" as const, label: "Tool Kit" },
-            { field: "tyreInflationKit" as const, label: "Tyre Inflation Kit" },
-            { field: "lockingWheelNut" as const, label: "Locking Wheel Nut" },
-            { field: "satNavWorking" as const, label: "Sat Nav Working" },
-          ].map(({ field, label }) => (
-            <div key={field}>
-              <Label className="text-sm font-medium">{label}</Label>
-              <RadioGroup
-                value={formState[field]}
-                onValueChange={(v) => updateField(field, v)}
-                className="mt-1 flex gap-4"
-              >
-                <div className="flex items-center space-x-1">
-                  <RadioGroupItem value="Yes" id={`${field}-yes`} />
-                  <Label htmlFor={`${field}-yes`} className="text-sm">Yes</Label>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <RadioGroupItem value="No" id={`${field}-no`} />
-                  <Label htmlFor={`${field}-no`} className="text-sm">No</Label>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <RadioGroupItem value="N/A" id={`${field}-na`} />
-                  <Label htmlFor={`${field}-na`} className="text-sm">N/A</Label>
-                </div>
-              </RadioGroup>
-            </div>
-          ))}
-
-          {/* Number of Keys – numeric stepper */}
+        <StepSection title="Keys">
           <div>
-            <Label className="text-sm font-medium">Number of Keys *</Label>
-            <div className="flex items-center gap-3 mt-1">
+            <p id="label-keys" className="mb-2 text-sm font-medium">Number of keys *</p>
+            <div className="flex items-center gap-3" role="group" aria-labelledby="label-keys">
               <Button
                 type="button"
                 variant="outline"
-                size="sm"
-                className="h-10 w-10 text-lg"
-                onClick={() => {
-                  const cur = parseInt(formState.numberOfKeys, 10) || 0;
-                  if (cur > 0) updateField("numberOfKeys", String(cur - 1));
-                }}
-                disabled={!formState.numberOfKeys || parseInt(formState.numberOfKeys, 10) <= 0}
+                className="h-12 w-12 rounded-xl text-xl"
+                aria-label="One fewer key"
+                onClick={() => { if (keys > 0) updateField("numberOfKeys", String(keys - 1)); }}
+                disabled={!formState.numberOfKeys || keys <= 0}
               >
                 −
               </Button>
@@ -2113,118 +2108,81 @@ export const InspectionFlow = () => {
                 inputMode="numeric"
                 min="0"
                 step="1"
+                aria-labelledby="label-keys"
                 value={formState.numberOfKeys}
-                onChange={(e) => {
-                  const v = e.target.value.replace(/[^0-9]/g, "");
-                  updateField("numberOfKeys", v);
-                }}
-                className="w-20 text-center text-lg font-semibold"
+                onChange={(e) => updateField("numberOfKeys", e.target.value.replace(/[^0-9]/g, ""))}
+                className="h-12 w-20 text-center text-lg font-semibold"
                 placeholder="0"
               />
               <Button
                 type="button"
                 variant="outline"
-                size="sm"
-                className="h-10 w-10 text-lg"
-                onClick={() => {
-                  const cur = parseInt(formState.numberOfKeys, 10) || 0;
-                  updateField("numberOfKeys", String(cur + 1));
-                }}
+                className="h-12 w-12 rounded-xl text-xl"
+                aria-label="One more key"
+                onClick={() => updateField("numberOfKeys", String(keys + 1))}
               >
                 +
               </Button>
             </div>
           </div>
+        </StepSection>
 
-          {[
-            { field: "evChargingCables" as const, label: "EV Charging Cables" },
-            { field: "aerial" as const, label: "Aerial" },
-            { field: "customerPaperwork" as const, label: "Customer Paperwork" },
-          ].map(({ field, label }) => (
-            <div key={field}>
-              <Label className="text-sm font-medium">{label}</Label>
-              <RadioGroup
-                value={formState[field]}
-                onValueChange={(v) => updateField(field, v)}
-                className="mt-1 flex gap-4"
-              >
-                <div className="flex items-center space-x-1">
-                  <RadioGroupItem value="Yes" id={`${field}-yes`} />
-                  <Label htmlFor={`${field}-yes`} className="text-sm">Yes</Label>
+        <StepSection title="Equipment" description="Is each item with the vehicle?">
+          <div className="divide-y">
+            {equipment.map(({ field, label }) => (
+              <div key={field} className="grid grid-cols-[1fr_auto] items-center gap-3 py-2 first:pt-0 last:pb-0">
+                <p id={`label-${field}`} className="text-sm font-medium">{label}</p>
+                <div role="radiogroup" aria-labelledby={`label-${field}`} className="grid w-[168px] grid-cols-3 gap-1 min-[400px]:w-[192px]">
+                  {YES_NO_NA.map((opt) => {
+                    const on = formState[field] === opt;
+                    return (
+                      <button
+                        key={opt}
+                        id={`${field}-${opt === "N/A" ? "na" : opt.toLowerCase()}`}
+                        type="button"
+                        role="radio"
+                        aria-checked={on}
+                        onClick={() => updateField(field, opt)}
+                        className={
+                          "min-h-[40px] rounded-lg border text-sm font-medium transition-colors " +
+                          (on ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-muted active:bg-muted")
+                        }
+                      >
+                        {opt}
+                      </button>
+                    );
+                  })}
                 </div>
-                <div className="flex items-center space-x-1">
-                  <RadioGroupItem value="No" id={`${field}-no`} />
-                  <Label htmlFor={`${field}-no`} className="text-sm">No</Label>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <RadioGroupItem value="N/A" id={`${field}-na`} />
-                  <Label htmlFor={`${field}-na`} className="text-sm">N/A</Label>
-                </div>
-              </RadioGroup>
-            </div>
-          ))}
-
-          <div>
-            <Label className="text-sm font-medium">Alloys or Trims</Label>
-            <RadioGroup
-              value={formState.alloysOrTrims}
-              onValueChange={(v) => updateField("alloysOrTrims", v)}
-              className="mt-1 flex gap-4"
-            >
-              <div className="flex items-center space-x-1">
-                <RadioGroupItem value="Alloys" id="aot-alloys" />
-                <Label htmlFor="aot-alloys" className="text-sm">Alloys</Label>
               </div>
-              <div className="flex items-center space-x-1">
-                <RadioGroupItem value="Trims" id="aot-trims" />
-                <Label htmlFor="aot-trims" className="text-sm">Trims</Label>
-              </div>
-            </RadioGroup>
+            ))}
           </div>
+        </StepSection>
 
+        <StepSection title="Wheels">
+          <ChoiceChips label="Alloys or trims" idPrefix="aot" columns={2} value={formState.alloysOrTrims} options={["Alloys", "Trims"]} onChange={(v) => updateField("alloysOrTrims", v)} />
           {formState.alloysOrTrims === "Alloys" && (
-            <div>
-              <Label className="text-sm font-medium">Alloys Damaged?</Label>
-              <RadioGroup
-                value={formState.alloysDamaged}
-                onValueChange={(v) => updateField("alloysDamaged", v)}
-                className="mt-1 flex gap-4"
-              >
-                <div className="flex items-center space-x-1">
-                  <RadioGroupItem value="Yes" id="ad-yes" />
-                  <Label htmlFor="ad-yes" className="text-sm">Yes</Label>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <RadioGroupItem value="No" id="ad-no" />
-                  <Label htmlFor="ad-no" className="text-sm">No</Label>
-                </div>
-              </RadioGroup>
-            </div>
+            <ChoiceChips label="Alloys damaged?" idPrefix="ad" columns={2} value={formState.alloysDamaged} options={["Yes", "No"]} onChange={(v) => updateField("alloysDamaged", v)} />
           )}
-
           {formState.alloysOrTrims === "Trims" && (
-            <div>
-              <Label className="text-sm font-medium">Wheel Trims Damaged?</Label>
-              <RadioGroup
-                value={formState.wheelTrimsDamaged}
-                onValueChange={(v) => updateField("wheelTrimsDamaged", v)}
-                className="mt-1 flex gap-4"
-              >
-                <div className="flex items-center space-x-1">
-                  <RadioGroupItem value="Yes" id="wtd-yes" />
-                  <Label htmlFor="wtd-yes" className="text-sm">Yes</Label>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <RadioGroupItem value="No" id="wtd-no" />
-                  <Label htmlFor="wtd-no" className="text-sm">No</Label>
-                </div>
-              </RadioGroup>
-            </div>
+            <ChoiceChips label="Wheel trims damaged?" idPrefix="wtd" columns={2} value={formState.wheelTrimsDamaged} options={["Yes", "No"]} onChange={(v) => updateField("wheelTrimsDamaged", v)} />
           )}
-        </div>
+        </StepSection>
+
+        <StepSection title="Notes">
+          <div>
+            <Label htmlFor="notes" className="sr-only">Notes</Label>
+            <Textarea
+              id="notes"
+              placeholder="Anything else worth recording (optional)"
+              value={formState.notes}
+              onChange={(e) => updateField("notes", e.target.value)}
+              className="min-h-[88px] text-base"
+            />
+          </div>
+        </StepSection>
       </div>
-    </div>
-  );
+    );
+  };
 
   // ───────────────── RENDER BY STEP ─────────────────
 
