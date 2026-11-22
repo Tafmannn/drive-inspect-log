@@ -9,7 +9,6 @@ import { BODY_TYPES } from "@/features/damage/bodyTypes";
 import { getDiagram, panelsForBodyType, VIEW_IDS, type DiagramView } from "@/features/damage/geometry/views";
 import { resolveTap, fromPanelUV, toPanelUV } from "@/features/damage/hitTest";
 import { isKnownPanel, PANELS, mirrorPanelId } from "@/features/damage/panels";
-import { SPECS } from "@/features/damage/geometry/specs";
 import { bbox } from "@/features/damage/geometry/poly";
 
 const anchorOf = (d: DiagramView, id: string) => d.panels.find((p) => p.id === id)!.anchor;
@@ -65,7 +64,8 @@ describe.each(BODY_TYPES)("%s diagrams", (bt) => {
     // Top view: front at the top of the screen.
     const T = getDiagram(bt, "top");
     expect(anchorOf(T, "front_bumper")[1]).toBeLessThan(anchorOf(T, "rear_bumper")[1]);
-    expect(anchorOf(T, "bonnet")[1]).toBeLessThan(anchorOf(T, "roof" in PANELS && T.panels.some((p) => p.id === "roof") ? "roof" : "soft_top")[1]);
+    expect(anchorOf(T, "bonnet")[1]).toBeLessThan(anchorOf(T, "windscreen")[1]);
+    expect(anchorOf(T, "windscreen")[1]).toBeLessThan(anchorOf(T, "rear_bumper")[1]);
   });
 
   it("empty space and wheel-arch gaps select nothing", () => {
@@ -144,8 +144,10 @@ describe("body families are distinct vehicles", () => {
       expect.arrayContaining(["left_sliding_door", "left_load_side", "left_rear_cargo_door", "right_rear_cargo_door"]),
     );
     expect(panelsForBodyType("pickup")).toEqual(expect.arrayContaining(["load_bed", "tailgate", "left_bed_side", "right_bed_side"]));
-    expect(panelsForBodyType("convertible")).toEqual(expect.arrayContaining(["soft_top", "rear_deck", "boot"]));
+    // the convertible artwork is roof-down: windscreen + stowed-roof deck, no roof panel
+    expect(panelsForBodyType("convertible")).toEqual(expect.arrayContaining(["rear_deck", "boot", "windscreen"]));
     expect(panelsForBodyType("convertible")).not.toContain("roof");
+    expect(panelsForBodyType("convertible")).not.toContain("front_left_window");
     expect(panelsForBodyType("coupe")).not.toContain("rear_left_door");
     expect(panelsForBodyType("saloon")).toContain("boot");
     expect(panelsForBodyType("hatchback")).toContain("tailgate");
@@ -153,20 +155,23 @@ describe("body families are distinct vehicles", () => {
     expect(panelsForBodyType("van")).not.toContain("rear_left_door");
   });
 
-  it("proportions: van tallest and longest, pickup bed behind the cab, estate roof longer than saloon", () => {
-    const h = (bt: (typeof BODY_TYPES)[number]) => getDiagram(bt, "left").viewBox.h;
-    expect(h("van")).toBeGreaterThan(h("suv"));
-    expect(h("suv")).toBeGreaterThan(h("saloon"));
-    expect(SPECS.estate.roofRearX - SPECS.estate.roofFrontX).toBeGreaterThan(SPECS.saloon.roofRearX - SPECS.saloon.roofFrontX);
+  it("proportions: van and SUV are taller for their length than a saloon; pickup bed behind the cab", () => {
+    const aspect = (bt: (typeof BODY_TYPES)[number]) => {
+      const vb = getDiagram(bt, "left").viewBox;
+      return vb.h / vb.w;
+    };
+    expect(aspect("van")).toBeGreaterThan(aspect("saloon"));
+    expect(aspect("suv")).toBeGreaterThan(aspect("saloon"));
+    expect(aspect("mpv")).toBeGreaterThan(aspect("coupe"));
     const p = getDiagram("pickup", "top");
     expect(anchorOf(p, "load_bed")[1]).toBeGreaterThan(anchorOf(p, "roof")[1]);
   });
 });
 
-describe("van uses the supplied illustration artwork", () => {
+describe.each(BODY_TYPES)("%s uses its supplied illustration artwork", (bt) => {
   it.each(VIEW_IDS)("%s view: artwork is set and every panel lies on it", (v) => {
-    const d = getDiagram("van", v);
-    expect(d.image?.href).toMatch(new RegExp(`${v}.*\\.webp`));
+    const d = getDiagram(bt, v);
+    expect(d.image?.href).toMatch(new RegExp(`${bt}/${v}.*\\.webp|${v}.*\\.webp`));
     expect(d.viewBox).toEqual({ x: 0, y: 0, w: d.image!.w, h: d.image!.h });
     for (const p of d.panels) {
       expect(p.bbox.x, p.id).toBeGreaterThanOrEqual(-1);
@@ -175,7 +180,10 @@ describe("van uses the supplied illustration artwork", () => {
       expect(p.bbox.y + p.bbox.h, p.id).toBeLessThanOrEqual(d.image!.h + 1);
     }
   });
-  it("other families stay vector-only", () => {
-    for (const bt of BODY_TYPES.filter((b) => b !== "van")) expect(getDiagram(bt, "left").image).toBeUndefined();
+  it("each view uses a different image from every other family", () => {
+    for (const v of VIEW_IDS) {
+      const mine = getDiagram(bt, v).image!.href;
+      for (const other of BODY_TYPES.filter((b) => b !== bt)) expect(getDiagram(other, v).image!.href).not.toBe(mine);
+    }
   });
 });

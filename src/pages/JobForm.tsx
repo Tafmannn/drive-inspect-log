@@ -40,6 +40,7 @@ import { PricingSuggestionPanel } from "@/components/PricingSuggestionPanel";
 import { useAuth } from "@/context/AuthContext";
 import { SectionCard, SectionHeader, AdvisoryNote, StatusPill } from "@/components/ui-kit";
 import { PoundSterling, Plus } from "lucide-react";
+import { BODY_TYPES, BODY_TYPE_LABELS, isBodyType } from "@/features/damage/bodyTypes";
 type ErrorMap = Record<string, string>;
 
 interface JobFormDraft {
@@ -567,6 +568,8 @@ export const JobForm = () => {
       vehicle_model: getStr(data, "vehicle_model"),
       vehicle_colour: getStr(data, "vehicle_colour"),
       vehicle_year: getStr(data, "vehicle_year") || null,
+      // Drives which damage-diagram template the inspection opens with.
+      vehicle_type: getStr(data, "vehicle_type") || null,
 
       pickup_contact_name: getStr(data, "pickup_contact_name"),
       pickup_contact_phone: getStr(data, "pickup_contact_phone"),
@@ -1057,6 +1060,29 @@ export const JobForm = () => {
                   className="mt-1"
                 />
               </div>
+            </div>
+            <div>
+              <Label htmlFor="vehicle_type" className="text-sm font-medium">
+                Body type
+              </Label>
+              <select
+                id="vehicle_type"
+                name="vehicle_type"
+                defaultValue={existingJob?.vehicle_type ?? ""}
+                className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-base sm:text-sm"
+              >
+                <option value="">Not set (driver chooses at inspection)</option>
+                {BODY_TYPES.map((bt) => (
+                  <option key={bt} value={bt}>{BODY_TYPE_LABELS[bt]}</option>
+                ))}
+                {existingJob?.vehicle_type && !isBodyType(existingJob.vehicle_type) && (
+                  // keep an imported free-text value instead of silently replacing it
+                  <option value={existingJob.vehicle_type}>{existingJob.vehicle_type} (as imported)</option>
+                )}
+              </select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Picks the vehicle diagram used for damage recording.
+              </p>
             </div>
           </div>
 

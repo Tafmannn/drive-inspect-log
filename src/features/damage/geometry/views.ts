@@ -16,7 +16,7 @@
 import type { BodyType } from "../bodyTypes";
 import { mirrorPanelId } from "../panels";
 import { SPECS, type BodySpec } from "./specs";
-import { buildVanArtView } from "../artwork/vanArtwork";
+import { buildArtView } from "../artwork";
 import {
   PathBuilder, type Poly, type Pt, type BBox,
   above, below, aboveLine, belowLine, between, leftOf, rightOf, vcut, xRange, yRange,
@@ -834,8 +834,8 @@ export function getDiagram(bodyType: BodyType, view: ViewId): DiagramView {
   const key = `${bodyType}:${view}`;
   const hit = cache.get(key);
   if (hit) return hit;
-  if (bodyType === "van") {
-    const art = buildVanArtView(view);
+  const art = buildArtView(bodyType, view);
+  if (art) {
     const v: Omit<DiagramView, "view"> = { ...art, bodyType };
     fixAnchors(v);
     const full: DiagramView = { ...v, view };

@@ -251,6 +251,10 @@ function VehicleDiagramSvgInner({
             .map((p) => (
               <path key="sel-outline" d={p.d} clipPath={diagram.holes.length && p.material !== "tyre" ? `url(#${rid}-arches)` : undefined} fill="none" stroke="#ffffff" strokeOpacity={0.9} strokeWidth={0.8} vectorEffect="non-scaling-stroke" />
             ))}
+        {showPanelIds && diagram.image &&
+          diagram.panels.map((p) => (
+            <path key={`dbg-${p.id}`} d={p.d} fill="none" stroke="#e11d48" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+          ))}
         {showPanelIds &&
           diagram.panels.map((p) => (
             <text
