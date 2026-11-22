@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { preferredName } from "@/lib/preferredName";
 import type { User as SupaUser, Session } from "@supabase/supabase-js";
 import { roleSatisfies, rolesForProfileRole, type AppRole } from "@/lib/roleModel";
 
@@ -171,12 +172,14 @@ function RealAuthProvider({ children }: { children: ReactNode }) {
       try {
         const { data } = await (supabase as any)
           .from("user_profiles")
-          .select("account_status, role")
+          .select("account_status, role, display_name, first_name, full_name")
           .eq("auth_user_id", session.user.id)
           .maybeSingle();
         if (data?.account_status) {
           user.accountStatus = data.account_status as AppUser["accountStatus"];
         }
+        // Greet people by their preferred name, not their email handle.
+        if (data) user.name = preferredName(data, user.name);
         if (data?.role) {
           // Expanded with inheritance: super_admin → SUPERADMIN+ADMIN+DRIVER,
           // admin → ADMIN+DRIVER, client → CLIENT only (never staff roles),
