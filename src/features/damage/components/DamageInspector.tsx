@@ -265,7 +265,10 @@ export function DamageInspector(props: DamageInspectorProps) {
 
   const [edgeL, edgeR] = EDGE_LABELS[view];
   const sourceLabel =
-    resolution.source === "job" ? "from job" : resolution.source === "catalogue" ? "from catalogue" : "chosen manually";
+    resolution.source === "job" ? "from job"
+    : resolution.source === "catalogue" ? "from catalogue"
+    : resolution.source === "model" ? "from make & model"
+    : "chosen manually";
 
   return (
     <div className="space-y-4">

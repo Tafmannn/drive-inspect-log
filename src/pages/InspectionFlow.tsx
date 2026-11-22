@@ -211,8 +211,10 @@ export const InspectionFlow = () => {
         manual: formState.bodyTypeOverride,
         jobVehicleType: job?.vehicle_type ?? null,
         catalogueBodyType,
+        make: job?.vehicle_make ?? null,
+        model: job?.vehicle_model ?? null,
       }),
-    [formState.bodyTypeOverride, job?.vehicle_type, catalogueBodyType],
+    [formState.bodyTypeOverride, job?.vehicle_type, catalogueBodyType, job?.vehicle_make, job?.vehicle_model],
   );
   const pickupReferenceDamages = useMemo(() => {
     if (!job) return [];

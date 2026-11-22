@@ -6,6 +6,8 @@
  * recorded data — never guessed from the manufacturer, and an unknown vehicle
  * is never silently drawn as a saloon (the UI asks instead).
  */
+import { inferBodyTypeFromModel } from "./bodyTypeFromModel";
+
 export const BODY_TYPES = [
   "suv",
   "saloon",
@@ -75,7 +77,7 @@ export function normaliseBodyType(raw: string | null | undefined): BodyType | nu
   return [...hits][0];
 }
 
-export type BodyTypeSource = "job" | "catalogue" | "manual";
+export type BodyTypeSource = "job" | "catalogue" | "model" | "manual";
 
 export interface BodyTypeResolution {
   bodyType: BodyType | null;
@@ -87,17 +89,24 @@ export interface BodyTypeResolution {
 /**
  * Priority: (1) manual choice already made for this inspection draft,
  * (2) the job's recorded body type, (3) the shared vehicle catalogue entry the
- * job is matched to, (4) nothing → the UI shows the body-type picker.
+ * job is matched to, (4) the job's make + model when that model only comes in
+ * one shape (bodyTypeFromModel.ts), (5) nothing → the body-type picker.
  */
 export function resolveBodyType(input: {
   manual?: string | null;
   jobVehicleType?: string | null;
   catalogueBodyType?: string | null;
+  make?: string | null;
+  model?: string | null;
 }): BodyTypeResolution {
   if (isBodyType(input.manual)) return { bodyType: input.manual, source: "manual", raw: input.manual };
   const fromJob = normaliseBodyType(input.jobVehicleType);
   if (fromJob) return { bodyType: fromJob, source: "job", raw: input.jobVehicleType ?? null };
   const fromCat = normaliseBodyType(input.catalogueBodyType);
   if (fromCat) return { bodyType: fromCat, source: "catalogue", raw: input.catalogueBodyType ?? null };
+  const fromModel = inferBodyTypeFromModel(input.make, input.model);
+  if (fromModel) {
+    return { bodyType: fromModel.bodyType, source: "model", raw: [input.make, input.model].filter(Boolean).join(" ") };
+  }
   return { bodyType: null, source: null, raw: input.jobVehicleType ?? input.catalogueBodyType ?? null };
 }

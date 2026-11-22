@@ -47,6 +47,15 @@ describe("body type resolution", () => {
     // an unusable manual value never wins
     expect(resolveBodyType({ manual: "spaceship", jobVehicleType: "Estate" }).bodyType).toBe("estate");
   });
+
+  it("falls back to make + model only when the job has nothing better", () => {
+    expect(resolveBodyType({ jobVehicleType: null, make: "KIA", model: "Sportage" })).toMatchObject({ bodyType: "suv", source: "model" });
+    // the job's own value still wins over make/model
+    expect(resolveBodyType({ jobVehicleType: "Estate", make: "KIA", model: "Sportage" })).toMatchObject({ bodyType: "estate", source: "job" });
+    // multi-shape model: still asks the driver
+    expect(resolveBodyType({ jobVehicleType: null, make: "VOLKSWAGEN", model: "Golf" }).bodyType).toBeNull();
+    expect(resolveBodyType({ jobVehicleType: null, make: "BMW", model: "" }).bodyType).toBeNull();
+  });
 });
 
 describe("panel catalogue", () => {

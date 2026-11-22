@@ -48,12 +48,20 @@ To replace the art, swap the five files and re-trace the seams (outline generato
 the comment in `vanOutlines.ts`).
 
 ## Body type resolution
-manual choice for this draft → `jobs.vehicle_type` (normalised synonyms) → the job's matched
-`vehicle_catalogue_images.body_type` → body-type picker. Admins set **Body type** on the
-job form (`jobs.vehicle_type`). As of 2026-11-22 no production job had one and the
-catalogue was empty, so until jobs are tagged, drivers pick the shape at inspection. Never inferred from make alone,
-never defaults to saloon. The manual choice is stored on each damage row (`body_type`);
-the job record is **not** modified.
+At inspection: manual choice for this draft → `jobs.vehicle_type` (normalised synonyms)
+→ the job's matched `vehicle_catalogue_images.body_type` → the job's **make + model**
+(`bodyTypeFromModel.ts`, single-shape model families or a body named in the model text)
+→ body-type picker. The damage screen shows where the choice came from ("from job",
+"from make & model", …) with a **Change** link. The job record is not modified there.
+
+On the admin job form, **Body type** fills in from make + model while it is unset, and
+says it is a suggestion. An explicit choice (including "Not set") or a value already saved
+on the job is never overwritten. Multi-shape models (Golf, 3 Series, A3 …) stay unset
+with a note.
+
+Backfill: on 2026-11-22, 46 of 77 production jobs were set from make + model with owner
+approval (`backfill-vehicle-type-2026-11-22.sql`, includes rollback). The other 31 have no
+make/model, a mismatch, or a multi-shape model.
 
 ## Database (migration `20261122120000_damage_inspection_v2.sql`, additive)
 - `damage_items`: `panel_id, view_id, body_type, diagram_version, severity, panel_position`.
