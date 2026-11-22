@@ -102,6 +102,14 @@ function VehicleDiagramSvgInner({
   const panelStyle = (p: PanelShape): React.SVGProps<SVGPathElement> => {
     const selected = p.id === selectedPanelId;
     const damaged = damagedPanelIds?.has(p.id);
+    if (diagram.image) {
+      // Artwork family: the illustration carries all the visual detail; the
+      // traced panel polygons stay invisible until selected, then tint the
+      // artwork (multiply keeps its shading and seams visible through blue).
+      return selected
+        ? { fill: "hsl(var(--primary))", fillOpacity: 0.5, stroke: "hsl(var(--primary))", strokeWidth: 2, style: { mixBlendMode: "multiply" } }
+        : { fill: "#000", fillOpacity: 0, stroke: "none", pointerEvents: "visibleFill" };
+    }
     if (selected) {
       return {
         fill: p.material === "glass" ? `url(#${rid}-selGlass)` : `url(#${rid}-sel)`,
@@ -191,6 +199,18 @@ function VehicleDiagramSvgInner({
         ))}
       </g>
 
+      {diagram.image && (
+        <image
+          href={diagram.image.href}
+          x={0}
+          y={0}
+          width={diagram.image.w}
+          height={diagram.image.h}
+          preserveAspectRatio="none"
+          pointerEvents="none"
+        />
+      )}
+
       <g>
         {diagram.panels.map((p) => (
           <path
@@ -216,7 +236,9 @@ function VehicleDiagramSvgInner({
             <path key={i} d={s.d} fill={fillFor(s.material, rid)} opacity={s.opacity} stroke={s.material === "plate" ? "#9ca3af" : "none"} strokeWidth={0.7} vectorEffect="non-scaling-stroke" />
           ),
         )}
-        <path d={diagram.outline} fill="none" stroke="#6f7987" strokeWidth={1.25} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+        {!diagram.image && (
+          <path d={diagram.outline} fill="none" stroke="#6f7987" strokeWidth={1.25} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+        )}
         {damagedPanelIds &&
           diagram.panels
             .filter((p) => damagedPanelIds.has(p.id) && p.id !== selectedPanelId)

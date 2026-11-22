@@ -16,6 +16,7 @@
 import type { BodyType } from "../bodyTypes";
 import { mirrorPanelId } from "../panels";
 import { SPECS, type BodySpec } from "./specs";
+import { buildVanArtView } from "../artwork/vanArtwork";
 import {
   PathBuilder, type Poly, type Pt, type BBox,
   above, below, aboveLine, belowLine, between, leftOf, rightOf, vcut, xRange, yRange,
@@ -65,6 +66,12 @@ export interface DiagramView {
   outline: string;
   /** wheel-arch openings: body panels are clipped by these (tyres are not) */
   holes: Poly[];
+  /**
+   * Raster artwork drawn under the (transparent) panel polygons. Set for body
+   * families illustrated with supplied artwork (currently: van). The panel
+   * polygons are traced onto this image in its own pixel coordinates.
+   */
+  image?: { href: string; w: number; h: number };
 }
 
 // ── helpers ───────────────────────────────────────────────────────────
@@ -72,7 +79,7 @@ export interface DiagramView {
 const Y = (h: number) => -h;
 const MIN_AREA = 2;
 
-function panel(id: string, polys: Poly[], material: Material = "paint"): PanelShape | null {
+export function panel(id: string, polys: Poly[], material: Material = "paint"): PanelShape | null {
   const ps = polys.filter((p) => p.length >= 3 && area(p) > MIN_AREA);
   if (!ps.length) return null;
   const all = ps.flat();
@@ -827,6 +834,14 @@ export function getDiagram(bodyType: BodyType, view: ViewId): DiagramView {
   const key = `${bodyType}:${view}`;
   const hit = cache.get(key);
   if (hit) return hit;
+  if (bodyType === "van") {
+    const art = buildVanArtView(view);
+    const v: Omit<DiagramView, "view"> = { ...art, bodyType };
+    fixAnchors(v);
+    const full: DiagramView = { ...v, view };
+    cache.set(key, full);
+    return full;
+  }
   const s = SPECS[bodyType];
   let built: Omit<DiagramView, "view" | "bodyType" | "viewBox" | "holes"> & { holes?: Poly[] };
   if (view === "left" || view === "right") built = buildLeftSide(s);

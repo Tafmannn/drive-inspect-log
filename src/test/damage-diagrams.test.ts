@@ -10,6 +10,7 @@ import { getDiagram, panelsForBodyType, VIEW_IDS, type DiagramView } from "@/fea
 import { resolveTap, fromPanelUV, toPanelUV } from "@/features/damage/hitTest";
 import { isKnownPanel, PANELS, mirrorPanelId } from "@/features/damage/panels";
 import { SPECS } from "@/features/damage/geometry/specs";
+import { bbox } from "@/features/damage/geometry/poly";
 
 const anchorOf = (d: DiagramView, id: string) => d.panels.find((p) => p.id === id)!.anchor;
 const sideOf = (id: string) => PANELS[id].side;
@@ -74,14 +75,19 @@ describe.each(BODY_TYPES)("%s diagrams", (bt) => {
       expect(resolveTap(d, [vb.x + 1, vb.y + 1], 0).panelId).toBeNull();
       expect(resolveTap(d, [vb.x + vb.w - 1, vb.y + 1], 0).panelId).toBeNull();
     }
-    const s = SPECS[bt];
-    const d = getDiagram(bt, "left");
-    // inside the arch but outside the tyre (top of the gap)
-    const gap: [number, number] = [s.FO, -(s.R + s.R + 2.2)];
-    const r = resolveTap(d, gap, 0);
-    expect(r.panelId === null || r.panelId === "front_left_wheel").toBe(true);
-    // the tyre itself is selectable
-    expect(resolveTap(d, [s.FO, -s.R], 0).panelId).toBe("front_left_wheel");
+    for (const v of ["left", "right"] as const) {
+      const d = getDiagram(bt, v);
+      expect(d.holes.length).toBe(2);
+      for (const hole of d.holes) {
+        const b = bbox(hole);
+        // just inside the top of the arch opening, above the tyre
+        const gap: [number, number] = [b.x + b.w / 2, b.y + 2];
+        const r = resolveTap(d, gap, 0);
+        expect(r.panelId === null || PANELS[r.panelId!].kind === "Wheels", `${bt}/${v} arch gap → ${r.panelId}`).toBe(true);
+        // the centre of the arch is the tyre itself
+        expect(PANELS[resolveTap(d, [b.x + b.w / 2, b.y + b.h / 2], 0).panelId!].kind).toBe("Wheels");
+      }
+    }
   });
 
   it("panel-relative pin positions round-trip and stay on their panel", () => {
@@ -154,5 +160,22 @@ describe("body families are distinct vehicles", () => {
     expect(SPECS.estate.roofRearX - SPECS.estate.roofFrontX).toBeGreaterThan(SPECS.saloon.roofRearX - SPECS.saloon.roofFrontX);
     const p = getDiagram("pickup", "top");
     expect(anchorOf(p, "load_bed")[1]).toBeGreaterThan(anchorOf(p, "roof")[1]);
+  });
+});
+
+describe("van uses the supplied illustration artwork", () => {
+  it.each(VIEW_IDS)("%s view: artwork is set and every panel lies on it", (v) => {
+    const d = getDiagram("van", v);
+    expect(d.image?.href).toMatch(new RegExp(`${v}.*\\.webp`));
+    expect(d.viewBox).toEqual({ x: 0, y: 0, w: d.image!.w, h: d.image!.h });
+    for (const p of d.panels) {
+      expect(p.bbox.x, p.id).toBeGreaterThanOrEqual(-1);
+      expect(p.bbox.y, p.id).toBeGreaterThanOrEqual(-1);
+      expect(p.bbox.x + p.bbox.w, p.id).toBeLessThanOrEqual(d.image!.w + 1);
+      expect(p.bbox.y + p.bbox.h, p.id).toBeLessThanOrEqual(d.image!.h + 1);
+    }
+  });
+  it("other families stay vector-only", () => {
+    for (const bt of BODY_TYPES.filter((b) => b !== "van")) expect(getDiagram(bt, "left").image).toBeUndefined();
   });
 });
