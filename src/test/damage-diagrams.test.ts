@@ -187,3 +187,36 @@ describe.each(BODY_TYPES)("%s uses its supplied illustration artwork", (bt) => {
     }
   });
 });
+
+describe("fingertip-sized panels next to big ones", () => {
+  it("a tap inside a big panel right beside a thin strip asks; a tap deep inside does not", () => {
+    // saloon left view: the roof is a thin strip along the top of the doors/windows
+    const d = getDiagram("saloon", "left");
+    const roof = d.panels.find((p) => p.id === "roof")!;
+    const tol = 14 * (d.viewBox.w / 332); // 14 CSS px on a 390px phone
+    expect(Math.min(roof.bbox.w, roof.bbox.h)).toBeLessThan(tol);
+    // find a point just below the roof strip that lies inside another panel
+    let probe: [number, number] | null = null;
+    const cx = roof.anchor[0];
+    for (let dy = 1; dy < tol; dy += 0.5) {
+      const pt: [number, number] = [cx, roof.bbox.y + roof.bbox.h + dy];
+      const r = resolveTap(d, pt, 0);
+      if (r.panelId && r.panelId !== "roof") { probe = pt; break; }
+    }
+    expect(probe).not.toBeNull();
+    const near = resolveTap(d, probe!, tol);
+    expect(near.panelId).toBeNull();
+    expect(near.candidates).toContain("roof");
+    expect(near.candidates.length).toBeGreaterThan(1);
+    // deep inside the front door: no prompt
+    const door = d.panels.find((p) => p.id === "front_left_door")!;
+    expect(resolveTap(d, door.anchor, tol)).toMatchObject({ panelId: "front_left_door" });
+  });
+
+  it("tapping the tiny panel itself still selects it directly", () => {
+    const d = getDiagram("saloon", "left");
+    const mirror = d.panels.find((p) => p.id === "left_mirror")!;
+    const tol = 14 * (d.viewBox.w / 332);
+    expect(resolveTap(d, mirror.anchor, tol).panelId).toBe("left_mirror");
+  });
+});

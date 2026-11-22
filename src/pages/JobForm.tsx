@@ -742,10 +742,10 @@ export const JobForm = () => {
         showBack
         onBack={() => navigate(backTarget)}
       />
-      <div className="p-4 space-y-6 max-w-lg lg:max-w-3xl mx-auto">
+      <div className="p-4 space-y-6 max-w-lg lg:max-w-3xl xl:max-w-6xl mx-auto">
         <form
           ref={formRef}
-          className="space-y-8"
+          className="space-y-8 xl:grid xl:grid-cols-2 xl:items-start xl:gap-x-10 xl:gap-y-8 xl:space-y-0 xl:[&>*]:col-span-2"
           onChange={saveDraftFromForm}
           onSubmit={(e) => {
             e.preventDefault();
@@ -1216,7 +1216,7 @@ export const JobForm = () => {
           </div>
 
           {/* PICKUP */}
-          <div className="space-y-4">
+          <div className="space-y-4 xl:!col-span-1">
             <h3 className="font-semibold text-lg">Pickup</h3>
             <div>
               <Label className="text-sm font-medium">
@@ -1394,7 +1394,7 @@ export const JobForm = () => {
           </div>
 
           {/* DELIVERY */}
-          <div className="space-y-4">
+          <div className="space-y-4 xl:!col-span-1">
             <h3 className="font-semibold text-lg">Delivery</h3>
             <div>
               <Label className="text-sm font-medium">

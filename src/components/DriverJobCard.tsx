@@ -58,7 +58,7 @@ export function DriverJobCard({ summary, onPrimaryAction, onCardClick }: DriverJ
       onClick={onCardClick}
     >
       {/* ── Header: Avatar + Client + Ref | Plate ── */}
-      <div className="flex items-center justify-between px-3 pt-3 pb-2">
+      <div className="flex items-center justify-between gap-2 px-3 pt-3 pb-2">
         <div className="flex items-center gap-2.5 min-w-0">
           <Avatar className="h-8 w-8 shrink-0">
             <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
@@ -69,12 +69,15 @@ export function DriverJobCard({ summary, onPrimaryAction, onCardClick }: DriverJ
             <p className="text-sm font-semibold text-foreground truncate leading-tight">
               {summary.client_name}
             </p>
-            <p className="text-[10px] text-muted-foreground leading-tight tabular-nums">
+            <p className="truncate text-[10px] text-muted-foreground leading-tight tabular-nums" title={summary.job_ref}>
               {summary.job_ref}
             </p>
           </div>
         </div>
-        <UKPlate reg={summary.vehicle_reg} />
+        {/* the plate is the vehicle's identity: never let a long reference squeeze it */}
+        <div className="shrink-0">
+          <UKPlate reg={summary.vehicle_reg} />
+        </div>
       </div>
 
       {/* ── Status pill + brain phase chip ── */}
