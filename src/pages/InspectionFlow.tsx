@@ -33,6 +33,11 @@ import {
   Plus,
   Trash2,
   AlertTriangle,
+  UserRound,
+  Users,
+  Smartphone,
+  CheckCircle2,
+  PenLine,
 } from "lucide-react";
 import { useJob, useSubmitInspection } from "@/hooks/useJobs";
 import { storageService } from "@/lib/storage";
@@ -98,6 +103,54 @@ import {
 } from "@/features/inspection/inspectionFormConfig";
 
 
+
+/**
+ * Presentational frame for one signer. Declared at module level so its type
+ * is stable across renders: the SignaturePad passed as a child keeps its
+ * canvas, ref and draft persistence exactly as before. The status pill shows
+ * the real signed state (never a placeholder signature).
+ */
+function SignerCard({
+  icon, title, description, signed, onClear, children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  signed: boolean;
+  onClear: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card className="space-y-3 rounded-2xl p-4">
+      <div className="flex items-start gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">{icon}</span>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-base font-semibold leading-tight">{title}</h3>
+          <p className="text-[13px] text-muted-foreground">{description}</p>
+        </div>
+        <span
+          className={
+            signed
+              ? "inline-flex shrink-0 items-center gap-1 rounded-full bg-success/10 px-2.5 py-1 text-xs font-semibold text-success"
+              : "inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground"
+          }
+        >
+          {signed ? <CheckCircle2 className="h-3.5 w-3.5" /> : <PenLine className="h-3.5 w-3.5" />}
+          {signed ? "Signed" : "Not signed"}
+        </span>
+      </div>
+      {children}
+      <div className="flex min-h-9 items-center justify-between">
+        <p className="text-xs text-muted-foreground">{signed ? "Signature captured." : "Sign inside the box."}</p>
+        {signed && (
+          <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={onClear}>
+            <Trash2 className="h-3.5 w-3.5" /> Clear
+          </Button>
+        )}
+      </div>
+    </Card>
+  );
+}
 
 const STEP_NAMES: Record<InspectionType, string[]> = {
   pickup: ["Odometer & Fuel", "Checklist", "Vehicle Damage", "Photos", "Signatures", "Review"],
@@ -1587,17 +1640,26 @@ export const InspectionFlow = () => {
   };
 
   const renderSignaturesStep = () => (
-    <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-center">Signatures</h2>
-      <Card className="p-4 space-y-3">
-        <h3 className="font-medium">Driver</h3>
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Both signatures are required to complete the {type === "pickup" ? "pickup" : "delivery"}.
+      </p>
+      <SignerCard
+        icon={<UserRound className="h-5 w-5" />}
+        title="Driver"
+        description={`The person carrying out the ${type === "pickup" ? "pickup" : "delivery"}`}
+        signed={driverSigned}
+        onClear={clearDriverSignature}
+      >
         <div>
-          <Label className="text-sm">Driver Name *</Label>
+          <Label htmlFor="sig-driver-name" className="text-sm font-medium">Driver name *</Label>
           <Input
+            id="sig-driver-name"
             value={formState.driverName}
             onChange={(e) => updateField("driverName", e.target.value)}
             placeholder="Driver full name"
-            className="mt-1"
+            autoComplete="name"
+            className="mt-1 h-11 text-base"
           />
         </div>
         <SignaturePad
@@ -1606,31 +1668,32 @@ export const InspectionFlow = () => {
           onSignStart={() => setDriverSigned(true)}
           className="w-full"
         />
-        <div className="flex items-center justify-between">
-          {driverSigned && <p className="text-xs text-success">Signed ✓</p>}
-          {driverSigned && (
-            <Button variant="ghost" size="sm" onClick={clearDriverSignature}>
-              Clear
-            </Button>
-          )}
-        </div>
-      </Card>
+      </SignerCard>
 
-      <div className="bg-warning border-2 border-warning rounded-lg p-4">
-        <p className="text-sm text-foreground font-bold">
-          ⚠ PLEASE PASS THE DEVICE TO THE CUSTOMER FOR THEIR SIGNATURE
+      <div className="flex items-center gap-3 rounded-2xl bg-[hsl(var(--app-header))] p-4 text-white" role="note">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10">
+          <Smartphone className="h-5 w-5" />
+        </span>
+        <p className="text-[15px] font-semibold leading-snug">
+          Please pass the device to the customer for their signature.
         </p>
       </div>
 
-      <Card className="p-4 space-y-3">
-        <h3 className="font-medium">Customer</h3>
+      <SignerCard
+        icon={<Users className="h-5 w-5" />}
+        title="Customer"
+        description={type === "pickup" ? "The person releasing the vehicle" : "The person receiving the vehicle"}
+        signed={customerSigned}
+        onClear={clearCustomerSignature}
+      >
         <div>
-          <Label className="text-sm">Customer Name *</Label>
+          <Label htmlFor="sig-customer-name" className="text-sm font-medium">Customer name *</Label>
           <Input
+            id="sig-customer-name"
             value={formState.customerName}
             onChange={(e) => updateField("customerName", e.target.value)}
             placeholder="Customer full name"
-            className="mt-1"
+            className="mt-1 h-11 text-base"
           />
         </div>
         <SignaturePad
@@ -1639,15 +1702,7 @@ export const InspectionFlow = () => {
           onSignStart={() => setCustomerSigned(true)}
           className="w-full"
         />
-        <div className="flex items-center justify-between">
-          {customerSigned && <p className="text-xs text-success">Signed ✓</p>}
-          {customerSigned && (
-            <Button variant="ghost" size="sm" onClick={clearCustomerSignature}>
-              Clear
-            </Button>
-          )}
-        </div>
-      </Card>
+      </SignerCard>
     </div>
   );
 
@@ -2228,17 +2283,15 @@ export const InspectionFlow = () => {
       )}
       <AppHeader
         title={`${type === "pickup" ? "Pickup" : "Delivery"} Inspection`}
+        subtitle={`Step ${currentStep} of ${totalSteps}${STEP_NAMES[type][currentStep - 1] ? ` · ${STEP_NAMES[type][currentStep - 1]}` : ""}`}
         showBack
         onBack={() => navigate(`/jobs/${jobId}${window.location.search}`)}
       />
 
-      <div className="px-4 pt-3 pb-2">
-        <p className="text-sm font-medium text-muted-foreground">
-          Step {currentStep} of {totalSteps}
-          {STEP_NAMES[type][currentStep - 1] ? ` · ${STEP_NAMES[type][currentStep - 1]}` : ""}
-        </p>
+      <div className="px-4 pt-2">
         <div
-          className="mt-2 w-full bg-muted rounded-full h-1.5"
+          className="w-full bg-muted rounded-full h-1.5"
+          aria-label={`Step ${currentStep} of ${totalSteps}`}
           role="progressbar"
           aria-valuemin={1}
           aria-valuemax={totalSteps}
