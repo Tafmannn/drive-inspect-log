@@ -50,6 +50,14 @@ interface EvidenceHealthBannerProps {
   onUnacknowledge?: (code: string) => void;
   /** Optional extra label for the override action (default: "Acknowledge"). */
   overrideLabel?: string;
+  /**
+   * Display-only: codes already listed by another banner on the same page.
+   * Those rows are not repeated here, but still count for the level and the
+   * acknowledged state (both banners share acknowledgements by code).
+   */
+  hiddenCodes?: string[];
+  /** Shown instead of the rows when every item is hidden (e.g. "Listed in Evidence Health above."). */
+  hiddenNote?: ReactNode;
 }
 
 const LEVEL_TONE: Record<EvidenceLevel, StatusPillTone> = {
@@ -86,10 +94,18 @@ export function EvidenceHealthBanner({
   onAcknowledge,
   onUnacknowledge,
   overrideLabel = "Acknowledge",
+  hiddenCodes,
+  hiddenNote,
 }: EvidenceHealthBannerProps) {
   const ackSet = new Set(acknowledgedCodes);
+  const hidden = new Set(hiddenCodes ?? []);
   const activeBlockers = blockers.filter((b) => !ackSet.has(b.code));
   const ackBlockers = blockers.filter((b) => ackSet.has(b.code));
+  // Rows actually rendered here (level logic above/below uses the full lists).
+  const shownActive = activeBlockers.filter((b) => !hidden.has(b.code));
+  const shownAck = ackBlockers.filter((b) => !hidden.has(b.code));
+  const shownWarnings = warnings.filter((w) => !hidden.has(w.code));
+  const hiddenCount = blockers.length + warnings.length - shownActive.length - shownAck.length - shownWarnings.length;
 
   // Visual downgrade: if the source said red/critical but every blocker has
   // been acknowledged by an admin, present the banner one tone lighter.
@@ -131,9 +147,12 @@ export function EvidenceHealthBanner({
         <p className="text-[11px] text-muted-foreground sm:hidden">{summary}</p>
       )}
 
-      {activeBlockers.length > 0 && (
+      {hiddenCount > 0 && hiddenNote && (
+        <p className="text-xs text-muted-foreground">{hiddenNote}</p>
+      )}
+      {shownActive.length > 0 && (
         <div className="space-y-1.5">
-          {activeBlockers.map((b) => (
+          {shownActive.map((b) => (
             <WarningCallout
               key={`b-${b.code}`}
               severity="critical"
@@ -161,14 +180,14 @@ export function EvidenceHealthBanner({
         </div>
       )}
 
-      {ackBlockers.length > 0 && (
+      {shownAck.length > 0 && (
         <div className="space-y-1 rounded-md border border-dashed border-border bg-muted/40 p-2">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
             <ShieldCheck className="h-3 w-3" />
-            Acknowledged by admin ({ackBlockers.length})
+            Acknowledged by admin ({shownAck.length})
           </p>
           <ul className="space-y-1">
-            {ackBlockers.map((b) => (
+            {shownAck.map((b) => (
               <li
                 key={`ack-${b.code}`}
                 className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground"
@@ -195,9 +214,9 @@ export function EvidenceHealthBanner({
         </div>
       )}
 
-      {warnings.length > 0 && (
+      {shownWarnings.length > 0 && (
         <div className="space-y-1.5">
-          {warnings.map((w) => (
+          {shownWarnings.map((w) => (
             <WarningCallout key={`w-${w.code}`} severity="warning">
               {w.message}
             </WarningCallout>
