@@ -11,7 +11,7 @@ const OUT = `${__dirname}/shots/ui-${TAG}`;
 fs.mkdirSync(OUT, { recursive: true });
 const J = JOBS[0].id;
 
-const ROUTES = [
+let ROUTES = [
   ["driver-home", "/"],
   ["driver-jobs", "/jobs"],
   ["job-detail", `/jobs/${J}`],
@@ -23,6 +23,21 @@ const ROUTES = [
   ["control", "/control?admin=1"],
   ["super-home", "/?super=1"],
 ];
+const ADMIN_ROUTES = [
+  ["a-jobs-master", "/jobs/master?admin=1"],
+  ["a-job-new", "/jobs/new?admin=1"],
+  ["a-job-detail", `/jobs/${J}?admin=1`],
+  ["c-overview", "/control?admin=1"],
+  ["c-jobs", "/control/jobs?admin=1"],
+  ["c-pod-review", "/control/pod-review?admin=1"],
+  ["c-drivers", "/control/drivers?admin=1"],
+  ["c-compliance", "/control/compliance?admin=1"],
+  ["c-finance", "/control/finance?admin=1"],
+  ["c-clients", "/control/clients?admin=1"],
+  ["c-admin", "/control/admin?admin=1"],
+  ["c-super", "/control/super-admin?super=1"],
+];
+if (process.env.ROUTESET === "admin") ROUTES.splice(0, ROUTES.length, ...ADMIN_ROUTES);
 const WIDTHS = (process.env.WIDTHS || "375,390,430,1440").split(",").map(Number);
 
 (async () => {
