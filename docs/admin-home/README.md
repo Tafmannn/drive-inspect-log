@@ -227,3 +227,26 @@ The app has **no platform-specific invoicing rule**: no code reads `job_source`.
 - RLS is enabled, with policies, on `jobs`, `job_pricing`, `invoices`, `invoice_items`, `user_profiles`, `driver_profiles` and `client_logs` (read-only catalogue check).
 
 Screenshots: `screenshots/refinement-3/` (before = `main` 16c50c6, after = this change; 390 px at 3×).
+
+## 9. Test data silenced everywhere (2026-11-22)
+
+Owner decision: test records are hidden from every screen; nothing is deleted.
+
+- **Database (live in production since 2026-11-22)**, migration `20261121180000_silence_test_data`:
+  - RESTRICTIVE SELECT policies `*_hide_test_data` on `jobs`, `invoices` and `expenses` for `anon` and
+    `authenticated`, `USING (is_test = false)`
+  - the six customer-facing SECURITY DEFINER functions (`portal_list_jobs`, `portal_get_job`,
+    `portal_list_invoices`, `portal_get_invoice`, `portal_can_read_invoice_pdf`, `qr_lookup`) filter test data too
+  - the service role still sees everything
+- **Verified on production (read-only, as a signed-in admin):** 4 of 76 jobs visible, 0 test jobs, 0 test
+  invoices, 0 test expenses. All 72 test jobs are still stored. History row recorded.
+- **Staging was skipped with owner sign-off.** Staging's schema has drifted: 16 production functions are not
+  created by any repo migration, so the staging sync can't run. That needs fixing separately (rebuild staging
+  from a production schema dump).
+- **Rollback:** `supabase/rollback/20261121180000_silence_test_data.down.sql`. Its function bodies were checked
+  byte-identical (MD5) to production's live definitions before the change.
+- **Edge functions** (`notify-customers` skips test jobs; `portal-access` count excludes them): these deploy
+  through the Supabase GitHub integration on merge. At apply time no customer notifications were queued, and
+  app users can no longer change test jobs, so no test-job email can be queued before then.
+- **To show a record again:** set `is_test = false` on it (service role / SQL editor).
+- **Movex and Revilo:** no platform-specific invoicing rule. They are invoiced manually for now (owner decision).
