@@ -432,6 +432,26 @@ export function SuperAdminSettings() {
 
         <FeatureFlagsCard />
 
+        {/* Vehicle catalogue artwork */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Vehicle images</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              Studio renders shown on job cards, matched by make, model, year and colour.
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs h-7 gap-1"
+              onClick={() => navigate("/super-admin/vehicle-images")}
+            >
+              Manage vehicle images <ChevronRight className="h-3 w-3" />
+            </Button>
+          </CardContent>
+        </Card>
+
         {/* Platform Controls */}
         <Card>
           <CardHeader className="pb-2">
