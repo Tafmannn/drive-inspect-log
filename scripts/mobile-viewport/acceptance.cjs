@@ -66,7 +66,11 @@ function jpeg() {
   results.notesFontSize = await page.$eval("#notes", (e) => getComputedStyle(e).fontSize);
   results.odoFontSizeLandscapeProbe = null;
   await page.getByRole("button", { name: /Next/ }).click();
-  // Step 3 damage (optional)
+  // Step 3 damage: since V2 it needs damage recorded OR "no damage found"
+  // confirmed. The fixture vehicle is a generic "car", so pick a shape first.
+  const saloon = page.getByRole("button", { name: /^Saloon$/ });
+  if (await saloon.count()) await saloon.click();
+  await page.getByRole("checkbox", { name: /no damage/i }).click();
   await page.getByRole("button", { name: /Next/ }).click();
   // Step 4 photos
   await page.waitForSelector("input[id^=photo-]", { state: "attached" });
