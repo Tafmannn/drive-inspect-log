@@ -99,11 +99,24 @@ describe("Admin Home UI", () => {
     expect(screen.getByText("2 PODs to review")).toBeTruthy();
   });
 
-  it("raises the not-invoiced banner (invoice-checked count) and keeps its destination", () => {
-    buckets = { ...zero, completed_not_invoiced: 68 };
+  it("keeps invoicing out of the attention banner and shows it in its own section", () => {
+    buckets = { ...zero, completed_not_invoiced: 4, ready_to_invoice: 3 };
     renderBody();
-    expect(screen.getByText("68 completed jobs are not yet invoiced.")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /Invoice prep/ }));
+    // The action queue is empty, so the banner must not warn about anything.
+    expect(screen.queryByText("Needs your attention")).toBeNull();
+    expect(screen.getByText("Action queue is empty")).toBeTruthy();
+    const inv = screen.getByRole("region", { name: /Invoicing/ });
+    expect(within(inv).getByText("Ready to invoice").closest("button")!.textContent).toContain("3");
+    // 4 completed uninvoiced, 3 of them ready -> 1 can't be invoiced yet.
+    const blocked = within(inv).getByText("Can’t invoice yet").closest("button")!;
+    expect(blocked.textContent).toContain("1");
+    fireEvent.click(blocked);
+    expect(screen.getByTestId("landed").textContent).toBe("/control/clients/link-jobs");
+  });
+
+  it("Invoice prep opens invoice preparation", () => {
+    renderBody();
+    fireEvent.click(screen.getByRole("button", { name: "Open invoice preparation" }));
     expect(screen.getByTestId("landed").textContent).toBe("/control/invoice-prep");
   });
 
@@ -129,14 +142,16 @@ describe("Admin Home UI", () => {
     expect(container.textContent).not.toMatch(/£|\+\d+%/);
   });
 
-  it("shows unknown counts as a dash, never as 0, and raises no banner from them", () => {
+  it("shows unknown counts as a dash, never as 0", () => {
     kpis = { active: 5, podReview: null, unassigned: null, stale: 0 };
-    buckets = { ...zero, ready_to_invoice: null, completed_not_invoiced: null, needs_admin_review: null };
+    buckets = { ...zero, ready_to_invoice: null, completed_not_invoiced: 4, todays_active: null };
     renderBody();
     expect(screen.getByRole("button", { name: "Unassigned: unavailable" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Ready to invoice: unavailable" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Admin review: unavailable" })).toBeTruthy();
-    expect(screen.queryByText(/not yet invoiced/)).toBeNull();
+    expect(screen.getByRole("button", { name: /^Due today: unavailable/ })).toBeTruthy();
+    const inv = screen.getByRole("region", { name: /Invoicing/ });
+    expect(within(inv).getByText("Ready to invoice").closest("button")!.textContent).toContain("—");
+    // Derived from an unknown count, so also unknown.
+    expect(within(inv).getByText("Can’t invoice yet").closest("button")!.textContent).toContain("—");
   });
 
   it("does not reassure ('Action queue is empty') while some counts are unknown", () => {

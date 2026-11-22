@@ -106,7 +106,7 @@ serve(async (req) => {
         const { data: job } = await admin
           .from("jobs")
           .select(
-            "id, status, client_id, is_hidden, vehicle_reg, vehicle_make, vehicle_model, external_job_number, pickup_city, pickup_postcode, delivery_city, delivery_postcode",
+            "id, status, client_id, is_hidden, is_test, vehicle_reg, vehicle_make, vehicle_model, external_job_number, pickup_city, pickup_postcode, delivery_city, delivery_postcode",
           )
           .eq("id", row.job_id)
           .maybeSingle();

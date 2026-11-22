@@ -215,11 +215,13 @@ const DELIVERED_STATUSES = ["delivery_complete", "pod_ready", "completed"];
  */
 export function skipReasonFor(
   event: StatusEvent,
-  job: { status: string | null; client_id: string | null; is_hidden?: boolean | null } | null,
+  job: { status: string | null; client_id: string | null; is_hidden?: boolean | null; is_test?: boolean | null } | null,
   queuedClientId: string,
 ): string | null {
   if (!job) return "job_missing";
   if (job.is_hidden) return "job_hidden";
+  // Test data never reaches a customer (the service role bypasses the RLS that silences it in the app).
+  if (job.is_test) return "job_test";
   if (job.client_id !== queuedClientId) return "client_changed";
   if (job.status === "cancelled" || job.status === "failed") return "job_cancelled";
   if (event === "collected" && job.status && DELIVERED_STATUSES.includes(job.status)) return "superseded_by_delivery";

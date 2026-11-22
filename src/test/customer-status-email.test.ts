@@ -120,6 +120,7 @@ describe("helpers", () => {
     expect(skipReasonFor("collected", job, "c1")).toBeNull();
     expect(skipReasonFor("collected", null, "c1")).toBe("job_missing");
     expect(skipReasonFor("collected", { ...job, is_hidden: true }, "c1")).toBe("job_hidden");
+    expect(skipReasonFor("collected", { ...job, is_test: true }, "c1")).toBe("job_test");
     expect(skipReasonFor("collected", job, "c2")).toBe("client_changed");
     expect(skipReasonFor("collected", { ...job, status: "cancelled" }, "c1")).toBe("job_cancelled");
     expect(skipReasonFor("collected", { ...job, status: "pod_ready" }, "c1")).toBe("superseded_by_delivery");

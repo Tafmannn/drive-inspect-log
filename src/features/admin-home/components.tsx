@@ -143,7 +143,7 @@ export function KpiTile({
           aria-hidden
           className={cn(
             "ah-num ah-figure block whitespace-nowrap font-semibold leading-8 tracking-[-0.025em]",
-            active ? "text-foreground" : "text-foreground/45",
+            active ? "text-foreground" : "text-muted-foreground",
             size,
           )}
         >
@@ -248,6 +248,8 @@ export interface QueueStat {
   label: string;
   /** `null` = the count could not be loaded; shown as "—". */
   value: number | null;
+  /** One short line saying what the count includes. */
+  hint?: string;
   /** Colour the value when non-zero (only for problem queues). */
   tone?: "danger";
   onClick?: () => void;
@@ -276,7 +278,7 @@ export function QueueStrip({ stats, loading }: { stats: QueueStat[]; loading?: b
               type="button"
               onClick={s.onClick}
               disabled={!s.onClick}
-              aria-label={`${s.label}: ${loading ? "loading" : s.value === null ? "unavailable" : s.value.toLocaleString("en-GB")}`}
+              aria-label={`${s.label}: ${loading ? "loading" : s.value === null ? "unavailable" : s.value.toLocaleString("en-GB")}${s.hint ? `. ${s.hint}` : ""}`}
               className="ah-row flex min-h-[64px] w-full flex-col items-start justify-start rounded-xl px-2.5 py-1.5 text-left disabled:cursor-default"
             >
               {loading ? (
@@ -287,13 +289,14 @@ export function QueueStrip({ stats, loading }: { stats: QueueStat[]; loading?: b
                   className={cn(
                     "ah-num ah-figure block whitespace-nowrap font-semibold leading-7 tracking-[-0.02em]",
                     figureSize,
-                    active && s.tone === "danger" ? "text-destructive" : active ? "text-foreground" : "text-foreground/45",
+                    active && s.tone === "danger" ? "text-destructive" : active ? "text-foreground" : "text-muted-foreground",
                   )}
                 >
                   {shown(s.value)}
                 </span>
               )}
               <span aria-hidden className="text-[13px] font-medium leading-[17px] text-[hsl(var(--ah-ink-soft))]">{s.label}</span>
+              {s.hint && <span aria-hidden className="mt-0.5 text-[12px] leading-[15px] text-muted-foreground">{s.hint}</span>}
             </button>
           </li>
         );

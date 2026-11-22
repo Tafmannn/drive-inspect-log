@@ -40,9 +40,13 @@ export interface OperationsBucketCounts {
   cancelled_archived: BucketCount;
 }
 
+// Every status where the job is with a driver (matches ACTIVE_STATUSES in
+// lib/statusConfig; pickup_in_progress was missing, so jobs mid-collection
+// were left out of "with drivers" and "today's active").
 const DRIVER_STATUSES = [
   "ready_for_pickup",
   "assigned",
+  "pickup_in_progress",
   "pickup_complete",
   "in_transit",
   "delivery_in_progress",
@@ -219,15 +223,17 @@ export function useAdminOperationsBuckets() {
           const [pricing, invoiced] = await Promise.all([fetchPricingByJobId(ids), invoicedAmong(ids)]);
           return countReadyToInvoice(ids, pricing, invoiced);
         }),
-        // Completed but not invoiced — completed/closed visible jobs with no
-        // non-cancelled invoice (was: a missing POD PDF, which is not an
-        // invoice check).
+        // Completed but not invoiced — completed/closed visible LIVE jobs with
+        // no non-cancelled invoice. Test jobs are excluded, as in Invoice Prep,
+        // ready_to_invoice and the weekly unbilled figure: they are never
+        // invoiced, and on 2026-11-21 they were 56 of the 60 counted here.
         orNull("completed_not_invoiced", async () => {
           const ids = await fetchAllIds(() =>
             supabase
               .from("jobs")
               .select("id")
               .eq("is_hidden", false)
+              .eq("is_test", false)
               .in("status", TERMINAL_STATUSES)
               .order("id"),
           );

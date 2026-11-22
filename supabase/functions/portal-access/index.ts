@@ -107,7 +107,8 @@ serve(async (req) => {
           .from("jobs")
           .select("id", { count: "exact", head: true })
           .eq("client_id", clientId)
-          .eq("is_hidden", false),
+          .eq("is_hidden", false)
+          .eq("is_test", false),
       ]);
       if (error) return jsonRes({ error: error.message }, 500);
 

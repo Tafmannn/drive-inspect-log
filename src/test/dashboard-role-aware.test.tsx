@@ -27,6 +27,7 @@ vi.mock("@/hooks/useJobs", () => ({
 }));
 
 import { Dashboard } from "@/pages/Dashboard";
+import { adminGreeting } from "@/features/admin-home/greeting";
 
 function renderDashboard() {
   return render(
@@ -74,5 +75,12 @@ describe("Dashboard role-aware home", () => {
     // The page H1 is the greeting, not a redundant "Dashboard" label.
     const heading = screen.getByRole("heading", { level: 1 });
     expect(heading.textContent).toMatch(/, Terry$/);
+  });
+
+  it("admin greeting stays one line: capitalises a handle, drops a long name", () => {
+    expect(adminGreeting("Simon Jones", 15)).toBe("Good afternoon, Simon");
+    expect(adminGreeting("jsmith", 9)).toBe("Good morning, Jsmith");
+    expect(adminGreeting("terrytapfumaneyi1987", 20)).toBe("Good evening");
+    expect(adminGreeting(undefined, 20)).toBe("Good evening");
   });
 });

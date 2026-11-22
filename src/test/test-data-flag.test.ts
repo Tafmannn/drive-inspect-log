@@ -57,7 +57,7 @@ describe("reports leave test data out", () => {
     ["src/features/control/hooks/useControlProfitabilityData.ts", '.eq("is_test", false)', 1],
     ["src/features/invoicing/hooks/useInvoicePrepData.ts", '.eq("is_test", false)', 1],
     ["src/features/attention/hooks/useAttentionData.ts", '.eq("is_test", false)', 1],
-    ["src/hooks/useAdminOperationsBuckets.ts", '.eq("is_test", false)', 1],
+    ["src/hooks/useAdminOperationsBuckets.ts", '.eq("is_test", false)', 2],
   ];
   for (const [file, needle, count] of filtered) {
     it(`${file} filters out is_test records`, () => {
@@ -80,5 +80,45 @@ describe("reports leave test data out", () => {
       expect(types.slice(a, b), t).toContain("is_test: boolean");
     }
     expect(read("src/lib/types.ts")).toContain("is_test?: boolean;");
+  });
+});
+
+describe("test data is silenced everywhere (migration 20261121180000)", () => {
+  const up = code(read("supabase/migrations/20261121180000_silence_test_data.sql"));
+  const down = code(read("supabase/rollback/20261121180000_silence_test_data.down.sql"));
+
+  it("hides is_test rows from every app user with RESTRICTIVE select policies", () => {
+    for (const t of ["jobs", "invoices", "expenses"]) {
+      expect(up).toMatch(new RegExp(`CREATE POLICY ${t}_hide_test_data ON public\\.${t}\\s+AS RESTRICTIVE FOR SELECT TO anon, authenticated\\s+USING \\(is_test = false\\);`));
+    }
+  });
+
+  it("never updates, deletes or re-flags data", () => {
+    expect(up).not.toMatch(/\bUPDATE\s+public\./i);
+    expect(up).not.toMatch(/\bDELETE\s+FROM\b/i);
+    expect(up).not.toMatch(/SET\s+is_test/i);
+  });
+
+  it("filters test data in every customer-facing SECURITY DEFINER function (they bypass RLS)", () => {
+    for (const fn of ["portal_list_jobs", "portal_get_job", "portal_list_invoices", "portal_get_invoice", "portal_can_read_invoice_pdf", "qr_lookup"]) {
+      const start = up.indexOf(`FUNCTION public.${fn}(`);
+      expect(start, fn).toBeGreaterThan(-1);
+      const body = up.slice(start, up.indexOf("$function$;", start));
+      expect(body, fn).toMatch(/is_test/);
+    }
+  });
+
+  it("rollback drops the policies and restores the functions without the filter", () => {
+    expect(down.trim().startsWith("BEGIN;")).toBe(true);
+    expect(down.trim().endsWith("COMMIT;")).toBe(true);
+    for (const t of ["jobs", "invoices", "expenses"]) expect(down).toContain(`DROP POLICY IF EXISTS ${t}_hide_test_data ON public.${t};`);
+    expect(down.match(/CREATE OR REPLACE FUNCTION/g)).toHaveLength(6);
+    expect(down).not.toMatch(/is_test/);
+  });
+
+  it("customer emails skip test jobs; the portal job count excludes them", () => {
+    expect(read("supabase/functions/_shared/customerStatusEmail.ts")).toContain('return "job_test"');
+    expect(read("supabase/functions/notify-customers/index.ts")).toContain("is_hidden, is_test,");
+    expect(read("supabase/functions/portal-access/index.ts")).toContain('.eq("is_test", false)');
   });
 });
