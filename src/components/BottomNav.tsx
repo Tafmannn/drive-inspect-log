@@ -77,25 +77,32 @@ export const BottomNav = ({ variant = "bar" }: { variant?: "bar" | "floating" })
         the bar is taller by env(safe-area-inset-bottom). This in-flow spacer
         adds exactly that, so the last card / action isn't hidden behind it. */}
     <div aria-hidden className="h-[env(safe-area-inset-bottom)]" />
-    <nav className="fixed bottom-0 inset-x-0 bg-card border-t border-border shadow-[0_-2px_8px_rgba(0,0,0,0.06)] flex justify-around py-2 z-50 safe-area-bottom">
-      {tabs.map(({ icon: Icon, label, path }) => {
-        const active = isActive(path);
-        return (
-          <button
-            key={path}
-            onClick={() => navigate(path)}
-            className={cn(
-              "flex flex-col items-center gap-1 min-h-[44px] min-w-[44px] px-3 py-1 rounded-lg transition-colors",
-              active ? "text-primary" : "text-muted-foreground"
-            )}
-            type="button"
-            aria-label={label}
-          >
-            <Icon className="w-6 h-6 stroke-[2]" />
-            <span className="text-xs font-medium">{label}</span>
-          </button>
-        );
-      })}
+
+    <nav
+      aria-label="Main"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-border/80 bg-card/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-1px_0_rgb(15_23_42/0.02),0_-8px_24px_-16px_rgb(15_23_42/0.18)] supports-[backdrop-filter]:bg-card/90 supports-[backdrop-filter]:backdrop-blur"
+    >
+      <div className="mx-auto flex max-w-xl items-stretch gap-1 px-2 pb-1.5 pt-1.5 pl-[max(0.5rem,env(safe-area-inset-left))] pr-[max(0.5rem,env(safe-area-inset-right))]">
+        {tabs.map(({ icon: Icon, label, path }) => {
+          const active = isActive(path);
+          return (
+            <button
+              key={path}
+              onClick={() => navigate(path)}
+              className={cn(
+                "flex min-h-[52px] min-w-0 flex-1 flex-col items-center justify-center gap-[3px] rounded-2xl px-1 transition-colors",
+                active ? "bg-primary/10 text-primary" : "text-muted-foreground active:bg-muted",
+              )}
+              type="button"
+              aria-label={label}
+              aria-current={active ? "page" : undefined}
+            >
+              <Icon aria-hidden className="h-[22px] w-[22px]" strokeWidth={active ? 2.25 : 1.75} />
+              <span className={cn("max-w-full truncate text-[11px] leading-[13px]", active ? "font-semibold" : "font-medium")}>{label}</span>
+            </button>
+          );
+        })}
+      </div>
     </nav>
     </>
   );

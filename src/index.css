@@ -77,6 +77,8 @@ All colors MUST be HSL.
     --text-h1: 1.5rem;         --lh-h1: 2rem;
     --text-display: 1.75rem;   --lh-display: 2rem;
 
+    /* Cobalt brand bar behind the logo in the shared page chrome. */
+    --brand-bar: 216 100% 40%;
     --app-header: 215 28% 17%;
     --app-header-foreground: 0 0% 100%;
 
