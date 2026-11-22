@@ -20,6 +20,7 @@ import { DriverGateScreen } from "@/components/DriverGateScreen";
 import { KpiPill } from "@/components/KpiPill";
 import { KpiRowSkeleton, ListRowsSkeleton } from "@/components/skeletons";
 import { InstallPrompt } from "@/components/InstallPrompt";
+import { UpNextCard } from "@/features/driver/UpNextCard";
 import { Truck, Clock, AlertTriangle, Receipt } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useDashboardCounts } from "@/hooks/useJobs";
@@ -113,6 +114,9 @@ export const Dashboard = () => {
       {(
         // Drivers → compact launcher.
         <div className="p-4 space-y-5 max-w-lg lg:max-w-3xl mx-auto page-enter">
+          {/* The driver's next job and its action come first. */}
+          <UpNextCard />
+
           {/* At-a-glance stat row (replaces three stacked full-width cards) */}
           <section>
             <div className="grid grid-cols-3 gap-2">

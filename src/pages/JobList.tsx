@@ -6,8 +6,6 @@ import { useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { useNavigate } from "react-router-dom";
-import { useActiveJobs } from "@/hooks/useJobs";
-import { useDriverGate } from "@/hooks/useDriverGate";
 import { Plus, Truck, Phone, Navigation } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
@@ -18,9 +16,8 @@ import { PushOptIn } from "@/components/PushOptIn";
 import { OfflineListState } from "@/components/OfflineListState";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { DeviationPrompt } from "@/components/DeviationPrompt";
-import { rankJobs, type RankedJob } from "@/lib/executionRanking";
-import { deriveJobSummaries, withoutPodCta, type DriverJobSummary } from "@/lib/driverJobSummary";
-import { useCanViewPod } from "@/hooks/useCanViewPod";
+import { type DriverJobSummary } from "@/lib/driverJobSummary";
+import { useDriverJobSummaries } from "@/features/driver/useDriverJobSummaries";
 import { logDeviation } from "@/lib/deviationApi";
 import { useAuth } from "@/context/AuthContext";
 import { RoleScope } from "@/components/ui-kit";
@@ -28,28 +25,12 @@ import { RoleScope } from "@/components/ui-kit";
 export const JobList = () => {
   const navigate = useNavigate();
   const { user, isAdmin, isSuperAdmin } = useAuth();
-  const gate = useDriverGate();
-  const canViewPod = useCanViewPod();
-  const { data: jobs, isLoading, isError, refetch } = useActiveJobs();
+  const { summaries, isLoading, isError, refetch, isDriverOnly } = useDriverJobSummaries();
   const online = useOnlineStatus();
   const [deviation, setDeviation] = useState<{
     target: DriverJobSummary;
     recommended: DriverJobSummary;
   } | null>(null);
-
-  // Scope BEFORE ranking so cross-driver route-adjacency comparisons don't
-  // corrupt the sort, and so deriveJobSummaries sees the same job set that
-  // rankJobs used when computing is_next_recommended.
-  const driverScoped = jobs
-    ? (gate.isDriverOnly && gate.driverProfileId)
-      ? jobs.filter(j => j.driver_id === gate.driverProfileId)
-      : jobs
-    : [];
-  const scoped = rankJobs(driverScoped).filter(j => j.execution_class !== "terminal");
-  const derived = deriveJobSummaries(scoped);
-  const summaries = canViewPod ? derived : derived.map(withoutPodCta);
-
-  const isDriverOnly = gate.isDriverOnly;
 
   const handleJobAction = (summary: DriverJobSummary) => {
     // If blocked or review-only, go directly
