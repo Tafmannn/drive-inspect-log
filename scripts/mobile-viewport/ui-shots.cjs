@@ -46,6 +46,16 @@ const REST_ROUTES = [
   ["r-profitability", "/control/profitability?admin=1"],
   ["r-exports", "/control/exports?admin=1"],
 ];
+const MORE_ROUTES = [
+  ["m-pod", `/jobs/${J}/pod`],
+  ["m-expenses", "/expenses"],
+  ["m-expense-new", "/expenses/new"],
+  ["m-digital-id", "/profile/id"],
+  ["m-timesheets", "/admin/timesheets?admin=1"],
+  ["m-welcome", "/welcome"],
+  ["m-completed", "/jobs/completed"],
+];
+if (process.env.ROUTESET === "more") ROUTES.splice(0, ROUTES.length, ...MORE_ROUTES);
 if (process.env.ROUTESET === "rest") ROUTES.splice(0, ROUTES.length, ...REST_ROUTES);
 if (process.env.ROUTESET === "admin") ROUTES.splice(0, ROUTES.length, ...ADMIN_ROUTES);
 const WIDTHS = (process.env.WIDTHS || "375,390,430,1440").split(",").map(Number);

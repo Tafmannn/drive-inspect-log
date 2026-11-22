@@ -697,6 +697,10 @@ export const PodReport = () => {
                     title="POD Readiness"
                     blockers={podReadiness.blockers.slice(0, 3)}
                     warnings={podReadiness.warnings.slice(0, 3)}
+                    // Same engine as Evidence Health above: don't list its
+                    // items twice. Acknowledgements are shared by code.
+                    hiddenCodes={[...evidenceHealth.blockers, ...evidenceHealth.warnings].map((x) => x.code)}
+                    hiddenNote="Issues are listed in Evidence Health above."
                     summary={`${podReadiness.photoSummary.pickupCount} pickup · ${podReadiness.photoSummary.deliveryCount} delivery · ${podReadiness.photoSummary.duplicateCount} dup`}
                     acknowledgedCodes={evidenceOverrides.acknowledgedCodes}
                     onAcknowledge={evidenceOverrides.acknowledge}
