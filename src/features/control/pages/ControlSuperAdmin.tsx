@@ -148,7 +148,7 @@ export function ControlSuperAdmin() {
       />
 
       {/* A. KPI Strip */}
-      <KpiStrip items={kpiItems} className="grid-cols-3 lg:grid-cols-5" />
+      <KpiStrip items={kpiItems} className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-5" />
 
       {/* B. Quick Actions */}
       <QuickActionsBar actions={quickActions} />

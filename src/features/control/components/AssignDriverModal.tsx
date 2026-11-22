@@ -87,6 +87,8 @@ export function AssignDriverModal({
   currentDriverId,
 }: AssignDriverModalProps) {
   const [search, setSearch] = useState("");
+  // Touch devices: opening the dialog should not pop the keyboard over the list.
+  const isTouch = typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches;
   const [mapsEnabled, setMapsEnabled] = useState(false);
   const queryClient = useQueryClient();
 
@@ -269,7 +271,14 @@ export function AssignDriverModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[80dvh] flex flex-col">
+      <DialogContent
+        className="sm:max-w-md max-h-[80dvh] flex flex-col"
+        // Touch devices: Radix focuses the search box on open, which pops the
+        // keyboard over the driver list. Keep focus on the dialog instead.
+        onOpenAutoFocus={(e) => {
+          if (isTouch) e.preventDefault();
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="text-sm">Assign Driver — {jobRef}</DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
@@ -285,7 +294,7 @@ export function AssignDriverModal({
             className="pl-8 h-8 text-xs"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            autoFocus
+            autoFocus={!isTouch}
           />
         </div>
 

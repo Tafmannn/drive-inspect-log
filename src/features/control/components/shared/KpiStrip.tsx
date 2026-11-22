@@ -32,6 +32,15 @@ const iconBg: Record<string, string> = {
   info: "bg-info/10 text-info",
 };
 
+/** Desktop column count follows the item count so a row never ends with a
+ *  lone orphan tile (7 tiles on lg:grid-cols-6 left one on its own row).
+ *  7–8 tiles use 4 columns: 7 columns beside the sidebar were too narrow for
+ *  the labels. Literal class names so Tailwind keeps them. */
+const LG_COLS: Record<number, string> = {
+  1: "lg:grid-cols-1", 2: "lg:grid-cols-2", 3: "lg:grid-cols-3", 4: "lg:grid-cols-4",
+  5: "lg:grid-cols-5", 6: "lg:grid-cols-6", 7: "lg:grid-cols-4", 8: "lg:grid-cols-4",
+};
+
 export function KpiStrip({
   items,
   className,
@@ -42,8 +51,8 @@ export function KpiStrip({
   return (
     <div
       className={cn(
-        "grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6",
-        className,
+        "grid gap-2 sm:gap-3 grid-cols-2 sm:grid-cols-3",
+        className ?? LG_COLS[Math.min(items.length, 8)] ?? "lg:grid-cols-6",
       )}
     >
       {items.map((item, i) => (
@@ -66,9 +75,10 @@ function KpiCard({
   const interactive = Boolean(href || onClick);
 
   const baseClass = cn(
-    "group rounded-xl border bg-card p-4 flex items-center gap-3 min-w-0 h-full shadow-sm",
-    // ensure ≥56px tap target on mobile, slightly tighter on desktop
-    "min-h-[88px] lg:min-h-[76px]",
+    "group rounded-xl border bg-card p-3 sm:p-4 flex items-center gap-2.5 sm:gap-3 min-w-0 h-full shadow-sm",
+    // compact on phones (still well above a 44px tap target) so the queues
+    // start higher; unchanged height on desktop
+    "min-h-[64px] sm:min-h-[76px]",
     interactive &&
       "text-left w-full transition-all active:scale-[0.98] hover:border-primary/40 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer",
   );
@@ -78,7 +88,7 @@ function KpiCard({
       {Icon && (
         <div
           className={cn(
-            "h-11 w-11 lg:h-10 lg:w-10 rounded-lg flex items-center justify-center shrink-0",
+            "h-9 w-9 sm:h-10 sm:w-10 rounded-lg flex items-center justify-center shrink-0",
             iconBg[variant],
           )}
         >
@@ -91,7 +101,7 @@ function KpiCard({
         ) : (
           <p
             className={cn(
-              "text-2xl font-semibold tabular-nums leading-tight",
+              "text-xl sm:text-2xl font-semibold tabular-nums leading-tight",
               variantStyles[variant],
             )}
           >
@@ -99,7 +109,7 @@ function KpiCard({
           </p>
         )}
         <p
-          className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider leading-snug line-clamp-2 break-words"
+          className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider leading-snug line-clamp-2 [overflow-wrap:normal] [word-break:normal]"
           title={label}
         >
           {label}

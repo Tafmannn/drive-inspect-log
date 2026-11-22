@@ -81,6 +81,18 @@ export function useBreadcrumbs(): Crumb[] {
     const crumbs: Crumb[] = [];
     const segments = pathname.split("/").filter(Boolean);
 
+    // /inspection/:jobId/:type is not a nested page tree: "/inspection" has no
+    // route and the job id is not an inspection. Show where it really sits.
+    if (segments[0] === "inspection" && segments.length >= 3) {
+      const type = segments[2] === "delivery" ? "Delivery" : "Pickup";
+      return [
+        { label: "Dashboard", path: "/" },
+        { label: "Jobs", path: "/jobs" },
+        { label: "Job", path: `/jobs/${segments[1]}` },
+        { label: type },
+      ];
+    }
+
     // Build cumulative paths
     let accumulated = "";
     for (let i = 0; i < segments.length; i++) {

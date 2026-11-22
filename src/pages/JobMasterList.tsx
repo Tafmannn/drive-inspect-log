@@ -156,7 +156,7 @@ export function JobMasterList() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <AppHeader title="Job Master" showBack onBack={() => navigate("/")} />
-      <div className="p-4 space-y-4 max-w-4xl mx-auto">
+      <div className="p-4 space-y-4 max-w-4xl lg:max-w-7xl lg:px-8 mx-auto">
         <div className="flex flex-col sm:flex-row gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground stroke-[2]" />
