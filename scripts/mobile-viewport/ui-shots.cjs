@@ -37,6 +37,16 @@ const ADMIN_ROUTES = [
   ["c-admin", "/control/admin?admin=1"],
   ["c-super", "/control/super-admin?super=1"],
 ];
+const REST_ROUTES = [
+  ["r-job-new", "/jobs/new?admin=1"],
+  ["r-job-edit", `/jobs/${J}/edit?admin=1`],
+  ["r-invoice-new", "/invoice/new?admin=1"],
+  ["r-invoice-prep", "/control/invoice-prep?admin=1"],
+  ["r-clients", "/control/clients?admin=1"],
+  ["r-profitability", "/control/profitability?admin=1"],
+  ["r-exports", "/control/exports?admin=1"],
+];
+if (process.env.ROUTESET === "rest") ROUTES.splice(0, ROUTES.length, ...REST_ROUTES);
 if (process.env.ROUTESET === "admin") ROUTES.splice(0, ROUTES.length, ...ADMIN_ROUTES);
 const WIDTHS = (process.env.WIDTHS || "375,390,430,1440").split(",").map(Number);
 
