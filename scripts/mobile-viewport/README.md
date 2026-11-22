@@ -33,7 +33,7 @@ NODE_PATH=$(npm root -g) node repro.cjs        # pull-to-refresh, fonts, step sc
 | `remount.cjs` | Re-opening an inspection in the same tab keeps the note and step |
 | `sigreload.cjs` | Signatures survive a same-tab reload and Next/Previous; Clear forgets them |
 | `verify.cjs` | Reduced motion, offline draft + rotation, desktop Command Center |
-| `damage.cjs` | Tallest dialog in a 340px-high landscape: contents reachable, page usable after close |
+| `damage.cjs` | Damage editor bottom sheet (V2) in a 340px-high landscape and portrait, rotated twice: Save reachable; page scrolls after close. Exits non-zero on failure |
 | `portal.cjs` | Customer portal routes and its photo viewer (auth-enabled server) |
 
 Screenshots go to `shots/` (git-ignored).
