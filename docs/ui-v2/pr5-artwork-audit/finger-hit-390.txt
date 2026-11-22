@@ -1,0 +1,1 @@
+{"tinyPanels":154,"median":100,"under50":0,"worst5":["hatchback/top/rear_bumper 67%","estate/top/rear_bumper 69%","pickup/top/right_taillight 69%","van/right/right_rear_cargo_door 71%","pickup/top/left_taillight 72%"]}
