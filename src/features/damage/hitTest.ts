@@ -10,6 +10,8 @@
  *  3. If two different panels are both that close and roughly equally near,
  *     the result is ambiguous and the UI shows a small chooser.
  *  4. Empty space further away selects nothing.
+ *  5. A tap inside a big panel but within ~half a fingertip of a panel that
+ *     is narrower than a fingertip (roof strip, lamp, mirror) asks too.
  */
 import type { DiagramView } from "./geometry/views";
 import { distToPoly, pointInPoly, type Pt } from "./geometry/poly";
@@ -21,6 +23,13 @@ export interface TapResult {
   inside: boolean;
 }
 
+/** A panel narrower than one fingertip (in either direction). */
+function isTiny(p: DiagramView["panels"][number], tolerance: number): boolean {
+  return Math.min(p.bbox.w, p.bbox.h) < tolerance;
+}
+/** How close (as a fraction of the fingertip tolerance) a tap must be to a tiny panel to ask. */
+const TINY_REACH = 0.4;
+
 export function resolveTap(diagram: DiagramView, pt: Pt, tolerance: number): TapResult {
   const inHole = diagram.holes.some((h) => pointInPoly(pt, h));
   for (let i = diagram.panels.length - 1; i >= 0; i--) {
@@ -28,6 +37,19 @@ export function resolveTap(diagram: DiagramView, pt: Pt, tolerance: number): Tap
     // Body panels are cut away by the wheel arches; tyres are not.
     if (inHole && p.material !== "tyre") continue;
     if (p.polys.some((poly) => pointInPoly(pt, poly))) {
+      // Thin/tiny panels (roof strips, lamps, mirrors) narrower than a
+      // fingertip can't be hit reliably when they border a big panel: a tap
+      // meant for the strip usually lands just inside the neighbour. If this
+      // tap is that close to such a panel, ask instead of guessing.
+      if (tolerance > 0 && !isTiny(p, tolerance)) {
+        const near = diagram.panels
+          .filter((q) => q.id !== p.id && isTiny(q, tolerance))
+          .map((q) => ({ id: q.id, d: Math.min(...q.polys.map((poly) => distToPoly(pt, poly))) }))
+          .filter((q) => q.d <= tolerance * TINY_REACH)
+          .sort((x, y) => x.d - y.d)
+          .map((q) => q.id);
+        if (near.length) return { panelId: null, candidates: [...near.slice(0, 3), p.id], inside: true };
+      }
       return { panelId: p.id, candidates: [p.id], inside: true };
     }
   }

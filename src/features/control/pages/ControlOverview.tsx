@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { kickCustomerNotifications } from "@/lib/customerNotifyApi";
 import { ControlShell, ControlHeader, ControlSection } from "../components/shared/ControlShell";
 import { KpiStrip } from "../components/shared/KpiStrip";
+import { overviewStatus, STATUS_TONE_CLASS } from "../overviewStatus";
 import { QuickActionsBar } from "../components/shared/QuickActionsBar";
 import { CompactTable, type CompactColumn } from "../components/shared/CompactTable";
 import {
@@ -196,7 +197,7 @@ export function ControlOverview() {
   const { data: podQueue, isLoading: podLoading } = usePodReviewQueue();
   const { data: completed, isLoading: completedLoading } = useRecentCompleted();
   const [filters] = useState<AttentionFiltersState>(DEFAULT_FILTERS);
-  const { data: attentionData, isLoading: attentionLoading, isFetching, refetch } = useAttentionData({ scope: "org", filters });
+  const { data: attentionData, isLoading: attentionLoading, isError: attentionError, isFetching, refetch } = useAttentionData({ scope: "org", filters });
   const [showAcknowledged, setShowAcknowledged] = useState(false);
   const [assignTarget, setAssignTarget] = useState<{ jobId: string; jobRef: string; driverId: string | null } | null>(null);
 
@@ -259,13 +260,12 @@ export function ControlOverview() {
   ];
 
   // ─── Live status chip ────────────────────────────────────────────
-  const criticalCount = exceptions.filter(e => e.severity === "critical").length;
-  const statusChip =
-    criticalCount > 0
-      ? { label: "Critical", className: "bg-destructive/10 text-destructive border-destructive/30" }
-      : highSevCount > 0
-      ? { label: "Attention Required", className: "bg-warning/10 text-warning border-warning/30" }
-      : { label: "All Clear", className: "bg-success/10 text-success border-success/30" };
+  const chip = overviewStatus({
+    loading: attentionLoading,
+    error: attentionError,
+    severities: exceptions.map((e) => e.severity),
+  });
+  const statusChip = { label: chip.label, className: STATUS_TONE_CLASS[chip.tone] };
 
   return (
     <ControlShell>
