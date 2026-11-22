@@ -99,6 +99,25 @@ describe("buildPodReportModel", () => {
     expect(m.checklist?.notes).toEqual([{ stage: "Collection", text: "Dirty on collection" }]);
   });
 
+  it("V2 damage rows report the canonical panel label + severity; legacy rows unchanged", () => {
+    const m = buildPodReportModel(
+      makeJob({
+        damage_items: [
+          { id: "d1", inspection_id: "id", area: "Rear", item: "Bumper", damage_types: ["Scuff"], notes: null },
+          {
+            id: "d2", inspection_id: "id", area: "Nearside", item: "Front Left Door", damage_types: ["Scratch"],
+            notes: "~5 cm", panel_id: "front_left_door", view_id: "top", severity: "minor",
+          },
+        ],
+      }),
+      noPhotos,
+    );
+    expect(m.damages).toEqual([
+      { stage: "Delivery", location: "Rear", item: "Bumper", damage: "Scuff", notes: null },
+      { stage: "Delivery", location: "Nearside", item: "Front Left Door", damage: "Scratch (Minor)", notes: "~5 cm" },
+    ]);
+  });
+
   it("lists damage, sign-offs and only POD-billable expenses", () => {
     const m = buildPodReportModel(makeJob(), noPhotos, [
       { category: "fuel", label: "Top-up", billable_on_pod: true },
