@@ -48,12 +48,23 @@ export interface StoredAdditionalPhoto {
   name: string;
 }
 
+/** Damage close-up (V2): one record per photo, linked to its damage draft. */
+export interface StoredDamagePhoto {
+  id: string;
+  damageTempId: string;
+  bytes?: ArrayBuffer;
+  type: string;
+  name: string;
+}
+
 export interface PhotoDraftRecord {
   id: string; // `${inspectionType}|${jobId}`
   jobId: string;
   inspectionType: string;
   standardPhotos: StoredStandardPhoto[];
   additionalPhotos: StoredAdditionalPhoto[];
+  /** Optional: absent on records written before damage photos were persisted. */
+  damagePhotos?: StoredDamagePhoto[];
   updatedAt: number;
 }
 
@@ -258,6 +269,68 @@ export async function clearPhotoDraft(
       req.onsuccess = () => resolve();
       req.onerror = () => reject(req.error);
     });
+  } catch {
+    // ignore
+  }
+}
+
+async function mutateRecord(
+  inspectionType: string,
+  jobId: string,
+  fn: (rec: PhotoDraftRecord) => PhotoDraftRecord,
+): Promise<void> {
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE, "readwrite");
+    const store = tx.objectStore(STORE);
+    const id = draftId(inspectionType, jobId);
+    const getReq = store.get(id);
+    getReq.onsuccess = () => {
+      const existing = (getReq.result as PhotoDraftRecord | undefined) ?? {
+        id, jobId, inspectionType, standardPhotos: [], additionalPhotos: [], updatedAt: Date.now(),
+      };
+      const putReq = store.put({ ...fn(existing), updatedAt: Date.now() });
+      putReq.onsuccess = () => resolve();
+      putReq.onerror = () => reject(putReq.error);
+    };
+    getReq.onerror = () => reject(getReq.error);
+  });
+}
+
+/** Persist a damage close-up so it survives an app close / camera kill. Best-effort. */
+export async function saveDamagePhoto(
+  inspectionType: string,
+  jobId: string,
+  photo: { id: string; damageTempId: string; file: File },
+): Promise<void> {
+  try {
+    const bytes = await photo.file.arrayBuffer();
+    await mutateRecord(inspectionType, jobId, (rec) => ({
+      ...rec,
+      damagePhotos: [
+        ...(rec.damagePhotos ?? []).filter((p) => p.id !== photo.id),
+        { id: photo.id, damageTempId: photo.damageTempId, bytes, type: photo.file.type, name: photo.file.name },
+      ],
+    }));
+  } catch {
+    // best-effort — the in-memory File is still authoritative this session
+  }
+}
+
+/** Remove damage close-ups by photo id and/or by owning damage. */
+export async function removeDamagePhotos(
+  inspectionType: string,
+  jobId: string,
+  match: { photoIds?: string[]; damageTempId?: string },
+): Promise<void> {
+  try {
+    const ids = new Set(match.photoIds ?? []);
+    await mutateRecord(inspectionType, jobId, (rec) => ({
+      ...rec,
+      damagePhotos: (rec.damagePhotos ?? []).filter(
+        (p) => !ids.has(p.id) && (!match.damageTempId || p.damageTempId !== match.damageTempId),
+      ),
+    }));
   } catch {
     // ignore
   }

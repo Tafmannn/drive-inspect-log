@@ -21,6 +21,7 @@
  *   • Removes magic strings (FUEL_LEVEL_MAP, photo keys) from JSX.
  */
 import { FUEL_LEVEL_MAP } from "@/lib/types";
+import { buildDamagePayloadItem } from "@/features/damage/damageModel";
 import type {
   InspectionType,
   DamageItemDraft,
@@ -55,6 +56,10 @@ export interface InspectionFormState {
   aerial: string;
   customerPaperwork: string;
   damages: DamageItemDraft[];
+  /** "none_found" once the driver explicitly confirms there is no damage. */
+  damageDeclaration: "" | "none_found";
+  /** Body-type family chosen by hand for the damage diagram ("" = from job data). */
+  bodyTypeOverride: string;
   standardPhotos: Record<string, File | null>;
   standardPhotoUrls: Record<string, string>;
   additionalPhotos: AdditionalPhotoDraft[];
@@ -88,6 +93,8 @@ export const INITIAL_INSPECTION_FORM: InspectionFormState = {
   aerial: "",
   customerPaperwork: "",
   damages: [],
+  damageDeclaration: "",
+  bodyTypeOverride: "",
   standardPhotos: {},
   standardPhotoUrls: {},
   additionalPhotos: [],
@@ -221,7 +228,8 @@ export function validateInspectionStep(
         if (!formState.lightCondition) missing.push("Light condition");
         if (!formState.numberOfKeys) missing.push("Number of keys");
         break;
-      case 3: // Damage – optional
+      case 3: // Damage – record damage OR explicitly confirm none found
+        if (!hasDamageAnswer(formState)) missing.push("Record damage or confirm no damage found");
         break;
       case 4: {
         const hasPhotos =
@@ -242,7 +250,8 @@ export function validateInspectionStep(
         if (!formState.odometer) missing.push("Odometer reading");
         if (!formState.fuelLevel) missing.push("Fuel level");
         break;
-      case 2: // Damage – optional
+      case 2: // Damage – record damage OR explicitly confirm none found
+        if (!hasDamageAnswer(formState)) missing.push("Record damage or confirm no damage found");
         break;
       case 3: {
         const hasPhotos =
@@ -261,6 +270,18 @@ export function validateInspectionStep(
   }
 
   return missing;
+}
+
+/** An empty damage list is NOT a damage-free inspection unless confirmed. */
+export function hasDamageAnswer(formState: Pick<InspectionFormState, "damages" | "damageDeclaration">): boolean {
+  return formState.damages.length > 0 || formState.damageDeclaration === "none_found";
+}
+
+export function damageDeclarationFor(
+  formState: Pick<InspectionFormState, "damages" | "damageDeclaration">,
+): "recorded" | "none_found" | null {
+  if (formState.damages.length > 0) return "recorded";
+  return formState.damageDeclaration === "none_found" ? "none_found" : null;
 }
 
 /** Aggregates validation across every step except the final review. */
@@ -300,6 +321,7 @@ export function buildInspectionPayload(
     driver_signature_url: signatures.driverSignatureUrl,
     customer_signature_url: signatures.customerSignatureUrl,
     notes: formState.notes || null,
+    damage_declaration: damageDeclarationFor(formState),
   };
 
   if (type !== "pickup") return base;
@@ -334,14 +356,5 @@ export function buildInspectionPayload(
 export function buildDamageItemsPayload(
   damages: DamageItemDraft[],
 ): Array<Record<string, unknown>> {
-  return damages.map((d) => ({
-    x: d.x,
-    y: d.y,
-    area: d.area,
-    location: d.location,
-    item: d.item,
-    damage_types: d.damageTypes,
-    notes: d.notes,
-    photo_url: null, // Populated when upload completes
-  }));
+  return damages.map(buildDamagePayloadItem);
 }
