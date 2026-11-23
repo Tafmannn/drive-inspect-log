@@ -3,13 +3,13 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 let session: unknown = null;
-const updateUser = vi.fn(async () => ({ error: null }));
+const updateUser = vi.fn(async (_attrs: unknown) => ({ error: null }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     auth: {
       getSession: () => Promise.resolve({ data: { session } }),
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
-      updateUser: (...a: unknown[]) => updateUser(...a),
+      updateUser: (attrs: unknown) => updateUser(attrs),
     },
   },
 }));
