@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS public.driver_digital_credentials (
   user_id uuid NOT NULL UNIQUE REFERENCES public.user_profiles(auth_user_id) ON DELETE RESTRICT,
   org_id uuid REFERENCES public.organisations(id),
   serial_number bigint GENERATED ALWAYS AS IDENTITY UNIQUE NOT NULL,
+  holder_name text NOT NULL DEFAULT '',
   credential_version integer NOT NULL DEFAULT 1 CHECK (credential_version > 0),
   status text NOT NULL DEFAULT 'active' CHECK (status IN ('active','revoked')),
   photo_path text,
@@ -24,7 +25,7 @@ CREATE TABLE IF NOT EXISTS public.driver_digital_credential_events (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   credential_id uuid NOT NULL REFERENCES public.driver_digital_credentials(id) ON DELETE RESTRICT,
   actor_user_id uuid,
-  event_type text NOT NULL CHECK (event_type IN ('issued','revoked','reactivated','photo_updated','org_changed')),
+  event_type text NOT NULL CHECK (event_type IN ('issued','revoked','reactivated','photo_updated','org_changed','name_updated')),
   credential_version integer NOT NULL CHECK (credential_version > 0),
   details jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now()
@@ -76,6 +77,7 @@ DECLARE
   v_eligible boolean;
   v_created boolean := false;
   v_event text;
+  v_approved_name text;
 BEGIN
   SELECT * INTO v_account FROM public.user_profiles
   WHERE auth_user_id = p_user_id;
@@ -83,6 +85,13 @@ BEGIN
 
   SELECT * INTO v_driver FROM public.driver_profiles
   WHERE user_id = p_user_id ORDER BY updated_at DESC LIMIT 1;
+
+  v_approved_name := COALESCE(
+    NULLIF(btrim(v_driver.full_name), ''),
+    NULLIF(btrim(v_account.full_name), ''),
+    NULLIF(btrim(concat_ws(' ', v_account.first_name, v_account.last_name)), ''),
+    ''
+  );
 
   v_eligible := v_account.role = 'driver'
                 AND v_account.account_status = 'active'
@@ -96,8 +105,8 @@ BEGIN
     -- Pending invitations have no issued credential. First issuance happens on activation.
     IF v_account.role <> 'driver' OR v_account.account_status <> 'active' THEN RETURN; END IF;
     INSERT INTO public.driver_digital_credentials
-      (user_id, org_id, status, revoked_at)
-    VALUES (p_user_id, v_account.org_id,
+      (user_id, org_id, holder_name, status, revoked_at)
+    VALUES (p_user_id, v_account.org_id, v_approved_name,
       CASE WHEN v_eligible THEN 'active' ELSE 'revoked' END,
       CASE WHEN v_eligible THEN NULL ELSE now() END)
     RETURNING * INTO v_current;
@@ -129,6 +138,21 @@ BEGIN
     v_event := 'revoked';
   END IF;
 
+  -- The customer-facing company-ID name is admin-approved and stored in the
+  -- credential. A driver may edit their normal profile without impersonating
+  -- another person on the company-issued card.
+  IF NOT v_created AND v_approved_name <> ''
+     AND (auth.uid() IS NULL OR public.is_admin_or_super_admin())
+     AND v_current.holder_name IS DISTINCT FROM v_approved_name THEN
+    UPDATE public.driver_digital_credentials
+      SET holder_name = v_approved_name, updated_at = now()
+      WHERE id = v_current.id RETURNING * INTO v_current;
+    INSERT INTO public.driver_digital_credential_events
+      (credential_id, actor_user_id, event_type, credential_version, details)
+    VALUES (v_current.id, auth.uid(), 'name_updated',
+            v_current.credential_version, jsonb_build_object('approved_name_updated', true));
+  END IF;
+
   IF v_event IS NOT NULL THEN
     INSERT INTO public.driver_digital_credential_events
       (credential_id, actor_user_id, event_type, credential_version, details)
@@ -158,7 +182,7 @@ REVOKE ALL ON FUNCTION axentra_private.on_digital_id_account_change()
 
 DROP TRIGGER IF EXISTS digital_id_account_state_change ON public.user_profiles;
 CREATE TRIGGER digital_id_account_state_change
-AFTER INSERT OR UPDATE OF account_status, role, org_id ON public.user_profiles
+AFTER INSERT OR UPDATE OF account_status, role, org_id, full_name, first_name, last_name ON public.user_profiles
 FOR EACH ROW EXECUTE FUNCTION axentra_private.on_digital_id_account_change();
 
 CREATE OR REPLACE FUNCTION axentra_private.on_digital_id_driver_change()
@@ -174,7 +198,7 @@ REVOKE ALL ON FUNCTION axentra_private.on_digital_id_driver_change()
   FROM PUBLIC, anon, authenticated;
 DROP TRIGGER IF EXISTS digital_id_driver_state_change ON public.driver_profiles;
 CREATE TRIGGER digital_id_driver_state_change
-AFTER INSERT OR UPDATE OF is_active, archived_at, org_id ON public.driver_profiles
+AFTER INSERT OR UPDATE OF is_active, archived_at, org_id, full_name ON public.driver_profiles
 FOR EACH ROW EXECUTE FUNCTION axentra_private.on_digital_id_driver_change();
 
 -- The existing driver_profiles UPDATE policy permits self-edits. Prevent
@@ -326,7 +350,6 @@ DECLARE
   v_org public.organisations%ROWTYPE;
   v_target_id uuid := COALESCE(p_user_id, auth.uid());
   v_active boolean;
-  v_name text;
   v_now timestamptz := clock_timestamp();
 BEGIN
   IF auth.uid() IS NULL THEN
@@ -355,6 +378,7 @@ BEGIN
   v_active := v_target.role = 'driver'
     AND v_target.account_status = 'active'
     AND v_credential.status = 'active'
+    AND NULLIF(btrim(v_credential.holder_name), '') IS NOT NULL
     AND (v_driver.id IS NULL OR (v_driver.is_active AND v_driver.archived_at IS NULL
       AND v_driver.org_id IS NOT DISTINCT FROM v_target.org_id));
 
@@ -363,20 +387,12 @@ BEGIN
     RAISE EXCEPTION 'CREDENTIAL_UNAVAILABLE' USING ERRCODE = '42501';
   END IF;
 
-  v_name := NULLIF(btrim(COALESCE(v_driver.full_name, '')), '');
-  IF v_name IS NULL THEN
-    v_name := NULLIF(btrim(COALESCE(v_target.full_name, '')), '');
-  END IF;
-  IF v_name IS NULL THEN
-    v_name := NULLIF(btrim(concat_ws(' ', v_target.first_name, v_target.last_name)), '');
-  END IF;
-
-  RETURN jsonb_build_object(
+   RETURN jsonb_build_object(
     'driver_id', 'AX-' || repeat('0', GREATEST(0, 6 - length(v_credential.serial_number::text))) || v_credential.serial_number::text,
     'credential_id', v_credential.id,
     'user_id', v_credential.user_id,
     'org_id', v_credential.org_id,
-    'full_name', v_name,
+    'full_name', v_credential.holder_name,
     'employment_type', v_driver.employment_type,
     'role_label', 'Authorised Driver',
     'photo_path', v_credential.photo_path,
