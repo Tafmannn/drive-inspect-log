@@ -101,6 +101,23 @@ describe("Abort fee-review lock", () => {
     });
   });
 
+  it("approves a client-confirmed fee higher than the original job price without changing pricing", async () => {
+    state.review.mockResolvedValue({ financeStatus: "approved", approvedAmount: 275 });
+    const pending: JobAbort = { ...base, finance_status: "pending_review", approved_amount: null };
+    render(<AbortFeeReview jobId="job-1" abort={pending} invoiced={false} paid={false} />);
+
+    fireEvent.change(screen.getByLabelText("Amount to approve"), { target: { value: "275.00" } });
+    expect(screen.getByText(/Above the original agreed price of £240.00/)).toBeTruthy();
+    const approve = screen.getByRole("button", { name: "Approve" });
+    expect(approve.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(screen.getByLabelText("I confirm the client agreed to this Abort fee"));
+    fireEvent.click(approve);
+    await waitFor(() => expect(state.review).toHaveBeenCalledWith({
+      abortId: "abort-1", decision: "approved", amount: 275, note: null, clientConfirmed: true,
+    }));
+    expect(pending.agreed_price).toBe(240);
+  });
+
   it("can reject a pending claim without an approved amount", async () => {
     state.review.mockResolvedValue({ financeStatus: "rejected", approvedAmount: null });
     const pending: JobAbort = { ...base, finance_status: "pending_review", approved_amount: null };
