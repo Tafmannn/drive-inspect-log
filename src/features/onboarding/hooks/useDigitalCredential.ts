@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 export interface DigitalIdCredential {
   driver_id: string;
   credential_id: string;
+  user_id: string;
   org_id: string | null;
   full_name: string | null;
   employment_type: string | null;
