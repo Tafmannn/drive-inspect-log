@@ -135,7 +135,8 @@ function deriveWorkflowState(job: Job): WorkflowState {
 // ── Action State ────────────────────────────────────────────────────
 
 function deriveActionState(job: Job, workflow: WorkflowState, allJobs: Job[]): ActionState {
-  if (workflow === "pending_review" || workflow === "terminal") return "view_pod";
+  if (workflow === "terminal") return job.status === "completed" ? "view_pod" : "view_job";
+  if (workflow === "pending_review") return "view_pod";
 
   // Blocked by active-job lock → can only view
   const lock = isBlockedByActiveJob(job, allJobs);
@@ -202,6 +203,11 @@ function derivePriorityState(
 ): PriorityResult {
   const today = todayStr();
   const now = nowMinutes();
+
+  // Closed movements are never late or recommended, even when original dates remain.
+  if (isOperationallyClosed(job.status)) {
+    return { state: "blocked", reason: job.status === "aborted" ? "Collection aborted" : "Job closed" };
+  }
 
   // Blocked: active-job lock
   const lock = isBlockedByActiveJob(job, allJobs);
