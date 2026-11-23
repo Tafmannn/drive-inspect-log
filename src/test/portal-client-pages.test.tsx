@@ -15,13 +15,15 @@ const h = vi.hoisted(() => ({
   invoice: null as unknown,
   ctx: undefined as unknown,
   csv: [] as { name: string; csv: string }[],
+  jobsQuery: {} as Record<string, unknown>,
+  invoicesQuery: {} as Record<string, unknown>,
 }));
 
 vi.mock("@/features/portal/api", () => ({
-  usePortalJobs: () => ({ data: h.jobs, isLoading: false, error: null, dataUpdatedAt: Date.UTC(2026, 10, 17, 9, 30) }),
+  usePortalJobs: () => ({ data: h.jobs, isLoading: false, error: null, dataUpdatedAt: Date.UTC(2026, 10, 17, 9, 30), refetch: () => {}, ...h.jobsQuery }),
   usePortalJob: () => ({ data: h.job, isLoading: false, error: null, dataUpdatedAt: Date.UTC(2026, 10, 17, 9, 30) }),
   usePortalEvidence: () => ({ data: h.evidence, isLoading: false }),
-  usePortalInvoices: () => ({ data: h.invoices, isLoading: false, error: null }),
+  usePortalInvoices: () => ({ data: h.invoices, isLoading: false, error: null, refetch: () => {}, ...h.invoicesQuery }),
   usePortalInvoice: () => ({ data: h.invoice, isLoading: false, error: null }),
   usePortalContext: () => ({ data: h.ctx }),
 }));
@@ -66,6 +68,8 @@ function LocationProbe() {
 }
 
 beforeEach(() => {
+  h.jobsQuery = {};
+  h.invoicesQuery = {};
   h.ctx = ctx;
   h.csv = [];
   h.jobs = [
@@ -96,9 +100,10 @@ describe("Vehicle moves overview", () => {
 
   it("summarises what's on the road, what's been delivered and what's owed", () => {
     renderList();
-    expect(screen.getByText("In progress").parentElement!.textContent).toContain("3");
-    expect(screen.getByText("Delivered this month").parentElement!.textContent).toContain("1");
-    const owed = screen.getByText("Awaiting payment").parentElement!;
+    const summary = within(screen.getByRole("region", { name: "Summary" }));
+    expect(summary.getByText("In progress").parentElement!.textContent).toContain("3");
+    expect(summary.getByText("Delivered this month").parentElement!.textContent).toContain("1");
+    const owed = summary.getByText("Awaiting payment").parentElement!;
     expect(owed.textContent).toContain("£420.00");
     expect(owed.textContent).toContain("£300.00 overdue");
   });
@@ -118,6 +123,7 @@ describe("Vehicle moves overview", () => {
     expect(screen.getByText("WR21 ONB")).toBeTruthy();
     expect(screen.getByText("SN70 FGU")).toBeTruthy();
 
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
     fireEvent.change(screen.getByLabelText("Date range"), { target: { value: "90" } });
     expect(screen.queryByText("SN70 FGU")).toBeNull();
 
@@ -147,6 +153,54 @@ describe("Vehicle moves overview", () => {
     h.ctx = { ...ctx, operator: { ...ctx.operator, contact_email: null } };
     renderList();
     expect(screen.queryByRole("link", { name: /Request a move/ })).toBeNull();
+  });
+
+  it("never shows a zero while loading or after a failed load", () => {
+    h.jobsQuery = { data: undefined, isLoading: true };
+    h.invoicesQuery = { data: undefined, isLoading: true };
+    renderList();
+    const summary = within(screen.getByRole("region", { name: "Summary" }));
+    expect(summary.getByLabelText("In progress: loading")).toBeTruthy();
+    expect(summary.getByLabelText("Awaiting payment: loading")).toBeTruthy();
+    expect(summary.queryByText("£0.00")).toBeNull();
+    expect(screen.getByRole("status", { name: "Loading your vehicle moves" })).toBeTruthy();
+    cleanup();
+
+    h.jobsQuery = { data: undefined, error: new Error("boom") };
+    h.invoicesQuery = { data: undefined, error: new Error("boom") };
+    renderList();
+    const failed = within(screen.getByRole("region", { name: "Summary" }));
+    expect(failed.queryByText("0")).toBeNull();
+    expect(failed.queryByText("£0.00")).toBeNull();
+    expect(failed.queryByText("All paid up")).toBeNull();
+    expect(failed.getAllByText("Couldn't load right now")).toHaveLength(3);
+    expect(screen.getByRole("alert").textContent).toContain("We couldn't load your vehicle moves.");
+  });
+
+  it("filters by a status the client actually has, and keeps it in the address", () => {
+    renderList();
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    // Only stages present among the live moves are offered.
+    expect(screen.queryByRole("button", { name: "Delivered" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Needs attention" }));
+    expect(screen.getByTestId("loc").textContent).toBe("/portal?stage=issue");
+    expect(screen.getByText("MA22 ZRC")).toBeTruthy();
+    expect(screen.queryByText("LK24 HXP")).toBeNull();
+  });
+
+  it("explains an empty search and clears it in one tap", () => {
+    renderList("/portal?q=zz99");
+    expect(screen.getByText("No moves match “zz99”")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Clear search and filters" }));
+    expect(screen.getByTestId("loc").textContent).toBe("/portal");
+    expect(screen.getByText("LK24 HXP")).toBeTruthy();
+  });
+
+  it("says plainly when nothing is on the road", () => {
+    h.jobs = [];
+    renderList();
+    expect(screen.getByText("No vehicle moves in progress")).toBeTruthy();
+    expect(screen.getByText("Your active vehicle movements will appear here once a booking is confirmed.")).toBeTruthy();
   });
 
   it("is all paid up when nothing is owed", () => {
@@ -302,6 +356,14 @@ describe("Invoices", () => {
     h.invoices = [invoice({ status: "paid" })];
     renderInvoices("/portal/invoices?show=unpaid");
     expect(screen.getByText("Nothing to pay. You're all up to date.")).toBeTruthy();
+  });
+
+  it("shows a retry, not empty totals, when invoices fail to load", () => {
+    h.invoicesQuery = { data: undefined, error: new Error("boom") };
+    renderInvoices();
+    expect(screen.getByRole("alert").textContent).toContain("We couldn't load your invoices.");
+    expect(screen.queryByText("£0.00")).toBeNull();
+    expect(screen.getByRole("button", { name: /Try again/ })).toBeTruthy();
   });
 
   it("downloads the invoice list as CSV", () => {

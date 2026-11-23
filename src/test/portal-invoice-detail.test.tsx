@@ -3,7 +3,7 @@
  * "Download PDF" serves the file stored when the invoice was issued.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { PortalInvoiceDetail, PortalInvoiceSummary } from "@/features/portal/api";
 
@@ -197,16 +197,19 @@ describe("PortalInvoices", () => {
       row({ id: "4", invoice_number: "CN26-0001", document_type: "credit_note" }),
     ];
     render(<MemoryRouter><PortalInvoices /></MemoryRouter>);
-    const label = (n: string) => screen.getByText(n).closest("p")!.textContent!.replace(n, "");
-    expect([label("AX26-1"), label("AX26-2"), label("AX26-3"), label("CN26-0001")]).toEqual(["Awaiting payment", "Paid", "Cancelled", "Credit note"]);
+    const badge = (n: string, text: string) => within(screen.getByText(n).closest("li")!).getByText(text);
+    expect(badge("AX26-1", "Awaiting payment")).toBeTruthy();
+    expect(badge("AX26-2", "Paid")).toBeTruthy();
+    expect(badge("AX26-3", "Cancelled")).toBeTruthy();
+    expect(badge("CN26-0001", "Credit note")).toBeTruthy();
   });
 
   it("shows an empty state and a load error", () => {
     const first = render(<MemoryRouter><PortalInvoices /></MemoryRouter>);
-    expect(screen.getByText("No invoices yet.")).toBeTruthy();
+    expect(screen.getByText("No invoices yet")).toBeTruthy();
     first.unmount();
     h.error = new Error("x");
     render(<MemoryRouter><PortalInvoices /></MemoryRouter>);
-    expect(screen.getByText(/Couldn't load your invoices/)).toBeTruthy();
+    expect(screen.getByText(/couldn't load your invoices/i)).toBeTruthy();
   });
 });
