@@ -404,7 +404,7 @@ export const InspectionFlow = () => {
   };
 
   useEffect(() => {
-    if (!dk || !sessionActive.current) return;
+    if (!dk || !sessionActive.current || !job || job.status === JOB_STATUS.ABORTED) return;
     // Only save serializable fields (exclude File objects)
     const { standardPhotos, additionalPhotos, damages, ...serializable } = formState;
     // Damage close-up Files live in IndexedDB (photoDraftStore); the JSON
@@ -412,7 +412,7 @@ export const InspectionFlow = () => {
     const draftPayload = { ...serializable, damages: serialiseDamagesForDraft(damages), _currentStep: currentStep };
     const timer = setTimeout(() => saveDraft(dk, draftPayload), 500);
     return () => clearTimeout(timer);
-  }, [formState, currentStep, dk]);
+  }, [formState, currentStep, dk, job?.status]);
 
   // ─── INTERRUPTION MARKER ───
   // While this screen is open, remember it so that if Android closes the
@@ -423,8 +423,12 @@ export const InspectionFlow = () => {
   const location = useLocation();
   const inspectionPath = location.pathname;
   useEffect(() => {
+    if (!job || job.status === JOB_STATUS.ABORTED) {
+      clearActiveInspection(inspectionPath);
+      return;
+    }
     markActiveInspection(inspectionPath, user?.id ?? null);
-  }, [inspectionPath, formState, currentStep, user?.id]);
+  }, [inspectionPath, formState, currentStep, user?.id, job?.status]);
   useEffect(() => () => clearActiveInspection(inspectionPath), [inspectionPath]);
   const resumedAfterRestart =
     (location.state as { resumeAfterRestart?: boolean } | null)?.resumeAfterRestart === true;
