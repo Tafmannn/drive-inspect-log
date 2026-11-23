@@ -54,4 +54,4 @@ jobs:
             echo "Unable to retrieve SonarQube issue details."
             exit 0
           }
-          echo "$response" | jq -r '.issues[]? | "[\\(.severity)] \\(.rule) \\(.component):\\(.line // 0) — \\(.message)"'
+          echo "$response" | jq -r '.issues[]? | "[\(.severity)] \(.rule) \(.component):\(.line // 0) — \(.message)"'
