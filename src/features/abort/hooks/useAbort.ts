@@ -90,7 +90,7 @@ export function useDismissAbortRequest(jobId: string) {
  * The UI must lock on success rather than expose an extra tap while refetching. */
 function cacheFeeDecision(
   qc: QueryClient, jobId: string, abortId: string,
-  status: "approved" | "rejected",
+  status: "approved" | "rejected" | "pending_review",
   amount: number | null, reviewedAt?: string,
 ) {
   qc.setQueryData<JobAbortState>(abortKeys.job(jobId), (old) => {
