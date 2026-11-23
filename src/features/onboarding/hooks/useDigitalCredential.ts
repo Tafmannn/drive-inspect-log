@@ -58,7 +58,7 @@ export function useDigitalCredential(userId: string) {
     const requestEpoch = epoch.current;
     const requestNumber = ++latestRequest.current;
     try {
-      const { data, error: rpcError } = await (supabase as any)
+      const { data, error: rpcError } = await supabase
         .rpc("get_driver_digital_id", { p_user_id: userId });
       if (epoch.current !== requestEpoch || latestRequest.current !== requestNumber) return;
       if (rpcError) throw rpcError;
@@ -69,7 +69,7 @@ export function useDigitalCredential(userId: string) {
         setError(null);
         return;
       }
-      const next = data as DigitalIdCredential;
+      const next = data as unknown as DigitalIdCredential;
       if (next.status !== "active") {
         lastCheck.current = null;
         setCredential(next);

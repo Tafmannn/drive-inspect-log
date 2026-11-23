@@ -26,7 +26,7 @@ export function DigitalIdAdminTools({
   const [historyError, setHistoryError] = useState<string | null>(null);
 
   const loadEvents = useCallback(async () => {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from("driver_digital_credential_events")
       .select("id, event_type, credential_version, created_at")
       .eq("credential_id", credential.credential_id)
@@ -45,7 +45,7 @@ export function DigitalIdAdminTools({
   const credentialUserId = credential.user_id;
 
   const updatePhoto = async (path: string | null) => {
-    const { error } = await (supabase as any).rpc("set_driver_digital_id_photo", {
+    const { error } = await supabase.rpc("set_driver_digital_id_photo", {
       p_user_id: credentialUserId,
       p_photo_path: path,
     });
