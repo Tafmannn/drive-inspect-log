@@ -65,6 +65,7 @@ import {
 } from "@/features/abort/api/abortApi";
 
 beforeEach(() => {
+  mockState.replacementLookupError = "";
   mockState.tableRows = {};
   mockState.tableErrors = {};
 });
