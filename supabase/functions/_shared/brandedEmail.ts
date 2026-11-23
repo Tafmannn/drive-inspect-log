@@ -5,6 +5,7 @@
 // default templates.
 
 import { pickAppOrigin } from "./appOrigin.ts";
+import { EMAIL_LOGO_ON_NAVY, resolveLogoUrl } from "./podEmail.ts";
 
 export function escapeHtml(s: string): string {
   return String(s)
@@ -18,63 +19,33 @@ export function escapeHtml(s: string): string {
  * The page an auth action link should land on after Supabase verifies the
  * token: APP_URL, or the request Origin only if it is explicitly allowed
  * (APP_ALLOWED_ORIGINS, default the production app). Never an arbitrary
- * Origin — see appOrigin.ts. undefined lets Supabase use its Site URL.
+ * Origin, and never a Lovable preview host — see appOrigin.ts. Falls back to
+ * the canonical app origin rather than Supabase's Site URL.
  */
-export function resolveRedirectUrl(req: Request, path: string): string | undefined {
+export function resolveRedirectUrl(req: Request, path: string): string {
   const origin = pickAppOrigin(
     Deno.env.get("APP_URL"),
     Deno.env.get("APP_ALLOWED_ORIGINS"),
     req.headers.get("origin"),
   );
-  return origin ? `${origin}${path}` : undefined;
+  return `${origin}${path}`;
 }
 
-export function renderActionEmailHtml(opts: {
-  firstName: string | null;
-  introHtml: string;
-  buttonLabel: string;
-  actionLink: string;
-  noteHtml: string;
-}): string {
-  const greeting = opts.firstName ? `Hi ${escapeHtml(opts.firstName)},` : "Hi,";
-  const href = escapeHtml(opts.actionLink);
-  return `<!doctype html>
-<html>
-  <body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:24px 0;">
-      <tr>
-        <td align="center">
-          <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;">
-            <tr>
-              <td style="background:#111827;padding:20px 32px;">
-                <span style="color:#ffffff;font-size:18px;font-weight:bold;">Axentra Vehicle Logistics</span>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:32px;color:#1f2937;font-size:15px;line-height:1.6;">
-                <p style="margin:0 0 16px;">${greeting}</p>
-                <p style="margin:0 0 24px;">${opts.introHtml}</p>
-                <p style="margin:0 0 24px;text-align:center;">
-                  <a href="${href}"
-                     style="background:#111827;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:bold;display:inline-block;">
-                    ${escapeHtml(opts.buttonLabel)}
-                  </a>
-                </p>
-                <p style="margin:0 0 16px;color:#6b7280;font-size:13px;">${opts.noteHtml}</p>
-                <p style="margin:0 0 16px;color:#6b7280;font-size:13px;word-break:break-all;">
-                  If the button doesn't work, copy and paste this link into your browser:<br/>
-                  <a href="${href}" style="color:#2563eb;">${href}</a>
-                </p>
-                <p style="margin:24px 0 0;">Kind regards,<br/>Axentra Vehicle Logistics<br/>info@axentravehicles.com</p>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>`;
+/**
+ * Absolute URL of the transparent Axentra logo for the navy banner, served by
+ * the app (same asset as the POD email). null when no app origin is known;
+ * the template then falls back to a text wordmark.
+ */
+export function brandLogoUrl(req: Request): string | null {
+  const origin = pickAppOrigin(
+    Deno.env.get("APP_URL"),
+    Deno.env.get("APP_ALLOWED_ORIGINS"),
+    req.headers.get("origin"),
+  );
+  return resolveLogoUrl(EMAIL_LOGO_ON_NAVY, origin);
 }
+
+export { renderActionEmailHtml, portalInviteIntroHtml, SUPPORT_EMAIL } from "./actionEmail.ts";
 
 /** Sends via Resend. Returns ok:false (with detail) if RESEND_API_KEY is unset or the send fails. */
 export async function sendBrandedEmail(opts: {

@@ -4,7 +4,19 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Lock, CheckCircle2 } from "lucide-react";
+import { Loader2, Lock, CheckCircle2, Truck, Camera, FileText } from "lucide-react";
+import type { Session } from "@supabase/supabase-js";
+
+/**
+ * A customer-portal invite? portal-access stamps app_metadata.role="client"
+ * server-side (users can't edit app_metadata). Used here ONLY to choose the
+ * wording and the post-setup destination; portal access itself is still
+ * enforced by PortalRoute / user_profiles.
+ */
+export function isPortalInvite(session: Session | null | undefined): boolean {
+  const meta = (session?.user?.app_metadata ?? {}) as { role?: unknown; roles?: unknown };
+  return meta.role === "client" || (Array.isArray(meta.roles) && meta.roles.includes("CLIENT"));
+}
 
 /**
  * Landing page for invitation links. The branded invite email points here:
@@ -21,6 +33,7 @@ export const Welcome = () => {
   // null = still resolving; false = no usable session (bad/expired link)
   const [hasSession, setHasSession] = useState<boolean | null>(null);
   const [linkError, setLinkError] = useState<string | null>(null);
+  const [portal, setPortal] = useState(false);
 
   useEffect(() => {
     // An expired/used link comes back as #error=access_denied&error_code=otp_expired&…
@@ -37,10 +50,16 @@ export const Welcome = () => {
     // (detectSessionInUrl) — it may already have done so, or may still be
     // doing it, so check the current session AND listen for SIGNED_IN.
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setHasSession(true);
+      if (data.session) {
+        setPortal(isPortalInvite(data.session));
+        setHasSession(true);
+      }
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) setHasSession(true);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        setPortal(isPortalInvite(session));
+        setHasSession(true);
+      }
     });
 
     // If neither resolves shortly, the page was opened without a valid link.
@@ -72,7 +91,8 @@ export const Welcome = () => {
       const { error: err } = await supabase.auth.updateUser({ password });
       if (err) throw err;
       setSuccess(true);
-      setTimeout(() => navigate("/", { replace: true }), 2000);
+      // Portal users go straight to their portal; staff to the app home.
+      setTimeout(() => navigate(portal ? "/portal" : "/", { replace: true }), 2000);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -103,7 +123,7 @@ export const Welcome = () => {
             />
             <div className="text-center">
               <h1 className="text-[22px] font-semibold tracking-wide text-slate-200">
-                Welcome to Axentra
+                {portal ? "Set up your customer portal" : "Welcome to Axentra"}
               </h1>
               <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500 mt-0.5">
                 Create your password to get started
@@ -111,12 +131,23 @@ export const Welcome = () => {
             </div>
           </div>
 
+          {portal && hasSession === true && !success && (
+            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+            <p className="mb-2 text-xs font-medium uppercase tracking-[0.14em] text-slate-400">In your portal you can</p>
+            <ul className="space-y-2 text-sm text-slate-300">
+              <li className="flex items-center gap-2.5"><Truck className="h-4 w-4 shrink-0 text-[#4b9be8]" aria-hidden /> Track your vehicle moves live</li>
+              <li className="flex items-center gap-2.5"><Camera className="h-4 w-4 shrink-0 text-[#4b9be8]" aria-hidden /> See collection and delivery photos and signatures</li>
+              <li className="flex items-center gap-2.5"><FileText className="h-4 w-4 shrink-0 text-[#4b9be8]" aria-hidden /> Download your invoices any time</li>
+            </ul>
+            </div>
+          )}
+
           {success ? (
             <div className="flex flex-col items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-5">
               <CheckCircle2 className="h-8 w-8 text-emerald-400" />
               <div className="text-center">
                 <p className="text-sm font-medium text-emerald-200">Password created</p>
-                <p className="text-xs text-emerald-300/70 mt-1">Taking you to the app…</p>
+                <p className="text-xs text-emerald-300/70 mt-1">{portal ? "Taking you to your portal…" : "Taking you to the app…"}</p>
               </div>
             </div>
           ) : hasSession === null ? (
@@ -127,7 +158,7 @@ export const Welcome = () => {
           ) : hasSession === false ? (
             <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-200">
               {linkError ??
-                "This invitation link is invalid or has expired. Please ask your administrator to send a new invite."}
+                "This invitation link is invalid or has expired. Please ask whoever invited you to send a new one."}
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -184,7 +215,7 @@ export const Welcome = () => {
                 className="w-full min-h-[44px] text-[0.95rem] font-medium bg-gradient-to-b from-[#1678d6] to-[#0b5da0] hover:from-[#1b80e3] hover:to-[#0c66ad] text-white rounded-lg shadow-[0_12px_30px_rgba(12,107,191,0.45)] hover:-translate-y-[1px] transition-all"
               >
                 {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Create password &amp; continue
+                {portal ? "Create password & open my portal" : "Create password & continue"}
               </Button>
             </form>
           )}

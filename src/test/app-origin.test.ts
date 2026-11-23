@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { pickAppOrigin } from "../../supabase/functions/_shared/appOrigin";
+import { isLovableHost, pickAppOrigin } from "../../supabase/functions/_shared/appOrigin";
 
 // request-password-reset is unauthenticated and used the request Origin as the
 // recovery redirect. A forged Origin on *.vercel.app could receive a victim's
@@ -14,8 +14,9 @@ describe("pickAppOrigin", () => {
   });
 
   it("forged Origin is ignored without APP_URL", () => {
-    expect(pickAppOrigin(null, null, "https://evil.vercel.app")).toBeNull();
-    expect(pickAppOrigin("", null, "https://axentra-app.vercel.app.evil.com")).toBeNull();
+    // falls back to the fixed production origin, never the forged one
+    expect(pickAppOrigin(null, null, "https://evil.vercel.app")).toBe("https://axentra-app.vercel.app");
+    expect(pickAppOrigin("", null, "https://axentra-app.vercel.app.evil.com")).toBe("https://axentra-app.vercel.app");
   });
 
   it("production origin is accepted by default", () => {
@@ -25,14 +26,26 @@ describe("pickAppOrigin", () => {
   it("explicit allow-list replaces the default", () => {
     const csv = "https://a.example.com, https://b.example.com";
     expect(pickAppOrigin(null, csv, "https://b.example.com")).toBe("https://b.example.com");
-    expect(pickAppOrigin(null, csv, "https://axentra-app.vercel.app")).toBeNull();
+    // not in the explicit list -> the list's first (canonical) entry
+    expect(pickAppOrigin(null, csv, "https://axentra-app.vercel.app")).toBe(new URL(csv.split(",")[0].trim()).origin);
+  });
+
+  it("never links to a Lovable preview, even if APP_URL or the allow-list says so", () => {
+    const prod = "https://axentra-app.vercel.app";
+    expect(pickAppOrigin("https://axentraapp.lovable.app", null, null)).toBe(prod);
+    expect(pickAppOrigin(null, null, "https://axentraapp.lovable.app")).toBe(prod);
+    expect(pickAppOrigin(null, "https://axentraapp.lovable.app,https://app.example.com", "https://axentraapp.lovable.app")).toBe("https://app.example.com");
+    expect(pickAppOrigin("https://id-preview--abc.lovableproject.com", null, null)).toBe(prod);
+    expect(isLovableHost("https://axentraapp.lovable.app")).toBe(true);
+    expect(isLovableHost("https://notlovable.app")).toBe(false);
   });
 
   it("non-https and junk are refused", () => {
-    expect(pickAppOrigin("http://app.example.com", null, null)).toBeNull();
-    expect(pickAppOrigin(null, "http://localhost:5173", "http://localhost:5173")).toBeNull();
-    expect(pickAppOrigin(null, null, "javascript:alert(1)")).toBeNull();
-    expect(pickAppOrigin(null, null, null)).toBeNull();
+    const prod = "https://axentra-app.vercel.app";
+    expect(pickAppOrigin("http://app.example.com", null, null)).toBe(prod);
+    expect(pickAppOrigin(null, "http://localhost:5173", "http://localhost:5173")).toBe(prod);
+    expect(pickAppOrigin(null, null, "javascript:alert(1)")).toBe(prod);
+    expect(pickAppOrigin(null, null, null)).toBe(prod);
   });
 });
 
