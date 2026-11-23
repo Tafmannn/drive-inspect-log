@@ -156,17 +156,17 @@ describe("Abort RPC API contracts", () => {
 
   it("reviews the fee with approved amount and note unchanged", async () => {
     mockState.rpcData = { financeStatus: "approved", approvedAmount: 75 };
-    await reviewAbortClaim({ abortId: "a1", decision: "approved", amount: 75, note: "Call-out fee" });
+    await reviewAbortClaim({ abortId: "a1", decision: "approved", amount: 75, note: "Call-out fee", clientConfirmed: true });
     expect(mockState.rpcCalls[0]).toEqual({
       fn: "review_job_abort_claim",
-      args: { p_abort_id: "a1", p_decision: "approved", p_amount: 75, p_note: "Call-out fee" },
+      args: { p_abort_id: "a1", p_decision: "approved", p_client_confirmed: true, p_amount: 75, p_note: "Call-out fee" },
     });
   });
 
   it("uses the dedicated amendment RPC with the old amount and mandatory reason", async () => {
     mockState.rpcData = { financeStatus: "approved", approvedAmount: 225, amendedAt: "2026-11-23T20:00:00Z" };
     await amendApprovedAbortClaim({
-      abortId: "a1", newAmount: 225, expectedAmount: 240,
+      abortId: "a1", newAmount: 225, expectedAmount: 240, clientConfirmed: true,
       reason: "Client confirmed a revised Abort fee",
     });
     expect(mockState.rpcCalls[0]).toEqual({
@@ -174,6 +174,7 @@ describe("Abort RPC API contracts", () => {
       args: {
         p_abort_id: "a1", p_new_amount: 225, p_expected_amount: 240,
         p_reason: "Client confirmed a revised Abort fee",
+        p_client_confirmed: true,
       },
     });
   });
@@ -266,7 +267,7 @@ describe("optional Abort RPC fields", () => {
     await reviewAbortClaim({ abortId: "a1", decision: "rejected" });
     expect(mockState.rpcCalls[0]).toEqual({
       fn: "review_job_abort_claim",
-      args: { p_abort_id: "a1", p_decision: "rejected", p_amount: undefined, p_note: undefined },
+      args: { p_abort_id: "a1", p_decision: "rejected", p_client_confirmed: false, p_amount: undefined, p_note: undefined },
     });
   });
 });
