@@ -30,6 +30,20 @@ export default function DriverDigitalId() {
   const isMissing = status === "missing";
   const revoked = status === "revoked";
   const unavailable = status === "unavailable";
+  let StatusIcon = AlertTriangle;
+  let statusHeading = "Digital ID unavailable";
+  let statusMessage = "Your company ID will be issued when your driver account is activated.";
+  if (revoked) {
+    StatusIcon = ShieldOff;
+    statusHeading = "Company ID unavailable";
+    statusMessage = "This account cannot present an active Axentra company ID. Contact your administrator.";
+  } else if (unavailable) {
+    StatusIcon = WifiOff;
+    statusHeading = "Unable to confirm authorisation";
+    statusMessage = "An up-to-date company status could not be confirmed. Connect to the internet and try again.";
+  } else if (isMissing) {
+    statusHeading = "No Digital ID issued yet";
+  }
 
   return (
     <div className="min-h-screen bg-background pb-28">
@@ -43,32 +57,16 @@ export default function DriverDigitalId() {
         </div>
 
         {isLoading && (
-          <div className="flex min-h-52 items-center justify-center gap-3 text-sm text-muted-foreground" role="status">
+          <output className="flex min-h-52 items-center justify-center gap-3 text-sm text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" /> Checking your company ID…
-          </div>
+          </output>
         )}
 
         {!isLoading && !showCard && (
           <div role="alert" className="rounded-2xl border border-border bg-card px-5 py-8 text-center shadow-sm">
-            {revoked ? (
-              <ShieldOff className="mx-auto mb-3 h-8 w-8 text-destructive" />
-            ) : unavailable ? (
-              <WifiOff className="mx-auto mb-3 h-8 w-8 text-amber-600" />
-            ) : (
-              <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
-            )}
-            <h1 className="text-base font-semibold">
-              {revoked ? "Company ID unavailable" :
-                unavailable ? "Unable to confirm authorisation" :
-                isMissing ? "No Digital ID issued yet" : "Digital ID unavailable"}
-            </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {revoked
-                ? "This account cannot present an active Axentra company ID. Contact your administrator."
-                : unavailable
-                ? "An up-to-date company status could not be confirmed. Connect to the internet and try again."
-                : "Your company ID will be issued when your driver account is activated."}
-            </p>
+            <StatusIcon className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
+            <h1 className="text-base font-semibold">{statusHeading}</h1>
+            <p className="mt-2 text-sm text-muted-foreground">{statusMessage}</p>
             {error && isAdminView && <p className="mt-2 break-words text-xs text-destructive">{error}</p>}
             {!revoked && (
               <Button variant="outline" className="mt-4" onClick={() => void refresh()}>
@@ -81,15 +79,15 @@ export default function DriverDigitalId() {
         {showCard && credential && (
           <>
             {status === "grace" && (
-              <div role="status" className="mb-3 flex items-center gap-2 rounded-xl border border-amber-300/40 bg-amber-50 p-3 text-xs text-amber-900">
+              <output className="mb-3 flex items-center gap-2 rounded-xl border border-amber-300/40 bg-amber-50 p-3 text-xs text-amber-900">
                 <WifiOff className="h-4 w-4 shrink-0" />
                 Connection lost. Showing the last known company status briefly.
-              </div>
+              </output>
             )}
             {status === "revoked" && isAdminView && (
-              <div role="status" className="mb-3 flex items-center gap-2 rounded-xl border border-red-300/40 bg-red-50 p-3 text-xs text-red-900">
+              <output className="mb-3 flex items-center gap-2 rounded-xl border border-red-300/40 bg-red-50 p-3 text-xs text-red-900">
                 <ShieldOff className="h-4 w-4 shrink-0" /> Historical admin view. This credential is not valid.
-              </div>
+              </output>
             )}
             <DriverIdCard credential={credential} displayStatus={status} photoUrl={photoUrl} />
             <div className="mt-5 flex items-start gap-3 rounded-2xl bg-blue-50 px-4 py-3 text-slate-700">
