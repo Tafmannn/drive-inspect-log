@@ -49,7 +49,8 @@ describe("Welcome page", () => {
     session = user({ role: "client", roles: ["CLIENT"] });
     renderWelcome();
     expect(await screen.findByRole("heading", { name: "Set up your customer portal" })).toBeInTheDocument();
-    expect(screen.getByRole("list", { name: /What you can do in the portal/ })).toBeInTheDocument();
+    expect(screen.getByText("In your portal you can")).toBeInTheDocument();
+    expect(screen.getByText("Download your invoices any time")).toBeInTheDocument();
     await setPassword();
     fireEvent.click(screen.getByRole("button", { name: /open my portal/ }));
     await waitFor(() => expect(updateUser).toHaveBeenCalledWith({ password: "secret123" }));
@@ -61,7 +62,7 @@ describe("Welcome page", () => {
     session = user({ role: "driver" });
     renderWelcome();
     expect(await screen.findByRole("heading", { name: "Welcome to Axentra" })).toBeInTheDocument();
-    expect(screen.queryByRole("list", { name: /portal/ })).toBeNull();
+    expect(screen.queryByText("In your portal you can")).toBeNull();
     await setPassword();
     fireEvent.click(screen.getByRole("button", { name: /Create password & continue/ }));
     expect(await screen.findByText("APP_HOME", {}, { timeout: 3000 })).toBeInTheDocument();

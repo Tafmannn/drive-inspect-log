@@ -132,11 +132,14 @@ export const Welcome = () => {
           </div>
 
           {portal && hasSession && !success && (
-            <ul className="space-y-2 rounded-xl border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-300" aria-label="What you can do in the portal">
+            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+            <p className="mb-2 text-xs font-medium uppercase tracking-[0.14em] text-slate-400">In your portal you can</p>
+            <ul className="space-y-2 text-sm text-slate-300">
               <li className="flex items-center gap-2.5"><Truck className="h-4 w-4 shrink-0 text-[#4b9be8]" aria-hidden /> Track your vehicle moves live</li>
               <li className="flex items-center gap-2.5"><Camera className="h-4 w-4 shrink-0 text-[#4b9be8]" aria-hidden /> See collection and delivery photos and signatures</li>
               <li className="flex items-center gap-2.5"><FileText className="h-4 w-4 shrink-0 text-[#4b9be8]" aria-hidden /> Download your invoices any time</li>
             </ul>
+            </div>
           )}
 
           {success ? (
