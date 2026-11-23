@@ -47,6 +47,8 @@ export type WorkflowPhase =
   | "pod_ready"
   | "completed"
   | "cancelled"
+  /** Collection could not go ahead; an admin confirmed the Abort. Not completed, not cancelled. */
+  | "aborted"
   | "on_hold";
 
 export interface WorkflowAction {
@@ -139,6 +141,8 @@ function deriveBasePhase(status: JobStatusValue | string): WorkflowPhase {
   switch (status) {
     case JOB_STATUS.CANCELLED:
       return "cancelled";
+    case JOB_STATUS.ABORTED:
+      return "aborted";
     case JOB_STATUS.COMPLETED:
     case JOB_STATUS.ARCHIVED:
       return "completed";
@@ -672,7 +676,7 @@ export function getWorkflowBrain(input: BrainInput): WorkflowBrain {
 
   // ── Driver next action ────────────────────────────────────────────
   let driverNextAction: BrainAction | null = null;
-  if (rawStatus === JOB_STATUS.CANCELLED) {
+  if (rawStatus === JOB_STATUS.CANCELLED || rawStatus === JOB_STATUS.ABORTED) {
     driverNextAction = null;
   } else if (
     rawStatus === JOB_STATUS.COMPLETED ||
@@ -726,7 +730,8 @@ export function getWorkflowBrain(input: BrainInput): WorkflowBrain {
 
   // ── Admin next action ─────────────────────────────────────────────
   let adminNextAction: BrainAction | null = null;
-  if (rawStatus === JOB_STATUS.CANCELLED) {
+  // Aborted: the Abort panel on the job owns the next step (fee review / invoice).
+  if (rawStatus === JOB_STATUS.CANCELLED || rawStatus === JOB_STATUS.ABORTED) {
     adminNextAction = null;
   } else if (
     rawStatus === JOB_STATUS.DELIVERY_COMPLETE ||
@@ -782,6 +787,7 @@ export function getWorkflowBrain(input: BrainInput): WorkflowBrain {
     !job.driver_id &&
     rawStatus !== JOB_STATUS.DRAFT &&
     rawStatus !== JOB_STATUS.CANCELLED &&
+    rawStatus !== JOB_STATUS.ABORTED &&
     rawStatus !== JOB_STATUS.COMPLETED
   ) {
     riskLevel = "low";

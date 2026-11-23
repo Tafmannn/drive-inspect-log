@@ -23,7 +23,7 @@ import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { useSuperAdminOverrideStatus } from "@/hooks/useJobs";
 import {
-  overrideStatusLabel, overrideTargets, overrideWarnings, reasonProblem,
+  canOverrideFrom, overrideStatusLabel, overrideTargets, overrideWarnings, reasonProblem,
 } from "@/lib/jobStatusOverride";
 
 interface Props {
@@ -38,7 +38,8 @@ export function SuperAdminStatusOverride({ jobId, jobStatus }: Props) {
   const [reason, setReason] = useState("");
   const [confirming, setConfirming] = useState(false);
 
-  if (!isSuperAdmin) return null;
+  // Aborted jobs are reopened through the Abort workflow; the database refuses an override.
+  if (!isSuperAdmin || !canOverrideFrom(jobStatus)) return null;
 
   const problem = reasonProblem(reason);
   const canSubmit = !!target && !problem && !override.isPending;

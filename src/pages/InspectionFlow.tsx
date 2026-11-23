@@ -594,7 +594,7 @@ export const InspectionFlow = () => {
       const terminalStatuses: string[] = [
         JOB_STATUS.COMPLETED, JOB_STATUS.POD_READY,
         JOB_STATUS.DELIVERY_COMPLETE, JOB_STATUS.CANCELLED,
-        JOB_STATUS.FAILED, JOB_STATUS.ARCHIVED,
+        JOB_STATUS.ABORTED, JOB_STATUS.FAILED, JOB_STATUS.ARCHIVED,
       ];
       if (terminalStatuses.includes(freshJob.status)) return;
 

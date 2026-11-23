@@ -209,8 +209,11 @@ export function buildPodReportModel(
   const status =
     delivery
       ? { label: "Delivered", tone: "success" as const }
-      : job.status === "cancelled" || job.status === "failed"
-        ? { label: job.status === "cancelled" ? "Cancelled" : "Not completed", tone: "danger" as const }
+      : job.status === "cancelled" || job.status === "failed" || job.status === "aborted"
+        ? {
+            label: job.status === "cancelled" ? "Cancelled" : job.status === "aborted" ? "Aborted — not collected" : "Not completed",
+            tone: "danger" as const,
+          }
         : pickup
           ? { label: "In transit", tone: "info" as const }
           : { label: "Awaiting collection", tone: "neutral" as const };

@@ -110,7 +110,7 @@ export async function authenticateCaller(
 
 // Job statuses a driver can no longer touch (keep in sync with
 // src/lib/driverJobAccess.ts and the database helpers).
-const DRIVER_LOCKED_STATUSES = new Set(["completed", "cancelled", "archived"]);
+const DRIVER_LOCKED_STATUSES = new Set(["completed", "cancelled", "archived", "aborted"]);
 
 /**
  * Authorize access to a storage object by resolving its owning org from the DB.
@@ -118,7 +118,7 @@ const DRIVER_LOCKED_STATUSES = new Set(["completed", "cancelled", "archived"]);
  * is resolved via the jobs table and compared to the caller's org. Fails closed
  * for non-super-admins when the path has no resolvable job/org. Non-admin
  * callers (drivers) are further limited to jobs assigned to them that are not
- * closed (completed, cancelled or archived).
+ * closed (completed, cancelled, archived or aborted).
  */
 export async function callerCanAccessPath(
   admin: SupabaseClient,

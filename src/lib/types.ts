@@ -17,6 +17,7 @@ export type JobStatus =
   | 'pod_ready'
   | 'completed'
   | 'cancelled'
+  | 'aborted'
   | 'failed'
   | 'archived';
 

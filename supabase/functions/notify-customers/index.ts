@@ -1,4 +1,5 @@
-// notify-customers — sends queued "collected" / "delivered" emails.
+// notify-customers — sends queued "collected" / "delivered" emails, and "aborted" notices
+// that an admin queued on purpose (notify_customer_job_aborted).
 //
 // The queue (public.customer_notifications) is written by a database trigger
 // on job status changes, so this function never decides WHAT to send from
@@ -153,15 +154,28 @@ serve(async (req) => {
           .eq("id", row.org_id)
           .maybeSingle();
 
-        const { data: insp } = await admin
-          .from("inspections")
-          .select("inspected_at, customer_name")
-          .eq("job_id", row.job_id)
-          .eq("type", row.event === "collected" ? "pickup" : "delivery")
-          .is("archived_at", null)
-          .order("inspected_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+        // "aborted": no inspection; the time is when the admin confirmed the Abort.
+        const { data: insp } = row.event === "aborted"
+          ? { data: null }
+          : await admin
+            .from("inspections")
+            .select("inspected_at, customer_name")
+            .eq("job_id", row.job_id)
+            .eq("type", row.event === "collected" ? "pickup" : "delivery")
+            .is("archived_at", null)
+            .order("inspected_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+        const { data: abortRow } = row.event === "aborted"
+          ? await admin
+            .from("job_aborts")
+            .select("confirmed_at")
+            .eq("job_id", row.job_id)
+            .is("reopened_at", null)
+            .order("confirmed_at", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+          : { data: null };
 
         const email = renderStatusEmail({
           event: row.event,
@@ -181,7 +195,7 @@ serve(async (req) => {
             fromPlace: place(job!.pickup_city, job!.pickup_postcode),
             toPlace: place(job!.delivery_city, job!.delivery_postcode),
           },
-          at: insp?.inspected_at ?? new Date().toISOString(),
+          at: abortRow?.confirmed_at ?? insp?.inspected_at ?? new Date().toISOString(),
           receivedBy: row.event === "delivered" ? insp?.customer_name : null,
           portalUrl: baseUrl ? `${baseUrl}/portal/jobs/${row.job_id}` : null,
         });

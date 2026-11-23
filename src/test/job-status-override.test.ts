@@ -25,8 +25,11 @@ const ROLLBACK = "supabase/rollback/20261120100000_super_admin_job_status_overri
 const sql = readFileSync(resolve(process.cwd(), MIGRATION), "utf8");
 
 describe("status list", () => {
-  it("offers every job status, and the database function accepts exactly the same list", () => {
-    expect([...OVERRIDE_STATUSES].sort()).toEqual(Object.values(JOB_STATUS).sort());
+  it("offers every job status except aborted, and the database function accepts exactly the same list", () => {
+    // 'aborted' is owned by the Abort workflow (confirm_job_abort / reopen_job).
+    expect([...OVERRIDE_STATUSES].sort()).toEqual(
+      Object.values(JOB_STATUS).filter((s) => s !== JOB_STATUS.ABORTED).sort(),
+    );
     const body = /v_valid\s+text\[\] := ARRAY\[([\s\S]*?)\];/.exec(sql)?.[1] ?? "";
     const inSql = [...body.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]).sort();
     expect(inSql).toEqual([...OVERRIDE_STATUSES].sort());

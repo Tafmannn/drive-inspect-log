@@ -33,6 +33,11 @@ export interface InvoiceJob {
   pickup_postcode?: string | null;
   delivery_city?: string | null;
   delivery_postcode?: string | null;
+  /**
+   * Aborted jobs only: the APPROVED Abort fee. When set, the line is billed at this
+   * amount (never total_price) and described as "Abort at Collection — ref — reg".
+   */
+  abort_fee?: number | null;
 }
 
 /** A stored receipt file. `backend_ref` is the durable storage path; `url` may be an expiring signed link. */
@@ -100,8 +105,12 @@ export function fmtDmy(iso: string | null | undefined): string {
   return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`;
 }
 
-/** "JOB-1042 | 02/11/2026 | AB12 CDE | Leeds LS11 - Bristol BS34" */
+/** "JOB-1042 | 02/11/2026 | AB12 CDE | Leeds LS11 - Bristol BS34", or the Abort wording. */
 export function jobLineDescription(job: InvoiceJob): string {
+  if (job.abort_fee != null) {
+    // Same wording as abortInvoiceDescription() in src/features/abort/lib/abortRules.ts.
+    return ["Abort at Collection", jobRef(job), (job.vehicle_reg ?? "").trim().toUpperCase()].filter(Boolean).join(" — ");
+  }
   const vehicle = `${job.vehicle_make} ${job.vehicle_model}`.trim();
   return [
     jobRef(job),
@@ -235,7 +244,8 @@ export function buildInvoiceDraft(input: {
   let expensesTotal = 0;
 
   jobs.forEach((job, i) => {
-    const transport = round2(Number(job.total_price ?? 0));
+    // An aborted job is billed at its approved Abort fee, never the original price.
+    const transport = round2(Number(job.abort_fee != null ? job.abort_fee : job.total_price ?? 0));
     const jobExpenses = [...(byJob.get(job.id) ?? [])].sort(
       (a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id),
     );

@@ -10,7 +10,7 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-  Edit, RefreshCw, Trash2, Loader2,
+  Edit, RefreshCw, Trash2, Loader2, OctagonX,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +29,11 @@ interface JobAdminControlsProps {
   jobStatus: string;
   onChangeStatus: (newStatus: string) => Promise<void> | void;
   onDelete: () => Promise<void> | void;
+  /**
+   * Opens the Abort Collection dialog. Only passed while the job can be aborted
+   * (pre-collection); the generic status picker never offers 'aborted'.
+   */
+  onAbort?: () => void;
 }
 
 export function JobAdminControls({
@@ -36,6 +41,7 @@ export function JobAdminControls({
   jobStatus,
   onChangeStatus,
   onDelete,
+  onAbort,
 }: JobAdminControlsProps) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -64,6 +70,16 @@ export function JobAdminControls({
       >
         <Edit className="h-4 w-4 mr-1.5" /> Edit Job
       </Button>
+
+      {onAbort && (
+        <Button
+          variant="outline"
+          className="w-full min-h-[44px] rounded-lg border-warning/40"
+          onClick={onAbort}
+        >
+          <OctagonX className="h-4 w-4 mr-1.5 text-warning" /> Abort Job
+        </Button>
+      )}
 
       {transitions.length > 0 && (
         <div className="flex gap-2">

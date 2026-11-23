@@ -147,7 +147,7 @@ export function usePortalContext() {
 /** How often live data re-checks while the page is open (moves in progress). */
 export const PORTAL_LIVE_REFRESH_MS = 60_000;
 
-const FINISHED_STATUSES = new Set(["delivery_complete", "pod_ready", "completed", "cancelled"]);
+const FINISHED_STATUSES = new Set(["delivery_complete", "pod_ready", "completed", "cancelled", "aborted"]);
 
 export function usePortalJobs() {
   return useQuery({

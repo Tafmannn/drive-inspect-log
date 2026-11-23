@@ -12,8 +12,18 @@ import { JOB_STATUS, type JobStatusValue } from "@/lib/statusConfig";
 
 export const MIN_REASON_LENGTH = 5;
 
-/** Every status a super admin may set (the whole JOB_STATUS set). */
-export const OVERRIDE_STATUSES: JobStatusValue[] = Object.values(JOB_STATUS);
+/**
+ * Every status a super admin may set: the whole JOB_STATUS set except 'aborted', which only
+ * the Abort workflow can enter or leave (it records who confirmed the Abort and the fee claim).
+ */
+export const OVERRIDE_STATUSES: JobStatusValue[] = Object.values(JOB_STATUS).filter(
+  (s) => s !== JOB_STATUS.ABORTED,
+);
+
+/** An aborted job cannot be overridden; it is reopened through Reopen job instead. */
+export function canOverrideFrom(current: string): boolean {
+  return current !== JOB_STATUS.ABORTED;
+}
 
 /** "ready_for_pickup" -> "Ready For Pickup" (the precise name, unlike the coarse badge labels). */
 export function overrideStatusLabel(status: string): string {
@@ -79,6 +89,9 @@ export function overrideErrorMessage(error: { message?: string; code?: string } 
   if (text.includes("INVALID_STATUS")) return "That is not a valid job status.";
   if (text.includes("JOB_NOT_FOUND")) return "This job could not be found.";
   if (text.includes("JOB_ALREADY_IN_STATUS")) return "The job is already in that status.";
+  if (text.includes("ABORT_STATUS_PROTECTED")) {
+    return "Aborted is managed by the Abort workflow. Use Abort Job, or reopen the aborted job.";
+  }
   if (text.includes("JOB_ON_LIVE_INVOICE")) {
     return "This job is on an invoice. Cancel the invoice first, then change the status.";
   }

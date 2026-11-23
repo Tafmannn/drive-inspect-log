@@ -15,6 +15,8 @@ export const JOB_STATUS = {
   POD_READY: "pod_ready",
   COMPLETED: "completed",
   CANCELLED: "cancelled",
+  /** Collection could not go ahead; confirmed by an admin (see src/features/abort). Terminal, not a cancellation. */
+  ABORTED: "aborted",
   FAILED: "failed",
   ARCHIVED: "archived",
 } as const;
@@ -42,6 +44,26 @@ export const TERMINAL_STATUSES: JobStatusValue[] = [
   JOB_STATUS.ARCHIVED,
 ];
 
+/**
+ * Statuses where the job is over operationally but the movement did NOT happen.
+ * Deliberately kept out of TERMINAL_STATUSES, which many finance and evidence views read as
+ * "the movement finished": an aborted job is not a completed delivery, has no POD, and is
+ * billed only through an approved Abort claim (src/features/abort).
+ */
+export const NON_MOVEMENT_CLOSED_STATUSES: JobStatusValue[] = [
+  JOB_STATUS.CANCELLED,
+  JOB_STATUS.ABORTED,
+];
+
+/** True when the driver has nothing left to do on the job and it is not live work. */
+export function isOperationallyClosed(status: string | null | undefined): boolean {
+  if (!status) return false;
+  return (
+    (TERMINAL_STATUSES as string[]).includes(status) ||
+    (NON_MOVEMENT_CLOSED_STATUSES as string[]).includes(status)
+  );
+}
+
 // ─── Status Display ──────────────────────────────────────────────────
 
 export interface StatusConfig {
@@ -67,6 +89,7 @@ const TONE = {
   progress: { backgroundColor: '#FFF1D1', color: '#7A4A00' }, // 6.68:1
   done:     { backgroundColor: '#ECE9FB', color: '#4A3CB0' }, // 6.87:1
   danger:   { backgroundColor: '#FDE7E4', color: '#B42318' }, // 5.55:1
+  aborted:  { backgroundColor: '#FCEFE6', color: '#9A3412' }, // 6.36:1 — distinct from cancelled
 } as const;
 
 const STATUS_MAP: Record<string, StatusStyle> = {
@@ -83,6 +106,7 @@ const STATUS_MAP: Record<string, StatusStyle> = {
   [JOB_STATUS.POD_READY]:              { ...TONE.done,     label: 'COMPLETED' },
   [JOB_STATUS.COMPLETED]:              { ...TONE.done,     label: 'COMPLETED' },
   [JOB_STATUS.CANCELLED]:              { ...TONE.danger,   label: 'CANCELLED' },
+  [JOB_STATUS.ABORTED]:                { ...TONE.aborted,  label: 'ABORTED' },
 };
 
 const FALLBACK: StatusStyle = { ...TONE.neutral, label: 'UNKNOWN' };
@@ -126,6 +150,9 @@ export const ADMIN_ALLOWED_TRANSITIONS: Record<string, JobStatusValue[]> = {
   [JOB_STATUS.POD_READY]:              [JOB_STATUS.COMPLETED, JOB_STATUS.CANCELLED],
   [JOB_STATUS.COMPLETED]:              [JOB_STATUS.READY_FOR_PICKUP], // Re-open
   [JOB_STATUS.CANCELLED]:              [JOB_STATUS.READY_FOR_PICKUP], // Re-open
+  // Aborted can only be reopened (reopen_job closes the Abort's claim). Nothing transitions
+  // INTO aborted here: that is the Abort Job dialog, which records the confirming name.
+  [JOB_STATUS.ABORTED]:                [JOB_STATUS.READY_FOR_PICKUP], // Re-open
   [JOB_STATUS.FAILED]:                 [JOB_STATUS.READY_FOR_PICKUP],
   [JOB_STATUS.PENDING]:                [JOB_STATUS.READY_FOR_PICKUP, JOB_STATUS.CANCELLED],
 };

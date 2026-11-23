@@ -18,6 +18,12 @@
  *   - total_price must be > 0.
  *   - Job must not already be invoiced (no row in invoice_items.job_id).
  *
+ * Abort exception (the ONLY non-completed path): an 'aborted' job is invoice-ready
+ * when its current Abort fee claim is explicitly approved for more than zero. No
+ * inspection, photo or POD is required on that path, and the invoiceable amount is
+ * the approved Abort fee, never the original price. Every other rule above is
+ * unchanged for every other job.
+ *
  * No side effects. No DB writes. The screen and createInvoice path use
  * this to gate the CTA and to render the precise blocker reason.
  */
@@ -53,7 +59,11 @@ export type InvoiceBlockerCode =
   | "missing_billing_contact"
   | "missing_receipts"
   | "evidence_red_or_critical"
-  | "already_invoiced";
+  | "already_invoiced"
+  | "abort_not_confirmed"
+  | "abort_fee_not_approved"
+  | "abort_fee_rejected"
+  | "abort_fee_nil";
 
 export type InvoiceWarningCode =
   | "no_billing_email"
@@ -82,6 +92,30 @@ export interface InvoiceReadinessJob {
   current_run_id?: string | null | undefined;
   inspections?: Inspection[] | null | undefined;
   photos?: Photo[] | null | undefined;
+  /**
+   * Aborted jobs only: the job's CURRENT Abort (not reopened). Absent/null means
+   * no confirmed Abort is known, which blocks.
+   */
+  abort?: AbortInvoiceInfo | null;
+}
+
+export interface AbortInvoiceInfo {
+  finance_status: "pending_review" | "approved" | "rejected";
+  approved_amount: number | null;
+  reopened_at?: string | null;
+}
+
+/**
+ * What this job would be invoiced for: the approved Abort fee for an aborted job
+ * (null while not approved), otherwise the job's agreed price.
+ */
+export function invoiceableAmount(job: Pick<InvoiceReadinessJob, "status" | "total_price" | "abort">): number | null {
+  if (job.status === "aborted") {
+    const a = job.abort;
+    if (!a || a.reopened_at || a.finance_status !== "approved" || a.approved_amount == null) return null;
+    return Number(a.approved_amount);
+  }
+  return job.total_price == null ? null : Number(job.total_price);
 }
 
 export interface InvoiceReadinessInput {
@@ -146,6 +180,11 @@ export function evaluateInvoiceReadiness(
       code: "already_invoiced",
       message: "Already invoiced",
     });
+  }
+
+  // 1b. Abort exception — its own rules, no POD / evidence requirements.
+  if (job.status === "aborted") {
+    return evaluateAbortReadiness(job, alreadyInvoiced, blockers, warnings);
   }
 
   // 2. Status gate. POD reviewed === job.status === 'completed' in our model.
@@ -240,6 +279,47 @@ export function evaluateInvoiceReadiness(
     warnings,
     alreadyInvoiced,
     evidenceLevel: health.level,
+  };
+}
+
+function clientBlockers(job: InvoiceReadinessJob, blockers: InvoiceBlocker[], warnings: InvoiceWarning[]) {
+  if (!hasMeaningfulClient(job)) {
+    if (!job.client_id && !job.client_name?.trim() && !job.client_company?.trim()) {
+      blockers.push({ code: "missing_client", message: "Blocked: missing client" });
+    } else {
+      blockers.push({ code: "missing_billing_contact", message: "Blocked: client has no billing email or phone on file" });
+    }
+  } else if (!job.client_email?.trim()) {
+    warnings.push({ code: "no_billing_email", message: "No billing email on file — invoice will need manual delivery" });
+  }
+}
+
+function evaluateAbortReadiness(
+  job: InvoiceReadinessJob,
+  alreadyInvoiced: boolean,
+  blockers: InvoiceBlocker[],
+  warnings: InvoiceWarning[],
+): InvoiceReadinessResult {
+  const a = job.abort;
+  if (!a || a.reopened_at) {
+    blockers.push({ code: "abort_not_confirmed", message: "Blocked: no confirmed Abort on this job" });
+  } else if (a.finance_status === "rejected") {
+    blockers.push({ code: "abort_fee_rejected", message: "Abort fee rejected — nothing to invoice" });
+  } else if (a.finance_status !== "approved") {
+    blockers.push({ code: "abort_fee_not_approved", message: "Blocked: Abort fee awaiting approval" });
+  } else if (!(Number(a.approved_amount ?? 0) > 0)) {
+    blockers.push({ code: "abort_fee_nil", message: "Abort approved at £0 — nothing to invoice" });
+  }
+  clientBlockers(job, blockers, warnings);
+  const ready = blockers.length === 0;
+  return {
+    ready,
+    primaryReason: ready ? "Ready to invoice (Abort fee)" : (blockers[0]?.message ?? "Blocked"),
+    blockers,
+    warnings,
+    alreadyInvoiced,
+    // No evidence is required for an Abort; nothing about it blocks or warns.
+    evidenceLevel: "green",
   };
 }
 

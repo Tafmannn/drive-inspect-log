@@ -36,6 +36,7 @@ const STATUS_LABELS: Record<string, string> = {
   [JOB_STATUS.DELIVERY_COMPLETE]: "Completed",
   [JOB_STATUS.POD_READY]: "POD Ready",
   [JOB_STATUS.CANCELLED]: "Cancelled",
+  [JOB_STATUS.ABORTED]: "Aborted",
 };
 const PRIORITY_ORDER: Record<string, number> = { Urgent: 0, High: 1, Normal: 2, Low: 3 };
 
@@ -45,6 +46,7 @@ function statusColor(status: string) {
     case JOB_STATUS.IN_TRANSIT: return "bg-warning/10 text-warning";
     case JOB_STATUS.DELIVERY_COMPLETE: case JOB_STATUS.POD_READY: return "bg-success/10 text-success";
     case JOB_STATUS.CANCELLED: return "bg-destructive/10 text-destructive";
+    case JOB_STATUS.ABORTED: return "bg-warning/10 text-warning";
     default: return "bg-muted text-muted-foreground";
   }
 }

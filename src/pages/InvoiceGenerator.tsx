@@ -19,6 +19,9 @@ import { withPricingOne } from "@/lib/jobPricingApi";
 import { getOrgId } from "@/lib/orgHelper";
 import { downloadInvoicePdf, type InvoiceLineItem, type InvoiceData } from "@/lib/invoicePdf";
 import { findAlreadyInvoicedJobs, isAlreadyInvoicedError } from "@/features/invoicing/api/createInvoice";
+import { JOB_STATUS } from "@/lib/statusConfig";
+import { getCurrentAbortsForJobs } from "@/features/abort/api/abortApi";
+import { abortInvoiceDescription } from "@/features/abort/lib/abortRules";
 import { useOrgInvoiceSettings } from "@/features/invoicing/hooks/useInvoiceSettings";
 import { settingsToPdfFields } from "@/features/invoicing/api/invoiceDocument";
 import {
@@ -178,9 +181,24 @@ export function InvoiceGenerator() {
             setClientCompany(j.delivery_company || j.client_company || "");
             setClientEmail(j.client_email || "");
             setClientAddress(`${j.delivery_address_line1}, ${j.delivery_city} ${j.delivery_postcode}`);
-            const desc = `Vehicle transportation - ${j.vehicle_reg} (${j.vehicle_make} ${j.vehicle_model}) - ${j.pickup_city || "-"} to ${j.delivery_city || "-"}`;
-            const price = j.admin_rate || j.total_price || 0;
-            setLineItems([{ id: crypto.randomUUID(), description: desc, quantity: 1, unitPrice: Number(price) }]);
+            let desc = `Vehicle transportation - ${j.vehicle_reg} (${j.vehicle_make} ${j.vehicle_model}) - ${j.pickup_city || "-"} to ${j.delivery_city || "-"}`;
+            let price = Number(j.admin_rate || j.total_price || 0);
+            if (j.status === JOB_STATUS.ABORTED) {
+              // An aborted job is billed at its APPROVED Abort fee only, never the
+              // original price. The database refuses anything else on save.
+              const abort = (await getCurrentAbortsForJobs([j.id])).get(j.id);
+              const fee = abort?.finance_status === "approved" ? Number(abort.approved_amount ?? 0) : 0;
+              desc = abortInvoiceDescription(j);
+              price = fee;
+              if (!(fee > 0)) {
+                toast({
+                  title: "Abort fee not approved",
+                  description: "Approve the Abort fee on the job before invoicing it.",
+                  variant: "destructive",
+                });
+              }
+            }
+            setLineItems([{ id: crypto.randomUUID(), description: desc, quantity: 1, unitPrice: price }]);
 
             const { data: expenses } = await supabase
               .from("expenses")
@@ -301,6 +319,14 @@ export function InvoiceGenerator() {
 
       if (isAlreadyInvoicedError(error)) {
         toast({ title: "Already invoiced", description: "This job was just invoiced elsewhere. Nothing was saved.", variant: "destructive" });
+        return;
+      }
+      if (error && /ABORT_NOT_APPROVED|ABORT_AMOUNT_EXCEEDED/.test(error.message ?? "")) {
+        toast({
+          title: "Abort fee not approved",
+          description: "This aborted job can only be invoiced for its approved Abort fee (plus its own expenses).",
+          variant: "destructive",
+        });
         return;
       }
       if (error) throw error;

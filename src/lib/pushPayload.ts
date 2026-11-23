@@ -7,7 +7,7 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Notification kinds the worker will render. Anything else is dropped. */
-export const PUSH_TYPES = ["job-assigned", "pod-submitted"] as const;
+export const PUSH_TYPES = ["job-assigned", "pod-submitted", "abort-requested"] as const;
 export type PushType = (typeof PUSH_TYPES)[number];
 
 export interface PushPayload {

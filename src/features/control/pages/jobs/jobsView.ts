@@ -6,7 +6,8 @@
  * (/control/jobs: server-filtered list, sort, KPIs). Each view says where its
  * rows come from:
  *   - "queue" views read the grouped triage data (useAdminJobQueues);
- *   - "list" views read the server-filtered list (useControlJobs).
+ *   - "list" views read the server-filtered list (useControlJobs);
+ *   - the "aborts" view reads Abort requests and Aborts (src/features/abort).
  *
  * Old links keep working: `?filter=` (old /admin/jobs and dashboard buckets)
  * and `?status=` (old /control/jobs) are translated to `?view=`.
@@ -23,12 +24,13 @@ export type JobsView =
   | "review"
   | "completed"
   | "cancelled"
+  | "aborts"
   | "all";
 
 export interface JobsViewDef {
   value: JobsView;
   label: string;
-  source: "queue" | "list";
+  source: "queue" | "list" | "aborts";
   /** Server filter for list views. */
   listStatus?: JobsFilter["status"];
 }
@@ -43,6 +45,7 @@ export const JOBS_VIEWS: JobsViewDef[] = [
   { value: "review", label: "POD Review", source: "list", listStatus: "pod_review" },
   { value: "completed", label: "Completed", source: "list", listStatus: "completed" },
   { value: "cancelled", label: "Cancelled", source: "list", listStatus: "cancelled" },
+  { value: "aborts", label: "Aborts", source: "aborts" },
   { value: "all", label: "All jobs", source: "list", listStatus: "all" },
 ];
 
@@ -63,6 +66,7 @@ const LEGACY_FILTER: Record<string, JobsView> = {
   review: "review",
   completed: "completed",
   cancelled: "cancelled",
+  aborts: "aborts",
 };
 
 /** Old /control/jobs `?status=` values. */

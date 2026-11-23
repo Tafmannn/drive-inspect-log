@@ -1,4 +1,5 @@
-// Customer-facing "collected" / "delivered" status emails.
+// Customer-facing "collected" / "delivered" status emails, and the "aborted" notice an
+// admin sends on purpose (never automatic; see notify_customer_job_aborted()).
 //
 // Pure and dependency-free (no Deno or Supabase imports) so it can be
 // unit-tested under vitest (src/test/customer-status-email.test.ts) and used
@@ -8,7 +9,7 @@
 // are only used when they're a plain #hex colour and an https URL, so a bad
 // value in organisations can't break or inject into the email.
 
-export type StatusEvent = "collected" | "delivered";
+export type StatusEvent = "collected" | "delivered" | "aborted";
 
 export interface StatusEmailInput {
   event: StatusEvent;
@@ -28,7 +29,7 @@ export interface StatusEmailInput {
     fromPlace?: string | null;
     toPlace?: string | null;
   };
-  /** When the inspection was done (ISO). */
+  /** When the inspection was done (ISO); for "aborted", when the Abort was confirmed. */
   at?: string | null;
   /** Delivery only: who signed for the vehicle. */
   receivedBy?: string | null;
@@ -111,20 +112,29 @@ export function renderStatusEmail(input: StatusEmailInput): RenderedEmail {
   const portalUrl = safePortalUrl(input.portalUrl);
   const when = formatUkDateTime(input.at);
   const isDelivered = input.event === "delivered";
+  const isAborted = input.event === "aborted";
 
-  const subject = isDelivered
-    ? `Delivered: ${reg} has arrived`
-    : `Collected: ${reg} is on its way`;
-  const headline = isDelivered ? "Your vehicle has been delivered" : "Your vehicle has been collected";
-  const lead = isDelivered
-    ? `${operator} has delivered ${vehicleLine(job)}.`
-    : `${operator} has collected ${vehicleLine(job)} and it's on its way.`;
-  const button = isDelivered ? "View delivery report and photos" : "Track this move";
+  // The aborted notice says only that the collection did not go ahead: no reasons, no names,
+  // no fees (those are internal to the operator).
+  const subject = isAborted
+    ? `Collection aborted: ${reg}`
+    : isDelivered
+      ? `Delivered: ${reg} has arrived`
+      : `Collected: ${reg} is on its way`;
+  const headline = isAborted
+    ? "Collection aborted"
+    : isDelivered ? "Your vehicle has been delivered" : "Your vehicle has been collected";
+  const lead = isAborted
+    ? `${operator} could not collect ${vehicleLine(job)} as planned, so this move has been aborted. The vehicle was not collected.`
+    : isDelivered
+      ? `${operator} has delivered ${vehicleLine(job)}.`
+      : `${operator} has collected ${vehicleLine(job)} and it's on its way.`;
+  const button = isAborted ? "View this move" : isDelivered ? "View delivery report and photos" : "Track this move";
 
   const rows: [string, string][] = [];
   if (job.ref) rows.push(["Reference", job.ref]);
   if (job.fromPlace || job.toPlace) rows.push(["Route", `${job.fromPlace || "—"} → ${job.toPlace || "—"}`]);
-  if (when) rows.push([isDelivered ? "Delivered" : "Collected", when]);
+  if (when) rows.push([isAborted ? "Aborted" : isDelivered ? "Delivered" : "Collected", when]);
   if (isDelivered && input.receivedBy?.trim()) rows.push(["Received by", input.receivedBy.trim()]);
 
   const contactBits = [input.operator.contactPhone, input.operator.contactEmail]
@@ -224,6 +234,9 @@ export function skipReasonFor(
   if (job.is_test) return "job_test";
   if (job.client_id !== queuedClientId) return "client_changed";
   if (job.status === "cancelled" || job.status === "failed") return "job_cancelled";
+  // An Abort notice is only true while the job is still aborted (it may have been reopened).
+  if (event === "aborted") return job.status === "aborted" ? null : "job_not_aborted";
+  if (job.status === "aborted") return "job_aborted";
   if (event === "collected" && job.status && DELIVERED_STATUSES.includes(job.status)) return "superseded_by_delivery";
   return null;
 }

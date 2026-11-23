@@ -17,7 +17,7 @@
  */
 
 import type { Job } from "./types";
-import { TERMINAL_STATUSES } from "./statusConfig";
+import { JOB_STATUS, TERMINAL_STATUSES, isOperationallyClosed } from "./statusConfig";
 
 // ── Executable State ─────────────────────────────────────────────────
 
@@ -39,6 +39,11 @@ export function evaluateExecutableState(
   job: Job,
   siblingJobs?: Job[],
 ): ExecutableEvaluation {
+  // Aborted: nothing to execute and no POD to review.
+  if (job.status === JOB_STATUS.ABORTED) {
+    return { state: "blocked", reason: "Aborted" };
+  }
+
   // Terminal jobs are review-only
   if ((TERMINAL_STATUSES as string[]).includes(job.status)) {
     return { state: "review_only", reason: "Completed" };
@@ -103,8 +108,8 @@ const IN_PROGRESS_STATUSES = [
 ];
 
 function classifyJob(job: Job, execState: ExecutableEvaluation): ExecutionClass {
-  // Terminal
-  if ((TERMINAL_STATUSES as string[]).includes(job.status)) {
+  // Terminal (aborted / cancelled included: no work left on them)
+  if (isOperationallyClosed(job.status)) {
     return "terminal";
   }
 

@@ -55,7 +55,7 @@ describe("reports leave test data out", () => {
   const filtered: Array<[string, string, number]> = [
     ["src/features/accounts/api/accountsData.ts", '.eq("is_test", false)', 2], // invoices + expenses
     ["src/features/control/hooks/useControlProfitabilityData.ts", '.eq("is_test", false)', 1],
-    ["src/features/invoicing/hooks/useInvoicePrepData.ts", '.eq("is_test", false)', 1],
+    ["src/features/invoicing/hooks/useInvoicePrepData.ts", '.eq("is_test", false)', 2], // completed + aborted jobs
     ["src/features/attention/hooks/useAttentionData.ts", '.eq("is_test", false)', 1],
     ["src/hooks/useAdminOperationsBuckets.ts", '.eq("is_test", false)', 2],
   ];
