@@ -151,6 +151,16 @@ describe("getWorkflowBrain — Stage 1 spec scenarios", () => {
     expect(b.debug.invoiceBlockerCodes).toContain("missing_client");
   });
 
+  it("aborted has no driver/POD actions and routes invoicing to fee approval", () => {
+    const b = getWorkflowBrain({ job: mkJob({ status: "aborted", total_price: 200, client_name: "Acme" }) });
+    expect(b.phase).toBe("aborted");
+    expect(b.driverNextAction).toBeNull();
+    expect(b.adminNextAction).toBeNull();
+    expect(b.podReadiness.ready).toBe(false);
+    expect(b.invoiceReadiness.ready).toBe(false);
+    expect(b.invoiceReadiness.blockers.join(" ")).toMatch(/separately approved fee/i);
+  });
+
   it("cancelled → no driver action, no admin action, no invoice", () => {
     const b = getWorkflowBrain({ job: mkJob({ status: "cancelled" }) });
     expect(b.phase).toBe("cancelled");
