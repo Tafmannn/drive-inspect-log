@@ -69,6 +69,10 @@ BEGIN
     IF p_client_confirmed IS NOT TRUE THEN
       RAISE EXCEPTION 'CLIENT_FEE_CONFIRMATION_REQUIRED' USING ERRCODE = '23514';
     END IF;
+    IF p_amount IS NOT NULL AND p_amount <> round(p_amount, 2) THEN
+      RAISE EXCEPTION 'INVALID_AMOUNT'
+        USING ERRCODE='23514', HINT='Client-agreed fees must be in pounds and pence';
+    END IF;
     v_amount := COALESCE(p_amount, v_abort.proposed_amount);
     IF v_amount IS NULL THEN
       RAISE EXCEPTION 'AMOUNT_REQUIRED'
