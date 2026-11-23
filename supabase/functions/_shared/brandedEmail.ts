@@ -45,7 +45,7 @@ export function brandLogoUrl(req: Request): string | null {
   return resolveLogoUrl(EMAIL_LOGO_ON_NAVY, origin);
 }
 
-export { renderActionEmailHtml, portalInviteIntroHtml, SUPPORT_EMAIL } from "./actionEmail.ts";
+export { renderActionEmailHtml, portalInviteIntroHtml, appTokenLink, SUPPORT_EMAIL } from "./actionEmail.ts";
 
 /** Sends via Resend. Returns ok:false (with detail) if RESEND_API_KEY is unset or the send fails. */
 export async function sendBrandedEmail(opts: {

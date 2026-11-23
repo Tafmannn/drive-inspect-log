@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Lock, CheckCircle2 } from "lucide-react";
+import { newPasswordProblem, useEmailLinkSession } from "@/hooks/useEmailLinkSession";
 
 export const ResetPassword = () => {
   const navigate = useNavigate();
@@ -13,63 +13,17 @@ export const ResetPassword = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  // null = still resolving; false = no usable session (bad/expired/used link);
-  // true = recovery session established, show the set-password form.
-  const [hasSession, setHasSession] = useState<boolean | null>(null);
-  const [linkError, setLinkError] = useState<string | null>(null);
-
-  useEffect(() => {
-    // A used/expired link comes back as #error=access_denied&error_code=otp_expired&…
-    const hash = window.location.hash;
-    if (hash.includes("error=")) {
-      const params = new URLSearchParams(hash.replace(/^#/, ""));
-      const description = params.get("error_description")?.replace(/\+/g, " ");
-      setLinkError(description || "This reset link is invalid or has expired.");
-      setHasSession(false);
-      return;
-    }
-
-    // supabase-js auto-consumes the #access_token=…&type=recovery hash
-    // (detectSessionInUrl) and strips it — often BEFORE this component mounts —
-    // so checking the raw hash / waiting for the PASSWORD_RECOVERY event alone
-    // races and misses a perfectly valid link (the old bug: the link verified
-    // server-side but the page still said "invalid"). Check the established
-    // session directly, and also listen for the auth event as a backstop.
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setHasSession(true);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) setHasSession(true);
-    });
-
-    // If nothing resolves shortly, the link was invalid/used or opened directly.
-    const timer = setTimeout(() => {
-      setHasSession((current) => (current === null ? false : current));
-    }, 2500);
-
-    return () => {
-      subscription.unsubscribe();
-      clearTimeout(timer);
-    };
-  }, []);
+  const { hasSession, linkError, saveNewPassword } = useEmailLinkSession("This reset link is invalid or has expired.");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-
-    if (password !== confirm) {
-      setError("Passwords do not match.");
-      return;
-    }
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
-      return;
-    }
+    const problem = newPasswordProblem(password, confirm);
+    setError(problem);
+    if (problem) return;
 
     setLoading(true);
     try {
-      const { error: err } = await supabase.auth.updateUser({ password });
-      if (err) throw err;
+      if (!(await saveNewPassword(password))) return; // link used/expired: the page now says so
       setSuccess(true);
       setTimeout(() => navigate("/login", { replace: true }), 2500);
     } catch (err: unknown) {

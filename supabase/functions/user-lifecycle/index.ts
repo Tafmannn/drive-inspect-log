@@ -11,7 +11,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { findAuthUserByEmail, listAllAuthUsers } from "../_shared/adminUsers.ts";
 import { isSensitivePermissionBlockedForNonSuperAdmin } from "../_shared/permissionEscalation.ts";
 import { inactiveAccountError } from "../_shared/profileAuthz.ts";
-import { renderActionEmailHtml, resolveRedirectUrl, sendBrandedEmail, brandLogoUrl } from "../_shared/brandedEmail.ts";
+import { appTokenLink, renderActionEmailHtml, resolveRedirectUrl, sendBrandedEmail, brandLogoUrl } from "../_shared/brandedEmail.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -360,7 +360,7 @@ serve(async (req) => {
             logoUrl: brandLogoUrl(req),
             to: email,
             firstName: first_name ?? null,
-            actionLink: linkData.properties.action_link,
+            actionLink: appTokenLink(redirectTo, linkData.properties),
             subject: "You've been invited to Axentra",
           });
           // A failed send must not abort creation — the profile below still
@@ -474,7 +474,7 @@ serve(async (req) => {
             logoUrl: brandLogoUrl(req),
           to: target.email,
           firstName: target.first_name,
-          actionLink: linkData.properties.action_link,
+          actionLink: appTokenLink(redirectTo, linkData.properties),
           subject: "Your Axentra invite link",
         });
         if (!sent.ok) {

@@ -1,16 +1,18 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Lock, CheckCircle2, Truck, Camera, FileText } from "lucide-react";
 import { isPortalInvite, welcomeStage } from "./welcomeHelpers";
+import { newPasswordProblem, useEmailLinkSession } from "@/hooks/useEmailLinkSession";
 
 /**
- * Landing page for invitation links. The branded invite email points here:
- * Supabase verifies the invite/recovery token and redirects with a session in
- * the URL hash, so the new user can create their first password immediately.
+ * Landing page for invitation links. Current emails link straight here with
+ * ?token_hash=…&type=invite|recovery; the token is redeemed only when the
+ * person submits their password, so scanners and repeat taps can't spend it.
+ * Older emails went via supabase.co, which redirects back with a session (or
+ * an #error) in the URL hash; that path still works.
  */
 export const Welcome = () => {
   const navigate = useNavigate();
@@ -19,77 +21,28 @@ export const Welcome = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  // null = still resolving; false = no usable session (bad/expired link)
-  const [hasSession, setHasSession] = useState<boolean | null>(null);
-  const [linkError, setLinkError] = useState<string | null>(null);
-  const [portal, setPortal] = useState(false);
-
-  useEffect(() => {
-    // An expired/used link comes back as #error=access_denied&error_code=otp_expired&…
-    const hash = window.location.hash;
-    if (hash.includes("error=")) {
-      const params = new URLSearchParams(hash.replace(/^#/, ""));
-      const description = params.get("error_description")?.replace(/\+/g, " ");
-      setLinkError(description || "This invitation link is invalid or has expired.");
-      setHasSession(false);
-      return;
-    }
-
-    // supabase-js consumes the #access_token=…&type=invite hash automatically
-    // (detectSessionInUrl) — it may already have done so, or may still be
-    // doing it, so check the current session AND listen for SIGNED_IN.
-    supabase.auth
-      .getSession()
-      .then(({ data }) => {
-        if (data.session) {
-          setPortal(isPortalInvite(data.session));
-          setHasSession(true);
-        }
-      })
-      .catch(() => {
-        // No session could be read; the timeout below then shows the
-        // "invalid or expired link" message, same as an absent session.
-      });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        setPortal(isPortalInvite(session));
-        setHasSession(true);
-      }
-    });
-
-    // If neither resolves shortly, the page was opened without a valid link.
-    const timer = setTimeout(() => {
-      setHasSession((current) => (current === null ? false : current));
-    }, 2500);
-
-    return () => {
-      subscription.unsubscribe();
-      clearTimeout(timer);
-    };
-  }, []);
+  const { search, fromTokenLink, hasSession, linkError, session, saveNewPassword } =
+    useEmailLinkSession("This invitation link is invalid or has expired.");
+  // Before the token is redeemed there is no session yet, so portal-access's
+  // portal=1 hint picks the wording; the destination uses the real session.
+  const portal = session ? isPortalInvite(session) : fromTokenLink && new URLSearchParams(search).get("portal") === "1";
 
   const stage = welcomeStage(success, hasSession);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-
-    if (password !== confirm) {
-      setError("Passwords do not match.");
-      return;
-    }
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
-      return;
-    }
+    const problem = newPasswordProblem(password, confirm);
+    setError(problem);
+    if (problem) return;
 
     setLoading(true);
     try {
-      const { error: err } = await supabase.auth.updateUser({ password });
-      if (err) throw err;
+      const saved = await saveNewPassword(password);
+      if (!saved) return; // link used/expired: the page now says so
       setSuccess(true);
       // Portal users go straight to their portal; staff to the app home.
-      setTimeout(() => navigate(portal ? "/portal" : "/", { replace: true }), 2000);
+      const toPortal = saved.session ? isPortalInvite(saved.session) : portal;
+      setTimeout(() => navigate(toPortal ? "/portal" : "/", { replace: true }), 2000);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
