@@ -15,10 +15,10 @@ type CredentialEvent = {
 /** Admin-only management area, separate from the customer-facing ID. */
 export function DigitalIdAdminTools({
   credential, onChanged,
-}: {
+}: Readonly<{
   credential: DigitalIdCredential;
   onChanged: () => Promise<void>;
-}) {
+}>) {
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [events, setEvents] = useState<CredentialEvent[]>([]);
@@ -41,6 +41,8 @@ export function DigitalIdAdminTools({
 
   useEffect(() => { void loadEvents(); }, [loadEvents]);
 
+  const credentialUserId = credential.user_id;
+
   const updatePhoto = async (path: string | null) => {
     const { error } = await (supabase as any).rpc("set_driver_digital_id_photo", {
       p_user_id: credentialUserId,
@@ -49,9 +51,8 @@ export function DigitalIdAdminTools({
     if (error) throw error;
   };
 
-  // The target user is encoded in the authenticated credential response; admin
-  // callers are restricted to their organisation by the backend RPC.
-  const credentialUserId = credential.user_id;
+  // The target user is resolved from the authenticated response; the backend
+  // enforces administrator role and organisation before any mutation.
 
   const upload = async (file: File) => {
     if (!credential.org_id || !credentialUserId) {
@@ -65,7 +66,9 @@ export function DigitalIdAdminTools({
     setBusy(true);
     let uploadedPath: string | null = null;
     try {
-      const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+      let extension = "jpg";
+      if (file.type === "image/png") extension = "png";
+      else if (file.type === "image/webp") extension = "webp";
       const nonce = crypto.randomUUID();
       uploadedPath = credential.org_id + "/" + credentialUserId + "/" + nonce + "." + extension;
       const { error: storageError } = await supabase.storage
