@@ -21,21 +21,24 @@ import { abortErrorMessage, approvalAmountProblem, isAbortFeeReviewLocked } from
 const money = (value: number | null | undefined): string =>
   value == null ? "Not set" : "£" + Number(value).toFixed(2);
 
-interface Props {
+interface PendingProps {
   jobId: string;
   abort: JobAbort;
+}
+
+interface Props extends PendingProps {
   invoiced: boolean;
   paid: boolean;
 }
 
-export function AbortFeeReview(props: Props) {
+export function AbortFeeReview(props: Readonly<Props>) {
   if (isAbortFeeReviewLocked(props.abort.finance_status, props.invoiced)) {
     return <LockedFeeReview {...props} />;
   }
-  return <PendingFeeReview {...props} />;
+  return <PendingFeeReview jobId={props.jobId} abort={props.abort} />;
 }
 
-function PendingFeeReview({ jobId, abort }: Props) {
+function PendingFeeReview({ jobId, abort }: Readonly<PendingProps>) {
   const review = useReviewAbortClaim(jobId);
   const [amount, setAmount] = useState(abort.proposed_amount == null ? "" : abort.proposed_amount.toFixed(2));
   const [note, setNote] = useState("");
@@ -115,7 +118,7 @@ function lockedDescription(abort: JobAbort, invoiced: boolean, paid: boolean): s
   return "This fee was rejected. The decision is final.";
 }
 
-function LockedFeeReview({ jobId, abort, invoiced, paid }: Props) {
+function LockedFeeReview({ jobId, abort, invoiced, paid }: Readonly<Props>) {
   const { isSuperAdmin } = useAuth();
   const amend = useAmendApprovedAbortClaim(jobId);
   const [isOpen, setIsOpen] = useState(false);
