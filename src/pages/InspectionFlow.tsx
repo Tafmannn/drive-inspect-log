@@ -1397,6 +1397,26 @@ export const InspectionFlow = () => {
     );
   }
 
+  // Direct navigation must not reopen inspection capture after the office has
+  // confirmed an Abort. This applies to admins too; the submit RPC also locks it.
+  if (job.status === JOB_STATUS.ABORTED) {
+    return (
+      <div className="min-h-screen bg-background">
+        <AppHeader title="Inspection unavailable" showBack onBack={() => navigate(`/jobs/${jobId}`)} />
+        <div className="p-4 flex flex-col items-center text-center gap-3 py-16">
+          <AlertTriangle className="w-10 h-10 text-muted-foreground" />
+          <p className="text-sm font-medium text-foreground">Collection aborted</p>
+          <p className="text-[13px] text-muted-foreground max-w-xs">
+            This job is closed. Pickup and delivery inspections cannot be started or submitted.
+          </p>
+          <Button variant="outline" className="min-h-[44px] rounded-lg mt-2" onClick={() => navigate(`/jobs/${jobId}`)}>
+            Back to Job
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   // WORKFLOW-003: nothing previously checked that the current driver is the
   // job's *assigned* driver before allowing inspection actions — confirmed
   // server-side too (submit_inspection reads driver_id only to check for a
