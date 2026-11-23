@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  isAbortFeeReviewLocked,
   ABORT_ELIGIBLE_STATUSES,
   abortConfirmPayload,
   abortErrorMessage,
@@ -234,5 +235,18 @@ describe("Aborts view grouping", () => {
       row({ kind: "abort", abort: abort("rejected", null) }),
     ] as never);
     expect([g.requests.length, g.review.length, g.ready.length, g.settled.length]).toEqual([1, 1, 1, 2]);
+  });
+});
+
+describe("approved Abort fee lock", () => {
+  it("locks ordinary review immediately after approval, before any invoice", () => {
+    expect(isAbortFeeReviewLocked("approved", false)).toBe(true);
+    expect(isAbortFeeReviewLocked("rejected", false)).toBe(true);
+    expect(isAbortFeeReviewLocked("pending_review", false)).toBe(false);
+  });
+
+  it("keeps invoiced claims locked even if a stale view shows pending", () => {
+    expect(isAbortFeeReviewLocked("pending_review", true)).toBe(true);
+    expect(isAbortFeeReviewLocked("approved", true)).toBe(true);
   });
 });
