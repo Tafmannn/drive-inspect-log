@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tansta
 import { invalidateForEvent } from "@/lib/mutationEvents";
 import {
   confirmJobAbort,
+  amendApprovedAbortClaim,
   createReplacementJob,
   dismissAbortRequest,
   getJobAbortState,
@@ -11,6 +12,7 @@ import {
   requestJobAbort,
   reviewAbortClaim,
 } from "../api/abortApi";
+import type { JobAbortState } from "../api/abortApi";
 
 export const abortKeys = {
   all: ["aborts"] as const,
@@ -84,10 +86,55 @@ export function useDismissAbortRequest(jobId: string) {
   });
 }
 
+/** Update the cached record synchronously after confirmation.
+ * The UI must lock on success rather than expose an extra tap while refetching. */
+function cacheFeeDecision(
+  qc: QueryClient, jobId: string, abortId: string,
+  status: "approved" | "rejected",
+  amount: number | null, reviewedAt?: string,
+) {
+  qc.setQueryData<JobAbortState>(abortKeys.job(jobId), (old) => {
+    if (!old?.current || old.current.id !== abortId) return old;
+    const current = {
+      ...old.current,
+      finance_status: status,
+      approved_amount: amount,
+      reviewed_at: reviewedAt ?? old.current.reviewed_at,
+    };
+    return {
+      ...old,
+      current,
+      history: old.history.map((a) => a.id === abortId ? current : a),
+    };
+  });
+}
+
 export function useReviewAbortClaim(jobId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: reviewAbortClaim,
+    onSuccess: (result, vars) => cacheFeeDecision(qc, jobId, vars.abortId, result.financeStatus, result.approvedAmount),
+    onSettled: () => refreshAfterAbortChange(qc, jobId),
+  });
+}
+
+export function useAmendApprovedAbortClaim(jobId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: amendApprovedAbortClaim,
+    retry: false,
+    onSuccess: (result, vars) => {
+      qc.setQueryData<JobAbortState>(abortKeys.job(jobId), (old) => {
+        if (!old?.current || old.current.id !== vars.abortId) return old;
+        const current = {
+          ...old.current,
+          approved_amount: result.approvedAmount,
+          last_amended_at: result.amendedAt,
+          last_amendment_reason: vars.reason,
+        };
+        return { ...old, current, history: old.history.map((a) => a.id === vars.abortId ? current : a) };
+      });
+    },
     onSettled: () => refreshAfterAbortChange(qc, jobId),
   });
 }
