@@ -1,25 +1,27 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 // supabase-js auto-consumes the recovery hash and can strip it before the
 // component mounts. These mocks stand in for that behaviour so we can assert
 // ResetPassword detects the session via getSession() rather than the hash.
 // vi.hoisted so the mock factory (hoisted above imports) can see them.
-const { getSession, onAuthStateChange } = vi.hoisted(() => ({
+const { getSession, onAuthStateChange, verifyOtp, updateUser } = vi.hoisted(() => ({
   getSession: vi.fn(),
+  verifyOtp: vi.fn(),
+  updateUser: vi.fn(),
   onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
 }));
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { auth: { getSession: () => getSession(), onAuthStateChange, updateUser: vi.fn() } },
+  supabase: { auth: { getSession: () => getSession(), onAuthStateChange, updateUser, verifyOtp } },
 }));
 
 import { ResetPassword } from "@/pages/ResetPassword";
 
-function renderReset() {
+function renderReset(entry = "/reset-password") {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[entry]}>
       <ResetPassword />
     </MemoryRouter>,
   );
@@ -59,5 +61,19 @@ describe("ResetPassword recovery detection", () => {
     await waitFor(() =>
       expect(screen.getByRole("button", { name: /request a new reset link/i })).toBeTruthy(),
     );
+  });
+
+  it("a token link shows the form without spending the token, and redeems it on submit", async () => {
+    verifyOtp.mockResolvedValue({ data: { session: { access_token: "x" } }, error: null });
+    updateUser.mockResolvedValue({ error: null });
+    renderReset("/reset-password?token_hash=r3set&type=recovery");
+    expect(await screen.findByLabelText(/new password/i)).toBeTruthy();
+    expect(verifyOtp).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText(/new password/i), { target: { value: "secret123" } });
+    fireEvent.change(screen.getByLabelText(/confirm password/i), { target: { value: "secret123" } });
+    fireEvent.click(screen.getByRole("button", { name: /update password/i }));
+    await waitFor(() => expect(updateUser).toHaveBeenCalledWith({ password: "secret123" }));
+    expect(verifyOtp).toHaveBeenCalledWith({ token_hash: "r3set", type: "recovery" });
+    expect(getSession).not.toHaveBeenCalled();
   });
 });

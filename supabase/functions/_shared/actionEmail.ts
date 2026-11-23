@@ -106,3 +106,24 @@ export function portalInviteIntroHtml(operatorName: string, clientName: string):
     ". Track your vehicle moves, see collection and delivery photos and signatures, and download your invoices, any time."
   );
 }
+
+/**
+ * The address the email button opens: our own page (redirectTo) carrying the
+ * hashed one-time token, e.g. https://app/welcome?token_hash=…&type=invite.
+ * The page redeems the token only when the person submits their new password,
+ * so email scanners, link previews and repeat taps can't use it up, and the
+ * link never depends on reaching supabase.co. Falls back to Supabase's own
+ * verify link if generateLink didn't return a hashed token.
+ */
+export function appTokenLink(
+  redirectTo: string,
+  props: { action_link?: string; hashed_token?: string; verification_type?: string } | null | undefined,
+  extra: Record<string, string> = {},
+): string {
+  if (!props?.hashed_token || !props.verification_type) return props?.action_link ?? redirectTo;
+  const url = new URL(redirectTo);
+  url.searchParams.set("token_hash", props.hashed_token);
+  url.searchParams.set("type", props.verification_type);
+  for (const [k, v] of Object.entries(extra)) url.searchParams.set(k, v);
+  return url.toString();
+}

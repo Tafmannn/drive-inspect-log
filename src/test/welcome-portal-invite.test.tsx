@@ -5,12 +5,15 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 let session: unknown = null;
 let sessionFails = false;
 const updateUser = vi.fn(async (_attrs: unknown) => ({ error: null }));
+let otpResult: { data: { session: unknown }; error: unknown } = { data: { session: null }, error: null };
+const verifyOtp = vi.fn(async (_args: unknown) => otpResult);
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     auth: {
       getSession: () => (sessionFails ? Promise.reject(new Error("storage unavailable")) : Promise.resolve({ data: { session } })),
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
       updateUser: (attrs: unknown) => updateUser(attrs),
+      verifyOtp: (args: unknown) => verifyOtp(args),
     },
   },
 }));
@@ -18,9 +21,9 @@ import { Welcome } from "@/pages/Welcome";
 import { isPortalInvite, welcomeStage } from "@/pages/welcomeHelpers";
 
 const user = (app_metadata: Record<string, unknown>) => ({ user: { id: "u", app_metadata } });
-function renderWelcome() {
+function renderWelcome(entry = "/welcome") {
   return render(
-    <MemoryRouter initialEntries={["/welcome"]}>
+    <MemoryRouter initialEntries={[entry]}>
       <Routes>
         <Route path="/welcome" element={<Welcome />} />
         <Route path="/portal" element={<div>PORTAL_HOME</div>} />
@@ -34,7 +37,7 @@ async function setPassword() {
   fireEvent.change(screen.getByLabelText("Confirm password"), { target: { value: "secret123" } });
 }
 
-beforeEach(() => { updateUser.mockClear(); vi.useRealTimers(); sessionFails = false; });
+beforeEach(() => { updateUser.mockClear(); verifyOtp.mockClear(); vi.useRealTimers(); sessionFails = false; });
 
 describe("welcomeStage", () => {
   it("maps page state to exactly one section", () => {
@@ -84,5 +87,36 @@ describe("Welcome page", () => {
     session = null;
     renderWelcome();
     expect(await screen.findByText(/invalid or has expired/, {}, { timeout: 4000 })).toBeInTheDocument();
+  });
+
+  it("a token link shows the portal form at once and spends the token only on submit", async () => {
+    session = null;
+    otpResult = { data: { session: user({ role: "client" }) }, error: null };
+    renderWelcome("/welcome?token_hash=abc123&type=recovery&portal=1");
+    expect(await screen.findByRole("heading", { name: "Set up your customer portal" })).toBeInTheDocument();
+    // Opening (or re-opening) the link must not redeem the one-time token.
+    expect(verifyOtp).not.toHaveBeenCalled();
+    await setPassword();
+    fireEvent.click(screen.getByRole("button", { name: /open my portal/ }));
+    await waitFor(() => expect(verifyOtp).toHaveBeenCalledWith({ token_hash: "abc123", type: "recovery" }));
+    await waitFor(() => expect(updateUser).toHaveBeenCalledWith({ password: "secret123" }));
+    expect(await screen.findByText("PORTAL_HOME", {}, { timeout: 3000 })).toBeInTheDocument();
+  });
+
+  it("a used or expired token shows the invalid-link message and sets no password", async () => {
+    session = null;
+    otpResult = { data: { session: null }, error: { message: "Token has expired or is invalid" } };
+    renderWelcome("/welcome?token_hash=old&type=invite");
+    await setPassword();
+    fireEvent.click(screen.getByRole("button", { name: /Create password/ }));
+    expect(await screen.findByText(/expired or has already been used/)).toBeInTheDocument();
+    expect(updateUser).not.toHaveBeenCalled();
+  });
+
+  it("ignores a token with an unknown type and falls back to the session check", async () => {
+    session = null;
+    renderWelcome("/welcome?token_hash=abc&type=bogus");
+    expect(await screen.findByText(/invalid or has expired/, {}, { timeout: 4000 })).toBeInTheDocument();
+    expect(verifyOtp).not.toHaveBeenCalled();
   });
 });

@@ -1,13 +1,19 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Lock, CheckCircle2 } from "lucide-react";
+import { readEmailLinkToken, redeemEmailLinkToken, EmailLinkExpiredError } from "@/lib/emailLinkToken";
 
 export const ResetPassword = () => {
   const navigate = useNavigate();
+  const { search } = useLocation();
+  // Current reset emails link here with ?token_hash=…&type=recovery; the token
+  // is redeemed only on submit, so scanners and repeat taps can't spend it.
+  const [linkToken] = useState(() => readEmailLinkToken(search));
+  const redeemed = useRef(false);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
@@ -15,10 +21,12 @@ export const ResetPassword = () => {
   const [success, setSuccess] = useState(false);
   // null = still resolving; false = no usable session (bad/expired/used link);
   // true = recovery session established, show the set-password form.
-  const [hasSession, setHasSession] = useState<boolean | null>(null);
+  const [hasSession, setHasSession] = useState<boolean | null>(linkToken ? true : null);
   const [linkError, setLinkError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (linkToken) return;
+
     // A used/expired link comes back as #error=access_denied&error_code=otp_expired&…
     const hash = window.location.hash;
     if (hash.includes("error=")) {
@@ -35,9 +43,14 @@ export const ResetPassword = () => {
     // races and misses a perfectly valid link (the old bug: the link verified
     // server-side but the page still said "invalid"). Check the established
     // session directly, and also listen for the auth event as a backstop.
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setHasSession(true);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (data.session) setHasSession(true);
+      })
+      .catch(() => {
+        // Unreadable session: the timeout below shows the invalid-link message.
+      });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) setHasSession(true);
     });
@@ -51,7 +64,7 @@ export const ResetPassword = () => {
       subscription.unsubscribe();
       clearTimeout(timer);
     };
-  }, []);
+  }, [linkToken]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,11 +81,20 @@ export const ResetPassword = () => {
 
     setLoading(true);
     try {
+      if (linkToken && !redeemed.current) {
+        await redeemEmailLinkToken(linkToken);
+        redeemed.current = true;
+      }
       const { error: err } = await supabase.auth.updateUser({ password });
       if (err) throw err;
       setSuccess(true);
       setTimeout(() => navigate("/login", { replace: true }), 2500);
     } catch (err: unknown) {
+      if (err instanceof EmailLinkExpiredError) {
+        setLinkError(err.message);
+        setHasSession(false);
+        return;
+      }
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setLoading(false);

@@ -1,30 +1,41 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Lock, CheckCircle2, Truck, Camera, FileText } from "lucide-react";
 import { isPortalInvite, welcomeStage } from "./welcomeHelpers";
+import { readEmailLinkToken, redeemEmailLinkToken, EmailLinkExpiredError } from "@/lib/emailLinkToken";
 
 /**
- * Landing page for invitation links. The branded invite email points here:
- * Supabase verifies the invite/recovery token and redirects with a session in
- * the URL hash, so the new user can create their first password immediately.
+ * Landing page for invitation links. Current emails link straight here with
+ * ?token_hash=…&type=invite|recovery; the token is redeemed only when the
+ * person submits their password, so scanners and repeat taps can't spend it.
+ * Older emails went via supabase.co, which redirects back with a session (or
+ * an #error) in the URL hash; that path still works.
  */
 export const Welcome = () => {
   const navigate = useNavigate();
+  const { search } = useLocation();
+  // Read once: the link's token, and the portal hint portal-access adds
+  // (wording only; the destination comes from the redeemed session).
+  const [linkToken] = useState(() => readEmailLinkToken(search));
+  const redeemed = useRef(false);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   // null = still resolving; false = no usable session (bad/expired link)
-  const [hasSession, setHasSession] = useState<boolean | null>(null);
+  const [hasSession, setHasSession] = useState<boolean | null>(linkToken ? true : null);
   const [linkError, setLinkError] = useState<string | null>(null);
-  const [portal, setPortal] = useState(false);
+  const [portal, setPortal] = useState(() => !!linkToken && new URLSearchParams(search).get("portal") === "1");
 
   useEffect(() => {
+    // Token link: show the form straight away; nothing to verify until submit.
+    if (linkToken) return;
+
     // An expired/used link comes back as #error=access_denied&error_code=otp_expired&…
     const hash = window.location.hash;
     if (hash.includes("error=")) {
@@ -66,7 +77,7 @@ export const Welcome = () => {
       subscription.unsubscribe();
       clearTimeout(timer);
     };
-  }, []);
+  }, [linkToken]);
 
   const stage = welcomeStage(success, hasSession);
 
@@ -85,12 +96,24 @@ export const Welcome = () => {
 
     setLoading(true);
     try {
+      let toPortal = portal;
+      if (linkToken && !redeemed.current) {
+        const session = await redeemEmailLinkToken(linkToken);
+        redeemed.current = true;
+        toPortal = isPortalInvite(session);
+        setPortal(toPortal);
+      }
       const { error: err } = await supabase.auth.updateUser({ password });
       if (err) throw err;
       setSuccess(true);
       // Portal users go straight to their portal; staff to the app home.
-      setTimeout(() => navigate(portal ? "/portal" : "/", { replace: true }), 2000);
+      setTimeout(() => navigate(toPortal ? "/portal" : "/", { replace: true }), 2000);
     } catch (err: unknown) {
+      if (err instanceof EmailLinkExpiredError) {
+        setLinkError(err.message);
+        setHasSession(false);
+        return;
+      }
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setLoading(false);

@@ -12,7 +12,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { createIpRateLimiter } from "../_shared/rateLimit.ts";
-import { renderActionEmailHtml, resolveRedirectUrl, sendBrandedEmail, brandLogoUrl } from "../_shared/brandedEmail.ts";
+import { appTokenLink, renderActionEmailHtml, resolveRedirectUrl, sendBrandedEmail, brandLogoUrl } from "../_shared/brandedEmail.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -78,7 +78,7 @@ serve(async (req) => {
               "<strong>Axentra Vehicle Logistics</strong> account. Click the button " +
               "below to choose a new password.",
             buttonLabel: "Reset my password",
-            actionLink: linkData.properties.action_link,
+            actionLink: appTokenLink(redirectTo, linkData.properties),
             logoUrl: brandLogoUrl(req),
             noteHtml:
               "This link is valid for 1 hour and can only be used once. If you " +

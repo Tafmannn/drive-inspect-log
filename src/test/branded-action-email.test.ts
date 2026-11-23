@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { portalInviteIntroHtml, renderActionEmailHtml, SUPPORT_EMAIL } from "../../supabase/functions/_shared/actionEmail";
+import { appTokenLink, portalInviteIntroHtml, renderActionEmailHtml, SUPPORT_EMAIL } from "../../supabase/functions/_shared/actionEmail";
 
 const base = { firstName: "Terrence", introHtml: "Intro", buttonLabel: "Set up my portal access", actionLink: "https://x.supabase.co/auth/v1/verify?token=abc&type=invite", noteHtml: "Valid 24h" };
 
@@ -41,5 +41,25 @@ describe("portal invite intro", () => {
   it("escapes names", () => {
     expect(portalInviteIntroHtml("A & B", "<C>")).toContain("A &amp; B");
     expect(portalInviteIntroHtml("A & B", "<C>")).toContain("&lt;C&gt;");
+  });
+});
+
+describe("appTokenLink", () => {
+  const props = {
+    action_link: "https://x.supabase.co/auth/v1/verify?token=t&type=invite&redirect_to=https://app.example/welcome",
+    hashed_token: "h4sh",
+    verification_type: "invite",
+  };
+  it("links to our own page with the hashed token, never supabase.co", () => {
+    const link = appTokenLink("https://app.example/welcome", props, { portal: "1" });
+    expect(link).toBe("https://app.example/welcome?token_hash=h4sh&type=invite&portal=1");
+    expect(link).not.toContain("supabase.co");
+  });
+  it("falls back to Supabase's verify link when no hashed token came back", () => {
+    expect(appTokenLink("https://app.example/welcome", { action_link: props.action_link })).toBe(props.action_link);
+  });
+  it("survives an href round-trip in the email", () => {
+    const html = renderActionEmailHtml({ firstName: null, introHtml: "x", buttonLabel: "Go", noteHtml: "", actionLink: appTokenLink("https://app.example/reset-password", props) });
+    expect(html).toContain('href="https://app.example/reset-password?token_hash=h4sh&amp;type=invite"');
   });
 });
