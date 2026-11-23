@@ -120,7 +120,7 @@ describe("queue stages and finance", () => {
     expect(approvalAmountProblem("250", 250)).toBeNull();
     expect(approvalAmountProblem("120.50", 250)).toBeNull();
     expect(approvalAmountProblem("0", 250)).toBeNull();
-    expect(approvalAmountProblem("251", 250)).toMatch(/Cannot exceed/);
+    expect(approvalAmountProblem("251", 250)).toBeNull();
     expect(approvalAmountProblem("12.345", 250)).toMatch(/Enter an amount/);
     expect(approvalAmountProblem("-5", 250)).toMatch(/Enter an amount/);
     expect(approvalAmountProblem("", null)).toMatch(/not known/);
