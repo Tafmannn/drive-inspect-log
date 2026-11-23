@@ -80,7 +80,14 @@ export function useDigitalCredential(userId: string) {
       setError(null);
     } catch (err) {
       if (generation.current !== requestGeneration) return;
-      setError(err instanceof Error ? err.message : "Unable to check authorisation");
+      const message = err instanceof Error ? err.message : "Unable to check authorisation";
+      setError(message);
+      if (/ACCOUNT_INACTIVE|CREDENTIAL_UNAVAILABLE|NOT_AUTHORISED|UNAUTHENTICATED/.test(message)) {
+        checkedAtMonotonic.current = null;
+        setCredential(null);
+        setStatus("revoked");
+        return;
+      }
       setStatus((previous) => {
         if (checkedAtMonotonic.current == null) return "unavailable";
         return previous === "revoked" ? previous : "grace";
