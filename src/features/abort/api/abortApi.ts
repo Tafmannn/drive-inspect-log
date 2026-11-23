@@ -94,7 +94,7 @@ export async function requestJobAbort(jobId: string): Promise<{ requestId: strin
 
 /** The pending request on a job (RLS: a driver sees only their own). */
 export async function getPendingAbortRequest(jobId: string): Promise<JobAbortRequest | null> {
-  const { data, error } = await db
+  const { data, error } = await supabase
     .from("job_abort_requests")
     .select("id, job_id, run_id, driver_id, requested_at, status, resolved_at, resolution_note")
     .eq("job_id", jobId)
