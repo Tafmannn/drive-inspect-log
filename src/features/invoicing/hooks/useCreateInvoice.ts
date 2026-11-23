@@ -12,6 +12,8 @@ export function useCreateInvoice() {
       // their queue membership (e.g. "Completed not invoiced" → invoiced).
       // Use the centralised event so every admin-visible surface refreshes.
       invalidateForEvent(queryClient, "invoice_created");
+      // Replacement invoices link automatically to their original Abort full-credit record.
+      queryClient.invalidateQueries({ queryKey: ["aborts"] });
     },
   });
 }
