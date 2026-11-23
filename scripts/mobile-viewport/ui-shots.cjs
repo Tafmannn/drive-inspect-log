@@ -55,6 +55,13 @@ const MORE_ROUTES = [
   ["m-welcome", "/welcome"],
   ["m-completed", "/jobs/completed"],
 ];
+const LAST_ROUTES = [
+  ["l-admin-users", "/admin/users?admin=1"],
+  ["l-control-admin", "/control/admin?admin=1"],
+  ["l-onboarding", "/admin/onboarding?admin=1"],
+  ["l-driver-wizard", "/admin/drivers/11111111-1111-4111-8111-111111111111/complete?admin=1"],
+];
+if (process.env.ROUTESET === "last") ROUTES.splice(0, ROUTES.length, ...LAST_ROUTES);
 if (process.env.ROUTESET === "more") ROUTES.splice(0, ROUTES.length, ...MORE_ROUTES);
 if (process.env.ROUTESET === "rest") ROUTES.splice(0, ROUTES.length, ...REST_ROUTES);
 if (process.env.ROUTESET === "admin") ROUTES.splice(0, ROUTES.length, ...ADMIN_ROUTES);
