@@ -18,6 +18,10 @@ describe('Axentra reference-matched UK plate', () => {
     // Admin/home and portal tests must be able to find the complete registration as text.
     expect(screen.getByText('FE72 ZZM').className).toContain('sr-only');
   });
+  it('does not duplicate text for older or nonstandard plates', () => {
+    render(<UKPlate reg="LIST9" />);
+    expect(screen.getAllByText('LIST9')).toHaveLength(1);
+  });
   it('uses the approved yellow artwork for both legacy variants', () => {
     const { rerender } = render(<UKPlate reg="FE72ZZM" variant="front" />);
     expect(document.querySelector('.axentra-uk-plate__art')?.getAttribute('src')).toBe('/assets/axentra-uk-plate.png');
