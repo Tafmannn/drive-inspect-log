@@ -3,6 +3,7 @@
  * Screenshot-locked design: navy card, central portrait, 2x3 info grid.
  * No driving licence, job, or independent identity-verification claims.
  */
+import type { ComponentType } from "react";
 import { BadgeCheck, Clock3, Globe2, HardHat, IdCard, Layers3, Phone, ShieldCheck } from "lucide-react";
 import { getInitials } from "@/lib/utils";
 import type { DigitalIdCredential, DigitalIdDisplayStatus } from "../hooks/useDigitalCredential";
@@ -40,7 +41,7 @@ interface DriverIdCardProps {
 interface InfoCellProps {
   label: string;
   value: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
 }
 
 function InfoCell({ label, value, icon: Icon }: InfoCellProps) {
