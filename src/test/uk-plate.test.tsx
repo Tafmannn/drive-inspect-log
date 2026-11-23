@@ -15,6 +15,8 @@ describe('Axentra reference-matched UK plate', () => {
     const element = screen.getByRole('img', { name: 'Vehicle registration FE72 ZZM' });
     expect(Array.from(element.querySelectorAll('svg text')).map(n => n.textContent).join('')).toBe('FE72ZZM');
     expect(element.querySelector('img')?.getAttribute('src')).toBe('/assets/axentra-uk-plate.png');
+    // Admin/home and portal tests must be able to find the complete registration as text.
+    expect(screen.getByText('FE72 ZZM').className).toContain('sr-only');
   });
   it('uses the approved yellow artwork for both legacy variants', () => {
     const { rerender } = render(<UKPlate reg="FE72ZZM" variant="front" />);
