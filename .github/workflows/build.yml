@@ -23,5 +23,11 @@ jobs:
         run: npm run test -- --coverage
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995 # v8.1.0
+        with:
+          # Scanning successfully is not the same as passing the quality gate.
+          # Fail CI if SonarQube reports insufficient coverage or reliability.
+          args: >
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=300
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

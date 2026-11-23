@@ -5,19 +5,28 @@
  * has committed, so the UI never shows an Abort or a request as done before it is.
  */
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 import { kickCustomerNotifications } from "@/lib/customerNotifyApi";
 import { notifyAbortRequested } from "@/lib/pushApi";
 import type { AbortFinanceStatus, AbortRequestStatus } from "../lib/abortRules";
 
-// The new tables and RPCs are not in the generated Supabase types yet.
-type Untyped = {
-  rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string; code?: string } | null }>;
-  from: (table: string) => any; // eslint-disable-line @typescript-eslint/no-explicit-any
-};
-const db = supabase as unknown as Untyped;
+// Bind every Abort RPC name and argument shape to the generated database schema.
+// RPC return values are JSONB; callers explicitly map each response to its contract.
+type AbortRpcName =
+  | "request_job_abort"
+  | "dismiss_job_abort_request"
+  | "confirm_job_abort"
+  | "review_job_abort_claim"
+  | "notify_customer_job_aborted"
+  | "create_abort_replacement_job";
 
-async function rpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
-  const { data, error } = await db.rpc(fn, args);
+async function rpc<T, Name extends AbortRpcName>(
+  fn: Name,
+  args: Database["public"]["Functions"][Name]["Args"],
+): Promise<T> {
+  // Supabase's generic overload cannot distribute a union of RPC signatures,
+  // so only the internal call needs a cast; arguments above remain schema-checked.
+  const { data, error } = await supabase.rpc(fn, args as never);
   if (error) throw Object.assign(new Error(error.message), { code: error.code });
   return data as T;
 }
@@ -78,21 +87,21 @@ function toAbort(r: Record<string, unknown>): JobAbort {
 
 // ── driver ────────────────────────────────────────────────────────────────
 export async function requestJobAbort(jobId: string): Promise<{ requestId: string; duplicate: boolean; requestedAt: string }> {
-  const res = await rpc<{ requestId: string; duplicate: boolean; requestedAt: string }>("request_job_abort", { p_job_id: jobId });
+  const res = await rpc<{ requestId: string; duplicate: boolean; requestedAt: string }, "request_job_abort">("request_job_abort", { p_job_id: jobId });
   if (!res.duplicate) notifyAbortRequested(jobId);
   return res;
 }
 
 /** The pending request on a job (RLS: a driver sees only their own). */
 export async function getPendingAbortRequest(jobId: string): Promise<JobAbortRequest | null> {
-  const { data, error } = await db
+  const { data, error } = await supabase
     .from("job_abort_requests")
     .select("id, job_id, run_id, driver_id, requested_at, status, resolved_at, resolution_note")
     .eq("job_id", jobId)
     .eq("status", "pending")
     .maybeSingle();
   if (error) throw new Error(error.message);
-  return (data as JobAbortRequest | null) ?? null;
+  return (data as unknown as JobAbortRequest | null) ?? null;
 }
 
 // ── admin ─────────────────────────────────────────────────────────────────
@@ -111,16 +120,16 @@ export function confirmJobAbort(input: {
   noNameException: boolean;
   expectedStatus: string;
 }): Promise<ConfirmAbortResult> {
-  return rpc("confirm_job_abort", {
+  return rpc<ConfirmAbortResult, "confirm_job_abort">("confirm_job_abort", {
     p_job_id: input.jobId,
-    p_contact_name: input.contactName,
+    p_contact_name: input.contactName ?? "",
     p_no_name_exception: input.noNameException,
     p_expected_status: input.expectedStatus,
   });
 }
 
 export function dismissAbortRequest(requestId: string, note?: string): Promise<{ status: string }> {
-  return rpc("dismiss_job_abort_request", { p_request_id: requestId, p_note: note ?? null });
+  return rpc<{ status: string }, "dismiss_job_abort_request">("dismiss_job_abort_request", { p_request_id: requestId, p_note: note ?? undefined });
 }
 
 export function reviewAbortClaim(input: {
@@ -129,22 +138,22 @@ export function reviewAbortClaim(input: {
   amount?: number | null;
   note?: string | null;
 }): Promise<{ financeStatus: AbortFinanceStatus; approvedAmount: number | null }> {
-  return rpc("review_job_abort_claim", {
+  return rpc<{ financeStatus: AbortFinanceStatus; approvedAmount: number | null }, "review_job_abort_claim">("review_job_abort_claim", {
     p_abort_id: input.abortId,
     p_decision: input.decision,
-    p_amount: input.amount ?? null,
-    p_note: input.note ?? null,
+    p_amount: input.amount ?? undefined,
+    p_note: input.note ?? undefined,
   });
 }
 
 export async function notifyCustomerAborted(abortId: string): Promise<{ queued: boolean; alreadyQueued: boolean }> {
-  const res = await rpc<{ queued: boolean; alreadyQueued: boolean }>("notify_customer_job_aborted", { p_abort_id: abortId });
+  const res = await rpc<{ queued: boolean; alreadyQueued: boolean }, "notify_customer_job_aborted">("notify_customer_job_aborted", { p_abort_id: abortId });
   if (res.queued) kickCustomerNotifications();
   return res;
 }
 
 export function createReplacementJob(jobId: string): Promise<{ jobId: string; jobRef: string | null; alreadyExists: boolean }> {
-  return rpc("create_abort_replacement_job", { p_job_id: jobId });
+  return rpc<{ jobId: string; jobRef: string | null; alreadyExists: boolean }, "create_abort_replacement_job">("create_abort_replacement_job", { p_job_id: jobId });
 }
 
 export interface JobAbortState {
@@ -162,32 +171,32 @@ export interface JobAbortState {
 /** Admin view of a job's Abort state. Fails loudly: an unknown state is never shown as "none". */
 export async function getJobAbortState(jobId: string): Promise<JobAbortState> {
   const [aborts, requests, events, items, legacy, replacement] = await Promise.all([
-    db.from("job_aborts").select("*").eq("job_id", jobId).order("confirmed_at", { ascending: false }),
-    db.from("job_abort_requests")
+    supabase.from("job_aborts").select("*").eq("job_id", jobId).order("confirmed_at", { ascending: false }),
+    supabase.from("job_abort_requests")
       .select("id, job_id, run_id, driver_id, requested_at, status, resolved_at, resolution_note")
       .eq("job_id", jobId).eq("status", "pending"),
-    db.from("job_abort_events")
+    supabase.from("job_abort_events")
       .select("id, action, actor_id, finance_status, amount, note, created_at")
       .eq("job_id", jobId).order("created_at", { ascending: true }),
     supabase.from("invoice_items").select("voided, invoices(status)").eq("job_id", jobId),
     supabase.from("invoices").select("status, document_type").eq("job_id", jobId),
-    supabase.from("jobs").select("id").eq("rebooked_from_job_id" as never, jobId).limit(1),
+    supabase.from("jobs").select("id").eq("rebooked_from_job_id", jobId).limit(1),
   ]);
-  const err = aborts.error ?? requests.error ?? events.error ?? items.error ?? legacy.error;
+  const err = aborts.error ?? requests.error ?? events.error ?? items.error ?? legacy.error ?? replacement.error;
   if (err) throw new Error(`Could not load the Abort: ${err.message}`);
 
-  const history = ((aborts.data ?? []) as Record<string, unknown>[]).map(toAbort);
-  const liveItems = ((items.data ?? []) as { voided?: boolean; invoices?: { status?: string } | null }[])
+  const history = ((aborts.data ?? []) as unknown as Record<string, unknown>[]).map(toAbort);
+  const liveItems = ((items.data ?? []) as unknown as { voided?: boolean; invoices?: { status?: string } | null }[])
     .filter((i) => !i.voided && i.invoices?.status !== "cancelled");
-  const liveLegacy = ((legacy.data ?? []) as { status?: string; document_type?: string }[])
+  const liveLegacy = ((legacy.data ?? []) as unknown as { status?: string; document_type?: string }[])
     .filter((i) => i.status !== "cancelled" && (i.document_type ?? "invoice") === "invoice");
   const statuses = [...liveItems.map((i) => i.invoices?.status), ...liveLegacy.map((i) => i.status)];
 
   return {
     current: history.find((a) => !a.reopened_at) ?? null,
     history,
-    pendingRequest: ((requests.data ?? []) as JobAbortRequest[])[0] ?? null,
-    events: (events.data ?? []) as JobAbortEvent[],
+    pendingRequest: ((requests.data ?? []) as unknown as JobAbortRequest[])[0] ?? null,
+    events: (events.data ?? []) as unknown as JobAbortEvent[],
     invoiced: statuses.length > 0,
     paid: statuses.length > 0 && statuses.every((s) => s === "paid"),
     replacementJobId: ((replacement.data ?? []) as { id: string }[])[0]?.id ?? null,
@@ -211,16 +220,16 @@ export interface AbortQueueRow {
 /** Everything the Aborts view lists: pending driver requests and every current Abort. */
 export async function listAbortQueue(): Promise<AbortQueueRow[]> {
   const [reqRes, abortRes] = await Promise.all([
-    db.from("job_abort_requests")
+    supabase.from("job_abort_requests")
       .select("id, job_id, run_id, driver_id, requested_at, status, resolved_at, resolution_note")
       .eq("status", "pending").order("requested_at", { ascending: true }).limit(200),
-    db.from("job_aborts").select("*").is("reopened_at", null)
+    supabase.from("job_aborts").select("*").is("reopened_at", null)
       .order("confirmed_at", { ascending: false }).limit(300),
   ]);
   const err = reqRes.error ?? abortRes.error;
   if (err) throw new Error(`Could not load Aborts: ${err.message}`);
-  const requests = (reqRes.data ?? []) as JobAbortRequest[];
-  const aborts = ((abortRes.data ?? []) as Record<string, unknown>[]).map(toAbort);
+  const requests = (reqRes.data ?? []) as unknown as JobAbortRequest[];
+  const aborts = ((abortRes.data ?? []) as unknown as Record<string, unknown>[]).map(toAbort);
 
   const jobIds = [...new Set([...requests.map((r) => r.job_id), ...aborts.map((a) => a.job_id)])];
   if (jobIds.length === 0) return [];
@@ -244,7 +253,7 @@ export async function listAbortQueue(): Promise<AbortQueueRow[]> {
   for (const i of (itemsRes.data ?? []) as unknown as { job_id: string | null; voided?: boolean; invoices?: { status?: string } | null }[]) {
     if (!i.voided) push(i.job_id, i.invoices?.status);
   }
-  for (const i of (legacyRes.data ?? []) as { job_id: string | null; status?: string; document_type?: string }[]) {
+  for (const i of (legacyRes.data ?? []) as unknown as { job_id: string | null; status?: string; document_type?: string }[]) {
     if ((i.document_type ?? "invoice") === "invoice") push(i.job_id, i.status);
   }
 
@@ -279,8 +288,8 @@ export async function listAbortQueue(): Promise<AbortQueueRow[]> {
 export async function getCurrentAbortsForJobs(jobIds: string[]): Promise<Map<string, JobAbort>> {
   const out = new Map<string, JobAbort>();
   if (jobIds.length === 0) return out;
-  const { data, error } = await db.from("job_aborts").select("*").in("job_id", jobIds).is("reopened_at", null);
+  const { data, error } = await supabase.from("job_aborts").select("*").in("job_id", jobIds).is("reopened_at", null);
   if (error) throw new Error(`Could not load Abort fees: ${error.message}`);
-  for (const r of ((data ?? []) as Record<string, unknown>[]).map(toAbort)) out.set(r.job_id, r);
+  for (const r of ((data ?? []) as unknown as Record<string, unknown>[]).map(toAbort)) out.set(r.job_id, r);
   return out;
 }
