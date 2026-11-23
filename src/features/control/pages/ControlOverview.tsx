@@ -28,7 +28,7 @@ import { getStatusStyle } from "@/lib/statusConfig";
 import { humanAge, isJobStale, canReviewPod } from "./jobs/jobsUtils";
 import {
   Truck, AlertTriangle, ClipboardCheck, CheckCircle, UserX, Send, Clock,
-  Eye, UserPlus, FileText, Receipt, RefreshCw, ChevronDown, ChevronUp,
+  Eye, UserPlus, FileText, ReceiptPoundSterling as Receipt, RefreshCw, ChevronDown, ChevronUp,
 } from "lucide-react";
 import type { AttentionFiltersState } from "@/features/attention/types/exceptionTypes";
 

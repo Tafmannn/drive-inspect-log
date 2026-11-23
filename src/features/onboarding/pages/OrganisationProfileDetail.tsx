@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Loader2, Pencil, FileText, Mail, Phone, Building2,
-  Palette, AlertTriangle, Receipt,
+  Palette, AlertTriangle, ReceiptPoundSterling as Receipt,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { scoreOrg } from "../lib/completion";

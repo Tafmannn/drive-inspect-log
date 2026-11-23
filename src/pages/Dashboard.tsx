@@ -21,7 +21,7 @@ import { KpiPill } from "@/components/KpiPill";
 import { KpiRowSkeleton, ListRowsSkeleton } from "@/components/skeletons";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { UpNextCard } from "@/features/driver/UpNextCard";
-import { Truck, Clock, AlertTriangle, Receipt } from "lucide-react";
+import { Truck, Clock, AlertTriangle, ReceiptPoundSterling as Receipt } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useDashboardCounts } from "@/hooks/useJobs";
 import { useDriverGate } from "@/hooks/useDriverGate";

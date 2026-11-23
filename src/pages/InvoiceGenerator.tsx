@@ -22,7 +22,7 @@ import { findAlreadyInvoicedJobs, isAlreadyInvoicedError } from "@/features/invo
 import { useOrgInvoiceSettings } from "@/features/invoicing/hooks/useInvoiceSettings";
 import { settingsToPdfFields } from "@/features/invoicing/api/invoiceDocument";
 import {
-  Loader2, Plus, Trash2, FileDown, Receipt,
+  Loader2, Plus, Trash2, FileDown, ReceiptPoundSterling as Receipt,
   Building2, User, Calendar, CreditCard
 } from "lucide-react";
 import type { Job } from "@/lib/types";

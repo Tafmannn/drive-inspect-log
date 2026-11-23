@@ -29,8 +29,8 @@ import { useJob, useDeleteJob, useAdminChangeStatus, useActiveJobs } from "@/hoo
 import { useJobExpenses } from "@/hooks/useExpenses";
 import { evaluateExecutableState, type ExecutableState } from "@/lib/executionRanking";
 import {
-  Phone, MapPin, Building, ClipboardCheck, Truck,
-  FileText, Receipt, QrCode, Navigation, AlertTriangle, ChevronRight,
+  Phone, MapPin, Building, UserRound, ClipboardCheck, Truck,
+  FileText, ReceiptPoundSterling, QrCode, Navigation, AlertTriangle, ChevronRight,
   Images, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -339,7 +339,7 @@ export const JobDetail = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <AppHeader title={`Job ${jobRef}`} showBack onBack={goBack} />
+      <AppHeader title="Job details" showBack onBack={goBack} />
 
       <div className="p-4 space-y-3 max-w-lg lg:max-w-3xl mx-auto page-enter">
         {/* ── 1. HEADER ── */}
@@ -506,7 +506,7 @@ export const JobDetail = () => {
           {/* Secondary: Expenses */}
           <div className="flex gap-2">
             <Button variant="outline" size="sm" className="flex-1 min-h-[44px] rounded-lg" onClick={() => navigate(withFrom(`/expenses?jobId=${job.id}`, searchParams))}>
-              <Receipt className="h-4 w-4 mr-1.5" />
+              <ReceiptPoundSterling className="h-4 w-4 mr-1.5" />
               Expenses{jobExpenses?.length ? ` (${jobExpenses.length})` : ""}
             </Button>
             {canViewPod && (job.has_pickup_inspection || job.has_delivery_inspection) && (
@@ -706,12 +706,22 @@ function LegCard({
   const dotClass = accent === "primary" ? "bg-primary" : "bg-success";
   return (
     <div className={`p-4 rounded-xl bg-card border border-border border-l-4 ${borderClass} shadow-sm space-y-2`}>
-      <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5 mb-1">
-        <span className={`h-2 w-2 rounded-full ${dotClass}`} /> {title}
+      <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-foreground/80">
+        <span className={`h-2 w-2 rounded-full ${dotClass}`} aria-hidden /> {title}
       </h3>
-      <ContactRow icon={Building} text={contactName} />
-      {company && <span className="text-xs text-foreground/70 pl-6 font-medium">{company}</span>}
-      <div className="flex items-start gap-2 min-h-[36px]">
+      {/* Who, then where: the company sits directly under the contact's name. */}
+      <div className="flex items-start gap-2">
+        <UserRound className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" aria-hidden />
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-foreground break-words">{contactName}</p>
+          {company && (
+            <p className="flex items-center gap-1 text-xs text-muted-foreground break-words">
+              <Building className="h-3 w-3 shrink-0" aria-hidden /> {company}
+            </p>
+          )}
+        </div>
+      </div>
+      <div className="flex items-start gap-2">
         <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
         <span className="text-sm text-foreground">{address}</span>
       </div>

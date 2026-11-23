@@ -17,7 +17,7 @@ import { getStatusStyle } from "@/lib/statusConfig";
 import { getWorkflowBrain } from "@/lib/workflowBrain";
 import { isJobStale, isUnassigned, canReviewPod, canAddExpense } from "@/features/control/pages/jobs/jobsUtils";
 import {
-  MapPin, UserPlus, Eye, ClipboardCheck, AlertTriangle, Clock, User, Receipt,
+  MapPin, UserPlus, Eye, ClipboardCheck, AlertTriangle, Clock, User, ReceiptPoundSterling as Receipt,
 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────

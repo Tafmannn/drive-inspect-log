@@ -14,7 +14,7 @@ import { EXPENSE_CATEGORIES } from "@/lib/expenseApi";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 import { OfflineListState } from "@/components/OfflineListState";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
-import { Plus, Receipt, Filter, ArrowLeft, ExternalLink, Paperclip } from "lucide-react";
+import { Plus, ReceiptPoundSterling as Receipt, Filter, ArrowLeft, ExternalLink, Paperclip } from "lucide-react";
 
 const DATE_RANGES = [
   { label: "Today", value: "today" },
