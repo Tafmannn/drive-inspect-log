@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { OFFLINE_GRACE_MS, remainingCredentialMs } from "./useDigitalCredential";
+import { OFFLINE_GRACE_MS, remainingCredentialMs, credentialWindowMs } from "./useDigitalCredential";
 
 describe("Digital ID time-limited authorisation", () => {
   const valid = { monotonicMs: 5000, wallMs: 100_000, windowMs: OFFLINE_GRACE_MS };
+
+  it("uses server timestamps without depending on the phone clock", () => {
+    expect(credentialWindowMs("2026-11-23T20:54:00Z", "2026-11-23T20:54:30Z", 1000)).toBe(29_000);
+    expect(credentialWindowMs("2026-11-23T20:54:00Z", "2026-11-23T20:54:30Z", 31_000)).toBe(0);
+    expect(credentialWindowMs("bad", "2026-11-23T20:54:30Z", 0)).toBe(0);
+    expect(credentialWindowMs("2026-11-23T20:54:00Z", null, 0)).toBe(0);
+  });
 
   it("never treats a missing successful status check as valid", () => {
     expect(remainingCredentialMs(null, 0, 0)).toBe(0);

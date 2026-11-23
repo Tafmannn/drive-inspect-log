@@ -70,7 +70,8 @@ export function DigitalIdAdminTools({
       // Use the existing defensive iOS image pipeline for orientation,
       // downscaling and HEIC-to-JPEG conversion where the browser supports it.
       const processed = await processImage(file);
-      if (!["image/jpeg", "image/png", "image/webp"].includes(processed.mimeType) ||
+      if (!processed.width || !processed.height ||
+          !["image/jpeg", "image/png", "image/webp"].includes(processed.mimeType) ||
           processed.bytes.byteLength > 5 * 1024 * 1024) {
         throw new Error("This photo could not be converted to a supported image under 5 MB. Try a JPEG.");
       }

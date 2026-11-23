@@ -26,6 +26,17 @@ export type DigitalIdDisplayStatus =
 const POLL_MS = 15_000;
 export const OFFLINE_GRACE_MS = 30_000;
 
+/**
+ * Bound a server-issued validity window using only server timestamps and
+ * elapsed request time; works even when the device clock is out of sync.
+ */
+export function credentialWindowMs(checkedAt: string, validUntil: string | null, requestElapsedMs: number): number {
+  const issued = Date.parse(checkedAt);
+  const expiry = Date.parse(validUntil ?? "");
+  if (!Number.isFinite(issued) || !Number.isFinite(expiry) || expiry <= issued) return 0;
+  return Math.max(0, Math.min(OFFLINE_GRACE_MS, expiry - issued - Math.max(0, requestElapsedMs)));
+}
+
 type LastValidCheck = {
   monotonicMs: number;
   wallMs: number;
@@ -57,6 +68,7 @@ export function useDigitalCredential(userId: string) {
     if (!userId) return;
     const requestEpoch = epoch.current;
     const requestNumber = ++latestRequest.current;
+    const requestStarted = performance.now();
     try {
       const { data, error: rpcError } = await supabase
         .rpc("get_driver_digital_id", { p_user_id: userId });
@@ -78,20 +90,18 @@ export function useDigitalCredential(userId: string) {
         return;
       }
 
-      // Fail closed if the server response was delayed beyond its validity,
-      // or if any critical timestamp is malformed.
-      const expiresAt = Date.parse(next.valid_until ?? "");
-      const checkedAt = Date.parse(next.checked_at);
-      const receivedAt = Date.now();
-      if (!Number.isFinite(expiresAt) || !Number.isFinite(checkedAt) ||
-          expiresAt <= receivedAt || expiresAt <= checkedAt) {
+      const receivedAtMonotonic = performance.now();
+      const allowedWindowMs = credentialWindowMs(
+        next.checked_at, next.valid_until, receivedAtMonotonic - requestStarted
+      );
+      if (allowedWindowMs <= 0) {
         throw new Error("Current authorisation cannot be confirmed");
       }
 
       lastCheck.current = {
-        monotonicMs: performance.now(),
-        wallMs: receivedAt,
-        windowMs: Math.min(OFFLINE_GRACE_MS, expiresAt - receivedAt),
+        monotonicMs: receivedAtMonotonic,
+        wallMs: Date.now(),
+        windowMs: allowedWindowMs,
       };
       setCredential(next);
       setStatus(navigator.onLine ? "active" : "grace");
