@@ -32,9 +32,9 @@ describe('Axentra reference-matched UK plate', () => {
     // jsdom does not calculate flex layout: verify the CSS contract that Chromium
     // needs. width:min(100%,...) computed to 0px in a shrink-wrapped job card.
     const css = readFileSync(resolve(process.cwd(), 'src/components/UKPlate.css'), 'utf8');
-    expect(css).toMatch(/width:\\s*var\\(--axentra-plate-width\\)\\s*;/);
-    expect(css).toMatch(/max-width:\\s*100%\\s*;/);
-    expect(css).not.toMatch(/width:\\s*min\\(100%,\\s*var\\(--axentra-plate-width\\)\\)/);
+    expect(css).toContain('width: var(--axentra-plate-width);');
+    expect(css).toContain('max-width: 100%;');
+    expect(css).not.toContain('width: min(100%, var(--axentra-plate-width));');
   });
 
   it('requires both plate assets before release (image must not be missing)', () => {
