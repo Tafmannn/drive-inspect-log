@@ -46,7 +46,7 @@ interface InfoCellProps {
 
 function InfoCell({ label, value, icon: Icon }: InfoCellProps) {
   return (
-    <div className="flex min-w-0 items-start gap-2.5 py-3 sm:gap-3">
+    <div className="flex min-w-0 items-start gap-2.5 py-2.5 sm:gap-3">
       <Icon className="mt-0.5 h-5 w-5 shrink-0 text-slate-200/85" />
       <div className="min-w-0 flex-1">
         <div className="text-[9px] font-medium uppercase tracking-[0.13em] text-slate-400 sm:text-[10px]">
@@ -85,20 +85,20 @@ export function DriverIdCard({ credential, displayStatus, photoUrl }: DriverIdCa
     >
       <div aria-hidden="true" className="pointer-events-none absolute -left-20 -top-24 h-52 w-72 rotate-[-30deg] rounded-full border-b border-cyan-300/60 bg-blue-500/10 blur-[1px]" />
       <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 -right-16 h-48 w-60 rounded-full border-t border-blue-300/50 bg-blue-500/10 blur-[2px]" />
-      <div className="relative px-5 pb-4 pt-6 sm:px-7 sm:pt-7">
+      <div className="relative px-5 pb-4 pt-5 sm:px-6 sm:pt-6">
         <div className="text-center">
           <img
             src="/axentra-logo-lockup.webp"
             alt="Axentra"
-            className="mx-auto mb-4 h-auto w-36 max-w-full object-contain drop-shadow-[0_0_12px_rgba(65,145,235,0.35)] sm:w-40"
+            className="mx-auto mb-3 h-auto w-28 max-w-full object-contain drop-shadow-[0_0_12px_rgba(65,145,235,0.35)] sm:w-32"
           />
-          <div className="mx-auto inline-flex max-w-full items-center justify-center rounded-full border border-sky-300/60 bg-white/[0.035] px-5 py-2 shadow-[inset_0_0_10px_rgba(44,149,239,0.2)]">
+          <div className="mx-auto inline-flex max-w-full items-center justify-center rounded-full border border-sky-300/60 bg-white/[0.035] px-4 py-1.5 shadow-[inset_0_0_10px_rgba(44,149,239,0.2)]">
             <span className="text-center text-[9px] font-semibold uppercase tracking-[0.18em] text-white sm:text-[10px]">
               Company-issued Driver ID
             </span>
           </div>
 
-          <div className="mx-auto mt-5 flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-2 border-sky-300/85 bg-gradient-to-b from-slate-600/50 to-slate-700/65 shadow-[0_0_0_3px_rgba(74,150,243,0.14),0_0_18px_rgba(79,154,255,0.38)] sm:h-28 sm:w-28">
+          <div className="mx-auto mt-4 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-2 border-sky-300/85 bg-gradient-to-b from-slate-600/50 to-slate-700/65 shadow-[0_0_0_3px_rgba(74,150,243,0.14),0_0_18px_rgba(79,154,255,0.38)] sm:h-24 sm:w-24">
             {photoUrl ? (
               <img src={photoUrl} alt={"Photograph of " + (credential.full_name || "driver")} className="h-full w-full object-cover" />
             ) : (
@@ -108,24 +108,24 @@ export function DriverIdCard({ credential, displayStatus, photoUrl }: DriverIdCa
             )}
           </div>
 
-          <h1 className="mt-4 break-words text-[25px] font-bold leading-tight tracking-tight text-white sm:text-[29px]">
+          <h1 className="mt-3 break-words text-[23px] font-bold leading-tight tracking-tight text-white sm:text-[26px]">
             {credential.full_name || "Name pending"}
           </h1>
-          <p className="mt-2 text-[10px] font-medium uppercase tracking-[0.32em] text-slate-300 sm:text-[11px]">
+          <p className="mt-1.5 text-[10px] font-medium uppercase tracking-[0.32em] text-slate-300 sm:text-[11px]">
             {credential.role_label || "Authorised Driver"}
           </p>
 
-          <div className={"mx-auto mt-3 inline-flex min-h-8 items-center gap-2 rounded-full border px-4 py-1.5 shadow-[inset_0_0_15px_rgba(255,255,255,0.07)] " + statusStyle}>
+          <div className={"mx-auto mt-2 inline-flex min-h-7 items-center gap-2 rounded-full border px-4 py-1 shadow-[inset_0_0_15px_rgba(255,255,255,0.07)] " + statusStyle}>
             <BadgeCheck className={"h-4 w-4 " + iconStyle} />
-            <span className="text-[13px] font-semibold">{stateText}</span>
+            <span className="text-[12px] font-semibold">{stateText}</span>
             {isActive && <span aria-hidden="true" className="ml-1 h-1.5 w-1.5 rounded-full bg-emerald-300 motion-safe:animate-pulse" />}
           </div>
-          <p className="mt-3 text-[12px] text-slate-300 sm:text-[13px]">
+          <p className="mt-2.5 text-[12px] text-slate-300 sm:text-[13px]">
             Representing Axentra Vehicle Logistics
           </p>
         </div>
 
-        <div className="mt-5 border-t border-sky-100/15">
+        <div className="mt-4 border-t border-sky-100/15">
           <div className="grid grid-cols-2 gap-x-3 border-b border-white/10">
             <InfoCell icon={IdCard} label="Driver ID" value={credential.driver_id} />
             <InfoCell icon={Phone} label="Company phone" value={credential.company_phone || "Not provided"} />
@@ -140,7 +140,7 @@ export function DriverIdCard({ credential, displayStatus, photoUrl }: DriverIdCa
           </div>
         </div>
 
-        <div className="mt-2 flex min-h-[53px] items-center justify-center gap-3 rounded-2xl border border-emerald-300/40 bg-gradient-to-r from-emerald-600/20 via-sky-600/10 to-emerald-500/20 px-3 py-3 shadow-[inset_0_0_12px_rgba(50,205,165,0.08)]">
+        <div className="mt-2 flex min-h-[46px] items-center justify-center gap-3 rounded-2xl border border-emerald-300/40 bg-gradient-to-r from-emerald-600/20 via-sky-600/10 to-emerald-500/20 px-3 py-2.5 shadow-[inset_0_0_12px_rgba(50,205,165,0.08)]">
           <ShieldCheck className="h-6 w-6 shrink-0 text-emerald-300" />
           <span className="h-6 border-l border-emerald-100/35" />
           <span className="text-center text-[12px] font-semibold leading-snug text-white sm:text-[13px]">
@@ -148,7 +148,7 @@ export function DriverIdCard({ credential, displayStatus, photoUrl }: DriverIdCa
           </span>
         </div>
 
-        <div className="mt-5 flex items-center gap-3 text-center">
+        <div className="mt-4 flex items-center gap-3 text-center">
           <span className="h-px flex-1 bg-slate-300/30" />
           <p className="shrink-0 text-[9px] font-medium uppercase tracking-[0.25em] text-slate-300 sm:text-[10px]">
             Precision in every move
