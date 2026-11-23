@@ -53,12 +53,24 @@ refuses every other path (direct writes, the status picker, the super-admin over
   `src/lib/invoiceReadiness.ts`, `src/features/invoicing/*`, `src/features/portal/lib/portalStatus.ts`.
 - Admin queue: **Jobs → Aborts** (`/control/jobs?view=aborts`).
 
-## Release steps (need owner approval)
+## Release state (verified 23 November 2026)
 
-1. Apply the migration to **staging** and run `supabase/tests/job_abort_workflow.sql` there
-   (`psql "$STAGING_DB_URL" -v ON_ERROR_STOP=1 -f supabase/tests/job_abort_workflow.sql`).
-2. Deploy the edge functions `notify-customers` and `send-push` (both changed) to staging; smoke test.
-3. Regenerate `src/integrations/supabase/types.ts` once the migration is applied (the new tables
-   and RPCs are currently called through an untyped wrapper in `abortApi.ts`).
-4. Production: apply the migration, deploy both functions, then the frontend. The frontend must
-   not go out before the migration (it calls the new RPCs).
+The original PR #176 release plan is now historical. **Do not run its steps blindly.**
+
+- **GitHub:** PR #176 has been merged into `main`.
+- **Production database:** project `lynkvfduzqdyvlzgriyh` has the `20261123100000_job_abort_workflow` migration recorded as applied. Tables, admin/driver RPCs, RLS policies, the job status guard and the two invoice guards have been observed. **Do not re-apply this migration to production.**
+- **Production customer email:** `notify-customers` is deployed with the `aborted` event.
+- **Production push:** `send-push` was manually deployed as v15 on 23 November 2026 and its deployed source was read back: `abort-requested` and the three shared authorization modules are present. Because `send-push` is deliberately excluded from `supabase/config.toml` automatic deployment (historical bundle 413 issue), future changes to this function need an **explicit targeted deploy and source read-back**.
+- **Staging:** project `mfedxybzajdgavzmajkl` is significantly behind production. It lacks `job_pricing`, `customer_notifications`, `invoice_items.voided`, `invoices.document_type`, the Abort tables and Edge Function deployments. **Do not apply the standalone Abort migration there; its prerequisites are missing.**
+- **Types:** generated against the actual production schema in draft PR #178; release only after checks pass.
+- **Tests:** PR #176's locally stubbed Postgres scenario tests are not a substitute for a clean live staging migration, and current production has not undergone an authenticated end-to-end smoke test.
+
+### Remaining release gates
+
+1. Approve a staging-parity plan after reviewing migration ordering, schema drift, staging data retention and restoration options. Rebuild or synchronize staging safely, then run its SQL scenario tests inside a rollback transaction.
+2. Validate with a real driver and admin account that an Abort request produces the intended admin push and never aborts the job until admin confirmation.
+3. Exercise admin confirmation, no-name exception, fee review, billing guards and optional customer notification. Check existing job-assigned and POD push paths too.
+4. Review SonarQube coverage/reliability findings. Do not confuse a successful scanner upload with a passing quality gate; draft PR #178 makes the gate blocking in GitHub CI.
+5. After validating PR #178 and staging parity, merge the follow-up PR and verify the new release. Production schema migrations should only run if a **new, reviewed** migration is actually needed.
+
+Tracking: [Issue #177](https://github.com/Tafmannn/drive-inspect-log/issues/177), [draft PR #178](https://github.com/Tafmannn/drive-inspect-log/pull/178).
