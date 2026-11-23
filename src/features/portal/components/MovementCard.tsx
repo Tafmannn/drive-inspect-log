@@ -45,7 +45,6 @@ export function MovementCard({ job, back }: { job: PortalJobSummary; back: strin
         <header className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <UKPlate reg={job.vehicle_reg} size="standard" />
-            <span className="sr-only">{job.vehicle_reg}</span>
             <p className="mt-1.5 truncate text-[13px] text-slate-600 dark:text-muted-foreground">
               {vehicleLine(job)} <span aria-hidden>·</span> Ref {job.job_ref}
             </p>
