@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS public.driver_digital_credential_events (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   credential_id uuid NOT NULL REFERENCES public.driver_digital_credentials(id) ON DELETE RESTRICT,
   actor_user_id uuid,
-  event_type text NOT NULL CHECK (event_type IN ('issued','revoked','reactivated','photo_updated')),
+  event_type text NOT NULL CHECK (event_type IN ('issued','revoked','reactivated','photo_updated','org_changed')),
   credential_version integer NOT NULL CHECK (credential_version > 0),
   details jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now()
@@ -86,7 +86,8 @@ BEGIN
 
   v_eligible := v_account.role = 'driver'
                 AND v_account.account_status = 'active'
-                AND (v_driver.id IS NULL OR (v_driver.is_active AND v_driver.archived_at IS NULL));
+                AND (v_driver.id IS NULL OR (v_driver.is_active AND v_driver.archived_at IS NULL
+                      AND v_driver.org_id IS NOT DISTINCT FROM v_account.org_id));
 
   SELECT * INTO v_current FROM public.driver_digital_credentials
   WHERE user_id = p_user_id FOR UPDATE;
@@ -102,6 +103,17 @@ BEGIN
     RETURNING * INTO v_current;
     v_created := true;
     v_event := 'issued';
+  ELSIF v_current.org_id IS DISTINCT FROM v_account.org_id THEN
+    -- A driver transferred between orgs must not keep an old organisation's
+    -- private portrait or access scope. Retain permanent serial, rotate version.
+    UPDATE public.driver_digital_credentials
+       SET org_id = v_account.org_id, photo_path = NULL,
+           credential_version = credential_version + 1,
+           status = CASE WHEN v_eligible THEN 'active' ELSE 'revoked' END,
+           revoked_at = CASE WHEN v_eligible THEN NULL ELSE now() END,
+           updated_at = now()
+     WHERE user_id = p_user_id RETURNING * INTO v_current;
+    v_event := 'org_changed';
   ELSIF v_eligible AND v_current.status = 'revoked' THEN
     UPDATE public.driver_digital_credentials
        SET status = 'active',
@@ -146,7 +158,7 @@ REVOKE ALL ON FUNCTION axentra_private.on_digital_id_account_change()
 
 DROP TRIGGER IF EXISTS digital_id_account_state_change ON public.user_profiles;
 CREATE TRIGGER digital_id_account_state_change
-AFTER INSERT OR UPDATE OF account_status, role ON public.user_profiles
+AFTER INSERT OR UPDATE OF account_status, role, org_id ON public.user_profiles
 FOR EACH ROW EXECUTE FUNCTION axentra_private.on_digital_id_account_change();
 
 CREATE OR REPLACE FUNCTION axentra_private.on_digital_id_driver_change()
@@ -162,7 +174,7 @@ REVOKE ALL ON FUNCTION axentra_private.on_digital_id_driver_change()
   FROM PUBLIC, anon, authenticated;
 DROP TRIGGER IF EXISTS digital_id_driver_state_change ON public.driver_profiles;
 CREATE TRIGGER digital_id_driver_state_change
-AFTER INSERT OR UPDATE OF is_active, archived_at ON public.driver_profiles
+AFTER INSERT OR UPDATE OF is_active, archived_at, org_id ON public.driver_profiles
 FOR EACH ROW EXECUTE FUNCTION axentra_private.on_digital_id_driver_change();
 
 -- The existing driver_profiles UPDATE policy permits self-edits. Prevent
@@ -343,7 +355,8 @@ BEGIN
   v_active := v_target.role = 'driver'
     AND v_target.account_status = 'active'
     AND v_credential.status = 'active'
-    AND (v_driver.id IS NULL OR (v_driver.is_active AND v_driver.archived_at IS NULL));
+    AND (v_driver.id IS NULL OR (v_driver.is_active AND v_driver.archived_at IS NULL
+      AND v_driver.org_id IS NOT DISTINCT FROM v_target.org_id));
 
   -- A driver must not receive even an obsolete card when suspended/revoked.
   IF v_target_id = auth.uid() AND NOT v_active THEN
