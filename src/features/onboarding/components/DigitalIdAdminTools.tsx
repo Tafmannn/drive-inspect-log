@@ -3,6 +3,7 @@ import { Camera, History, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { processImage } from "@/lib/evidence/imageProcessing";
 import type { DigitalIdCredential } from "../hooks/useDigitalCredential";
 
 type CredentialEvent = {
@@ -59,21 +60,29 @@ export function DigitalIdAdminTools({
       toast({ title: "Missing organisation", description: "This driver needs an organisation before an ID photo can be uploaded.", variant: "destructive" });
       return;
     }
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024 || file.size === 0) {
-      toast({ title: "Unsupported image", description: "Choose a JPEG, PNG or WebP image up to 5 MB.", variant: "destructive" });
+    if (!file.type.startsWith("image/") || file.size === 0 || file.size > 40 * 1024 * 1024) {
+      toast({ title: "Unsupported image", description: "Choose an image smaller than 40 MB. It will be optimised for the card.", variant: "destructive" });
       return;
     }
     setBusy(true);
     let uploadedPath: string | null = null;
     try {
+      // Use the existing defensive iOS image pipeline for orientation,
+      // downscaling and HEIC-to-JPEG conversion where the browser supports it.
+      const processed = await processImage(file);
+      if (!["image/jpeg", "image/png", "image/webp"].includes(processed.mimeType) ||
+          processed.bytes.byteLength > 5 * 1024 * 1024) {
+        throw new Error("This photo could not be converted to a supported image under 5 MB. Try a JPEG.");
+      }
       let extension = "jpg";
-      if (file.type === "image/png") extension = "png";
-      else if (file.type === "image/webp") extension = "webp";
+      if (processed.mimeType === "image/png") extension = "png";
+      else if (processed.mimeType === "image/webp") extension = "webp";
+      const uploadBlob = new Blob([processed.bytes], { type: processed.mimeType });
       const nonce = crypto.randomUUID();
       uploadedPath = credential.org_id + "/" + credentialUserId + "/" + nonce + "." + extension;
       const { error: storageError } = await supabase.storage
         .from("digital-id-photos")
-        .upload(uploadedPath, file, { upsert: false, contentType: file.type });
+        .upload(uploadedPath, uploadBlob, { upsert: false, contentType: processed.mimeType });
       if (storageError) throw storageError;
       await updatePhoto(uploadedPath);
       await onChanged();
@@ -117,7 +126,7 @@ export function DigitalIdAdminTools({
       <input
         ref={input}
         type="file"
-        accept="image/jpeg,image/png,image/webp"
+        accept="image/*"
         className="hidden"
         aria-label="Select Digital ID photograph"
         onChange={(event) => {
