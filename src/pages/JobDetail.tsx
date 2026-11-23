@@ -567,6 +567,9 @@ export const JobDetail = () => {
                 onUnacknowledge={evidenceOverrides.unacknowledge}
               />
             )}
+            {/* The Abort fee is reviewed in AbortPanel; do not reprice a closed movement. */}
+            {!isAborted && (
+              <>
             <JobPriceEditor
               jobId={job.id}
               initialTotalPrice={(job as { total_price?: number | null }).total_price ?? null}
@@ -587,6 +590,8 @@ export const JobDetail = () => {
                 ratePerMileOverride: (job as { rate_per_mile?: number | null }).rate_per_mile ?? null,
               }}
             />
+              </>
+            )}
             <PricingAuditTimeline jobId={job.id} />
             <JobAdminControls
               jobId={job.id}
