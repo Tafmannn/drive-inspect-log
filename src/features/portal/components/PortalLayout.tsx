@@ -1,7 +1,15 @@
-import { NavLink, Outlet } from "react-router-dom";
-import { Loader2, LogOut, Mail, Phone, ShieldAlert } from "lucide-react";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { CarFront, FileText, Loader2, LogOut, Mail, Phone, ShieldAlert, UserRound } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { usePortalContext } from "../api";
 
@@ -21,9 +29,37 @@ function safeLogo(url: string | null | undefined): string {
   }
 }
 
+/**
+ * The operator's own logo when it has one; otherwise the Axentra mark (cut
+ * from the official logo) beside the operator's name.
+ */
+function OperatorBrand({ name, logoUrl }: { name: string; logoUrl: string | null }) {
+  if (logoUrl) {
+    return <img src={safeLogo(logoUrl)} alt={name} className="h-8 w-auto max-w-[132px] object-contain sm:h-9" />;
+  }
+  const axentra = /axentra/i.test(name);
+  return (
+    <span className="flex min-w-0 items-center gap-2">
+      <img src="/brand/axentra-mark.png" alt="" aria-hidden className="h-6 w-auto shrink-0 sm:h-7" />
+      {axentra ? (
+        <span className="min-w-0 whitespace-nowrap leading-none">
+          <span className="block text-[15px] font-semibold tracking-[0.14em] text-slate-900 dark:text-foreground">AXENTRA</span>
+          <span className="mt-1 block text-[8px] font-medium tracking-[0.2em] text-slate-500 dark:text-muted-foreground">VEHICLE LOGISTICS</span>
+          <span className="sr-only">{name}</span>
+        </span>
+      ) : (
+        <span className="truncate text-[15px] font-semibold text-slate-900 dark:text-foreground">{name}</span>
+      )}
+    </span>
+  );
+}
+
 export function PortalLayout() {
   const { logout, user } = useAuth();
   const { data: ctx, isLoading, error } = usePortalContext();
+  const { pathname } = useLocation();
+  // A move's own page still belongs to "Vehicle moves".
+  const onMoves = pathname === "/portal" || pathname.startsWith("/portal/jobs");
 
   if (isLoading) {
     return (
@@ -54,46 +90,67 @@ export function PortalLayout() {
     ? ctx.operator.primary_colour
     : undefined;
 
-  const navClass = ({ isActive }: { isActive: boolean }) =>
+  const tabClass = ({ isActive }: { isActive: boolean }) =>
     cn(
-      "px-3 py-2 text-sm font-medium rounded-md transition-colors",
-      isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted",
+      "inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-[10px] px-4 text-sm font-medium transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1E4FA8] sm:flex-none",
+      isActive
+        ? "bg-[#1E4FA8] text-white shadow-[0_1px_2px_rgb(30_79_168/0.3)]"
+        : "text-slate-700 hover:bg-white hover:text-slate-900 dark:text-muted-foreground dark:hover:bg-card dark:hover:text-foreground",
     );
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-[100dvh] bg-[#F6F8FB] flex flex-col dark:bg-background">
       <header
-        className="border-b border-border bg-card pt-[env(safe-area-inset-top)]"
+        className="border-b border-slate-200/70 bg-white/95 pt-[env(safe-area-inset-top)] supports-[backdrop-filter]:bg-white/85 supports-[backdrop-filter]:backdrop-blur sticky top-0 z-30 dark:border-border dark:bg-card/95"
         style={accent ? { borderTop: `3px solid ${accent}` } : undefined}
       >
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <img
-              src={safeLogo(ctx.operator.logo_url)}
-              alt={ctx.operator.name}
-              className="h-8 w-auto max-w-[140px] object-contain"
-            />
-            <div className="min-w-0">
-              <p className="text-sm font-semibold truncate">{ctx.operator.name}</p>
-              <p className="text-xs text-muted-foreground truncate">Customer portal · {ctx.client.name}</p>
-            </div>
+        <div className="max-w-5xl mx-auto flex h-14 items-center justify-between gap-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:h-16">
+          <div className="flex min-w-0 items-center gap-3">
+            <OperatorBrand name={ctx.operator.name} logoUrl={ctx.operator.logo_url} />
+            <span aria-hidden className="hidden h-7 w-px bg-slate-200 sm:block dark:bg-border" />
+            <span className="hidden shrink-0 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-medium text-[#1E4FA8] min-[360px]:inline-flex dark:bg-primary/15 dark:text-primary">
+              Customer Portal
+            </span>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => void logout()} aria-label="Sign out">
-            <LogOut className="w-4 h-4 sm:mr-1.5" />
-            <span className="hidden sm:inline">Sign out</span>
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label="Account"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1E4FA8] dark:border-border dark:bg-card dark:text-foreground"
+              >
+                <UserRound className="h-5 w-5" aria-hidden />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64 rounded-xl">
+              <DropdownMenuLabel className="space-y-0.5 font-normal">
+                <span className="block truncate text-sm font-semibold">{ctx.client.name}</span>
+                {user?.email && <span className="block truncate text-xs text-muted-foreground">{user.email}</span>}
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => void logout()} className="gap-2">
+                <LogOut className="h-4 w-4" aria-hidden /> Sign out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-        <nav className="max-w-5xl mx-auto px-4 pb-2 flex gap-1" aria-label="Portal">
-          <NavLink to="/portal" end className={navClass}>Vehicle moves</NavLink>
-          <NavLink to="/portal/invoices" className={navClass}>Invoices</NavLink>
+        <nav className="max-w-5xl mx-auto px-4 pb-3" aria-label="Portal">
+          <div className="flex gap-1 rounded-xl bg-slate-100 p-1 sm:inline-flex dark:bg-muted">
+            <Link to="/portal" className={tabClass({ isActive: onMoves })} aria-current={onMoves ? "page" : undefined}>
+              <CarFront className="h-4 w-4" aria-hidden /> Vehicle moves
+            </Link>
+            <NavLink to="/portal/invoices" className={tabClass}>
+              <FileText className="h-4 w-4" aria-hidden /> Invoices
+            </NavLink>
+          </div>
         </nav>
       </header>
 
-      <main className="flex-1 w-full max-w-5xl mx-auto px-4 py-5">
+      <main className="flex-1 w-full max-w-5xl mx-auto px-4 py-4 sm:py-6">
         <Outlet />
       </main>
 
-      <footer className="border-t border-border pb-[env(safe-area-inset-bottom)] print:hidden">
+      <footer className="border-t border-slate-200/70 bg-white pb-[env(safe-area-inset-bottom)] print:hidden dark:border-border dark:bg-card">
         <div className="max-w-5xl mx-auto px-4 py-4 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
           <span>Questions about a move? Contact {ctx.operator.name}</span>
           {ctx.operator.contact_email && (

@@ -57,7 +57,38 @@ function fakeSession() {
 }
 const JOBS = Array.from({ length: 25 }, (_, i) => job(i + 1));
 
-async function setup(context) {
+// Customer-portal fixture states (portal-v3-shots.cjs): setup(ctx, { portal: "empty" | "one" | "many" | "long" | "loading" | "error" }).
+const dayOffset = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+const pjBase = (i, over) => ({ id: `10000000-0000-4000-8000-${String(i).padStart(12, "0")}`, job_ref: `AX-${2000 + i}`, vehicle_reg: `LK2${i % 10} H${String.fromCharCode(65 + (i % 26))}P`, vehicle_make: "BMW", vehicle_model: "3 Series", vehicle_colour: "Black", pickup_city: "Manchester", pickup_postcode: "M1 1AA", delivery_city: "Leeds", delivery_postcode: "LS1 4DY", job_date: dayOffset(i % 4), status: "assigned", created_at: new Date(Date.now() - 5 * 864e5).toISOString(), completed_at: null, ...over });
+const inv = (i, over) => ({ id: `20000000-0000-4000-8000-${String(i).padStart(12, "0")}`, invoice_number: `INV-${1040 + i}`, issue_date: dayOffset(-20 - i), due_date: dayOffset(10 - i * 4), subtotal: 300, vat_amount: 60, total: 360, sent_at: new Date().toISOString(), status: "sent", document_type: "invoice", paid_at: null, ...over });
+const PORTAL = {
+  empty: { jobs: [], invoices: [] },
+  one: { jobs: [pjBase(1, { status: "in_transit", job_date: dayOffset(0) })], invoices: [inv(1, { status: "paid", paid_at: new Date(Date.now() - 3 * 864e5).toISOString() })] },
+  many: {
+    jobs: [
+      pjBase(1, { status: "in_transit", job_date: dayOffset(0) }),
+      pjBase(2, { status: "delivery_in_progress", vehicle_make: "Volkswagen", vehicle_model: "Golf", vehicle_colour: "Grey", pickup_city: "Birmingham", pickup_postcode: "B1 1AA", delivery_city: "Bristol", delivery_postcode: "BS1 4ST" }),
+      pjBase(3, { status: "assigned", job_date: dayOffset(1), vehicle_make: "Ford", vehicle_model: "Puma", vehicle_colour: "Blue" }),
+      pjBase(4, { status: "failed", vehicle_make: "Audi", vehicle_model: "A4", pickup_city: "Sheffield", delivery_city: "York", delivery_postcode: "YO1 7HH" }),
+      pjBase(5, { status: "ready_for_pickup", job_date: dayOffset(3) }),
+      pjBase(6, { status: "completed", completed_at: new Date(Date.now() - 2 * 864e5).toISOString() }),
+      pjBase(7, { status: "completed", completed_at: new Date(Date.now() - 40 * 864e5).toISOString(), vehicle_make: "Kia", vehicle_model: "Sportage" }),
+      pjBase(8, { status: "cancelled" }),
+    ],
+    invoices: [inv(1, { due_date: dayOffset(-6), total: 480 }), inv(2, { due_date: dayOffset(9), total: 1250.5 }), inv(3, { status: "paid", paid_at: new Date(Date.now() - 9 * 864e5).toISOString(), total: 999 }), inv(4, { document_type: "credit_note", total: -120, invoice_number: "CN-0012" })],
+  },
+  long: {
+    jobs: [
+      pjBase(1, { status: "pickup_in_progress", vehicle_make: "Mercedes-Benz", vehicle_model: "Sprinter 319 CDI Long Wheelbase High Roof Panel Van Automatic", vehicle_colour: "Obsidian Black Metallic", job_ref: "MVX-2026-11-20-LONGREFERENCE-0000000007-REBOOKED", pickup_city: "Llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch", pickup_postcode: "LL61 5UJ", delivery_city: "Stoke-on-Trent Business Park North", delivery_postcode: "ST4 4EG" }),
+      pjBase(2, { status: "assigned", vehicle_make: null, vehicle_model: null, vehicle_colour: null, pickup_city: null, pickup_postcode: null, job_date: null }),
+    ],
+    invoices: [inv(1, { due_date: null, total: 12450.75 })],
+  },
+};
+let portalScenario = null;
+
+async function setup(context, opts = {}) {
+  portalScenario = opts.portal || null;
   await context.route(/fake-supabase\.test/, async (route) => {
     const req = route.request();
     const url = new URL(req.url());
@@ -83,8 +114,10 @@ async function setup(context) {
       const fn = url.pathname.split("/").pop();
       const pj = (j) => ({ id: j.id, job_ref: j.external_job_number, vehicle_reg: j.vehicle_reg, vehicle_make: j.vehicle_make, vehicle_model: j.vehicle_model, vehicle_colour: j.vehicle_colour, pickup_city: j.pickup_city, pickup_postcode: j.pickup_postcode, delivery_city: j.delivery_city, delivery_postcode: j.delivery_postcode, job_date: j.job_date, status: j.status, created_at: j.created_at, completed_at: null });
       if (fn === "portal_context") return json({ client: { id: "c1", name: "Fixture Client Ltd with a rather long trading name" }, operator: { name: "Axentra Vehicles", logo_url: null, primary_colour: "#1E4FA8", contact_email: "ops@example.test", contact_phone: "01234 567890" } });
-      if (fn === "portal_list_jobs") return json(JOBS.map(pj));
-      if (fn === "portal_list_invoices") return json([]);
+      if (portalScenario === "loading" && (fn === "portal_list_jobs" || fn === "portal_list_invoices")) return new Promise(() => {});
+      if (portalScenario === "error" && (fn === "portal_list_jobs" || fn === "portal_list_invoices")) return route.fulfill({ status: 500, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ message: "fixture failure" }) });
+      if (fn === "portal_list_jobs") return json(PORTAL[portalScenario] ? PORTAL[portalScenario].jobs : JOBS.map(pj));
+      if (fn === "portal_list_invoices") return json(PORTAL[portalScenario] ? PORTAL[portalScenario].invoices : []);
       if (fn === "portal_get_job") {
         const body = JSON.parse(req.postData() || "{}"); const j = JOBS.find((x) => x.id === body.p_job_id) || JOBS[6];
         return json({ job: { ...pj(j), vehicle_year: "2021", pickup_address_line1: j.pickup_address_line1, pickup_address_line2: null, pickup_contact_name: "Pat", delivery_address_line1: j.delivery_address_line1, delivery_address_line2: null, delivery_contact_name: "Dee", earliest_delivery_date: null }, timeline: [{ status: "assigned", at: j.created_at }], inspections: [{ type: "pickup", inspected_at: j.created_at, odometer: 12345, fuel_level_percent: 50, number_of_keys: "2", customer_name: "Pat", inspected_by_name: "Driver", notes: "Light scuff nearside rear", damage: [] }] });
