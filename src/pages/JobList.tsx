@@ -138,7 +138,7 @@ export const JobList = () => {
             },
           ];
           return (
-            <SwipeableRow key={summary.job_id} actions={swipeActions} className="mb-2">
+            <SwipeableRow key={summary.job_id} actions={swipeActions} className="mb-3 rounded-2xl">
               <DriverJobCard
                 summary={summary}
                 onPrimaryAction={() => handleJobAction(summary)}

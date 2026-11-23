@@ -1,29 +1,26 @@
 /**
- * DriverJobCard — Visual layout matching the detailed card screenshot.
+ * DriverJobCard — one job in the driver's list, compact enough that several
+ * fit on a phone screen.
  *
  * Layout:
- * 1. Header: Avatar + client name + job ref | UK plate
- * 2. Status pill
- * 3. Collect From section (contact, phone, company, address)
- * 4. Deliver To section (contact, phone, company, address)
- * 5. Constraint warning strip
- * 6. Full-width primary CTA
+ * 1. Plate · vehicle | status (+ risk chip)
+ * 2. Client · job ref
+ * 3. Route: collection → delivery (town, postcode, company)
+ * 4. When: day, collection window, distance (only when reliable)
+ * 5. Workflow blocker / warning / delivery restriction strip
+ * 6. Action row: Call + Navigate for the current leg, and the primary CTA
+ *
+ * Full addresses and both contacts live on the job page (tap the card).
  */
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { UKPlate } from "@/components/UKPlate";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import {
-  Phone,
-  MapPin,
-  ChevronRight,
-  AlertTriangle,
-  User,
-} from "lucide-react";
+import { AlertTriangle, CalendarDays, ChevronRight, Navigation, Phone } from "lucide-react";
 import { getStatusStyle } from "@/lib/statusConfig";
 import type { DriverJobSummary } from "@/lib/driverJobSummary";
 import { getWorkflowBrain } from "@/lib/workflowBrain";
+import { cn } from "@/lib/utils";
 
 interface DriverJobCardProps {
   summary: DriverJobSummary;
@@ -35,191 +32,176 @@ export function mapsUrl(address: string): string {
   return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
 }
 
+const hhmm = (t: string | null | undefined) => (t ? t.slice(0, 5) : null);
+
+/** "Today", "Tomorrow", "Yesterday", or "Wed 25 Nov". */
+function dayLabel(day: string | null | undefined, today = new Date()): string | null {
+  if (!day) return null;
+  const d = new Date(`${day.slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  const t = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12);
+  const diff = Math.round((d.getTime() - t.getTime()) / 86_400_000);
+  if (diff === 0) return "Today";
+  if (diff === 1) return "Tomorrow";
+  if (diff === -1) return "Yesterday";
+  return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }).replace(",", "");
+}
+
+function RouteLine({ kind, place, company }: { kind: "Collect" | "Deliver"; place: string; company: string | null }) {
+  return (
+    <div className="flex min-w-0 items-center gap-2.5">
+      <span
+        aria-hidden
+        className={cn(
+          "h-2.5 w-2.5 shrink-0 rounded-full border-2",
+          kind === "Collect" ? "border-primary bg-card" : "border-success bg-success",
+        )}
+      />
+      <p className="min-w-0 truncate text-sm text-foreground">
+        <span className="sr-only">{kind === "Collect" ? "Collect from" : "Deliver to"}: </span>
+        <span className="font-medium">{place}</span>
+        {company && <span className="text-muted-foreground"> · {company}</span>}
+      </p>
+    </div>
+  );
+}
+
 export function DriverJobCard({ summary, onPrimaryAction, onCardClick }: DriverJobCardProps) {
-  const status = getStatusStyle(summary._raw.status);
-  const initial = (summary.client_name || "?")[0].toUpperCase();
+  const job = summary._raw;
+  const status = getStatusStyle(job.status);
 
   // ── Workflow brain (additive — never replaces existing CTA logic) ──
-  // Computed from the same Job already in scope. Pure, no IO.
-  const brain = getWorkflowBrain({ job: summary._raw });
+  const brain = getWorkflowBrain({ job });
   const brainBlocker = brain.blockers[0] ?? null;
   const brainWarning = brain.warnings[0] ?? null;
-  const showRiskStrip =
-    brain.riskLevel === "high" || brain.riskLevel === "medium" || !!brainBlocker;
+  const showRiskChip = brain.riskLevel === "high" || brain.riskLevel === "medium" || !!brainBlocker;
+  const deliveryRestriction = summary.constraints.find((c) => c.kind === "do_not_deliver_before");
+  const strip = brainBlocker
+    ? { text: brainBlocker, tone: "destructive" as const }
+    : brainWarning
+      ? { text: brainWarning, tone: "warning" as const }
+      : null;
 
-  // Find the first "do_not_deliver_before" constraint for the warning strip
-  const deliveryRestriction = summary.constraints.find(
-    (c) => c.kind === "do_not_deliver_before"
-  );
+  const vehicle = [job.vehicle_make, job.vehicle_model].filter(Boolean).join(" ");
+  const pickupPlace = [job.pickup_city, summary.pickup_postcode].filter(Boolean).join(", ") || summary.pickup_address_full;
+  const deliveryPlace = [job.delivery_city, summary.delivery_postcode].filter(Boolean).join(", ") || summary.delivery_address_full;
+  const window = [hhmm(job.pickup_time_from), hhmm(job.pickup_time_to)].filter(Boolean).join("–");
+  const when = [
+    dayLabel(job.job_date),
+    window || null,
+    summary.route_metrics_reliable && summary.route_distance_miles != null ? `${Math.round(summary.route_distance_miles)} mi` : null,
+  ].filter(Boolean);
+
+  const stop = (e: React.MouseEvent) => e.stopPropagation();
 
   return (
     <Card
-      className="p-0 border border-border overflow-hidden cursor-pointer active:bg-muted/50 transition-colors"
+      className="cursor-pointer overflow-hidden rounded-2xl border border-border p-0 transition-colors active:bg-muted/50"
       onClick={onCardClick}
     >
-      {/* ── Header: Avatar + Client + Ref | Plate ── */}
-      <div className="flex items-center justify-between gap-2 px-3 pt-3 pb-2">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <Avatar className="h-8 w-8 shrink-0">
-            <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
-              {initial}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-foreground truncate leading-tight">
-              {summary.client_name}
-            </p>
-            <p className="truncate text-[10px] text-muted-foreground leading-tight tabular-nums" title={summary.job_ref}>
-              {summary.job_ref}
-            </p>
+      <div className="space-y-2.5 p-3">
+        {/* Plate · vehicle | status */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2.5">
+            {/* the plate is the vehicle's identity: never let other text squeeze it */}
+            <div className="shrink-0">
+              <UKPlate reg={summary.vehicle_reg} />
+            </div>
+            {vehicle && <p className="min-w-0 truncate text-[13px] font-medium text-foreground/80">{vehicle}</p>}
+          </div>
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <span
+              style={{ backgroundColor: status.backgroundColor, color: status.color }}
+              className="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase leading-none tracking-wide"
+            >
+              {status.label}
+            </span>
+            {showRiskChip && (
+              <span
+                className={cn(
+                  "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide",
+                  brain.riskLevel === "high" ? "bg-destructive/10 text-destructive" : "bg-warning/15 text-warning",
+                )}
+                aria-label={`Risk ${brain.riskLevel}`}
+              >
+                {brain.riskLevel === "high" ? "Action needed" : "Heads up"}
+              </span>
+            )}
           </div>
         </div>
-        {/* the plate is the vehicle's identity: never let a long reference squeeze it */}
-        <div className="shrink-0">
-          <UKPlate reg={summary.vehicle_reg} />
-        </div>
-      </div>
 
-      {/* ── Status pill + brain phase chip ── */}
-      <div className="px-3 pb-2 flex items-center gap-1.5 flex-wrap">
-        <span
-          style={{ backgroundColor: status.backgroundColor, color: status.color }}
-          className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide"
-        >
-          {status.label}
-        </span>
-        {showRiskStrip && (
-          <span
-            className={
-              brain.riskLevel === "high"
-                ? "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide bg-destructive/10 text-destructive"
-                : "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide bg-warning/15 text-warning"
-            }
-            aria-label={`Risk ${brain.riskLevel}`}
+        {/* Client · ref | when */}
+        <div className="flex items-center justify-between gap-3 text-[13px] text-muted-foreground">
+          <p className="min-w-0 truncate" title={`${summary.client_name} · ${summary.job_ref}`}>
+            <span className="font-medium text-foreground">{summary.client_name}</span> · <span className="tabular-nums">{summary.job_ref}</span>
+          </p>
+          {when.length > 0 && (
+            <p className="flex shrink-0 items-center gap-1">
+              <CalendarDays className="h-3.5 w-3.5" aria-hidden />
+              {when.join(" · ")}
+            </p>
+          )}
+        </div>
+
+        {/* Route */}
+        <div className="space-y-1.5 rounded-xl bg-muted/50 px-3 py-2">
+          <RouteLine kind="Collect" place={pickupPlace} company={summary.pickup_company} />
+          <RouteLine kind="Deliver" place={deliveryPlace} company={summary.delivery_company} />
+        </div>
+
+        {strip && (
+          <p
+            className={cn(
+              "flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium",
+              strip.tone === "destructive" ? "bg-destructive/10 text-destructive" : "bg-warning/10 text-warning",
+            )}
           >
-            {brain.riskLevel === "high" ? "Action needed" : "Heads up"}
-          </span>
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span className="truncate">{strip.text}</span>
+          </p>
         )}
-      </div>
+        {deliveryRestriction && (
+          <p className="flex items-center gap-1.5 rounded-lg bg-destructive/10 px-2.5 py-1.5 text-xs font-medium text-destructive">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span className="truncate">{deliveryRestriction.label}</span>
+          </p>
+        )}
 
-      {/* ── Collect From ── */}
-      <div className="px-3 pb-2">
-        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-          Collect From
-        </p>
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 text-xs text-foreground">
-            <User className="h-3 w-3 shrink-0 text-muted-foreground" />
-            <span className="truncate">{summary.pickup_contact_name}</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs">
-            <Phone className="h-3 w-3 shrink-0 text-muted-foreground" />
-            <a
-              href={`tel:${summary.pickup_contact_phone}`}
-              onClick={(e) => e.stopPropagation()}
-              className="text-primary hover:underline truncate"
+        {/* Actions: the current leg's contact and destination, then the next step */}
+        <div className="flex items-center gap-2 pt-0.5">
+          {summary.current_contact_phone ? (
+            <Button
+              asChild
+              variant="outline"
+              size="icon"
+              className="h-11 w-11 shrink-0 rounded-xl"
             >
-              {summary.pickup_contact_phone}
-            </a>
-          </div>
-          {summary.pickup_company && (
-            <p className="text-[11px] text-muted-foreground pl-5 truncate">
-              {summary.pickup_company}
-            </p>
+              <a
+                href={`tel:${summary.current_contact_phone}`}
+                onClick={stop}
+                aria-label={`Call ${summary.current_contact_name || "contact"}`}
+              >
+                <Phone className="h-[18px] w-[18px]" aria-hidden />
+              </a>
+            </Button>
+          ) : (
+            <Button variant="outline" size="icon" className="h-11 w-11 shrink-0 rounded-xl" disabled aria-label="No phone number">
+              <Phone className="h-[18px] w-[18px]" aria-hidden />
+            </Button>
           )}
-          <div className="flex items-start gap-2 text-xs">
-            <MapPin className="h-3 w-3 shrink-0 mt-0.5 text-muted-foreground" />
-            <a
-              href={mapsUrl(summary.pickup_address_full)}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="text-primary hover:underline leading-tight"
-            >
-              {summary.pickup_address_full}
+          <Button asChild variant="outline" size="icon" className="h-11 w-11 shrink-0 rounded-xl">
+            <a href={mapsUrl(summary.nav_address)} target="_blank" rel="noopener noreferrer" onClick={stop} aria-label="Navigate">
+              <Navigation className="h-[18px] w-[18px]" aria-hidden />
             </a>
-          </div>
+          </Button>
+          <Button
+            onClick={(e) => { e.stopPropagation(); onPrimaryAction(); }}
+            className="h-11 min-w-0 flex-1 rounded-xl text-sm font-semibold"
+          >
+            <span className="truncate">{summary.primary_cta.label}</span>
+            <ChevronRight className="ml-1 h-4 w-4 shrink-0" aria-hidden />
+          </Button>
         </div>
-      </div>
-
-      {/* ── Deliver To ── */}
-      <div className="px-3 pb-2">
-        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-          Deliver To
-        </p>
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 text-xs text-foreground">
-            <User className="h-3 w-3 shrink-0 text-muted-foreground" />
-            <span className="truncate">{summary.delivery_contact_name}</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs">
-            <Phone className="h-3 w-3 shrink-0 text-muted-foreground" />
-            <a
-              href={`tel:${summary.delivery_contact_phone}`}
-              onClick={(e) => e.stopPropagation()}
-              className="text-primary hover:underline truncate"
-            >
-              {summary.delivery_contact_phone}
-            </a>
-          </div>
-          {summary.delivery_company && (
-            <p className="text-[11px] text-muted-foreground pl-5 truncate">
-              {summary.delivery_company}
-            </p>
-          )}
-          <div className="flex items-start gap-2 text-xs">
-            <MapPin className="h-3 w-3 shrink-0 mt-0.5 text-muted-foreground" />
-            <a
-              href={mapsUrl(summary.delivery_address_full)}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="text-primary hover:underline leading-tight"
-            >
-              {summary.delivery_address_full}
-            </a>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Brain blocker / warning strip (workflowBrain) ── */}
-      {brainBlocker && (
-        <div className="mx-3 mb-2 flex items-center gap-1.5 rounded bg-destructive/10 px-2 py-1.5">
-          <AlertTriangle className="h-3 w-3 shrink-0 text-destructive" />
-          <span className="text-[11px] font-medium text-destructive truncate">
-            {brainBlocker}
-          </span>
-        </div>
-      )}
-      {!brainBlocker && brainWarning && (
-        <div className="mx-3 mb-2 flex items-center gap-1.5 rounded bg-warning/10 px-2 py-1.5">
-          <AlertTriangle className="h-3 w-3 shrink-0 text-warning" />
-          <span className="text-[11px] font-medium text-warning truncate">
-            {brainWarning}
-          </span>
-        </div>
-      )}
-
-      {/* ── Constraint warning strip ── */}
-      {deliveryRestriction && (
-        <div className="mx-3 mb-2 flex items-center gap-1.5 rounded bg-destructive/10 px-2 py-1.5">
-          <AlertTriangle className="h-3 w-3 shrink-0 text-destructive" />
-          <span className="text-[11px] font-medium text-destructive truncate">
-            {deliveryRestriction.label}
-          </span>
-        </div>
-      )}
-
-      {/* ── Primary CTA ── */}
-      <div className="px-3 pb-3">
-        <Button
-          onClick={(e) => { e.stopPropagation(); onPrimaryAction(); }}
-          className="w-full min-h-[44px] text-sm font-semibold"
-          size="sm"
-        >
-          {summary.primary_cta.label}
-          <ChevronRight className="ml-1 h-4 w-4" />
-        </Button>
       </div>
     </Card>
   );
