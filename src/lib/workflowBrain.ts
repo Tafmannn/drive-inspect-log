@@ -772,9 +772,9 @@ export function getWorkflowBrain(input: BrainInput): WorkflowBrain {
 
   // ── Risk level ────────────────────────────────────────────────────
   let riskLevel: RiskLevel = "none";
-  // An Abort is closed, not a delivery with outstanding upload/POD risk.
-  if (rawStatus === JOB_STATUS.ABORTED) riskLevel = "none";
-  else if (lock) riskLevel = "high";
+  // Abort is closed, so do not assess missing-delivery or upload risk.
+  if (rawStatus !== JOB_STATUS.ABORTED) {
+    if (lock) riskLevel = "high";
   else if (
     rawStatus === JOB_STATUS.FAILED ||
     rawStatus === JOB_STATUS.INCOMPLETE
@@ -795,6 +795,7 @@ export function getWorkflowBrain(input: BrainInput): WorkflowBrain {
     rawStatus !== JOB_STATUS.COMPLETED
   ) {
     riskLevel = "low";
+    }
   }
 
   // ── Advisory warnings (do not block) ──────────────────────────────
