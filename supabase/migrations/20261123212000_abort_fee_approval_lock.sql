@@ -39,14 +39,6 @@ BEGIN
   IF v_abort.id IS NULL OR NOT (public.is_super_admin() OR v_abort.org_id = public.user_org_id()) THEN
     RAISE EXCEPTION 'ABORT_NOT_FOUND' USING ERRCODE = '02000';
   END IF;
-  -- Finance review is final. Repeated Approve/Reject calls must never rewrite
-  -- the first approver, reviewed_at, approved_amount or audit history.
-  -- Explicit super-admin corrections use amend_approved_job_abort_claim().
-  IF v_abort.finance_status <> 'pending_review' THEN
-    RAISE EXCEPTION 'ABORT_CLAIM_ALREADY_REVIEWED'
-      USING ERRCODE = '23514',
-            HINT = 'This fee decision is final. A super admin must use the audited amendment action';
-  END IF;
   IF v_abort.reopened_at IS NOT NULL THEN
     RAISE EXCEPTION 'ABORT_REOPENED'
       USING ERRCODE = '23514', HINT = 'The job was reopened, so this Abort can no longer be claimed';
@@ -63,6 +55,14 @@ BEGIN
       USING ERRCODE = '23514', HINT = 'Cancel the invoice before changing this Abort fee';
   END IF;
 
+  -- Finance review is final. Repeated Approve/Reject calls must never rewrite
+  -- the first approver, reviewed_at, approved_amount or audit history.
+  -- Explicit super-admin corrections use amend_approved_job_abort_claim().
+  IF v_abort.finance_status <> 'pending_review' THEN
+    RAISE EXCEPTION 'ABORT_CLAIM_ALREADY_REVIEWED'
+      USING ERRCODE = '23514',
+            HINT = 'This fee decision is final. A super admin must use the audited amendment action';
+  END IF;
   IF p_decision = 'approved' THEN
     v_amount := COALESCE(p_amount, v_abort.proposed_amount);
     IF v_amount IS NULL THEN
