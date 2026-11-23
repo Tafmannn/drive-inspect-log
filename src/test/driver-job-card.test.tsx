@@ -38,6 +38,14 @@ describe("DriverJobCard (compact)", () => {
     expect(screen.getByText("Today · 09:00–12:00 · 44 mi")).toBeTruthy();
   });
 
+  it("keeps the registration visible in its own mobile-friendly row", () => {
+    render(<DriverJobCard summary={summary()} onPrimaryAction={() => {}} onCardClick={() => {}} />);
+    const plate = screen.getByRole("img", { name: "Vehicle registration AB11 CDE" });
+    expect(plate.parentElement?.className).toContain("flex min-w-0 items-center");
+    expect(plate.querySelector("img")?.getAttribute("src")).toBe("/assets/axentra-uk-plate.png");
+    expect(plate.parentElement?.contains(screen.getByText("Volkswagen Golf"))).toBe(false);
+  });
+
   it("hides the distance when route metrics aren't reliable", () => {
     render(<DriverJobCard summary={summary({ route_metrics_reliable: false })} onPrimaryAction={() => {}} onCardClick={() => {}} />);
     expect(screen.getByText("Today · 09:00–12:00")).toBeTruthy();

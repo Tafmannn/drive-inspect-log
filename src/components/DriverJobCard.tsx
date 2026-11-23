@@ -100,15 +100,9 @@ export function DriverJobCard({ summary, onPrimaryAction, onCardClick }: DriverJ
       onClick={onCardClick}
     >
       <div className="space-y-2.5 p-3">
-        {/* Plate · vehicle | status */}
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2.5">
-            {/* the plate is the vehicle's identity: never let other text squeeze it */}
-            <div className="shrink-0">
-              <UKPlate size="compact" reg={summary.vehicle_reg} />
-            </div>
-            {vehicle && <p className="min-w-0 truncate text-[13px] font-medium text-foreground/80">{vehicle}</p>}
-          </div>
+        {/* Keep vehicle name + status aligned on mobile; the plate has its own lane. */}
+        <div className="flex min-w-0 items-start justify-between gap-2">
+          {vehicle && <p className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground/80">{vehicle}</p>}
           <div className="flex shrink-0 flex-col items-end gap-1">
             <span
               style={{ backgroundColor: status.backgroundColor, color: status.color }}
@@ -128,6 +122,11 @@ export function DriverJobCard({ summary, onPrimaryAction, onCardClick }: DriverJ
               </span>
             )}
           </div>
+        </div>
+
+        {/* Do not let surrounding text collapse the licence plate to zero width. */}
+        <div className="flex min-w-0 items-center">
+          <UKPlate size="compact" reg={summary.vehicle_reg} />
         </div>
 
         {/* Client · ref | when */}

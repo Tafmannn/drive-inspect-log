@@ -28,6 +28,15 @@ describe('Axentra reference-matched UK plate', () => {
     rerender(<UKPlate reg="FE72ZZM" variant="rear" />);
     expect(document.querySelector('.axentra-uk-plate__art')?.getAttribute('src')).toBe('/assets/axentra-uk-plate.png');
   });
+  it('keeps a nonzero intrinsic width in auto-sized flex layouts', () => {
+    // jsdom does not calculate flex layout: verify the CSS contract that Chromium
+    // needs. width:min(100%,...) computed to 0px in a shrink-wrapped job card.
+    const css = readFileSync(resolve(process.cwd(), 'src/components/UKPlate.css'), 'utf8');
+    expect(css).toContain('width: var(--axentra-plate-width);');
+    expect(css).toContain('max-width: 100%;');
+    expect(css).not.toContain('width: min(100%, var(--axentra-plate-width));');
+  });
+
   it('requires both plate assets before release (image must not be missing)', () => {
     const original = resolve(process.cwd(), 'public/assets/axentra-uk-plate-original-4k.png');
     const display = resolve(process.cwd(), 'public/assets/axentra-uk-plate.png');
