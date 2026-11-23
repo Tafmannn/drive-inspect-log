@@ -197,7 +197,14 @@ export function correctInvoicedAbortFee(input: {
   otherJobsToReinvoice: number;
   originalWasPaid: boolean;
 }> {
-  return rpc("correct_invoiced_job_abort_fee", {
+  return rpc<{
+    correctionId: string;
+    creditNoteId: string | null;
+    originalInvoiceNumber: string;
+    approvedAmount: number;
+    otherJobsToReinvoice: number;
+    originalWasPaid: boolean;
+  }, "correct_invoiced_job_abort_fee">("correct_invoiced_job_abort_fee", {
     p_abort_id: input.abortId,
     p_original_invoice_id: input.originalInvoiceId,
     p_new_amount: input.newAmount,
