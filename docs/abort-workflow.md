@@ -40,7 +40,10 @@ refuses every other path (direct writes, the status picker, the super-admin over
   refuses an invoice line for an unapproved Abort, or above the approved fee plus that job's own
   expenses, on both the multi-job and the legacy single-job invoice paths.
 - The existing one-live-invoice-per-job guard still prevents double billing.
-- Once invoiced, the fee cannot be re-reviewed and the job cannot be reopened (rebook instead).
+- **Fee approval is final immediately** — repeat Approve or Reject calls cannot change an already-reviewed claim, even before an invoice exists.
+- An exceptional correction to an approved, not-yet-invoiced fee is **Super Admin-only**, requires a 15–500 character explanation, checks that the amount still matches what was reviewed, and records the previous/new fee and actor in the append-only Abort event log. The original approver, original review timestamp and review note remain untouched.
+- Once invoiced, the approved amount cannot be amended through the Abort workflow. Follow the invoice/credit-note process for corrections; do not edit historic invoice amounts in place.
+- An invoiced Abort job cannot be reopened (rebook instead).
 - Reopening closes the Abort's claim; it stays in the history but can never be invoiced.
 - Aborts do not count as completed moves, as cancellations, or against a driver's completion rate.
 
@@ -80,3 +83,19 @@ Tracking: [Issue #177](https://github.com/Tafmannn/drive-inspect-log/issues/177)
 `scripts/sync-staging-migrations.sh` is dry-run by default. It understands staging's rebuilt timestamp history **and** its two bare-name catalogue migrations, avoiding duplicate application. Before running any DDL, obtain and verify a **restorable staging backup**, inspect the pending migration list and dependencies in order, and confirm the connected project is `mfedxybzajdgavzmajkl`. The script requires both the known staging project ref in its connection URL and `STAGING_BACKUP_VERIFIED=YES` for `--apply`.
 
 No staging schema or data was modified during the PR #178 release recovery. A fresh, data-less Supabase QA branch would be safer for destructive test fixtures, but creating that branch incurs additional usage charges and requires explicit cost agreement. Do not run `supabase/tests/job_abort_workflow.sql` against production.
+
+## Subsequent fee-approval lock fix (pending release)
+
+The screenshot-reported issue was that the fee review form used `locked = invoiced` and `review_job_abort_claim` permitted repeated approvals or rejection before invoicing. That meant a fee shown as **Approved · Ready to invoice** still exposed editable controls.
+
+Proposed fix (feature branch `fix/abort-approval-lock-and-audited-amendments`):
+
+- Hide ordinary Approve/Reject inputs as soon as `finance_status` leaves `pending_review`.
+- Apply the lock immediately to React Query cache after successful approval.
+- At the database level, allow the ordinary review function to make a decision **only once**. Attempts after approval/rejection return `ABORT_CLAIM_ALREADY_REVIEWED`.
+- Add `amend_approved_job_abort_claim` for exceptional Super Admin corrections, only on a current approved Abort with no live invoice and with a mandatory reason. Keep original approval metadata and log every amendment with the previous amount.
+- Extend the audit event constraint to allow `claim_amended`.
+- Preserve all existing approved fee amounts during migration. Historical repeated approval events remain in the immutable history; they are not deleted.
+- Deploy the database migration before the updated client so no unprotected API window is introduced.
+
+**Release warning:** This follow-up migration is NOT part of the historical PR #176/#178 deployment. Do not assume it is live until the new migration is applied, code deployed and authenticated smoke tests pass. Staging remains drifted from production per the earlier release notes. The SQL scenario test uses a rollback transaction on a properly migrated non-production database; do not run it on production.
