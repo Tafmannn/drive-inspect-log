@@ -251,6 +251,15 @@ describe("PodReport access", () => {
     expect(screen.getByText("Job completed")).toBeTruthy();
   });
 
+  it("refuses an aborted POD even to admins on a direct link", () => {
+    state.auth = { user: { id: "u1" }, isAdmin: true, isSuperAdmin: false };
+    state.job = job({ status: "aborted", has_pickup_inspection: false, has_delivery_inspection: false });
+    renderPod();
+    expect(screen.getByText("POD not applicable — collection aborted")).toBeTruthy();
+    expect(screen.queryByText("Proof of Delivery")).toBeNull();
+    expect(screen.getByRole("button", { name: /Back to job/i })).toBeTruthy();
+  });
+
   it("blocks drivers without the View PODs permission", () => {
     state.canViewPod = false;
     state.job = job({ status: "pod_ready" });
