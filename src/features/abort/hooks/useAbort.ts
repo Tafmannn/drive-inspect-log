@@ -160,7 +160,7 @@ export function useCorrectInvoicedAbortFee(jobId: string) {
     retry: false,
     onSettled: () => {
       refreshAfterAbortChange(qc, jobId);
-      qc.invalidateQueries({ queryKey: ["invoicing"] });
+      void qc.invalidateQueries({ queryKey: ["invoicing"] });
     },
   });
 }
