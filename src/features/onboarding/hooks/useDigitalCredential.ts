@@ -37,6 +37,26 @@ export function credentialWindowMs(checkedAt: string, validUntil: string | null,
   return Math.max(0, Math.min(OFFLINE_GRACE_MS, expiry - issued - Math.max(0, requestElapsedMs)));
 }
 
+type ParsedCredential = {
+  credential: DigitalIdCredential | null;
+  state: "missing" | "revoked" | "active";
+  windowMs: number;
+};
+
+function parseCredentialResponse(data: unknown, requestElapsedMs: number): ParsedCredential {
+  if (!data) return { credential: null, state: "missing", windowMs: 0 };
+  const credential = data as DigitalIdCredential;
+  if (credential.status !== "active") return { credential, state: "revoked", windowMs: 0 };
+  const windowMs = credentialWindowMs(credential.checked_at, credential.valid_until, requestElapsedMs);
+  if (windowMs <= 0) throw new Error("Current authorisation cannot be confirmed");
+  return { credential, state: "active", windowMs };
+}
+
+function statusAfterResume(current: DigitalIdDisplayStatus, remainingMs: number): DigitalIdDisplayStatus {
+  if (current !== "active" && current !== "grace") return current;
+  return remainingMs > 0 ? "grace" : "unavailable";
+}
+
 type LastValidCheck = {
   monotonicMs: number;
   wallMs: number;
@@ -74,36 +94,22 @@ export function useDigitalCredential(userId: string) {
         .rpc("get_driver_digital_id", { p_user_id: userId });
       if (epoch.current !== requestEpoch || latestRequest.current !== requestNumber) return;
       if (rpcError) throw rpcError;
-      if (!data) {
-        lastCheck.current = null;
-        setCredential(null);
-        setStatus("missing");
-        setError(null);
-        return;
-      }
-      const next = data as unknown as DigitalIdCredential;
-      if (next.status !== "active") {
-        lastCheck.current = null;
-        setCredential(next);
-        setStatus("revoked");
-        setError(null);
-        return;
-      }
-
       const receivedAtMonotonic = performance.now();
-      const allowedWindowMs = credentialWindowMs(
-        next.checked_at, next.valid_until, receivedAtMonotonic - requestStarted
-      );
-      if (allowedWindowMs <= 0) {
-        throw new Error("Current authorisation cannot be confirmed");
+      const parsed = parseCredentialResponse(data, receivedAtMonotonic - requestStarted);
+      if (parsed.state !== "active") {
+        lastCheck.current = null;
+        setCredential(parsed.credential);
+        setStatus(parsed.state);
+        setError(null);
+        return;
       }
 
       lastCheck.current = {
         monotonicMs: receivedAtMonotonic,
         wallMs: Date.now(),
-        windowMs: allowedWindowMs,
+        windowMs: parsed.windowMs,
       };
-      setCredential(next);
+      setCredential(parsed.credential);
       setStatus(navigator.onLine ? "active" : "grace");
       setError(null);
     } catch (err) {
@@ -147,11 +153,7 @@ export function useDigitalCredential(userId: string) {
     const onVisibility = () => {
       if (document.visibilityState !== "visible") return;
       const remaining = remainingCredentialMs(lastCheck.current, performance.now(), Date.now());
-      setStatus((current) =>
-        current === "active" || current === "grace"
-          ? (remaining > 0 ? "grace" : "unavailable")
-          : current
-      );
+      setStatus((current) => statusAfterResume(current, remaining));
       void refresh();
     };
     window.addEventListener("online", onOnline);
