@@ -131,7 +131,7 @@ export const Welcome = () => {
             </div>
           </div>
 
-          {portal && hasSession && !success && (
+          {portal && hasSession === true && !success && (
             <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
             <p className="mb-2 text-xs font-medium uppercase tracking-[0.14em] text-slate-400">In your portal you can</p>
             <ul className="space-y-2 text-sm text-slate-300">
