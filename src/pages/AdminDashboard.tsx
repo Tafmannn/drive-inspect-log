@@ -363,6 +363,10 @@ function NeedsActionQueue() {
   const { items, loading } = useNeedsActionItems();
   const [assignTarget, setAssignTarget] = useState<{ jobId: string; jobRef: string; driverId: string | null } | null>(null);
 
+  // Empty queue: the status banner above already says "Action queue is
+  // empty" (it summarises this exact queue), so don't repeat it in a card.
+  if (!loading && items.length === 0) return null;
+
   return (
     <Card aria-labelledby={`${NEEDS_ACTION_ID}-title`}>
       <div id={NEEDS_ACTION_ID} className="scroll-mt-4">
@@ -379,8 +383,6 @@ function NeedsActionQueue() {
         <div className="space-y-2 px-4 pb-4 sm:px-5">
           {[1, 2, 3].map(i => <Skeleton key={i} className="h-[76px] w-full rounded-xl" />)}
         </div>
-      ) : items.length === 0 ? (
-        <EmptyLine>Nothing in the queue.</EmptyLine>
       ) : (
         <ul className="ah-divide pb-1">
           {items.map(item => (
