@@ -54,7 +54,7 @@ export function UKPlate({ reg, size = 'compact', className = '', style }: UKPlat
       data-testid="axentra-uk-plate" data-registration={formatted}>
       <img src="/assets/axentra-uk-plate.png" className="axentra-uk-plate__art"
         alt="" aria-hidden="true" draggable={false} loading="eager" decoding="async" />
-      {formatted && <span className="sr-only" aria-hidden="true">{formatted}</span>}
+      {formatted && MODERN_REG.test(formatted.replace(/\s/g, '')) && <span className="sr-only" aria-hidden="true">{formatted}</span>}
       {formatted && <RegistrationOverlay formatted={formatted} />}
     </span>
   );
