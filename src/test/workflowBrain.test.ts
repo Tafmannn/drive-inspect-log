@@ -258,6 +258,7 @@ describe("workflowBrain", () => {
       job: mkJob({ status: "aborted" }),
       inspections: [mkInspection()],
       photos: [mkPhoto()],
+      pendingUploads: { failedCount: 1 },
     });
     expect(s.phase).toBe("aborted");
     expect(s.nextAction).toBeNull();
