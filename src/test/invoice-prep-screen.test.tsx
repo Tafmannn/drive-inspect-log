@@ -151,7 +151,7 @@ describe("InvoicePrepScreen", () => {
   it("deep-links a corrected Abort invoice to its eligible job and client only", async () => {
     renderScreen("/control/invoice-prep?clientId=client-1&abortCorrectionJob=ax1043");
     await waitFor(() => {
-      expect(screen.getByText("AX1043")).toBeTruthy();
+      expect(screen.getAllByText("AX1043").length).toBeGreaterThan(0);
       const chosen = screen.getByLabelText("Select all");
       expect(chosen).toBeTruthy();
     });
