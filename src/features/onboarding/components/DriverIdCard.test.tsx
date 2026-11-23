@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { DriverIdCard, formatEmployment } from "./DriverIdCard";
+import { DriverIdCard, formatEmployment } from "./DriverIdCardV2";
 import type { DigitalIdCredential } from "../hooks/useDigitalCredential";
 
 const credential: DigitalIdCredential = {
