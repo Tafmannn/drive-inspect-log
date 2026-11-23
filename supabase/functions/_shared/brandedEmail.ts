@@ -19,15 +19,16 @@ export function escapeHtml(s: string): string {
  * The page an auth action link should land on after Supabase verifies the
  * token: APP_URL, or the request Origin only if it is explicitly allowed
  * (APP_ALLOWED_ORIGINS, default the production app). Never an arbitrary
- * Origin — see appOrigin.ts. undefined lets Supabase use its Site URL.
+ * Origin, and never a Lovable preview host — see appOrigin.ts. Falls back to
+ * the canonical app origin rather than Supabase's Site URL.
  */
-export function resolveRedirectUrl(req: Request, path: string): string | undefined {
+export function resolveRedirectUrl(req: Request, path: string): string {
   const origin = pickAppOrigin(
     Deno.env.get("APP_URL"),
     Deno.env.get("APP_ALLOWED_ORIGINS"),
     req.headers.get("origin"),
   );
-  return origin ? `${origin}${path}` : undefined;
+  return `${origin}${path}`;
 }
 
 /**
