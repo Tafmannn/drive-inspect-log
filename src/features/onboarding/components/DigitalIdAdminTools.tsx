@@ -1,0 +1,163 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Camera, History, Loader2, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import type { DigitalIdCredential } from "../hooks/useDigitalCredential";
+
+type CredentialEvent = {
+  id: number;
+  event_type: string;
+  credential_version: number;
+  created_at: string;
+};
+
+/** Admin-only management area, separate from the customer-facing ID. */
+export function DigitalIdAdminTools({
+  credential, onChanged,
+}: {
+  credential: DigitalIdCredential;
+  onChanged: () => Promise<void>;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [events, setEvents] = useState<CredentialEvent[]>([]);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+
+  const loadEvents = useCallback(async () => {
+    const { data, error } = await (supabase as any)
+      .from("driver_digital_credential_events")
+      .select("id, event_type, credential_version, created_at")
+      .eq("credential_id", credential.credential_id)
+      .order("created_at", { ascending: false })
+      .limit(30);
+    if (error) {
+      setHistoryError(error.message);
+    } else {
+      setHistoryError(null);
+      setEvents((data ?? []) as CredentialEvent[]);
+    }
+  }, [credential.credential_id]);
+
+  useEffect(() => { void loadEvents(); }, [loadEvents]);
+
+  const updatePhoto = async (path: string | null) => {
+    const { error } = await (supabase as any).rpc("set_driver_digital_id_photo", {
+      p_user_id: credentialUserId,
+      p_photo_path: path,
+    });
+    if (error) throw error;
+  };
+
+  // The target user is encoded in the authenticated credential response; admin
+  // callers are restricted to their organisation by the backend RPC.
+  const credentialUserId = credential.user_id;
+
+  const upload = async (file: File) => {
+    if (!credential.org_id || !credentialUserId) {
+      toast({ title: "Missing organisation", description: "This driver needs an organisation before an ID photo can be uploaded.", variant: "destructive" });
+      return;
+    }
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024 || file.size === 0) {
+      toast({ title: "Unsupported image", description: "Choose a JPEG, PNG or WebP image up to 5 MB.", variant: "destructive" });
+      return;
+    }
+    setBusy(true);
+    let uploadedPath: string | null = null;
+    try {
+      const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+      const nonce = crypto.randomUUID();
+      uploadedPath = credential.org_id + "/" + credentialUserId + "/" + nonce + "." + extension;
+      const { error: storageError } = await supabase.storage
+        .from("digital-id-photos")
+        .upload(uploadedPath, file, { upsert: false, contentType: file.type });
+      if (storageError) throw storageError;
+      await updatePhoto(uploadedPath);
+      await onChanged();
+      await loadEvents();
+      toast({ title: "ID photograph updated" });
+    } catch (error) {
+      // Remove an orphan created if the DB pointer update was rejected.
+      if (uploadedPath) {
+        await supabase.storage.from("digital-id-photos").remove([uploadedPath]);
+      }
+      toast({ title: "Unable to update ID photo", description: (error as Error).message, variant: "destructive" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async () => {
+    setBusy(true);
+    try {
+      await updatePhoto(null);
+      await onChanged();
+      await loadEvents();
+      toast({ title: "ID photograph removed", description: "The driver will see their initials until another photo is uploaded." });
+    } catch (error) {
+      toast({ title: "Unable to remove photo", description: (error as Error).message, variant: "destructive" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="mt-5 space-y-3 rounded-2xl border border-border bg-card p-4" aria-label="Digital ID administration">
+      <div className="flex items-center gap-2">
+        <Camera className="h-4 w-4 text-primary" />
+        <h2 className="text-sm font-semibold">Manage company ID</h2>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Driver number {credential.driver_id} · Version {credential.credential_version}.
+        Only administrators can change the company ID photograph.
+      </p>
+      <input
+        ref={input}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        aria-label="Select Digital ID photograph"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) void upload(file);
+          event.target.value = "";
+        }}
+      />
+      <div className="flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={busy || !credential.org_id}
+          onClick={() => input.current?.click()}
+        >
+          {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Camera className="mr-2 h-4 w-4" />}
+          {credential.photo_path ? "Replace photo" : "Upload photo"}
+        </Button>
+        {credential.photo_path && (
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => void remove()}>
+            <Trash2 className="mr-2 h-4 w-4" /> Remove photo
+          </Button>
+        )}
+      </div>
+      <div className="border-t border-border pt-3">
+        <div className="mb-2 flex items-center gap-2 text-xs font-semibold">
+          <History className="h-4 w-4" /> Credential history
+        </div>
+        {historyError && <p role="alert" className="text-xs text-destructive">History unavailable: {historyError}</p>}
+        {!historyError && events.length === 0 && <p className="text-xs text-muted-foreground">No history recorded yet.</p>}
+        {!historyError && (
+          <ul className="max-h-40 space-y-2 overflow-y-auto">
+            {events.map((event) => (
+              <li key={event.id} className="flex items-start justify-between gap-3 text-xs">
+                <span className="capitalize">{event.event_type.replace(/_/g, " ")} · V{event.credential_version}</span>
+                <time className="shrink-0 text-muted-foreground" dateTime={event.created_at}>
+                  {new Date(event.created_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                </time>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
+  );
+}
