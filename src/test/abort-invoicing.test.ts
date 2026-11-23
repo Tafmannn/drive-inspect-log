@@ -29,6 +29,7 @@ describe("Abort invoice readiness", () => {
     const r = evaluateInvoiceReadiness({ job: aborted({ finance_status: "approved", approved_amount: 250 }), alreadyInvoiced: false });
     expect(r.ready).toBe(true);
     expect(r.primaryReason).toMatch(/Abort fee/);
+    expect(r.evidenceLevel).toBe("not_applicable"); // An Abort is never a completed POD with green evidence
     expect(r.blockers.some((b) => b.code === "evidence_red_or_critical")).toBe(false);
   });
 
