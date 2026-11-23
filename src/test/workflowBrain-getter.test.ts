@@ -159,6 +159,7 @@ describe("getWorkflowBrain — Stage 1 spec scenarios", () => {
     expect(b.podReadiness.ready).toBe(false);
     expect(b.invoiceReadiness.ready).toBe(false);
     expect(b.invoiceReadiness.blockers.join(" ")).toMatch(/separately approved fee/i);
+    expect(b.riskLevel).toBe("none");
   });
 
   it("cancelled → no driver action, no admin action, no invoice", () => {
