@@ -33,15 +33,15 @@ function verifiedTime(value: string | null | undefined): string {
 }
 
 interface DriverIdCardProps {
-  credential: DigitalIdCredential;
-  displayStatus: DigitalIdDisplayStatus;
-  photoUrl: string | null;
+  readonly credential: DigitalIdCredential;
+  readonly displayStatus: DigitalIdDisplayStatus;
+  readonly photoUrl: string | null;
 }
 
 interface InfoCellProps {
-  label: string;
-  value: string;
-  icon: ComponentType<{ className?: string }>;
+  readonly label: string;
+  readonly value: string;
+  readonly icon: ComponentType<{ className?: string }>;
 }
 
 function InfoCell({ label, value, icon: Icon }: InfoCellProps) {
@@ -64,13 +64,18 @@ export function DriverIdCard({ credential, displayStatus, photoUrl }: DriverIdCa
   const initials = getInitials(credential.full_name || "");
   const isActive = displayStatus === "active" && credential.status === "active";
   const isGrace = displayStatus === "grace" && credential.status === "active";
-  const stateText = isActive
-    ? "Authorised / Active"
-    : isGrace ? "Connection lost" : "Not authorised";
-  const statusStyle = isActive
-    ? "border-emerald-300/50 bg-emerald-600/25 text-white"
-    : isGrace ? "border-amber-300/60 bg-amber-600/25 text-amber-100"
-    : "border-red-300/50 bg-red-600/25 text-red-100";
+  let stateText = "Not authorised";
+  let statusStyle = "border-red-300/50 bg-red-600/25 text-red-100";
+  let iconStyle = "text-red-200";
+  if (isActive) {
+    stateText = "Authorised / Active";
+    statusStyle = "border-emerald-300/50 bg-emerald-600/25 text-white";
+    iconStyle = "text-emerald-300";
+  } else if (isGrace) {
+    stateText = "Connection lost";
+    statusStyle = "border-amber-300/60 bg-amber-600/25 text-amber-100";
+    iconStyle = "text-amber-200";
+  }
 
   return (
     <section
@@ -111,7 +116,7 @@ export function DriverIdCard({ credential, displayStatus, photoUrl }: DriverIdCa
           </p>
 
           <div className={"mx-auto mt-3 inline-flex min-h-8 items-center gap-2 rounded-full border px-4 py-1.5 shadow-[inset_0_0_15px_rgba(255,255,255,0.07)] " + statusStyle}>
-            <BadgeCheck className={"h-4 w-4 " + (isActive ? "text-emerald-300" : isGrace ? "text-amber-200" : "text-red-200")} />
+            <BadgeCheck className={"h-4 w-4 " + iconStyle} />
             <span className="text-[13px] font-semibold">{stateText}</span>
             {isActive && <span aria-hidden="true" className="ml-1 h-1.5 w-1.5 rounded-full bg-emerald-300 motion-safe:animate-pulse" />}
           </div>
