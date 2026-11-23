@@ -1,106 +1,118 @@
 /**
- * DriverDigitalId — a driver's badge-style digital ID.
- *
- * Reachable at /profile/id (self, no :userId param — resolves to the
- * logged-in user) and /admin/drivers/:userId/id (admin viewing a specific
- * driver). Read-only: this is a presentation view, not another editor —
- * changes are made via the onboarding wizard / DriverProfileDetail as
- * today, this just gives the driver (and whoever they show it to) a
- * clean, single-glance identity card.
+ * Axentra Digital ID V2. Company-issued identification, not an independent
+ * identity verification document. Job information is intentionally separate.
  */
-import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/context/AuthContext";
+import { AlertTriangle, Info, Loader2, RefreshCw, ShieldOff, WifiOff } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
-import { Loader2, AlertTriangle } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
-import { useProfilePhotoUrl } from "@/hooks/useProfilePhoto";
+import { useAuth } from "@/context/AuthContext";
 import { DriverIdCard } from "../components/DriverIdCard";
+import { DigitalIdAdminTools } from "../components/DigitalIdAdminTools";
+import { useDigitalCredential } from "../hooks/useDigitalCredential";
+import { useDigitalIdPhotoUrl } from "../hooks/useDigitalIdPhotoUrl";
 
 export default function DriverDigitalId() {
   const navigate = useNavigate();
-  const { userId: paramUserId } = useParams<{ userId: string }>();
-  const { user } = useAuth();
-  const userId = paramUserId || user?.id || "";
-  const isAdminView = !!paramUserId;
+  const { userId: targetUserId } = useParams<{ userId: string }>();
+  const { user, isAdmin } = useAuth();
+  const isAdminView = Boolean(targetUserId);
+  const userId = targetUserId || user?.id || "";
+  const backTarget = isAdminView ? "/admin/drivers/" + userId : "/profile";
+  const { credential, status, error, refresh } = useDigitalCredential(userId);
+  const photoUrl = useDigitalIdPhotoUrl(credential?.photo_path);
 
-  const [loading, setLoading] = useState(true);
-  const [driver, setDriver] = useState<any | null>(null);
-  const [profile, setProfile] = useState<any | null>(null);
-
-  const load = useCallback(async () => {
-    if (!userId) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    try {
-      const [dp, up] = await Promise.all([
-        supabase.from("driver_profiles").select("*").eq("user_id", userId).maybeSingle(),
-        supabase.from("user_profiles").select("*").eq("auth_user_id", userId).maybeSingle(),
-      ]);
-      setDriver(dp.data);
-      setProfile(up.data);
-    } catch (e) {
-      toast({ title: "Failed to load", description: String((e as Error).message ?? e), variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
-  }, [userId]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const photoUrl = useProfilePhotoUrl(profile?.profile_photo_path ?? null);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  const name = driver?.full_name || profile?.display_name || profile?.email || "Driver";
-  const backTarget = isAdminView ? `/admin/drivers/${userId}` : "/profile";
-
-  if (!driver) {
-    return (
-      <div className="min-h-screen bg-background">
-        <AppHeader title="Digital ID" showBack onBack={() => navigate(backTarget)} />
-        <div className="p-6 max-w-lg lg:max-w-3xl mx-auto text-center space-y-3">
-          <AlertTriangle className="w-8 h-8 mx-auto text-muted-foreground" />
-          <h2 className="text-lg font-semibold">No driver profile yet</h2>
-          <p className="text-sm text-muted-foreground">
-            {isAdminView
-              ? "This driver's profile hasn't been set up yet."
-              : "Your driver profile hasn't been set up yet. Contact your administrator."}
-          </p>
-          <Button variant="outline" onClick={() => navigate(backTarget)}>
-            Back
-          </Button>
-        </div>
-        <BottomNav />
-      </div>
-    );
-  }
+  const showCard = credential && (
+    status === "active" || status === "grace" || (isAdminView && status === "revoked")
+  );
+  const isLoading = status === "loading";
+  const isMissing = status === "missing";
+  const revoked = status === "revoked";
+  const unavailable = status === "unavailable";
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background pb-28">
       <AppHeader title="Digital ID" showBack onBack={() => navigate(backTarget)} />
 
-      <div className="p-4 max-w-md mx-auto">
-        <DriverIdCard driver={driver} name={name} photoUrl={photoUrl} />
+      <main className="mx-auto w-full max-w-[460px] px-4 pb-4 pt-5">
+        <div className="mb-5">
+          <p className="text-xs text-muted-foreground">
+            Professional Axentra company identification for customer checks
+          </p>
+        </div>
 
-        <p className="text-[11px] text-muted-foreground text-center mt-3">
-          This card is generated from your Axentra driver profile and updates automatically when your details change.
-        </p>
-      </div>
+        {isLoading && (
+          <div className="flex min-h-52 items-center justify-center gap-3 text-sm text-muted-foreground" role="status">
+            <Loader2 className="h-5 w-5 animate-spin" /> Checking your company ID…
+          </div>
+        )}
 
+        {!isLoading && !showCard && (
+          <div role="alert" className="rounded-2xl border border-border bg-card px-5 py-8 text-center shadow-sm">
+            {revoked ? (
+              <ShieldOff className="mx-auto mb-3 h-8 w-8 text-destructive" />
+            ) : unavailable ? (
+              <WifiOff className="mx-auto mb-3 h-8 w-8 text-amber-600" />
+            ) : (
+              <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
+            )}
+            <h1 className="text-base font-semibold">
+              {revoked ? "Company ID unavailable" :
+                unavailable ? "Unable to confirm authorisation" :
+                isMissing ? "No Digital ID issued yet" : "Digital ID unavailable"}
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {revoked
+                ? "This account cannot present an active Axentra company ID. Contact your administrator."
+                : unavailable
+                ? "An up-to-date company status could not be confirmed. Connect to the internet and try again."
+                : "Your company ID will be issued when your driver account is activated."}
+            </p>
+            {error && isAdminView && <p className="mt-2 break-words text-xs text-destructive">{error}</p>}
+            {!revoked && (
+              <Button variant="outline" className="mt-4" onClick={() => void refresh()}>
+                <RefreshCw className="mr-2 h-4 w-4" /> Try again
+              </Button>
+            )}
+          </div>
+        )}
+
+        {showCard && credential && (
+          <>
+            {status === "grace" && (
+              <div role="status" className="mb-3 flex items-center gap-2 rounded-xl border border-amber-300/40 bg-amber-50 p-3 text-xs text-amber-900">
+                <WifiOff className="h-4 w-4 shrink-0" />
+                Connection lost. Showing the last known company status briefly.
+              </div>
+            )}
+            {status === "revoked" && isAdminView && (
+              <div role="status" className="mb-3 flex items-center gap-2 rounded-xl border border-red-300/40 bg-red-50 p-3 text-xs text-red-900">
+                <ShieldOff className="h-4 w-4 shrink-0" /> Historical admin view. This credential is not valid.
+              </div>
+            )}
+            <DriverIdCard credential={credential} displayStatus={status} photoUrl={photoUrl} />
+            <div className="mt-5 flex items-start gap-3 rounded-2xl bg-blue-50 px-4 py-3 text-slate-700">
+              <Info className="mt-0.5 h-5 w-5 shrink-0 text-blue-700" />
+              <p className="text-center text-xs leading-relaxed sm:text-sm">
+                This card identifies an Axentra driver and displays the current company authorisation status.
+                It is not an independent identity or driving-licence verification.
+              </p>
+            </div>
+
+            {isAdminView && isAdmin && (
+              <DigitalIdAdminTools credential={credential} onChanged={refresh} />
+            )}
+
+            {isAdminView && isAdmin && !credential.company_phone && (
+              <p role="note" className="mt-3 text-xs text-amber-700">
+                Company contact number is not yet configured in the organisation record.
+                Add it before releasing the customer-facing card.
+              </p>
+            )}
+          </>
+        )}
+      </main>
       <BottomNav />
     </div>
   );
