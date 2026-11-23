@@ -94,7 +94,7 @@ function cacheFeeDecision(
   amount: number | null, reviewedAt?: string,
 ) {
   qc.setQueryData<JobAbortState>(abortKeys.job(jobId), (old) => {
-    if (!old?.current || old.current.id !== abortId) return old;
+    if (old?.current?.id !== abortId) return old;
     const current = {
       ...old.current,
       finance_status: status,
@@ -125,7 +125,7 @@ export function useAmendApprovedAbortClaim(jobId: string) {
     retry: false,
     onSuccess: (result, vars) => {
       qc.setQueryData<JobAbortState>(abortKeys.job(jobId), (old) => {
-        if (!old?.current || old.current.id !== vars.abortId) return old;
+        if (old?.current?.id !== vars.abortId) return old;
         const current = {
           ...old.current,
           approved_amount: result.approvedAmount,
