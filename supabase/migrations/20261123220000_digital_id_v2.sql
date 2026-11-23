@@ -90,7 +90,8 @@ BEGIN
   WHERE user_id = p_user_id FOR UPDATE;
 
   IF NOT FOUND THEN
-    IF v_account.role <> 'driver' THEN RETURN; END IF;
+    -- Pending invitations have no issued credential. First issuance happens on activation.
+    IF v_account.role <> 'driver' OR v_account.account_status <> 'active' THEN RETURN; END IF;
     INSERT INTO public.driver_digital_credentials
       (user_id, org_id, status, revoked_at)
     VALUES (p_user_id, v_account.org_id,
