@@ -420,54 +420,72 @@ export type Database = {
         Row: {
           archived_at: string | null
           area: string | null
+          body_type: string | null
           created_at: string
           damage_types: string[] | null
+          diagram_version: string | null
           id: string
           inspection_id: string
           item: string | null
           location: string | null
           notes: string | null
           org_id: string
+          panel_id: string | null
+          panel_position: Json | null
           photo_url: string | null
           run_id: string | null
+          severity: string | null
           submission_index: number | null
           submission_session_id: string | null
+          view_id: string | null
           x: number | null
           y: number | null
         }
         Insert: {
           archived_at?: string | null
           area?: string | null
+          body_type?: string | null
           created_at?: string
           damage_types?: string[] | null
+          diagram_version?: string | null
           id?: string
           inspection_id: string
           item?: string | null
           location?: string | null
           notes?: string | null
           org_id: string
+          panel_id?: string | null
+          panel_position?: Json | null
           photo_url?: string | null
           run_id?: string | null
+          severity?: string | null
           submission_index?: number | null
           submission_session_id?: string | null
+          view_id?: string | null
           x?: number | null
           y?: number | null
         }
         Update: {
           archived_at?: string | null
           area?: string | null
+          body_type?: string | null
           created_at?: string
           damage_types?: string[] | null
+          diagram_version?: string | null
           id?: string
           inspection_id?: string
           item?: string | null
           location?: string | null
           notes?: string | null
           org_id?: string
+          panel_id?: string | null
+          panel_position?: Json | null
           photo_url?: string | null
           run_id?: string | null
+          severity?: string | null
           submission_index?: number | null
           submission_session_id?: string | null
+          view_id?: string | null
           x?: number | null
           y?: number | null
         }
@@ -891,7 +909,6 @@ export type Database = {
       }
       expenses: {
         Row: {
-          is_test: boolean
           amount: number
           billable_on_pod: boolean
           category: string
@@ -901,6 +918,7 @@ export type Database = {
           driver_id: string | null
           id: string
           is_hidden: boolean
+          is_test: boolean
           job_id: string
           label: string | null
           notes: string | null
@@ -912,7 +930,6 @@ export type Database = {
           vat_amount: number | null
         }
         Insert: {
-          is_test?: boolean
           amount: number
           billable_on_pod?: boolean
           category: string
@@ -922,6 +939,7 @@ export type Database = {
           driver_id?: string | null
           id?: string
           is_hidden?: boolean
+          is_test?: boolean
           job_id: string
           label?: string | null
           notes?: string | null
@@ -933,7 +951,6 @@ export type Database = {
           vat_amount?: number | null
         }
         Update: {
-          is_test?: boolean
           amount?: number
           billable_on_pod?: boolean
           category?: string
@@ -943,6 +960,7 @@ export type Database = {
           driver_id?: string | null
           id?: string
           is_hidden?: boolean
+          is_test?: boolean
           job_id?: string
           label?: string | null
           notes?: string | null
@@ -980,6 +998,7 @@ export type Database = {
           customer_name: string | null
           customer_paperwork: string | null
           customer_signature_url: string | null
+          damage_declaration: string | null
           driver_signature_url: string | null
           ev_charging_cables: string | null
           fuel_level_percent: number | null
@@ -1021,6 +1040,7 @@ export type Database = {
           customer_name?: string | null
           customer_paperwork?: string | null
           customer_signature_url?: string | null
+          damage_declaration?: string | null
           driver_signature_url?: string | null
           ev_charging_cables?: string | null
           fuel_level_percent?: number | null
@@ -1062,6 +1082,7 @@ export type Database = {
           customer_name?: string | null
           customer_paperwork?: string | null
           customer_signature_url?: string | null
+          damage_declaration?: string | null
           driver_signature_url?: string | null
           ev_charging_cables?: string | null
           fuel_level_percent?: number | null
@@ -1266,7 +1287,6 @@ export type Database = {
       }
       invoices: {
         Row: {
-          is_test: boolean
           cancel_reason: string | null
           cancelled_at: string | null
           client_address: string | null
@@ -1282,6 +1302,7 @@ export type Database = {
           expenses_total: number
           id: string
           invoice_number: string
+          is_test: boolean
           issue_date: string
           job_id: string | null
           line_items: Json
@@ -1302,7 +1323,6 @@ export type Database = {
           vat_registered: boolean | null
         }
         Insert: {
-          is_test?: boolean
           cancel_reason?: string | null
           cancelled_at?: string | null
           client_address?: string | null
@@ -1318,6 +1338,7 @@ export type Database = {
           expenses_total?: number
           id?: string
           invoice_number: string
+          is_test?: boolean
           issue_date?: string
           job_id?: string | null
           line_items?: Json
@@ -1338,7 +1359,6 @@ export type Database = {
           vat_registered?: boolean | null
         }
         Update: {
-          is_test?: boolean
           cancel_reason?: string | null
           cancelled_at?: string | null
           client_address?: string | null
@@ -1354,6 +1374,7 @@ export type Database = {
           expenses_total?: number
           id?: string
           invoice_number?: string
+          is_test?: boolean
           issue_date?: string
           job_id?: string | null
           line_items?: Json
@@ -1397,6 +1418,227 @@ export type Database = {
           },
           {
             foreignKeyName: "invoices_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_abort_events: {
+        Row: {
+          abort_id: string | null
+          action: string
+          actor_id: string | null
+          amount: number | null
+          created_at: string
+          finance_status: string | null
+          id: string
+          job_id: string
+          note: string | null
+          org_id: string
+          request_id: string | null
+        }
+        Insert: {
+          abort_id?: string | null
+          action: string
+          actor_id?: string | null
+          amount?: number | null
+          created_at?: string
+          finance_status?: string | null
+          id?: string
+          job_id: string
+          note?: string | null
+          org_id: string
+          request_id?: string | null
+        }
+        Update: {
+          abort_id?: string | null
+          action?: string
+          actor_id?: string | null
+          amount?: number | null
+          created_at?: string
+          finance_status?: string | null
+          id?: string
+          job_id?: string
+          note?: string | null
+          org_id?: string
+          request_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_abort_events_abort_id_fkey"
+            columns: ["abort_id"]
+            isOneToOne: false
+            referencedRelation: "job_aborts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_abort_events_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_abort_events_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "job_abort_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_abort_requests: {
+        Row: {
+          abort_id: string | null
+          driver_id: string
+          id: string
+          job_id: string
+          org_id: string
+          requested_at: string
+          requested_by: string
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          run_id: string | null
+          status: string
+        }
+        Insert: {
+          abort_id?: string | null
+          driver_id: string
+          id?: string
+          job_id: string
+          org_id: string
+          requested_at?: string
+          requested_by: string
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          run_id?: string | null
+          status?: string
+        }
+        Update: {
+          abort_id?: string | null
+          driver_id?: string
+          id?: string
+          job_id?: string
+          org_id?: string
+          requested_at?: string
+          requested_by?: string
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          run_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_abort_requests_abort_id_fkey"
+            columns: ["abort_id"]
+            isOneToOne: false
+            referencedRelation: "job_aborts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_abort_requests_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_abort_requests_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_aborts: {
+        Row: {
+          agreed_price: number | null
+          approved_amount: number | null
+          confirmed_at: string
+          confirmed_by: string
+          contact_name: string | null
+          created_at: string
+          customer_notified_at: string | null
+          customer_notified_by: string | null
+          driver_id: string | null
+          finance_status: string
+          from_status: string
+          id: string
+          job_id: string
+          no_name_exception: boolean
+          org_id: string
+          proposed_amount: number | null
+          reopened_at: string | null
+          reopened_by: string | null
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          run_id: string | null
+        }
+        Insert: {
+          agreed_price?: number | null
+          approved_amount?: number | null
+          confirmed_at?: string
+          confirmed_by: string
+          contact_name?: string | null
+          created_at?: string
+          customer_notified_at?: string | null
+          customer_notified_by?: string | null
+          driver_id?: string | null
+          finance_status?: string
+          from_status: string
+          id?: string
+          job_id: string
+          no_name_exception?: boolean
+          org_id: string
+          proposed_amount?: number | null
+          reopened_at?: string | null
+          reopened_by?: string | null
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          run_id?: string | null
+        }
+        Update: {
+          agreed_price?: number | null
+          approved_amount?: number | null
+          confirmed_at?: string
+          confirmed_by?: string
+          contact_name?: string | null
+          created_at?: string
+          customer_notified_at?: string | null
+          customer_notified_by?: string | null
+          driver_id?: string | null
+          finance_status?: string
+          from_status?: string
+          id?: string
+          job_id?: string
+          no_name_exception?: boolean
+          org_id?: string
+          proposed_amount?: number | null
+          reopened_at?: string | null
+          reopened_by?: string | null
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          run_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_aborts_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_aborts_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organisations"
@@ -1557,11 +1799,54 @@ export type Database = {
           },
         ]
       }
+      job_status_overrides: {
+        Row: {
+          actor_id: string
+          created_at: string
+          from_status: string
+          id: string
+          job_id: string
+          org_id: string
+          prev_completed_at: string | null
+          reason: string
+          to_status: string
+        }
+        Insert: {
+          actor_id: string
+          created_at?: string
+          from_status: string
+          id?: string
+          job_id: string
+          org_id: string
+          prev_completed_at?: string | null
+          reason: string
+          to_status: string
+        }
+        Update: {
+          actor_id?: string
+          created_at?: string
+          from_status?: string
+          id?: string
+          job_id?: string
+          org_id?: string
+          prev_completed_at?: string | null
+          reason?: string
+          to_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_status_overrides_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       jobs: {
         Row: {
-          catalogue_image_path: string | null
-          is_test: boolean
           cancellation_reason: string | null
+          catalogue_image_path: string | null
           caz_ulez_flag: string | null
           client_company: string | null
           client_email: string | null
@@ -1594,6 +1879,7 @@ export type Database = {
           has_pickup_inspection: boolean
           id: string
           is_hidden: boolean
+          is_test: boolean
           job_date: string | null
           job_notes: string | null
           job_source: string | null
@@ -1619,6 +1905,7 @@ export type Database = {
           pod_pdf_url: string | null
           priority: string | null
           promise_by_time: string | null
+          rebooked_from_job_id: string | null
           route_distance_miles: number | null
           route_eta_minutes: number | null
           route_order: number | null
@@ -1637,9 +1924,8 @@ export type Database = {
           vehicle_year: string | null
         }
         Insert: {
-          catalogue_image_path?: string | null
-          is_test?: boolean
           cancellation_reason?: string | null
+          catalogue_image_path?: string | null
           caz_ulez_flag?: string | null
           client_company?: string | null
           client_email?: string | null
@@ -1672,6 +1958,7 @@ export type Database = {
           has_pickup_inspection?: boolean
           id?: string
           is_hidden?: boolean
+          is_test?: boolean
           job_date?: string | null
           job_notes?: string | null
           job_source?: string | null
@@ -1697,6 +1984,7 @@ export type Database = {
           pod_pdf_url?: string | null
           priority?: string | null
           promise_by_time?: string | null
+          rebooked_from_job_id?: string | null
           route_distance_miles?: number | null
           route_eta_minutes?: number | null
           route_order?: number | null
@@ -1715,9 +2003,8 @@ export type Database = {
           vehicle_year?: string | null
         }
         Update: {
-          catalogue_image_path?: string | null
-          is_test?: boolean
           cancellation_reason?: string | null
+          catalogue_image_path?: string | null
           caz_ulez_flag?: string | null
           client_company?: string | null
           client_email?: string | null
@@ -1750,6 +2037,7 @@ export type Database = {
           has_pickup_inspection?: boolean
           id?: string
           is_hidden?: boolean
+          is_test?: boolean
           job_date?: string | null
           job_notes?: string | null
           job_source?: string | null
@@ -1775,6 +2063,7 @@ export type Database = {
           pod_pdf_url?: string | null
           priority?: string | null
           promise_by_time?: string | null
+          rebooked_from_job_id?: string | null
           route_distance_miles?: number | null
           route_eta_minutes?: number | null
           route_order?: number | null
@@ -1819,6 +2108,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_rebooked_from_job_id_fkey"
+            columns: ["rebooked_from_job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
         ]
@@ -2790,6 +3086,7 @@ export type Database = {
       }
     }
     Functions: {
+      abort_eligible_statuses: { Args: never; Returns: string[] }
       activate_user_account: {
         Args: { p_target_user_id: string }
         Returns: {
@@ -2908,12 +3205,12 @@ export type Database = {
         Args: { p_invoice_id: string; p_reason: string }
         Returns: string
       }
+      canonical_make: { Args: { p: string }; Returns: string }
       complete_job: {
         Args: { p_job_id: string; p_notes?: string }
         Returns: {
-          admin_rate: number | null
           cancellation_reason: string | null
-          caz_ulez_cost: number | null
+          catalogue_image_path: string | null
           caz_ulez_flag: string | null
           client_company: string | null
           client_email: string | null
@@ -2946,6 +3243,7 @@ export type Database = {
           has_pickup_inspection: boolean
           id: string
           is_hidden: boolean
+          is_test: boolean
           job_date: string | null
           job_notes: string | null
           job_source: string | null
@@ -2969,12 +3267,9 @@ export type Database = {
           pickup_time_from: string | null
           pickup_time_to: string | null
           pod_pdf_url: string | null
-          pricing_metadata: Json | null
-          pricing_suggestion_used_at: string | null
-          pricing_suggestion_used_by: string | null
           priority: string | null
           promise_by_time: string | null
-          rate_per_mile: number | null
+          rebooked_from_job_id: string | null
           route_distance_miles: number | null
           route_eta_minutes: number | null
           route_order: number | null
@@ -2983,7 +3278,6 @@ export type Database = {
           sort_order: number | null
           status: string
           sync_to_map: boolean | null
-          total_price: number | null
           updated_at: string
           vehicle_colour: string
           vehicle_fuel_type: string | null
@@ -2999,6 +3293,19 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      confirm_job_abort: {
+        Args: {
+          p_contact_name: string
+          p_expected_status?: string
+          p_job_id: string
+          p_no_name_exception?: boolean
+        }
+        Returns: Json
+      }
+      create_abort_replacement_job: {
+        Args: { p_job_id: string }
+        Returns: Json
       }
       current_actor_email: { Args: never; Returns: string }
       current_driver_profile_id: { Args: never; Returns: string }
@@ -3019,6 +3326,10 @@ export type Database = {
             }
             Returns: undefined
           }
+      dismiss_job_abort_request: {
+        Args: { p_note?: string; p_request_id: string }
+        Returns: Json
+      }
       driver_can_access_expense: {
         Args: { p_expense_id: string }
         Returns: boolean
@@ -3034,6 +3345,15 @@ export type Database = {
       driver_can_use_job_path: { Args: { p_name: string }; Returns: boolean }
       driver_owns_job: { Args: { p_job_id: string }; Returns: boolean }
       expense_is_invoiced: { Args: { p_expense_id: string }; Returns: boolean }
+      get_vehicle_catalogue_image: {
+        Args: {
+          p_colour?: string
+          p_make: string
+          p_model: string
+          p_year: number
+        }
+        Returns: string
+      }
       is_admin_or_super_admin: { Args: never; Returns: boolean }
       is_protected_user: { Args: { p_user_id: string }; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
@@ -3048,6 +3368,10 @@ export type Database = {
       }
       next_job_number: { Args: never; Returns: string }
       normalize_client_name: { Args: { input: string }; Returns: string }
+      notify_customer_job_aborted: {
+        Args: { p_abort_id: string }
+        Returns: Json
+      }
       portal_can_read_invoice_pdf: {
         Args: { p_object_name: string }
         Returns: boolean
@@ -3066,6 +3390,16 @@ export type Database = {
       reopen_job: {
         Args: { p_job_id: string; p_notes?: string }
         Returns: Json
+      }
+      request_job_abort: { Args: { p_job_id: string }; Returns: Json }
+      resolve_catalogue_image: {
+        Args: {
+          p_colour?: string
+          p_make: string
+          p_model: string
+          p_year: string
+        }
+        Returns: string
       }
       restore_driver_profile: {
         Args: {
@@ -3127,6 +3461,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      review_job_abort_claim: {
+        Args: {
+          p_abort_id: string
+          p_amount?: number
+          p_decision: string
+          p_note?: string
+        }
+        Returns: Json
+      }
       role_rank: { Args: { p_role: string }; Returns: number }
       rollback_inspection_submission: {
         Args: {
@@ -3145,6 +3488,10 @@ export type Database = {
           p_submission_session_id?: string
           p_type: string
         }
+        Returns: Json
+      }
+      super_admin_override_job_status: {
+        Args: { p_job_id: string; p_new_status: string; p_reason: string }
         Returns: Json
       }
       suspend_user_account: {
@@ -3214,6 +3561,7 @@ export type Database = {
       }
       user_org_id: { Args: never; Returns: string }
       user_role: { Args: never; Returns: string }
+      vehicle_name_norm: { Args: { p: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never
