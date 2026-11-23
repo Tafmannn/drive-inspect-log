@@ -4,8 +4,11 @@
   display: inline-block;
   position: relative;
   box-sizing: border-box;
-  flex: 0 1 auto;
-  width: min(100%, var(--axentra-plate-width));
+  /* Explicit intrinsic width: percentage min() collapses to zero when this
+     inline-block sits inside an auto-sized flex item (e.g. My Jobs cards). */
+  flex: 0 0 auto;
+  width: var(--axentra-plate-width);
+  max-width: 100%;
   min-width: 0;
   aspect-ratio: 3411 / 672;
   isolation: isolate;
