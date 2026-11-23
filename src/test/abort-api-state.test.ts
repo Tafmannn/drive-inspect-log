@@ -3,6 +3,8 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const mockState = vi.hoisted(() => ({
   replacementLookupError: "",
+  tableRows: {} as Record<string, unknown[]>,
+  tableErrors: {} as Record<string, string>,
   rpcData: null as unknown,
   rpcError: null as { message: string; code?: string } | null,
   rpcCalls: [] as { fn: string; args: unknown }[],
@@ -25,12 +27,22 @@ vi.mock("@/integrations/supabase/client", () => ({
           eq: (_column: string, _value: unknown) => chain,
           order: (_column: string, _options?: unknown) => chain,
           limit: (_count: number) => chain,
+          in: (_column: string, _values: unknown[]) => chain,
+          is: (_column: string, _value: unknown) => chain,
+          maybeSingle: async () => ({
+            data: mockState.tableRows[table]?.[0] ?? null,
+            error: mockState.tableErrors[table]
+              ? { message: mockState.tableErrors[table] }
+              : null,
+          }),
           then: (resolve: (value: { data: unknown[]; error: { message: string } | null }) => unknown) =>
             Promise.resolve({
-              data: [] as unknown[],
+              data: mockState.tableRows[table] ?? [],
               error: table === "jobs" && mockState.replacementLookupError
                 ? { message: mockState.replacementLookupError }
-                : null,
+                : mockState.tableErrors[table]
+                  ? { message: mockState.tableErrors[table] }
+                  : null,
             }).then(resolve),
         };
         return chain;
@@ -46,7 +58,16 @@ import {
   reviewAbortClaim,
   notifyCustomerAborted,
   createReplacementJob,
+  getPendingAbortRequest,
+  listAbortQueue,
+  getCurrentAbortsForJobs,
+  dismissAbortRequest,
 } from "@/features/abort/api/abortApi";
+
+beforeEach(() => {
+  mockState.tableRows = {};
+  mockState.tableErrors = {};
+});
 
 describe("getJobAbortState", () => {
   beforeEach(() => {
@@ -155,5 +176,80 @@ describe("Abort RPC API contracts", () => {
     const result = await createReplacementJob("j1");
     expect(result.jobId).toBe("j2");
     expect(mockState.rpcCalls[0]).toEqual({ fn: "create_abort_replacement_job", args: { p_job_id: "j1" } });
+  });
+});
+
+describe("Abort table queries", () => {
+  it("loads the requesting driver's pending Abort and reports lookup failures", async () => {
+    mockState.tableRows.job_abort_requests = [{
+      id: "r1", job_id: "j1", driver_id: "d1", run_id: null,
+      requested_at: "2026-11-23T12:00:00Z", status: "pending", resolved_at: null, resolution_note: null,
+    }];
+    expect((await getPendingAbortRequest("j1"))?.id).toBe("r1");
+
+    mockState.tableErrors.job_abort_requests = "RLS denied";
+    await expect(getPendingAbortRequest("j1")).rejects.toThrow("RLS denied");
+  });
+
+  it("does not confuse an empty Abort queue with a query failure", async () => {
+    await expect(listAbortQueue()).resolves.toEqual([]);
+    mockState.tableErrors.job_aborts = "database unavailable";
+    await expect(listAbortQueue()).rejects.toThrow("Could not load Aborts: database unavailable");
+  });
+
+  it("loads Abort fees and converts Postgres numeric strings to numbers", async () => {
+    mockState.tableRows.job_aborts = [{
+      id: "a1", job_id: "j1", confirmed_at: "2026-11-23T12:00:00Z",
+      agreed_price: "250.50", proposed_amount: "250.50", approved_amount: "75.25",
+      finance_status: "approved", reopened_at: null,
+    }];
+    const rows = await getCurrentAbortsForJobs(["j1"]);
+    expect(rows.get("j1")?.approved_amount).toBe(75.25);
+    expect(rows.get("j1")?.agreed_price).toBe(250.50);
+    expect(await getCurrentAbortsForJobs([])).toEqual(new Map());
+  });
+
+  it("shows only current non-test Aborts and pending requests in the admin queue", async () => {
+    mockState.tableRows.job_abort_requests = [{
+      id: "r1", job_id: "j1", requested_at: "2026-11-23T11:00:00Z",
+      status: "pending",
+    }];
+    mockState.tableRows.job_aborts = [{
+      id: "a1", job_id: "j1", confirmed_at: "2026-11-23T12:00:00Z",
+      agreed_price: null, proposed_amount: null, approved_amount: null,
+      finance_status: "pending_review", reopened_at: null,
+    }];
+    mockState.tableRows.jobs = [{
+      id: "j1", external_job_number: "AX-1", vehicle_reg: "AB12 CDE",
+      client_company: "Acme", client_name: "Acme", status: "aborted", is_test: false,
+    }];
+    const rows = await listAbortQueue();
+    expect(rows.map((r) => r.kind)).toEqual(["request", "abort"]);
+    expect(rows[1].abort?.finance_status).toBe("pending_review");
+  });
+});
+
+describe("optional Abort RPC fields", () => {
+  beforeEach(() => {
+    mockState.rpcData = { status: "dismissed" };
+    mockState.rpcError = null;
+    mockState.rpcCalls.length = 0;
+  });
+
+  it("lets admins dismiss a request without a note", async () => {
+    await dismissAbortRequest("r1");
+    expect(mockState.rpcCalls[0]).toEqual({
+      fn: "dismiss_job_abort_request",
+      args: { p_request_id: "r1", p_note: undefined },
+    });
+  });
+
+  it("allows an approval RPC to omit amount and reason for explicit server validation", async () => {
+    mockState.rpcData = { financeStatus: "rejected", approvedAmount: null };
+    await reviewAbortClaim({ abortId: "a1", decision: "rejected" });
+    expect(mockState.rpcCalls[0]).toEqual({
+      fn: "review_job_abort_claim",
+      args: { p_abort_id: "a1", p_decision: "rejected", p_amount: undefined, p_note: undefined },
+    });
   });
 });
