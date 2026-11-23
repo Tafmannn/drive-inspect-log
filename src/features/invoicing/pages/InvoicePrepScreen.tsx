@@ -543,7 +543,7 @@ export function InvoicePrepScreen() {
 
           <ControlSection
             title="2. Select Jobs"
-            description="Completed, uninvoiced jobs for this client"
+            description="Completed moves and approved Abort-fee claims for this client"
             flush
           >
             {isLoading ? (
@@ -576,7 +576,7 @@ export function InvoicePrepScreen() {
                         Vehicle
                       </TableHead>
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider">
-                        Completed
+                        Completed / Aborted
                       </TableHead>
                       <TableHead className="text-[11px] font-medium uppercase tracking-wider text-right">
                         Price
