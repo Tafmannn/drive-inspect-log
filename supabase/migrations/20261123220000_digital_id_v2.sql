@@ -350,6 +350,8 @@ BEGIN
 
   RETURN jsonb_build_object(
     'driver_id', 'AX-' || lpad(v_credential.serial_number::text, 6, '0'),
+    'credential_id', v_credential.id,
+    'org_id', v_credential.org_id,
     'full_name', v_name,
     'employment_type', v_driver.employment_type,
     'role_label', 'Authorised Driver',
