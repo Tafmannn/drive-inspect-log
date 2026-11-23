@@ -350,7 +350,7 @@ BEGIN
   END IF;
 
   RETURN jsonb_build_object(
-    'driver_id', 'AX-' || lpad(v_credential.serial_number::text, 6, '0'),
+    'driver_id', 'AX-' || repeat('0', GREATEST(0, 6 - length(v_credential.serial_number::text))) || v_credential.serial_number::text,
     'credential_id', v_credential.id,
     'user_id', v_credential.user_id,
     'org_id', v_credential.org_id,
