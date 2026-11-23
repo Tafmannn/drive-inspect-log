@@ -9,10 +9,13 @@
  */
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/context/AuthContext";
 import { Link } from "react-router-dom";
 import { Loader2, OctagonX, Mail, CopyPlus, RotateCcw, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -22,7 +25,7 @@ import { useAdminChangeStatus } from "@/hooks/useJobs";
 import { JOB_STATUS } from "@/lib/statusConfig";
 import type { JobAbort } from "../api/abortApi";
 import {
-  abortKeys, useCreateReplacementJob, useDismissAbortRequest, useJobAbortState, useNotifyCustomerAborted, useReviewAbortClaim,
+  abortKeys, useAmendApprovedAbortClaim, useCreateReplacementJob, useDismissAbortRequest, useJobAbortState, useNotifyCustomerAborted, useReviewAbortClaim,
 } from "../hooks/useAbort";
 import {
   ABORT_STAGE_LABEL, FINANCE_STATUS_LABEL, abortErrorMessage, abortQueueStage, approvalAmountProblem,
@@ -139,6 +142,8 @@ function ConfirmedAbort({
   replacementJobId: string | null;
 }) {
   const review = useReviewAbortClaim(jobId);
+  const amend = useAmendApprovedAbortClaim(jobId);
+  const { isSuperAdmin } = useAuth();
   const notify = useNotifyCustomerAborted(jobId);
   const replace = useCreateReplacementJob(jobId);
   const reopen = useAdminChangeStatus();
@@ -146,10 +151,21 @@ function ConfirmedAbort({
   const [amount, setAmount] = useState(abort.proposed_amount != null ? abort.proposed_amount.toFixed(2) : "");
   const [note, setNote] = useState("");
   const [confirmReopen, setConfirmReopen] = useState(false);
+  const [amendOpen, setAmendOpen] = useState(false);
+  const [amendAmount, setAmendAmount] = useState("");
+  const [amendReason, setAmendReason] = useState("");
 
   const stage = abortQueueStage(abort, { invoiced, paid });
-  const locked = invoiced; // a billed claim cannot be changed (the database refuses too)
+  // A fee decision is final immediately, even before invoicing. The server
+  // enforces this independently; the only exception is the audited Super Admin RPC.
+  const locked = invoiced || abort.finance_status !== "pending_review";
   const amountProblem = approvalAmountProblem(amount, abort.agreed_price);
+  const amendmentProblem = approvalAmountProblem(amendAmount, abort.agreed_price);
+  const canAmend = isSuperAdmin && abort.finance_status === "approved" && !invoiced && !abort.reopened_at;
+  const amendmentValid = amendReason.trim().length >= 15
+    && amendReason.trim().length <= 500
+    && !amendmentProblem && amendAmount.trim() !== ""
+    && Number(amendAmount) !== abort.approved_amount;
 
   const decide = async (decision: "approved" | "rejected") => {
     try {
@@ -192,10 +208,12 @@ function ConfirmedAbort({
         <Row label="Proposed claim">{money(abort.proposed_amount)}</Row>
         <Row label="Fee">
           {FINANCE_STATUS_LABEL[abort.finance_status]}
-          {abort.finance_status === "approved" ? ` · ${money(abort.approved_amount)}` : ""}
+          {abort.finance_status === "approved" ? ` · ${money(abort.approved_amount)} · Locked` : abort.finance_status === "rejected" ? " · Locked" : ""}
         </Row>
         {abort.reviewed_at && <Row label="Reviewed at">{formatAbortConfirmedAt(abort.reviewed_at)}</Row>}
         {abort.review_note && <Row label="Review note">{abort.review_note}</Row>}
+        {abort.last_amended_at && <Row label="Last fee amendment">{formatAbortConfirmedAt(abort.last_amended_at)}</Row>}
+        {abort.last_amendment_reason && <Row label="Amendment reason">{abort.last_amendment_reason}</Row>}
       </dl>
 
       {abort.no_name_exception && abort.finance_status === "pending_review" && (
@@ -250,9 +268,28 @@ function ConfirmedAbort({
           </Button>
         </div>
       ) : (
-        <p className="text-[12px] text-muted-foreground">
-          This fee is on an invoice{paid ? " that has been paid" : ""}. Cancel the invoice to change it.
-        </p>
+        <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
+          <p className="text-[13px] font-medium text-foreground">
+            {abort.finance_status === "approved" ? "Approved fee locked" : "Fee review closed"}
+          </p>
+          <p className="text-[12px] text-muted-foreground">
+            {invoiced
+              ? `This fee has been invoiced${paid ? " and paid" : ""}. Corrections must follow the invoice/credit-note process.`
+              : abort.finance_status === "approved"
+                ? `${money(abort.approved_amount)} has been approved and cannot be changed through normal fee review.`
+                : "This fee was rejected. The decision is final."}
+          </p>
+          {canAmend && (
+            <Button variant="outline" className="min-h-[44px] rounded-lg"
+              onClick={() => {
+                setAmendAmount(abort.approved_amount?.toFixed(2) ?? "");
+                setAmendReason("");
+                setAmendOpen(true);
+              }}>
+              Exceptional fee amendment
+            </Button>
+          )}
+        </div>
       )}
 
       <div className="grid gap-2 sm:grid-cols-3">
@@ -308,6 +345,59 @@ function ConfirmedAbort({
           <RotateCcw className="mr-1.5 h-4 w-4" aria-hidden /> Reopen job
         </Button>
       </div>
+
+      <Dialog open={amendOpen} onOpenChange={(open) => { if (!amend.isPending) setAmendOpen(open); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Amend locked Abort fee</DialogTitle>
+            <DialogDescription>
+              Super Admin exception only. The original approval and amount remain in the audit history.
+              An invoiced fee cannot be amended here.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-[13px] text-muted-foreground">
+              Current approved amount: <strong className="text-foreground">{money(abort.approved_amount)}</strong>
+            </p>
+            <label htmlFor="abort-amend-amount" className="text-sm font-medium">Corrected amount (£)</label>
+            <Input id="abort-amend-amount" aria-label="Corrected Abort fee amount"
+              inputMode="decimal" value={amendAmount} disabled={amend.isPending}
+              onChange={(e) => setAmendAmount(e.target.value)} />
+            {amendmentProblem && <p role="alert" className="text-xs text-destructive">{amendmentProblem}</p>}
+            <label htmlFor="abort-amend-reason" className="text-sm font-medium">
+              Reason for exceptional amendment (required)
+            </label>
+            <Textarea id="abort-amend-reason" value={amendReason}
+              disabled={amend.isPending} maxLength={500}
+              onChange={(e) => setAmendReason(e.target.value)}
+              placeholder="Explain the client's revised fee confirmation (at least 15 characters)" />
+            <p className="text-xs text-muted-foreground">
+              This records who changed the amount, when, the old amount and the reason.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" disabled={amend.isPending} onClick={() => setAmendOpen(false)}>Cancel</Button>
+            <Button disabled={!amendmentValid || amend.isPending}
+              onClick={async () => {
+                try {
+                  const result = await amend.mutateAsync({
+                    abortId: abort.id,
+                    newAmount: Number(amendAmount),
+                    expectedAmount: Number(abort.approved_amount),
+                    reason: amendReason.trim(),
+                  });
+                  setAmendOpen(false);
+                  toast({ title: "Approved fee amended", description: `Now ${money(result.approvedAmount)}. Audit history retained.` });
+                } catch (e) {
+                  toast({ title: "Amendment not saved", description: abortErrorMessage(e), variant: "destructive" });
+                }
+              }}>
+              {amend.isPending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+              Confirm exceptional amendment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={confirmReopen} onOpenChange={setConfirmReopen}>
         <AlertDialogContent>
