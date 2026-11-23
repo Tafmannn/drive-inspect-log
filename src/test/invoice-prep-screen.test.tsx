@@ -116,11 +116,11 @@ vi.mock("@/features/invoicing/hooks/useCreateInvoice", () => ({
 import { InvoicePrepScreen } from "@/features/invoicing/pages/InvoicePrepScreen";
 import { buildInvoiceDraft } from "@/features/invoicing/lib/invoiceMath";
 
-function renderScreen() {
+function renderScreen(initialPath = "/control/invoice-prep") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[initialPath]}>
         <InvoicePrepScreen />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -148,6 +148,18 @@ beforeEach(() => {
 });
 
 describe("InvoicePrepScreen", () => {
+  it("deep-links a corrected Abort invoice to its eligible job and client only", async () => {
+    renderScreen("/control/invoice-prep?clientId=client-1&abortCorrectionJob=ax1043");
+    await waitFor(() => {
+      expect(screen.getByText("AX1043")).toBeTruthy();
+      const chosen = screen.getByLabelText("Select all");
+      expect(chosen).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Create Invoice/ }));
+    await waitFor(() => expect(state.mutateAsync).toHaveBeenCalled());
+    expect(state.mutateAsync.mock.calls[0][0].jobs.map((job: EligibleJob) => job.id)).toEqual(["ax1043"]);
+  });
+
   it("shows no expense step until jobs are ticked", () => {
     renderScreen();
     fireEvent.click(screen.getByText("Pick CJE"));
