@@ -13,7 +13,7 @@ export function useCreateInvoice() {
       // Use the centralised event so every admin-visible surface refreshes.
       invalidateForEvent(queryClient, "invoice_created");
       // Replacement invoices link automatically to their original Abort full-credit record.
-      queryClient.invalidateQueries({ queryKey: ["aborts"] });
+      void queryClient.invalidateQueries({ queryKey: ["aborts"] });
     },
   });
 }
