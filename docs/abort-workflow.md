@@ -57,12 +57,12 @@ refuses every other path (direct writes, the status picker, the super-admin over
 
 The original PR #176 release plan is now historical. **Do not run its steps blindly.**
 
-- **GitHub:** PR #176 has been merged into `main`.
+- **GitHub:** PR #176 and corrective PR #178 have both been merged into `main`; SonarQube passed at 80% new-code coverage (1,968 tests passed).
 - **Production database:** project `lynkvfduzqdyvlzgriyh` has the `20261123100000_job_abort_workflow` migration recorded as applied. Tables, admin/driver RPCs, RLS policies, the job status guard and the two invoice guards have been observed. **Do not re-apply this migration to production.**
 - **Production customer email:** `notify-customers` is deployed with the `aborted` event.
 - **Production push:** `send-push` was manually deployed as v15 on 23 November 2026 and its deployed source was read back: `abort-requested` and the three shared authorization modules are present. Because `send-push` is deliberately excluded from `supabase/config.toml` automatic deployment (historical bundle 413 issue), future changes to this function need an **explicit targeted deploy and source read-back**.
-- **Staging:** project `mfedxybzajdgavzmajkl` is significantly behind production. It lacks `job_pricing`, `customer_notifications`, `invoice_items.voided`, `invoices.document_type`, the Abort tables and Edge Function deployments. **Do not apply the standalone Abort migration there; its prerequisites are missing.**
-- **Types:** generated against the actual production schema in draft PR #178; release only after checks pass.
+- **Staging:** project `mfedxybzajdgavzmajkl` has 10 jobs and one user (not an empty disposable database), and 44 repository migrations remain unapplied after accounting for custom migration names. It lacks `job_pricing`, `customer_notifications`, `invoice_items.voided`, `invoices.document_type`, the Abort tables and Edge Function deployments. **Do not apply the standalone Abort migration there; its prerequisites are missing. Do not reset without a restorable backup and owner approval.**
+- **Types:** regenerated against the actual production schema and merged in PR #178. The post-merge Vercel deployment for that commit succeeded.
 - **Tests:** PR #176's locally stubbed Postgres scenario tests are not a substitute for a clean live staging migration, and current production has not undergone an authenticated end-to-end smoke test.
 
 ### Remaining release gates
@@ -70,7 +70,13 @@ The original PR #176 release plan is now historical. **Do not run its steps blin
 1. Approve a staging-parity plan after reviewing migration ordering, schema drift, staging data retention and restoration options. Rebuild or synchronize staging safely, then run its SQL scenario tests inside a rollback transaction.
 2. Validate with a real driver and admin account that an Abort request produces the intended admin push and never aborts the job until admin confirmation.
 3. Exercise admin confirmation, no-name exception, fee review, billing guards and optional customer notification. Check existing job-assigned and POD push paths too.
-4. Review SonarQube coverage/reliability findings. Do not confuse a successful scanner upload with a passing quality gate; draft PR #178 makes the gate blocking in GitHub CI.
-5. After validating PR #178 and staging parity, merge the follow-up PR and verify the new release. Production schema migrations should only run if a **new, reviewed** migration is actually needed.
+4. SonarQube passed its 80% new-code coverage requirement on PR #178 and its gate now blocks GitHub Build on failure. Keep that protection active.
+5. PR #178 was merged and Vercel reported a successful deployment. Run role-specific authenticated smoke tests before declaring the workflow end-to-end certified. Production schema migrations should only run if a **new, reviewed** migration is needed.
 
 Tracking: [Issue #177](https://github.com/Tafmannn/drive-inspect-log/issues/177), [draft PR #178](https://github.com/Tafmannn/drive-inspect-log/pull/178).
+
+### Staging synchronization safety
+
+`scripts/sync-staging-migrations.sh` is dry-run by default. It understands staging's rebuilt timestamp history **and** its two bare-name catalogue migrations, avoiding duplicate application. Before running any DDL, obtain and verify a **restorable staging backup**, inspect the pending migration list and dependencies in order, and confirm the connected project is `mfedxybzajdgavzmajkl`. The script requires both the known staging project ref in its connection URL and `STAGING_BACKUP_VERIFIED=YES` for `--apply`.
+
+No staging schema or data was modified during the PR #178 release recovery. A fresh, data-less Supabase QA branch would be safer for destructive test fixtures, but creating that branch incurs additional usage charges and requires explicit cost agreement. Do not run `supabase/tests/job_abort_workflow.sql` against production.
