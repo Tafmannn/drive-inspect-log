@@ -49,7 +49,7 @@ describe("sync-staging-migrations.sh", () => {
 
   it("has unambiguous migration slugs for safe staging name matching", () => {
     const slugs = readdirSync("supabase/migrations")
-      .filter((f) => /^\\d{14}_.+\\.sql$/.test(f))
+      .filter((f) => /^\d{14}_.+\.sql$/.test(f))
       .map((f) => f.slice(15, -4));
     expect(new Set(slugs).size).toBe(slugs.length);
   });
