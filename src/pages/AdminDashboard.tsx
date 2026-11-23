@@ -405,7 +405,7 @@ function NeedsActionQueue() {
                 </span>
 
                 <span className="flex min-w-0 items-center gap-2">
-                  {item.vehicleReg && <span className="inline-flex shrink-0"><UKPlate reg={item.vehicleReg} /></span>}
+                  {item.vehicleReg && <span className="inline-flex shrink-0"><UKPlate size="compact" reg={item.vehicleReg} /></span>}
                   {item.route && (
                     <span className="flex min-w-0 items-center gap-1 text-[13px] text-muted-foreground">
                       <MapPin aria-hidden className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
@@ -626,7 +626,7 @@ function CompactJobRow({
           <span className="ah-num ml-auto shrink-0 text-[13px] text-muted-foreground">{humanAge(job.updated_at)}</span>
         </span>
         <span className="flex min-w-0 items-center gap-2">
-          <span className="inline-flex shrink-0"><UKPlate reg={job.vehicle_reg} /></span>
+          <span className="inline-flex shrink-0"><UKPlate size="compact" reg={job.vehicle_reg} /></span>
           <span className="truncate text-[13px] text-muted-foreground">
             {job.pickup_postcode} → {job.delivery_postcode}
           </span>

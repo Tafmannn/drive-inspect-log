@@ -72,14 +72,14 @@ export function JobHeaderCard({
         label={[make, model].filter(Boolean).join(" ")}
         className="-mx-1 -mt-1 mb-2"
       />
-      <div className="flex items-center justify-between mb-1">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
         <span
           style={{ backgroundColor: status.backgroundColor, color: status.color }}
           className="inline-flex items-center rounded-full px-3 py-1 text-[13px] font-semibold uppercase leading-none"
         >
           {status.label}
         </span>
-        <UKPlate reg={vehicleReg} variant={plateVariant} />
+        <UKPlate size="standard" reg={vehicleReg} variant={plateVariant} />
       </div>
 
       <div className="flex items-center justify-between gap-2">

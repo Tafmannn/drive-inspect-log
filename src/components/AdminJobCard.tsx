@@ -72,7 +72,7 @@ export function AdminJobCard({ job, onView, onAssign, onPod, onExpense, footer }
       onClick={() => onView(job)}
     >
       {/* ── HEADER: status + reg + ref ── */}
-      <div className="flex items-center justify-between px-3 pt-3 pb-1.5">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 pt-3 pb-1.5">
         <div className="flex items-center gap-2 min-w-0">
           <span
             style={{ backgroundColor: statusStyle.backgroundColor, color: statusStyle.color }}
@@ -89,7 +89,7 @@ export function AdminJobCard({ job, onView, onAssign, onPod, onExpense, footer }
             </span>
           )}
         </div>
-        <UKPlate reg={job.vehicle_reg} />
+        <UKPlate size="compact" reg={job.vehicle_reg} />
       </div>
 
       {/* ── DRIVER OVERLAY ── */}

@@ -1,3 +1,4 @@
+import { UKPlate } from "@/components/UKPlate";
 import { useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import {
@@ -284,9 +285,10 @@ export default function PortalJobDetail() {
 
       <Card>
         <CardContent className="p-4 space-y-4">
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <h1 className="font-mono text-xl font-semibold tracking-wide">{job.vehicle_reg}</h1>
+              <h1 className="sr-only">Vehicle registration {job.vehicle_reg}</h1>
+              <UKPlate reg={job.vehicle_reg} size="large" />
               <p className="text-sm text-muted-foreground">
                 {[job.vehicle_year, job.vehicle_make, job.vehicle_model, job.vehicle_colour].filter(Boolean).join(" · ") || "Vehicle"}
               </p>

@@ -88,7 +88,7 @@ export function PodReviewCard({ row, actions }: { row: ClosureReviewRow; actions
             {row.external_job_number || row.id.slice(0, 8)}
           </span>
         </div>
-        <UKPlate reg={row.vehicle_reg} />
+        <UKPlate size="compact" reg={row.vehicle_reg} />
       </div>
 
       <div className="px-3 pb-1.5 space-y-0.5">

@@ -130,7 +130,7 @@ export function DriverCard({
         </div>
         {driver.latestJobReg && statusStyle && (
           <div className="flex items-center gap-2">
-            <UKPlate reg={driver.latestJobReg} />
+            <UKPlate size="compact" reg={driver.latestJobReg} />
             <span
               style={{ backgroundColor: statusStyle.backgroundColor, color: statusStyle.color }}
               className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase leading-none"

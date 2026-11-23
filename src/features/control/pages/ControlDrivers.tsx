@@ -155,7 +155,7 @@ export function ControlDrivers() {
             </div>
             {r.latestJobReg && (
               <div className="flex items-center gap-1.5">
-                <UKPlate reg={r.latestJobReg} />
+                <UKPlate size="table" reg={r.latestJobReg} />
                 {statusStyle && (
                   <span
                     className="text-[9px] font-medium px-1.5 py-0 rounded"

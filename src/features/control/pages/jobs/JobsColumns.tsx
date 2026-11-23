@@ -49,7 +49,7 @@ export function buildJobColumns(actions: JobsColumnActions): CompactColumn<JobCo
       className: "w-[130px]",
       render: (r) => (
         <div className="flex flex-col gap-0.5">
-          <UKPlate reg={r.vehicle_reg} />
+          <UKPlate size="table" reg={r.vehicle_reg} />
           <span className="text-[10px] text-muted-foreground truncate">
             {[r.vehicle_make, r.vehicle_model].filter(Boolean).join(" ")}
           </span>

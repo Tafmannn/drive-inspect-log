@@ -101,11 +101,11 @@ export function DriverJobCard({ summary, onPrimaryAction, onCardClick }: DriverJ
     >
       <div className="space-y-2.5 p-3">
         {/* Plate · vehicle | status */}
-        <div className="flex items-start justify-between gap-2">
+        <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2.5">
             {/* the plate is the vehicle's identity: never let other text squeeze it */}
             <div className="shrink-0">
-              <UKPlate reg={summary.vehicle_reg} />
+              <UKPlate size="compact" reg={summary.vehicle_reg} />
             </div>
             {vehicle && <p className="min-w-0 truncate text-[13px] font-medium text-foreground/80">{vehicle}</p>}
           </div>

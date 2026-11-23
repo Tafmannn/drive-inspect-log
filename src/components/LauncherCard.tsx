@@ -56,7 +56,7 @@ export function LauncherCard({ job, ctaLabel, ctaVariant = "default", onPrimaryA
             {job.external_job_number || job.id.slice(0, 8)}
           </span>
         </div>
-        <UKPlate reg={job.vehicle_reg} />
+        <UKPlate size="compact" reg={job.vehicle_reg} />
       </div>
 
       {/* ── Execution reason ── */}
