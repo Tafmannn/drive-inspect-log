@@ -167,6 +167,7 @@ export function approvalAmountProblem(raw: string, agreedPrice: number | null): 
   if (!t) return agreedPrice == null ? "Enter the amount to approve — the agreed price is not known." : null;
   if (!/^\d+(\.\d{1,2})?$/.test(t)) return "Enter an amount in pounds, e.g. 120 or 120.50.";
   const n = Number(t);
+  if (!Number.isFinite(n)) return "Enter a finite amount in pounds and pence.";
   return null;
 }
 
