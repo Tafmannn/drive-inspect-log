@@ -139,7 +139,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 function ConfirmedAbort({
   jobId, hasClient, clientId, abort, invoiced, paid, replacementJobId,
-}: {
+}: Readonly<{
   jobId: string;
   hasClient: boolean;
   clientId: string | null;
@@ -147,7 +147,7 @@ function ConfirmedAbort({
   invoiced: boolean;
   paid: boolean;
   replacementJobId: string | null;
-}) {
+}>) {
   const notify = useNotifyCustomerAborted(jobId);
   const replace = useCreateReplacementJob(jobId);
   const reopen = useAdminChangeStatus();
