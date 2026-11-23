@@ -11,6 +11,9 @@
  *   4. linked to the selected client (client_id), or — for unlinked legacy
  *      jobs only — client_company / client_name matches it
  *   5. Each row carries a readinessReason so the UI can render a clear badge.
+ *   6. Aborted jobs are listed too (the Abort exception): ready only once their
+ *      Abort fee is approved above zero, and billed at that fee. Their date is
+ *      the Abort confirmation time (they have no completed_at).
  */
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,8 +21,10 @@ import type { Client } from "@/lib/clientApi";
 import {
   evaluateInvoiceReadiness,
   INVOICEABLE_STATUSES,
+  type AbortInvoiceInfo,
   type InvoiceReadinessResult,
 } from "@/lib/invoiceReadiness";
+import { getCurrentAbortsForJobs } from "@/features/abort/api/abortApi";
 import type { Inspection, Photo } from "@/lib/types";
 import { findAlreadyInvoicedJobs } from "../api/createInvoice";
 import { withPricing } from "@/lib/jobPricingApi";
@@ -53,6 +58,11 @@ export interface EligibleJob {
   receiptCount?: number;
   // Stage 5 readiness — populated below.
   readiness?: InvoiceReadinessResult;
+  // Aborted jobs only (status 'aborted').
+  abort?: AbortInvoiceInfo | null;
+  /** Approved Abort fee: what the invoice line is billed at. */
+  abort_fee?: number | null;
+  abort_confirmed_at?: string | null;
 }
 
 // Only jobs in a true terminal state are surfaced. POD-ready and
@@ -96,10 +106,47 @@ export function useEligibleJobs(
         query = query.lt("completed_at", toDate.toISOString());
       }
 
-      const { data: jobsRaw, error } = await query;
+      // Aborted jobs have no completed_at, so they are read separately and their
+      // date filter is applied to the Abort confirmation time below.
+      const abortedQuery = supabase
+        .from("jobs")
+        .select(
+          "id, external_job_number, vehicle_reg, vehicle_make, vehicle_model, job_date, completed_at, distance_miles, client_id, client_company, client_name, client_email, client_phone, status, current_run_id, pickup_city, pickup_postcode, delivery_city, delivery_postcode"
+        )
+        .eq("is_hidden", false)
+        .eq("is_test", false)
+        .eq("status", "aborted");
+
+      const [{ data: jobsRaw, error }, { data: abortedRaw, error: abortedErr }] = await Promise.all([
+        query,
+        abortedQuery,
+      ]);
       if (error) throw error;
-      if (!jobsRaw?.length) return [];
-      const jobs = await withPricing(jobsRaw);
+      if (abortedErr) throw abortedErr;
+
+      // Attach each aborted job's current Abort. A failed read throws: an
+      // unknown fee is never treated as approved (or as zero).
+      const aborts = await getCurrentAbortsForJobs((abortedRaw ?? []).map((j) => j.id));
+      const from = opts?.dateFrom ? new Date(opts.dateFrom).getTime() : null;
+      const to = opts?.dateTo ? new Date(opts.dateTo).getTime() + 86_400_000 : null;
+      const abortedRows = (abortedRaw ?? []).flatMap((j) => {
+        const a = aborts.get(j.id);
+        const at = a ? new Date(a.confirmed_at).getTime() : NaN;
+        if (from != null && !(at >= from)) return [];
+        if (to != null && !(at < to)) return [];
+        const approved = a && a.finance_status === "approved" && a.approved_amount != null && a.approved_amount > 0;
+        return [{
+          ...j,
+          completed_at: null,
+          abort: a ? { finance_status: a.finance_status, approved_amount: a.approved_amount, reopened_at: a.reopened_at } : null,
+          abort_fee: approved ? a!.approved_amount : null,
+          abort_confirmed_at: a?.confirmed_at ?? null,
+        }];
+      });
+
+      const allRaw = [...(jobsRaw ?? []), ...abortedRows];
+      if (!allRaw.length) return [];
+      const jobs = await withPricing(allRaw);
 
       // 2. Filter to this client's jobs. A linked job (client_id) belongs to
       //    exactly that client, whatever its free-text name says; only an

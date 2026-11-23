@@ -123,3 +123,14 @@ export function notifyPodSubmitted(jobId: string): void {
     .invoke("send-push", { body: { event: "pod-submitted", jobId } })
     .catch(() => {});
 }
+
+/**
+ * Fire-and-forget notify to the org's admins after a driver requests an Abort. The edge
+ * function only sends while the job has a pending request in the database, and only for the
+ * job's own driver (or an admin). Never throws, never blocks the request.
+ */
+export function notifyAbortRequested(jobId: string): void {
+  void supabase.functions
+    .invoke("send-push", { body: { event: "abort-requested", jobId } })
+    .catch(() => {});
+}

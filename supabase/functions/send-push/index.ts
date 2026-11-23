@@ -11,6 +11,9 @@
 //   pod-submitted  the job's OWN assigned driver (or an admin in the job's
 //                  org). Notifies that org's admins/super-admins. A driver
 //                  can never notify about someone else's job.
+//   abort-requested  same callers and recipients as pod-submitted, and only
+//                  while the job has a PENDING Abort request in the database
+//                  (request_job_abort), so it cannot be used to spam admins.
 //
 // Delivery is best-effort: a push failure must never surface as an
 // assignment or submission failure.
@@ -47,7 +50,7 @@ serve(async (req) => {
     const body = await req.json().catch(() => null);
     const event = body?.event;
     const jobId = body?.jobId;
-    if (event !== "job-assigned" && event !== "pod-submitted") {
+    if (event !== "job-assigned" && event !== "pod-submitted" && event !== "abort-requested") {
       return jsonRes({ error: "UNSUPPORTED_EVENT" }, 400);
     }
     // Assignment notices are an admin action; POD notices are raised by the
@@ -91,7 +94,17 @@ serve(async (req) => {
       }
       recipientUserIds = [driver.user_id];
     } else {
-      // pod-submitted. A non-admin caller MUST be the job's own assigned
+      if (event === "abort-requested") {
+        const { data: pending, error: pendingErr } = await admin
+          .from("job_abort_requests")
+          .select("id")
+          .eq("job_id", job.id)
+          .eq("status", "pending")
+          .limit(1);
+        if (pendingErr) return jsonRes({ error: "REQUEST_LOOKUP_FAILED" }, 500);
+        if (!pending || pending.length === 0) return jsonRes({ sent: 0, reason: "NO_PENDING_ABORT_REQUEST" });
+      }
+      // pod-submitted / abort-requested. A non-admin caller MUST be the job's own assigned
       // driver — resolve their driver profile and compare to jobs.driver_id.
       // This is the only thing stopping a driver notifying an org's admins
       // about a job that isn't theirs.
@@ -155,12 +168,19 @@ serve(async (req) => {
             title: "New job assigned",
             body: `${reg} is ready to review.`,
           }
-        : {
-            type: "pod-submitted",
-            jobId: job.id,
-            title: "POD ready to review",
-            body: `${reg} — inspection submitted.`,
-          },
+        : event === "abort-requested"
+          ? {
+              type: "abort-requested",
+              jobId: job.id,
+              title: "Abort requested",
+              body: `${reg} — driver asked to abort the collection.`,
+            }
+          : {
+              type: "pod-submitted",
+              jobId: job.id,
+              title: "POD ready to review",
+              body: `${reg} — inspection submitted.`,
+            },
     );
 
     let sent = 0;

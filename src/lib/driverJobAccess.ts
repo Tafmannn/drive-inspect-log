@@ -1,7 +1,7 @@
 /**
  * Driver access to closed jobs.
  *
- * Once a job is completed (POD approved by an admin), cancelled or archived,
+ * Once a job is completed (POD approved by an admin), cancelled, aborted or archived,
  * a driver may still see completed ones listed in "Last 14 Days" as a record,
  * but must not open the job, the POD, or any navigation/contact actions for
  * it. Admins are unaffected.
@@ -16,6 +16,7 @@ export const DRIVER_LOCKED_STATUSES: readonly string[] = [
   JOB_STATUS.COMPLETED,
   JOB_STATUS.CANCELLED,
   JOB_STATUS.ARCHIVED,
+  JOB_STATUS.ABORTED,
 ];
 
 export function isJobLockedForDriver(
@@ -26,7 +27,9 @@ export function isJobLockedForDriver(
   return !!status && DRIVER_LOCKED_STATUSES.includes(status);
 }
 
-/** Heading for the locked screen: "Job completed" vs "Job closed". */
+/** Heading for the locked screen: "Job completed", "Job aborted" or "Job closed". */
 export function lockedJobHeading(status: string | null | undefined): string {
-  return status === JOB_STATUS.COMPLETED ? "Job completed" : "Job closed";
+  if (status === JOB_STATUS.COMPLETED) return "Job completed";
+  if (status === JOB_STATUS.ABORTED) return "Job aborted";
+  return "Job closed";
 }

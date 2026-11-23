@@ -33,7 +33,7 @@ function RoutePoint({ kind, value }: { kind: "From" | "To"; value: string }) {
  */
 export function MovementCard({ job, back }: { job: PortalJobSummary; back: string }) {
   const stage = portalStage(job.status);
-  const finished = stage === "delivered" || stage === "cancelled";
+  const finished = stage === "delivered" || stage === "cancelled" || stage === "aborted";
   return (
     <Link
       to={`/portal/jobs/${job.id}`}
@@ -79,7 +79,7 @@ export function MovementCard({ job, back }: { job: PortalJobSummary; back: strin
                 <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden />
                 <span className="truncate">Delivered {fmtDate(job.completed_at)}</span>
               </>
-            ) : stage === "cancelled" ? (
+            ) : stage === "cancelled" || stage === "aborted" ? (
               <span className="truncate">Booked {fmtDate(job.created_at)}</span>
             ) : job.job_date ? (
               <>

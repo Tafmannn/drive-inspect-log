@@ -13,6 +13,7 @@ export type PortalStage =
   | "delivering"
   | "delivered"
   | "cancelled"
+  | "aborted"
   | "issue";
 
 const STAGE_BY_STATUS: Record<string, PortalStage> = {
@@ -29,6 +30,8 @@ const STAGE_BY_STATUS: Record<string, PortalStage> = {
   pod_ready: "delivered",
   completed: "delivered",
   cancelled: "cancelled",
+  // The collection could not go ahead. Never shown as collected or delivered.
+  aborted: "aborted",
   failed: "issue",
 };
 
@@ -40,6 +43,7 @@ export const STAGE_LABEL: Record<PortalStage, string> = {
   delivering: "Out for delivery",
   delivered: "Delivered",
   cancelled: "Cancelled",
+  aborted: "Aborted",
   issue: "Needs attention",
 };
 
@@ -99,11 +103,12 @@ export const STAGE_NEXT: Record<PortalStage, string> = {
   delivering: "The driver is at the delivery address and handing the vehicle over.",
   delivered: "The vehicle has been delivered. The full condition report is below.",
   cancelled: "This move was cancelled. Contact us if you need it rebooked.",
+  aborted: "The collection could not go ahead, so the vehicle was not collected. Contact us to rebook.",
   issue: "Something needs our attention on this move. We'll be in touch, or contact us for an update.",
 };
 
 export function isActiveStage(stage: PortalStage): boolean {
-  return stage !== "delivered" && stage !== "cancelled";
+  return stage !== "delivered" && stage !== "cancelled" && stage !== "aborted";
 }
 
 /**

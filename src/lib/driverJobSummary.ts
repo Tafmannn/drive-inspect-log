@@ -6,7 +6,7 @@
  */
 
 import type { Job } from "./types";
-import { TERMINAL_STATUSES } from "./statusConfig";
+import { isOperationallyClosed } from "./statusConfig";
 
 // ── Enums ────────────────────────────────────────────────────────────
 
@@ -109,7 +109,7 @@ function areRouteMetricsReliable(job: Job): boolean {
 // ── Workflow State ───────────────────────────────────────────────────
 
 function deriveWorkflowState(job: Job): WorkflowState {
-  if ((TERMINAL_STATUSES as string[]).includes(job.status)) return "terminal";
+  if (isOperationallyClosed(job.status)) return "terminal";
 
   const s = job.status as string;
   switch (s) {
@@ -448,7 +448,7 @@ export function deriveJobSummaries(jobs: Job[]): DriverJobSummary[] {
   // Find the single recommended job
   let recommendedId: string | null = null;
   for (const job of jobs) {
-    if ((TERMINAL_STATUSES as string[]).includes(job.status)) continue;
+    if (isOperationallyClosed(job.status)) continue;
     if (["draft", "incomplete", "cancelled", "failed"].includes(job.status)) continue;
     if (inProgress.includes(job.status)) {
       recommendedId = job.id;
@@ -458,7 +458,7 @@ export function deriveJobSummaries(jobs: Job[]): DriverJobSummary[] {
   // If no in-progress, find first executable
   if (!recommendedId) {
     for (const job of jobs) {
-      if ((TERMINAL_STATUSES as string[]).includes(job.status)) continue;
+      if (isOperationallyClosed(job.status)) continue;
       if (["draft", "incomplete", "cancelled", "failed"].includes(job.status)) continue;
       const lock = isBlockedByActiveJob(job, jobs);
       if (lock.blocked) continue;

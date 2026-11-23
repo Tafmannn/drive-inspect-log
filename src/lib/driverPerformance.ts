@@ -69,6 +69,11 @@ export interface DriverPerformance {
   activeJobs: number;
   completedJobs: number;
   cancelledJobs: number;
+  /**
+   * Aborted collections. Reported separately and NOT counted against completion rate:
+   * most Aborts are caused by the customer or the collection site, not the driver.
+   */
+  abortedJobs: number;
 
   latePickupCount: number;
   lateDeliveryCount: number;
@@ -141,6 +146,7 @@ export function calculateDriverPerformance(
   let activeJobs = 0;
   let completedJobs = 0;
   let cancelledJobs = 0;
+  let abortedJobs = 0;
   let latePickupCount = 0;
   let lateDeliveryCount = 0;
   let failedUploadCount = 0;
@@ -157,6 +163,7 @@ export function calculateDriverPerformance(
   for (const j of mine) {
     if (j.status === JOB_STATUS.COMPLETED) completedJobs += 1;
     else if (j.status === JOB_STATUS.CANCELLED || j.status === JOB_STATUS.FAILED) cancelledJobs += 1;
+    else if (j.status === JOB_STATUS.ABORTED) abortedJobs += 1;
     else if (activeSet.has(j.status)) activeJobs += 1;
 
     if (isLate(j.pickup_time_to, j.pickup_inspected_at)) latePickupCount += 1;
@@ -222,6 +229,7 @@ export function calculateDriverPerformance(
     activeJobs,
     completedJobs,
     cancelledJobs,
+    abortedJobs,
     latePickupCount,
     lateDeliveryCount,
     failedUploadCount,

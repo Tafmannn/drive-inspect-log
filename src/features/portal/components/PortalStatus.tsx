@@ -16,6 +16,7 @@ const BADGE_TONE: Record<PortalStage, string> = {
   delivering: "bg-primary/10 text-primary",
   delivered: "bg-success/15 text-success",
   cancelled: "bg-muted text-muted-foreground line-through",
+  aborted: "bg-warning/15 text-warning",
   issue: "bg-destructive/10 text-destructive",
 };
 

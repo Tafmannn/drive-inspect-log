@@ -39,7 +39,7 @@ import { useState, useEffect } from "react";
 import { createQrConfirmation, getQrConfirmationsForJob, buildQrUrl, type QrConfirmation } from "@/lib/qrApi";
 import { QrDisplayModal } from "@/components/QrDisplayModal";
 import { useAuth } from "@/context/AuthContext";
-import { getStatusStyle } from "@/lib/statusConfig";
+import { getStatusStyle, JOB_STATUS } from "@/lib/statusConfig";
 import { logClientEvent } from "@/lib/logger";
 import { isJobLockedForDriver, lockedJobHeading } from "@/lib/driverJobAccess";
 import { DriverJobLocked } from "@/components/DriverJobLocked";
@@ -55,6 +55,10 @@ import { JobAdminControls } from "@/features/jobs/components/JobAdminControls";
 import { SuperAdminStatusOverride } from "@/features/jobs/components/SuperAdminStatusOverride";
 import { evaluateEvidenceHealth } from "@/lib/evidenceHealth";
 import { useEvidenceOverrides } from "@/hooks/useEvidenceOverrides";
+import { AbortJobDialog } from "@/features/abort/components/AbortJobDialog";
+import { AbortPanel } from "@/features/abort/components/AbortPanel";
+import { RequestAbortButton } from "@/features/abort/components/RequestAbortButton";
+import { abortErrorMessage, isAbortEligible } from "@/features/abort/lib/abortRules";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -141,6 +145,7 @@ export const JobDetail = () => {
   const [resolvedPhotos, setResolvedPhotos] = useState<Record<string, string>>({});
   const [photosLoading, setPhotosLoading] = useState(false);
   const [photoRetryCount, setPhotoRetryCount] = useState(0);
+  const [abortDialog, setAbortDialog] = useState<{ open: boolean; requestedAt?: string | null }>({ open: false });
 
   // Resolve photos for admin gallery — with automatic retry for failures
   useEffect(() => {
@@ -225,7 +230,7 @@ export const JobDetail = () => {
       await changeStatus.mutateAsync({ jobId, newStatus });
       toast({ title: `Status changed to ${newStatus.replace(/_/g, " ")}` });
     } catch (e: any) {
-      toast({ title: "Status change failed", description: e.message, variant: "destructive" });
+      toast({ title: "Status change failed", description: abortErrorMessage(e), variant: "destructive" });
       throw e;
     }
   };
@@ -315,6 +320,9 @@ export const JobDetail = () => {
   const primaryCtaOpensPod = isReviewOnly || primaryCta.route(job.id).endsWith("/pod");
   const showPrimaryCta = !isBlocked && (canViewPod || !primaryCtaOpensPod);
 
+  const isAborted = job.status === JOB_STATUS.ABORTED;
+  const abortEligible = isAbortEligible(job);
+
   const pickupAddr = buildFullAddress([job.pickup_address_line1, job.pickup_address_line2, job.pickup_city, job.pickup_postcode]);
   const deliveryAddr = buildFullAddress([job.delivery_address_line1, job.delivery_address_line2, job.delivery_city, job.delivery_postcode]);
 
@@ -395,7 +403,16 @@ export const JobDetail = () => {
           </div>
         )}
 
+        {/* ── ABORT — request (driver) / review (admin). Aborted jobs have no next step. ── */}
+        {canAdmin && (
+          <AbortPanel
+            job={{ id: job.id, status: job.status, client_id: (job as { client_id?: string | null }).client_id ?? null }}
+            onAbort={(requestedAt) => setAbortDialog({ open: true, requestedAt })}
+          />
+        )}
+
         {/* ── NEXT STEP — the primary action, surfaced at the top ── */}
+        {!isAborted && (
         <div className="p-4 rounded-xl bg-card border border-border shadow-sm space-y-3">
           <div className="flex items-center gap-2">
             {isBlocked ? (
@@ -425,7 +442,10 @@ export const JobDetail = () => {
               <ChevronRight className="ml-1 h-5 w-5" />
             </Button>
           )}
+          {/* Driver: one-tap Abort request on an eligible job (the office confirms it). */}
+          {!canAdmin && abortEligible && <RequestAbortButton jobId={job.id} />}
         </div>
+        )}
 
         {/* ── COLLECT FROM ── */}
         <LegCard
@@ -557,6 +577,7 @@ export const JobDetail = () => {
               jobStatus={job.status}
               onChangeStatus={handleChangeStatus}
               onDelete={handleDeleteJob}
+              onAbort={abortEligible ? () => setAbortDialog({ open: true }) : undefined}
             />
             <SuperAdminStatusOverride jobId={job.id} jobStatus={job.status} />
           </RoleScope>
@@ -613,6 +634,15 @@ export const JobDetail = () => {
           </RoleScope>
         </div>
       </div>
+
+      {canAdmin && (
+        <AbortJobDialog
+          open={abortDialog.open}
+          onOpenChange={(open) => setAbortDialog((d) => ({ ...d, open }))}
+          job={{ id: job.id, ref: jobRef, vehicleReg: job.vehicle_reg, status: job.status }}
+          requestedAt={abortDialog.requestedAt}
+        />
+      )}
 
       <QrDisplayModal
         isOpen={qrModal.open}

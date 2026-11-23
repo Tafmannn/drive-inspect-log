@@ -27,6 +27,7 @@ import {
   JOBS_VIEWS, jobsViewDef, jobsViewUrl, matchesJobSearch, resolveJobsView, type JobsView,
 } from "./jobs/jobsView";
 import { AdminJobCard } from "@/components/AdminJobCard";
+import { AbortQueueSection } from "@/features/abort/components/AbortQueueSection";
 import { useAdminJobQueues } from "@/hooks/useAdminJobQueues";
 import { useRefetchOnFocus } from "@/hooks/useRefetchOnFocus";
 import { useEvidenceAckRealtime } from "@/hooks/useEvidenceAckRealtime";
@@ -185,8 +186,9 @@ export function ControlJobs() {
     { label: "Total jobs", value: kpis?.total, icon: LayoutList, variant: "default" as const, loading: kpisLoading, onClick: () => setView("all") },
   ];
 
-  const activeQuery = def.source === "queue" ? queues : list;
-  const loadError = activeQuery.error;
+  // The Aborts view loads (and reports errors for) its own data.
+  const activeQuery = def.source === "queue" ? queues : def.source === "list" ? list : null;
+  const loadError = activeQuery?.error;
 
   return (
     <ControlShell>
@@ -250,11 +252,13 @@ export function ControlJobs() {
             <p className="text-sm text-destructive mb-2">
               Failed to load jobs: {loadError instanceof Error ? loadError.message : "Unknown error"}
             </p>
-            <Button variant="outline" size="sm" onClick={() => void activeQuery.refetch()}>
+            <Button variant="outline" size="sm" onClick={() => void activeQuery?.refetch()}>
               Retry
             </Button>
           </div>
         </ControlSection>
+      ) : def.source === "aborts" ? (
+        <AbortQueueSection search={search} />
       ) : def.source === "list" ? (
         <ControlSection
           title={def.label}

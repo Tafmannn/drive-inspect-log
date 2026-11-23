@@ -19,6 +19,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { EligibleJob } from "../hooks/useInvoicePrepData";
 import type { Client } from "@/lib/clientApi";
+import { getCurrentAbortsForJobs } from "@/features/abort/api/abortApi";
 import {
   buildInvoiceDraft,
   dueDateFor,
@@ -159,6 +160,25 @@ export async function createMultiJobInvoice(
     );
   }
 
+  // 1b. Aborted jobs: re-read the Abort right before creating. The fee must still be
+  //     approved, above zero, and the same amount the admin saw on screen; otherwise
+  //     the invoice could bill a stale or withdrawn claim. (The database also refuses
+  //     an unapproved Abort and any line above the approved fee.)
+  const abortedJobs = jobs.filter((j) => j.status === "aborted");
+  if (abortedJobs.length > 0) {
+    const current = await getCurrentAbortsForJobs(abortedJobs.map((j) => j.id));
+    const stale = abortedJobs.filter((j) => {
+      const a = current.get(j.id);
+      return !a || a.finance_status !== "approved" || !(Number(a.approved_amount) > 0)
+        || Number(a.approved_amount) !== Number(j.abort_fee);
+    });
+    if (stale.length > 0) {
+      throw new Error(
+        `The Abort fee for ${stale.map((j) => jobRef(j)).join(", ")} is not approved or has changed. Refresh and try again.`,
+      );
+    }
+  }
+
   // 2. Build the document
   const draft = buildInvoiceDraft({ jobs, expenses, vatRegistered, vatRate });
 
@@ -219,6 +239,9 @@ export async function createMultiJobInvoice(
       throw new Error(
         "One or more selected jobs were just invoiced on another invoice. Refresh and try again.",
       );
+    }
+    if (/ABORT_NOT_APPROVED|ABORT_AMOUNT_EXCEEDED/.test(itemsErr.message)) {
+      throw new Error("An Abort fee on this invoice is not approved or is above the approved amount. Refresh and try again.");
     }
     throw new Error(`Failed to create line items: ${itemsErr.message}`);
   }

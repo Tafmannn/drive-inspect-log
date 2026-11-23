@@ -15,6 +15,9 @@
  *     (the invoiceReadiness brain already enforces this; we just respect
  *     its `ready` boolean).
  *   - Cancelled jobs only appear in the cancelled bucket.
+ *   - Aborted jobs appear in NO operational bucket: they are not live work, not
+ *     completed, and have no POD. They are worked from the Aborts view
+ *     (/control/jobs?view=aborts), which tracks the fee claim.
  *   - A single job may appear in multiple operational buckets (e.g. a
  *     completed job with a failed upload is both "completed_not_invoiced"
  *     and "failed_uploads"); but never in mutually exclusive ones
@@ -251,6 +254,11 @@ function classifyOne(input: BucketJobInput, now: Date): BucketJobAssignment {
     alreadyInvoiced: !!input.alreadyInvoiced,
     evidenceHealth: evidence,
   });
+
+  // Aborted: no driver action, no POD review, not "completed but not invoiced".
+  if (status === "aborted") {
+    return { job, buckets: [], evidence, invoice };
+  }
 
   // Cancelled / archived: short-circuit. No other bucket applies.
   if (isCancelled(status) || job.is_hidden) {

@@ -235,7 +235,7 @@ export function InvoicePrepScreen() {
 
   const warnings = useMemo(() => {
     const list: string[] = [];
-    const noPrice = selectedJobs.filter((j) => !j.total_price || j.total_price <= 0).length;
+    const noPrice = selectedJobs.filter((j) => j.status !== "aborted" && (!j.total_price || j.total_price <= 0)).length;
     if (noPrice > 0) list.push(`${noPrice} job(s) have no price set — total may be inaccurate.`);
     return list;
   }, [selectedJobs]);
@@ -251,6 +251,8 @@ export function InvoicePrepScreen() {
   const isJobSelectable = (job: EligibleJob) => {
     if (job.readiness?.alreadyInvoiced) return false;
     if (job.readiness?.ready) return true;
+    // An Abort is billable only once its fee is approved: no override.
+    if (job.status === "aborted") return false;
     return isOverridden(job.id);
   };
 
@@ -627,7 +629,7 @@ export function InvoicePrepScreen() {
                                 ? `Override · ${job.readiness?.primaryReason ?? "blocked"}`
                                 : job.readiness?.primaryReason ?? job.status.replace(/_/g, " ")}
                             </Badge>
-                            {!job.readiness?.ready && !job.readiness?.alreadyInvoiced && (
+                            {!job.readiness?.ready && !job.readiness?.alreadyInvoiced && job.status !== "aborted" && (
                               <RoleScope admin>
                                 <Button
                                   type="button"
@@ -669,11 +671,20 @@ export function InvoicePrepScreen() {
                         </TableCell>
                         <TableCell>
                           <span className="text-xs text-muted-foreground">
-                            {shortDate(job.completed_at)}
+                            {shortDate(job.completed_at ?? job.abort_confirmed_at ?? null)}
                           </span>
                         </TableCell>
                         <TableCell className="text-right">
-                          {job.total_price ? (
+                          {job.status === "aborted" ? (
+                            job.abort_fee != null ? (
+                              <span className="text-sm font-semibold tabular-nums text-foreground" title="Approved Abort fee">
+                                {fmtGbp(job.abort_fee)}
+                                <span className="block text-[11px] font-normal text-muted-foreground">Abort fee</span>
+                              </span>
+                            ) : (
+                              <span className="text-xs text-warning font-medium">Fee not approved</span>
+                            )
+                          ) : job.total_price ? (
                             <span className="text-sm font-semibold tabular-nums text-foreground">
                               {fmtGbp(job.total_price)}
                             </span>
