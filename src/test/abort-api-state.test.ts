@@ -109,6 +109,20 @@ describe("Abort RPC API contracts", () => {
     });
   });
 
+  it("maps the no-name exception to a valid typed RPC payload", async () => {
+    mockState.rpcData = { abortId: "a2", alreadyAborted: false, financeStatus: "pending_review" };
+    await confirmJobAbort({ jobId: "j1", contactName: null, noNameException: true, expectedStatus: "assigned" });
+    expect(mockState.rpcCalls[0]).toEqual({
+      fn: "confirm_job_abort",
+      args: {
+        p_job_id: "j1",
+        p_contact_name: "",
+        p_no_name_exception: true,
+        p_expected_status: "assigned",
+      },
+    });
+  });
+
   it("preserves database error codes for a denied admin-only action", async () => {
     mockState.rpcError = { message: "ADMIN_OR_SUPER_ADMIN_ONLY", code: "42501" };
     await expect(confirmJobAbort({
