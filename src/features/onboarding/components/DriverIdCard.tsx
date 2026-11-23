@@ -1,148 +1,155 @@
 /**
- * DriverIdCard — the presentational digital-ID badge.
- * Pure/props-driven so it can be previewed or reused without a data fetch.
+ * Axentra Digital ID V2 — customer-facing company identification.
+ * Screenshot-locked design: navy card, central portrait, 2x3 info grid.
+ * No driving licence, job, or independent identity-verification claims.
  */
-import { Badge } from "@/components/ui/badge";
+import { BadgeCheck, Clock3, Globe2, HardHat, IdCard, Layers3, Phone, ShieldCheck } from "lucide-react";
 import { getInitials } from "@/lib/utils";
-import { licenceStatus } from "../lib/licenceStatus";
+import type { DigitalIdCredential, DigitalIdDisplayStatus } from "../hooks/useDigitalCredential";
 
 const CARD_GRADIENT =
-  "radial-gradient(60% 50% at 50% 0%, rgba(35,120,220,0.35), transparent 70%), " +
-  "radial-gradient(55% 45% at 85% 100%, rgba(20,90,190,0.28), transparent 70%), " +
-  "linear-gradient(180deg, #0b1c3f 0%, #071431 55%, #040c22 100%)";
+  "radial-gradient(70% 35% at 52% 0%, rgba(16,101,209,0.44) 0%, transparent 85%), " +
+  "radial-gradient(55% 38% at 100% 100%, rgba(5,108,232,0.28), transparent 85%), " +
+  "linear-gradient(153deg, #0b224b 0%, #061631 48%, #06112b 100%)";
 
-const LICENCE_STATUS_STYLE: Record<string, string> = {
-  valid: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
-  expiring: "bg-amber-500/15 text-amber-300 border-amber-500/30",
-  expired: "bg-red-500/15 text-red-300 border-red-500/30",
-  unknown: "bg-white/10 text-white/60 border-white/20",
-};
-
-const LICENCE_STATUS_LABEL: Record<string, string> = {
-  valid: "Valid",
-  expiring: "Expiring soon",
-  expired: "Expired",
-  unknown: "Not on file",
-};
-
-function fmtDate(d?: string | null): string {
-  if (!d) return "—";
-  try {
-    return new Date(d + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-  } catch {
-    return d;
-  }
+export function formatEmployment(value: string | null | undefined): string {
+  const names: Record<string, string> = {
+    contractor: "Contractor",
+    self_employed: "Self-employed",
+    employed: "Employee",
+    agency: "Agency",
+  };
+  return value ? (names[value] ?? value.replace(/_/g, " ")) : "Driver";
 }
 
-export interface DriverIdCardDriver {
-  full_name?: string | null;
-  is_active?: boolean | null;
-  licence_number?: string | null;
-  licence_expiry?: string | null;
-  licence_categories?: string[] | null;
-  trade_plate_number?: string | null;
-  employment_type?: string | null;
+function verifiedTime(value: string | null | undefined): string {
+  if (!value) return "Not checked";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Not checked";
+  return date.toLocaleString("en-GB", {
+    day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+  });
 }
 
 interface DriverIdCardProps {
-  driver: DriverIdCardDriver;
-  name: string;
+  credential: DigitalIdCredential;
+  displayStatus: DigitalIdDisplayStatus;
   photoUrl: string | null;
 }
 
-export function DriverIdCard({ driver, name, photoUrl }: DriverIdCardProps) {
-  const licStatus = licenceStatus(driver.licence_expiry);
-  const initials = getInitials(name);
-  const categories = driver.licence_categories ?? [];
+interface InfoCellProps {
+  label: string;
+  value: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
 
+function InfoCell({ label, value, icon: Icon }: InfoCellProps) {
   return (
-    <div
-      className="rounded-2xl overflow-hidden border border-white/10 shadow-[0_30px_60px_rgba(3,9,28,0.45),inset_0_1px_0_rgba(255,255,255,0.08)]"
-      style={{ background: CARD_GRADIENT }}
-    >
-      <div className="px-6 pt-6 pb-5 text-center">
-        <img
-          src="/axentra-logo-lockup.webp"
-          alt="Axentra"
-          className="w-28 h-auto mx-auto mb-4 opacity-90"
-          onError={(e) => {
-            (e.target as HTMLImageElement).style.display = "none";
-          }}
-        />
-
-        <div className="relative w-24 h-24 mx-auto mb-3">
-          <div className="w-full h-full rounded-full overflow-hidden border-2 border-white/25 bg-white/10 flex items-center justify-center">
-            {photoUrl ? (
-              <img src={photoUrl} alt={name} className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-2xl font-semibold text-white/80">{initials || "?"}</span>
-            )}
-          </div>
+    <div className="flex min-w-0 items-start gap-2.5 py-3 sm:gap-3">
+      <Icon className="mt-0.5 h-5 w-5 shrink-0 text-slate-200/85" />
+      <div className="min-w-0 flex-1">
+        <div className="text-[9px] font-medium uppercase tracking-[0.13em] text-slate-400 sm:text-[10px]">
+          {label}
         </div>
-
-        <h1 className="text-xl font-semibold text-white truncate">{name}</h1>
-        <p className="text-[11px] uppercase tracking-[0.2em] text-white/50 mt-0.5">Authorised Driver</p>
-
-        <div className="flex items-center justify-center gap-1.5 mt-2 flex-wrap">
-          <Badge
-            variant="outline"
-            className={driver.is_active ? "bg-primary/20 text-primary-foreground border-primary/40 text-[10px]" : "bg-white/10 text-white/60 border-white/20 text-[10px]"}
-          >
-            {driver.is_active ? "Active" : "Inactive"}
-          </Badge>
-          {driver.trade_plate_number && (
-            <Badge variant="outline" className="bg-white/10 text-white/80 border-white/20 text-[10px] font-mono">
-              {driver.trade_plate_number}
-            </Badge>
-          )}
+        <div className="mt-0.5 break-words text-[12px] font-semibold leading-snug text-white sm:text-[13px]">
+          {value}
         </div>
-      </div>
-
-      <div className="border-t border-white/10 bg-black/15 px-6 py-5 space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <p className="text-[10px] uppercase tracking-wider text-white/40">Licence No.</p>
-            <p className="text-sm font-mono text-white/90 mt-0.5 truncate">{driver.licence_number || "—"}</p>
-          </div>
-          <div>
-            <p className="text-[10px] uppercase tracking-wider text-white/40">Expiry</p>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <p className="text-sm text-white/90">{fmtDate(driver.licence_expiry)}</p>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <p className="text-[10px] uppercase tracking-wider text-white/40 mb-1">Licence status</p>
-          <Badge variant="outline" className={`text-[10px] ${LICENCE_STATUS_STYLE[licStatus]}`}>
-            {LICENCE_STATUS_LABEL[licStatus]}
-          </Badge>
-        </div>
-
-        {categories.length > 0 && (
-          <div>
-            <p className="text-[10px] uppercase tracking-wider text-white/40 mb-1.5">Categories</p>
-            <div className="flex flex-wrap gap-1">
-              {categories.map((c) => (
-                <Badge key={c} variant="outline" className="bg-white/10 text-white/80 border-white/20 text-[10px]">
-                  {c}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {driver.employment_type && (
-          <div>
-            <p className="text-[10px] uppercase tracking-wider text-white/40">Employment</p>
-            <p className="text-sm text-white/90 mt-0.5 capitalize">{driver.employment_type.replace(/_/g, " ")}</p>
-          </div>
-        )}
-      </div>
-
-      <div className="border-t border-white/10 px-6 py-3 text-center">
-        <p className="text-[10px] uppercase tracking-[0.2em] text-white/40">Precision in Every Move</p>
       </div>
     </div>
+  );
+}
+
+export function DriverIdCard({ credential, displayStatus, photoUrl }: DriverIdCardProps) {
+  const initials = getInitials(credential.full_name || "");
+  const isActive = displayStatus === "active" && credential.status === "active";
+  const isGrace = displayStatus === "grace" && credential.status === "active";
+  const stateText = isActive
+    ? "Authorised / Active"
+    : isGrace ? "Connection lost" : "Not authorised";
+  const statusStyle = isActive
+    ? "border-emerald-300/50 bg-emerald-600/25 text-white"
+    : isGrace ? "border-amber-300/60 bg-amber-600/25 text-amber-100"
+    : "border-red-300/50 bg-red-600/25 text-red-100";
+
+  return (
+    <section
+      aria-label="Axentra company-issued Digital ID"
+      className="relative isolate overflow-hidden rounded-[25px] border border-blue-300/25 text-white shadow-[0_25px_46px_-14px_rgba(5,16,44,0.5)]"
+      style={{ background: CARD_GRADIENT }}
+    >
+      <div aria-hidden="true" className="pointer-events-none absolute -left-20 -top-24 h-52 w-72 rotate-[-30deg] rounded-full border-b border-cyan-300/60 bg-blue-500/10 blur-[1px]" />
+      <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 -right-16 h-48 w-60 rounded-full border-t border-blue-300/50 bg-blue-500/10 blur-[2px]" />
+      <div className="relative px-5 pb-4 pt-6 sm:px-7 sm:pt-7">
+        <div className="text-center">
+          <img
+            src="/axentra-logo-lockup.webp"
+            alt="Axentra"
+            className="mx-auto mb-4 h-auto w-36 max-w-full object-contain drop-shadow-[0_0_12px_rgba(65,145,235,0.35)] sm:w-40"
+          />
+          <div className="mx-auto inline-flex max-w-full items-center justify-center rounded-full border border-sky-300/60 bg-white/[0.035] px-5 py-2 shadow-[inset_0_0_10px_rgba(44,149,239,0.2)]">
+            <span className="text-center text-[9px] font-semibold uppercase tracking-[0.18em] text-white sm:text-[10px]">
+              Company-issued Driver ID
+            </span>
+          </div>
+
+          <div className="mx-auto mt-5 flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-2 border-sky-300/85 bg-gradient-to-b from-slate-600/50 to-slate-700/65 shadow-[0_0_0_3px_rgba(74,150,243,0.14),0_0_18px_rgba(79,154,255,0.38)] sm:h-28 sm:w-28">
+            {photoUrl ? (
+              <img src={photoUrl} alt={"Photograph of " + (credential.full_name || "driver")} className="h-full w-full object-cover" />
+            ) : (
+              <span aria-label="Photograph not yet uploaded" className="text-3xl font-semibold tracking-wide text-white sm:text-4xl">
+                {initials || "—"}
+              </span>
+            )}
+          </div>
+
+          <h1 className="mt-4 break-words text-[25px] font-bold leading-tight tracking-tight text-white sm:text-[29px]">
+            {credential.full_name || "Name pending"}
+          </h1>
+          <p className="mt-2 text-[10px] font-medium uppercase tracking-[0.32em] text-slate-300 sm:text-[11px]">
+            {credential.role_label || "Authorised Driver"}
+          </p>
+
+          <div className={"mx-auto mt-3 inline-flex min-h-8 items-center gap-2 rounded-full border px-4 py-1.5 shadow-[inset_0_0_15px_rgba(255,255,255,0.07)] " + statusStyle}>
+            <BadgeCheck className={"h-4 w-4 " + (isActive ? "text-emerald-300" : isGrace ? "text-amber-200" : "text-red-200")} />
+            <span className="text-[13px] font-semibold">{stateText}</span>
+            {isActive && <span aria-hidden="true" className="ml-1 h-1.5 w-1.5 rounded-full bg-emerald-300 motion-safe:animate-pulse" />}
+          </div>
+          <p className="mt-3 text-[12px] text-slate-300 sm:text-[13px]">
+            Representing Axentra Vehicle Logistics
+          </p>
+        </div>
+
+        <div className="mt-5 border-t border-sky-100/15">
+          <div className="grid grid-cols-2 gap-x-3 border-b border-white/10">
+            <InfoCell icon={IdCard} label="Driver ID" value={credential.driver_id} />
+            <InfoCell icon={Phone} label="Company phone" value={credential.company_phone || "Not provided"} />
+          </div>
+          <div className="grid grid-cols-2 gap-x-3 border-b border-white/10">
+            <InfoCell icon={HardHat} label="Employment" value={formatEmployment(credential.employment_type)} />
+            <InfoCell icon={Globe2} label="Website" value={credential.company_website} />
+          </div>
+          <div className="grid grid-cols-2 gap-x-3">
+            <InfoCell icon={Layers3} label="Issued by" value={credential.issued_by} />
+            <InfoCell icon={Clock3} label="Last checked" value={verifiedTime(credential.checked_at)} />
+          </div>
+        </div>
+
+        <div className="mt-2 flex min-h-[53px] items-center justify-center gap-3 rounded-2xl border border-emerald-300/40 bg-gradient-to-r from-emerald-600/20 via-sky-600/10 to-emerald-500/20 px-3 py-3 shadow-[inset_0_0_12px_rgba(50,205,165,0.08)]">
+          <ShieldCheck className="h-6 w-6 shrink-0 text-emerald-300" />
+          <span className="h-6 border-l border-emerald-100/35" />
+          <span className="text-center text-[12px] font-semibold leading-snug text-white sm:text-[13px]">
+            Official Axentra company ID
+          </span>
+        </div>
+
+        <div className="mt-5 flex items-center gap-3 text-center">
+          <span className="h-px flex-1 bg-slate-300/30" />
+          <p className="shrink-0 text-[9px] font-medium uppercase tracking-[0.25em] text-slate-300 sm:text-[10px]">
+            Precision in every move
+          </p>
+          <span className="h-px flex-1 bg-slate-300/30" />
+        </div>
+      </div>
+    </section>
   );
 }
