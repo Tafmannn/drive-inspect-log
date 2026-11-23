@@ -13,7 +13,7 @@
  * while it is off, no VAT is charged and none appears on the invoice.
  */
 import { useState, useMemo, useEffect, useRef } from "react";
-import { useSearchParams, Link } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
 import {
   ControlShell,
