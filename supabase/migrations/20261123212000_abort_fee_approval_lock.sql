@@ -11,6 +11,15 @@ ALTER TABLE public.job_aborts
   ADD COLUMN IF NOT EXISTS last_amended_by uuid,
   ADD COLUMN IF NOT EXISTS last_amendment_reason text;
 
+-- The existing append-only audit log has an explicit action constraint.
+ALTER TABLE public.job_abort_events DROP CONSTRAINT IF EXISTS job_abort_events_action_check;
+ALTER TABLE public.job_abort_events
+  ADD CONSTRAINT job_abort_events_action_check CHECK (action IN (
+    'requested', 'request_dismissed', 'confirmed', 'claim_approved',
+    'claim_rejected', 'claim_amended', 'reopened',
+    'customer_notified', 'replacement_created'
+  ));
+
 CREATE OR REPLACE FUNCTION public.review_job_abort_claim(
   p_abort_id uuid,
   p_decision text,
