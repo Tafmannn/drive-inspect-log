@@ -24,6 +24,12 @@ export const CONTACT_NAME_MAX = 120;
 export type AbortFinanceStatus = "pending_review" | "approved" | "rejected";
 export type AbortRequestStatus = "pending" | "confirmed" | "dismissed" | "superseded";
 
+/** A finance decision locks ordinary review as soon as it is made.
+ * Invoicing is an additional lock, not the trigger for the first one. */
+export function isAbortFeeReviewLocked(status: AbortFinanceStatus, invoiced: boolean): boolean {
+  return invoiced || status !== "pending_review";
+}
+
 export interface AbortEligibilityJob {
   status: string | null | undefined;
   has_pickup_inspection?: boolean | null;
