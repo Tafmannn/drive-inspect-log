@@ -27,7 +27,7 @@
  */
 
 import type { Job, Inspection, Photo, JobWithRelations } from "./types";
-import { JOB_STATUS, TERMINAL_STATUSES, type JobStatusValue } from "./statusConfig";
+import { JOB_STATUS, TERMINAL_STATUSES, isOperationallyClosed, type JobStatusValue } from "./statusConfig";
 import { canonicalisePhotos } from "./photoDedupe";
 import { evaluateExecutableState } from "./executionRanking";
 
@@ -218,7 +218,7 @@ export function deriveWorkflowState(input: WorkflowInput): WorkflowState {
   const blockers: WorkflowBlocker[] = [];
 
   // Active-job lock surfaces as a blocker but does not change phase.
-  if (siblingJobs && siblingJobs.length > 0) {
+  if (!isOperationallyClosed(job.status) && siblingJobs && siblingJobs.length > 0) {
     const exec = evaluateExecutableState(job, siblingJobs);
     if (exec.state === "blocked" && exec.reason && /Complete Job/i.test(exec.reason)) {
       blockers.push({ code: "active_job_lock", message: exec.reason });
@@ -772,7 +772,9 @@ export function getWorkflowBrain(input: BrainInput): WorkflowBrain {
 
   // ── Risk level ────────────────────────────────────────────────────
   let riskLevel: RiskLevel = "none";
-  if (lock) riskLevel = "high";
+  // An Abort is closed, not a delivery with outstanding upload/POD risk.
+  if (rawStatus === JOB_STATUS.ABORTED) riskLevel = "none";
+  else if (lock) riskLevel = "high";
   else if (
     rawStatus === JOB_STATUS.FAILED ||
     rawStatus === JOB_STATUS.INCOMPLETE
