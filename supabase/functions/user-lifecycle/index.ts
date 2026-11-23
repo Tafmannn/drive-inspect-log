@@ -11,7 +11,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { findAuthUserByEmail, listAllAuthUsers } from "../_shared/adminUsers.ts";
 import { isSensitivePermissionBlockedForNonSuperAdmin } from "../_shared/permissionEscalation.ts";
 import { inactiveAccountError } from "../_shared/profileAuthz.ts";
-import { renderActionEmailHtml, resolveRedirectUrl, sendBrandedEmail } from "../_shared/brandedEmail.ts";
+import { renderActionEmailHtml, resolveRedirectUrl, sendBrandedEmail, brandLogoUrl } from "../_shared/brandedEmail.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -83,6 +83,7 @@ async function sendInviteEmail(opts: {
   firstName: string | null;
   actionLink: string;
   subject: string;
+  logoUrl: string | null;
 }): Promise<{ ok: boolean; detail?: unknown }> {
   return sendBrandedEmail({
     to: opts.to,
@@ -94,6 +95,7 @@ async function sendInviteEmail(opts: {
         "Click the button below to create your password and finish setting up your account.",
       buttonLabel: "Set up my account",
       actionLink: opts.actionLink,
+      logoUrl: opts.logoUrl,
       noteHtml:
         "This link is valid for 24 hours and can only be used once. If it has " +
         "expired, ask your administrator to resend the invitation.",
@@ -355,6 +357,7 @@ serve(async (req) => {
           }
           authUserId = linkData.user.id;
           const sent = await sendInviteEmail({
+            logoUrl: brandLogoUrl(req),
             to: email,
             firstName: first_name ?? null,
             actionLink: linkData.properties.action_link,
@@ -468,6 +471,7 @@ serve(async (req) => {
           return json({ error: linkErr?.message ?? "LINK_GENERATION_FAILED" }, 500);
         }
         const sent = await sendInviteEmail({
+            logoUrl: brandLogoUrl(req),
           to: target.email,
           firstName: target.first_name,
           actionLink: linkData.properties.action_link,

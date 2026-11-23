@@ -12,7 +12,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { createIpRateLimiter } from "../_shared/rateLimit.ts";
-import { renderActionEmailHtml, resolveRedirectUrl, sendBrandedEmail } from "../_shared/brandedEmail.ts";
+import { renderActionEmailHtml, resolveRedirectUrl, sendBrandedEmail, brandLogoUrl } from "../_shared/brandedEmail.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -79,6 +79,7 @@ serve(async (req) => {
               "below to choose a new password.",
             buttonLabel: "Reset my password",
             actionLink: linkData.properties.action_link,
+            logoUrl: brandLogoUrl(req),
             noteHtml:
               "This link is valid for 1 hour and can only be used once. If you " +
               "didn't request this, you can safely ignore this email — your " +

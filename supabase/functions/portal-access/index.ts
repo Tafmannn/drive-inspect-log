@@ -15,7 +15,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { authenticateCaller, corsHeaders, inactiveAccountError, jsonRes } from "../_shared/auth.ts";
 import { findAuthUserByEmail } from "../_shared/adminUsers.ts";
-import { escapeHtml, renderActionEmailHtml, resolveRedirectUrl, sendBrandedEmail } from "../_shared/brandedEmail.ts";
+import { brandLogoUrl, portalInviteIntroHtml, renderActionEmailHtml, resolveRedirectUrl, sendBrandedEmail } from "../_shared/brandedEmail.ts";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -46,6 +46,7 @@ async function sendPortalEmail(opts: {
   clientName: string;
   actionLink: string;
   isResend: boolean;
+  logoUrl: string | null;
 }) {
   return sendBrandedEmail({
     to: opts.to,
@@ -54,10 +55,9 @@ async function sendPortalEmail(opts: {
       : `You've been invited to the ${opts.operatorName} customer portal`,
     html: renderActionEmailHtml({
       firstName: opts.firstName,
-      introHtml:
-        `<strong>${escapeHtml(opts.operatorName)}</strong> has given you access to their customer portal for ` +
-        `<strong>${escapeHtml(opts.clientName)}</strong>. Track your vehicle moves, see delivery photos and ` +
-        "signatures, and download your invoices — any time.",
+      introHtml: portalInviteIntroHtml(opts.operatorName, opts.clientName),
+      logoUrl: opts.logoUrl,
+      eyebrow: "Customer portal",
       buttonLabel: opts.isResend ? "Set my password" : "Set up my portal access",
       actionLink: opts.actionLink,
       noteHtml:
@@ -168,7 +168,7 @@ serve(async (req) => {
         authUserId = linkData.user.id;
         const sent = await sendPortalEmail({
           to: email, firstName, operatorName, clientName,
-          actionLink: linkData.properties.action_link, isResend: false,
+          actionLink: linkData.properties.action_link, isResend: false, logoUrl: brandLogoUrl(req),
         });
         inviteEmail = sent.ok ? "sent" : "failed";
         if (!sent.ok) console.error("portal invite email failed", sent.detail);
@@ -245,7 +245,7 @@ serve(async (req) => {
         }
         const sent = await sendPortalEmail({
           to: target.email, firstName: target.first_name, operatorName, clientName,
-          actionLink: linkData.properties.action_link, isResend: true,
+          actionLink: linkData.properties.action_link, isResend: true, logoUrl: brandLogoUrl(req),
         });
         if (!sent.ok) return jsonRes({ error: "EMAIL_SEND_FAILED" }, 500);
       } else {
