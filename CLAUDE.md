@@ -28,3 +28,12 @@ Functions in `supabase/functions`), deployed via Lovable/Vercel. Production Supa
 - `ui-ux-pro-max` — UI design guidance.
 - `mobile-native`, `apple-design`, `animation-performance` — third-party (emilkowalski/skills, pinned in `skills-lock.json`): mobile web polish, Apple-style motion, animation perf.
 - Design-engineering toolkit (more emilkowalski skills, Motion AI Kit `motion`, plugins `frontend-design` and `dashboard-design`): see `.claude/design-engineering.md` for which skill to use when and the Axentra visual standards. Load only the skills a task needs.
+
+## Deployment control (important)
+
+Follow root `AGENTS.md` for all ChatGPT/Claude coding and release decisions. In particular:
+- Routine `claude/*`, `chatgpt/*`, `fix/*`, `feature/*` and other development branches do **not** automatically deploy.
+- Automatic deployment is reserved for `main` and explicit `deploy-preview/<slug>` branches.
+- Do not use Vercel CLI/API/redeploy hooks to bypass this without explicit user deployment authorization.
+- Batch changes, validate before pushing, and do not use GitHub pushes as a test loop.
+- Before touching the deployment rules run `node scripts/check-vercel-deployment-policy.mjs`.
