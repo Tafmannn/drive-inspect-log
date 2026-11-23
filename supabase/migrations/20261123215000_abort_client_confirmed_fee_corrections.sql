@@ -234,7 +234,7 @@ CREATE TABLE IF NOT EXISTS public.job_abort_invoice_corrections (
   abort_id uuid NOT NULL REFERENCES public.job_aborts(id),
   original_invoice_id uuid NOT NULL REFERENCES public.invoices(id),
   credit_note_id uuid REFERENCES public.invoices(id),
-  replacement_invoice_id uuid REFERENCES public.invoices(id),
+  replacement_invoice_id uuid REFERENCES public.invoices(id) ON DELETE SET NULL,
   original_invoice_number text NOT NULL,
   previous_fee numeric NOT NULL,
   revised_fee numeric NOT NULL,
