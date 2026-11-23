@@ -84,11 +84,11 @@ Tracking: [Issue #177](https://github.com/Tafmannn/drive-inspect-log/issues/177)
 
 No staging schema or data was modified during the PR #178 release recovery. A fresh, data-less Supabase QA branch would be safer for destructive test fixtures, but creating that branch incurs additional usage charges and requires explicit cost agreement. Do not run `supabase/tests/job_abort_workflow.sql` against production.
 
-## Subsequent fee-approval lock fix (pending release)
+## Subsequent fee-approval lock fix (production DB applied; app release pending)
 
 The screenshot-reported issue was that the fee review form used `locked = invoiced` and `review_job_abort_claim` permitted repeated approvals or rejection before invoicing. That meant a fee shown as **Approved · Ready to invoice** still exposed editable controls.
 
-Proposed fix (feature branch `fix/abort-approval-lock-and-audited-amendments`):
+Implemented fix (feature branch `fix/abort-approval-lock-and-audited-amendments`):
 
 - Hide ordinary Approve/Reject inputs as soon as `finance_status` leaves `pending_review`.
 - Apply the lock immediately to React Query cache after successful approval.
@@ -98,4 +98,4 @@ Proposed fix (feature branch `fix/abort-approval-lock-and-audited-amendments`):
 - Preserve all existing approved fee amounts during migration. Historical repeated approval events remain in the immutable history; they are not deleted.
 - Deploy the database migration before the updated client so no unprotected API window is introduced.
 
-**Release warning:** This follow-up migration is NOT part of the historical PR #176/#178 deployment. Do not assume it is live until the new migration is applied, code deployed and authenticated smoke tests pass. Staging remains drifted from production per the earlier release notes. The SQL scenario test uses a rollback transaction on a properly migrated non-production database; do not run it on production.
+**Production database verification (23 November 2026, 20:28 UTC):** The additive migration `supabase/migrations/20261123202841_abort_fee_approval_lock.sql` was applied through the connected Supabase migration service, and the generated remote version was matched to this repository filename. Read-only checks confirmed the repeat-approval guard, Super Admin correction procedure, three amendment metadata columns, and the `claim_amended` audit constraint. The existing approved amount remains **£240.00** and all **3** prior approval events remain. No amendments were made. This migration does **not** deploy the React UI. The branch must still be merged and deployed, with authenticated UI smoke testing afterwards. Staging remains drifted from production per the earlier release notes; do not run its SQL scenario tests against production.
