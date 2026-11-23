@@ -5,18 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Lock, CheckCircle2, Truck, Camera, FileText } from "lucide-react";
-import type { Session } from "@supabase/supabase-js";
-
-/**
- * A customer-portal invite? portal-access stamps app_metadata.role="client"
- * server-side (users can't edit app_metadata). Used here ONLY to choose the
- * wording and the post-setup destination; portal access itself is still
- * enforced by PortalRoute / user_profiles.
- */
-export function isPortalInvite(session: Session | null | undefined): boolean {
-  const meta = (session?.user?.app_metadata ?? {}) as { role?: unknown; roles?: unknown };
-  return meta.role === "client" || (Array.isArray(meta.roles) && meta.roles.includes("CLIENT"));
-}
+import { isPortalInvite, welcomeStage } from "./welcomeHelpers";
 
 /**
  * Landing page for invitation links. The branded invite email points here:
@@ -49,12 +38,18 @@ export const Welcome = () => {
     // supabase-js consumes the #access_token=…&type=invite hash automatically
     // (detectSessionInUrl) — it may already have done so, or may still be
     // doing it, so check the current session AND listen for SIGNED_IN.
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
-        setPortal(isPortalInvite(data.session));
-        setHasSession(true);
-      }
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (data.session) {
+          setPortal(isPortalInvite(data.session));
+          setHasSession(true);
+        }
+      })
+      .catch(() => {
+        // No session could be read; the timeout below then shows the
+        // "invalid or expired link" message, same as an absent session.
+      });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
         setPortal(isPortalInvite(session));
@@ -72,6 +67,8 @@ export const Welcome = () => {
       clearTimeout(timer);
     };
   }, []);
+
+  const stage = welcomeStage(success, hasSession);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -142,7 +139,7 @@ export const Welcome = () => {
             </div>
           )}
 
-          {success ? (
+          {stage === "success" && (
             <div className="flex flex-col items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-5">
               <CheckCircle2 className="h-8 w-8 text-emerald-400" />
               <div className="text-center">
@@ -150,17 +147,20 @@ export const Welcome = () => {
                 <p className="text-xs text-emerald-300/70 mt-1">{portal ? "Taking you to your portal…" : "Taking you to the app…"}</p>
               </div>
             </div>
-          ) : hasSession === null ? (
+          )}
+          {stage === "verifying" && (
             <div className="flex items-center justify-center gap-2 py-6 text-sm text-slate-400">
               <Loader2 className="h-4 w-4 animate-spin" />
               Verifying your invitation…
             </div>
-          ) : hasSession === false ? (
+          )}
+          {stage === "invalid" && (
             <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-200">
               {linkError ??
                 "This invitation link is invalid or has expired. Please ask whoever invited you to send a new one."}
             </div>
-          ) : (
+          )}
+          {stage === "form" && (
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="space-y-3.5">
                 <div className="space-y-1.5">

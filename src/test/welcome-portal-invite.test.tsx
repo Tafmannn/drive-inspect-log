@@ -3,17 +3,19 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 let session: unknown = null;
+let sessionFails = false;
 const updateUser = vi.fn(async (_attrs: unknown) => ({ error: null }));
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     auth: {
-      getSession: () => Promise.resolve({ data: { session } }),
+      getSession: () => (sessionFails ? Promise.reject(new Error("storage unavailable")) : Promise.resolve({ data: { session } })),
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
       updateUser: (attrs: unknown) => updateUser(attrs),
     },
   },
 }));
-import { Welcome, isPortalInvite } from "@/pages/Welcome";
+import { Welcome } from "@/pages/Welcome";
+import { isPortalInvite, welcomeStage } from "@/pages/welcomeHelpers";
 
 const user = (app_metadata: Record<string, unknown>) => ({ user: { id: "u", app_metadata } });
 function renderWelcome() {
@@ -32,7 +34,16 @@ async function setPassword() {
   fireEvent.change(screen.getByLabelText("Confirm password"), { target: { value: "secret123" } });
 }
 
-beforeEach(() => { updateUser.mockClear(); vi.useRealTimers(); });
+beforeEach(() => { updateUser.mockClear(); vi.useRealTimers(); sessionFails = false; });
+
+describe("welcomeStage", () => {
+  it("maps page state to exactly one section", () => {
+    expect(welcomeStage(true, true)).toBe("success");
+    expect(welcomeStage(false, null)).toBe("verifying");
+    expect(welcomeStage(false, false)).toBe("invalid");
+    expect(welcomeStage(false, true)).toBe("form");
+  });
+});
 
 describe("isPortalInvite", () => {
   it("is true only for the server-set client role", () => {
@@ -66,5 +77,12 @@ describe("Welcome page", () => {
     await setPassword();
     fireEvent.click(screen.getByRole("button", { name: /Create password & continue/ }));
     expect(await screen.findByText("APP_HOME", {}, { timeout: 3000 })).toBeInTheDocument();
+  });
+
+  it("a failed session read ends on the invalid-link message, not a spinner", async () => {
+    sessionFails = true;
+    session = null;
+    renderWelcome();
+    expect(await screen.findByText(/invalid or has expired/, {}, { timeout: 4000 })).toBeInTheDocument();
   });
 });
