@@ -253,6 +253,22 @@ describe("workflowBrain", () => {
     expect(s.readiness.canGeneratePod).toBe(false);
   });
 
+  it("aborted remains closed with no POD even when stale delivery evidence exists", () => {
+    const s = deriveWorkflowState({
+      job: mkJob({ status: "aborted" }),
+      inspections: [mkInspection()],
+      photos: [mkPhoto()],
+      pendingUploads: { failedCount: 1 },
+    });
+    expect(s.phase).toBe("aborted");
+    expect(s.nextAction).toBeNull();
+    expect(s.readiness.canStartPickup).toBe(false);
+    expect(s.readiness.canStartDelivery).toBe(false);
+    expect(s.readiness.canGeneratePod).toBe(false);
+    expect(s.readiness.canCloseJob).toBe(false);
+    expect(s.evidence.deliveryInspection).toBeTruthy(); // historical evidence stays intact
+  });
+
   it("cancelled jobs return null nextAction", () => {
     const s = deriveWorkflowState({ job: mkJob({ status: "cancelled" }) });
     expect(s.phase).toBe("cancelled");

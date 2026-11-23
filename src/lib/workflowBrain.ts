@@ -27,7 +27,7 @@
  */
 
 import type { Job, Inspection, Photo, JobWithRelations } from "./types";
-import { JOB_STATUS, TERMINAL_STATUSES, type JobStatusValue } from "./statusConfig";
+import { JOB_STATUS, TERMINAL_STATUSES, isOperationallyClosed, type JobStatusValue } from "./statusConfig";
 import { canonicalisePhotos } from "./photoDedupe";
 import { evaluateExecutableState } from "./executionRanking";
 
@@ -218,7 +218,7 @@ export function deriveWorkflowState(input: WorkflowInput): WorkflowState {
   const blockers: WorkflowBlocker[] = [];
 
   // Active-job lock surfaces as a blocker but does not change phase.
-  if (siblingJobs && siblingJobs.length > 0) {
+  if (!isOperationallyClosed(job.status) && siblingJobs && siblingJobs.length > 0) {
     const exec = evaluateExecutableState(job, siblingJobs);
     if (exec.state === "blocked" && exec.reason && /Complete Job/i.test(exec.reason)) {
       blockers.push({ code: "active_job_lock", message: exec.reason });
@@ -228,13 +228,13 @@ export function deriveWorkflowState(input: WorkflowInput): WorkflowState {
   }
 
   const isTerminal = (TERMINAL_STATUSES as string[]).includes(job.status);
-  const isCancelled = job.status === JOB_STATUS.CANCELLED;
+  const isNonMovementClosed = job.status === JOB_STATUS.CANCELLED || job.status === JOB_STATUS.ABORTED;
   const driverAssigned = !!job.driver_id;
 
   // Readiness gates ---------------------------------------------------
   const canStartPickup =
     !isTerminal &&
-    !isCancelled &&
+    !isNonMovementClosed &&
     driverAssigned &&
     blockers.find((b) => b.code === "active_job_lock") === undefined &&
     (job.status === JOB_STATUS.READY_FOR_PICKUP ||
@@ -243,7 +243,7 @@ export function deriveWorkflowState(input: WorkflowInput): WorkflowState {
 
   const canStartDelivery =
     !isTerminal &&
-    !isCancelled &&
+    !isNonMovementClosed &&
     driverAssigned &&
     blockers.find((b) => b.code === "active_job_lock") === undefined &&
     (job.status === JOB_STATUS.IN_TRANSIT ||
@@ -301,7 +301,7 @@ export function deriveWorkflowState(input: WorkflowInput): WorkflowState {
     });
   }
 
-  const canGeneratePod = !isTerminal && !isCancelled && podBlockers.length === 0;
+  const canGeneratePod = !isTerminal && !isNonMovementClosed && podBlockers.length === 0;
 
   // Surface POD blockers only when we're at/past the delivery stage.
   // Showing "missing delivery photos" on a freshly-created job would be
@@ -318,7 +318,7 @@ export function deriveWorkflowState(input: WorkflowInput): WorkflowState {
 
   // Next action -------------------------------------------------------
   let nextAction: WorkflowAction | null = null;
-  if (isCancelled) {
+  if (isNonMovementClosed) {
     nextAction = null;
   } else if (isTerminal) {
     nextAction = {
@@ -650,6 +650,8 @@ export function getWorkflowBrain(input: BrainInput): WorkflowBrain {
       invoiceBlockerMessages.push(
         "Job is awaiting admin review. It must be closed before invoicing.",
       );
+    } else if (rawStatus === JOB_STATUS.ABORTED) {
+      invoiceBlockerMessages.push("Abort invoicing requires a separately approved fee in Jobs → Aborts.");
     } else {
       invoiceBlockerMessages.push("Job must be completed before invoicing.");
     }
@@ -770,7 +772,9 @@ export function getWorkflowBrain(input: BrainInput): WorkflowBrain {
 
   // ── Risk level ────────────────────────────────────────────────────
   let riskLevel: RiskLevel = "none";
-  if (lock) riskLevel = "high";
+  // Abort is closed, so do not assess missing-delivery or upload risk.
+  if (rawStatus !== JOB_STATUS.ABORTED) {
+    if (lock) riskLevel = "high";
   else if (
     rawStatus === JOB_STATUS.FAILED ||
     rawStatus === JOB_STATUS.INCOMPLETE
@@ -791,6 +795,7 @@ export function getWorkflowBrain(input: BrainInput): WorkflowBrain {
     rawStatus !== JOB_STATUS.COMPLETED
   ) {
     riskLevel = "low";
+    }
   }
 
   // ── Advisory warnings (do not block) ──────────────────────────────

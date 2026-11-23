@@ -146,7 +146,7 @@ export interface InvoiceReadinessResult {
   blockers: InvoiceBlocker[];
   warnings: InvoiceWarning[];
   alreadyInvoiced: boolean;
-  evidenceLevel: EvidenceHealthResult["level"];
+  evidenceLevel: EvidenceHealthResult["level"] | "not_applicable";
 }
 
 function statusIsInvoiceable(status: string | null | undefined): boolean {
@@ -319,7 +319,7 @@ function evaluateAbortReadiness(
     warnings,
     alreadyInvoiced,
     // No evidence is required for an Abort; nothing about it blocks or warns.
-    evidenceLevel: "green",
+    evidenceLevel: "not_applicable",
   };
 }
 

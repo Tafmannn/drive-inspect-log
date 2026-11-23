@@ -31,3 +31,37 @@ jobs:
             -Dsonar.qualitygate.timeout=300
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      - name: Summarise new SonarQube findings when the gate fails
+        if: ${{ failure() && github.event_name == 'pull_request' }}
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if [[ -z "$SONAR_TOKEN" ]]; then echo 'Sonar API credential unavailable.'; exit 0; fi
+          response=$(curl -fsS --max-time 20 --user "$SONAR_TOKEN:" --get 'https://sonarcloud.io/api/issues/search' --data-urlencode 'componentKeys=axentra' --data-urlencode "pullRequest=$PR_NUMBER" --data-urlencode 'statuses=OPEN,CONFIRMED' --data-urlencode 'ps=100') || { echo 'Sonar API unavailable; use the Quality Gate check.'; exit 0; }
+          echo 'New-code issues (component, line, rule, message):'
+          echo "$response" | jq -r '.issues[:30][]? | [.component, (.line // 0), .rule, .message] | @tsv'
+      # The scanner's quality-gate summary gives a rating but not the actual
+      # new-code issues. Report issue locations on a failed PR scan so
+      # maintainers can fix the problem without weakening the gate.
+      - name: Report new-code SonarQube issues on failure
+        if: ${{ failure() && github.event_name == 'pull_request' }}
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_PR: ${{ github.event.pull_request.number }}
+        run: |
+          if [ -z "$SONAR_TOKEN" ]; then
+            echo "Sonar token not available; skip issue diagnostics."
+            exit 0
+          fi
+          response="$(curl --fail --silent --show-error --max-time 30 \
+            --user "$SONAR_TOKEN:" --get \
+            --data-urlencode "componentKeys=axentra" \
+            --data-urlencode "pullRequest=$SONAR_PR" \
+            --data-urlencode "resolved=false" \
+            --data-urlencode "ps=100" \
+            https://sonarcloud.io/api/issues/search)" || {
+            echo "Unable to retrieve SonarQube issue details."
+            exit 0
+          }
+          echo "$response" | jq -r '.issues[]? | "[\(.severity)] \(.rule) \(.component):\(.line // 0) — \(.message)"'

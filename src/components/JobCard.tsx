@@ -300,6 +300,8 @@ function deriveCta(
   hasPickup: boolean,
   hasDelivery: boolean,
 ): string {
+  // Closed jobs cannot offer inspection actions just because pickup evidence is absent.
+  if (["aborted", "cancelled", "archived", "failed"].includes(status)) return "View Job";
   if (!hasPickup) return "Start Pickup";
   switch (status) {
     case "ready_for_pickup":

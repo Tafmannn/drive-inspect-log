@@ -166,8 +166,12 @@ export function calculateDriverPerformance(
     else if (j.status === JOB_STATUS.ABORTED) abortedJobs += 1;
     else if (activeSet.has(j.status)) activeJobs += 1;
 
-    if (isLate(j.pickup_time_to, j.pickup_inspected_at)) latePickupCount += 1;
-    if (isLate(j.delivery_time_to, j.delivery_inspected_at)) lateDeliveryCount += 1;
+    // A collection that did not happen must not turn historical timestamps
+    // into a late pickup/delivery penalty for the driver.
+    if (j.status !== JOB_STATUS.ABORTED) {
+      if (isLate(j.pickup_time_to, j.pickup_inspected_at)) latePickupCount += 1;
+      if (isLate(j.delivery_time_to, j.delivery_inspected_at)) lateDeliveryCount += 1;
+    }
 
     failedUploadCount += j.failed_upload_count ?? 0;
 
@@ -181,7 +185,9 @@ export function calculateDriverPerformance(
       if (!j.has_customer_signature) missingSignatureCount += 1;
     }
 
-    const ev = jobEvidence(j);
+    // No collection/delivery evidence is required for an Abort. Retain the
+    // Abort count, but do not penalise evidence health or intervention rates.
+    const ev = j.status === JOB_STATUS.ABORTED ? null : jobEvidence(j);
     if (ev) {
       dist[ev.level] += 1;
       healthScoreSum += HEALTH_SCORE[ev.level];

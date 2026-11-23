@@ -124,6 +124,21 @@ describe("driverPerformance — uploads and signatures", () => {
 });
 
 describe("driverPerformance — evidence health aggregation", () => {
+  it("excludes Aborts from evidence quality and intervention scoring, but counts them separately", () => {
+    const p = calculateDriverPerformance("d1", [
+      baseJob({ status: "completed", evidenceHealth: ev("green") }),
+      baseJob({ status: "aborted", evidenceHealth: ev("critical"), pickup_time_to: "09:00", pickup_inspected_at: "2026-01-01T11:00:00Z" }),
+    ]);
+    expect(p.abortedJobs).toBe(1);
+    expect(p.completedJobs).toBe(1);
+    expect(p.evidenceHealthDistribution.green).toBe(1);
+    expect(p.evidenceHealthDistribution.critical).toBe(0);
+    expect(p.adminInterventionCount).toBe(0);
+    expect(p.latePickupCount).toBe(0);
+    expect(p.completionRate).toBe(1);
+  });
+
+
   it("uses provided evidenceHealth and computes distribution + average", () => {
     const p = calculateDriverPerformance("d1", [
       baseJob({ evidenceHealth: ev("green") }),

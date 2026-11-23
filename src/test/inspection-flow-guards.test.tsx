@@ -111,6 +111,17 @@ describe("InspectionFlow guards", () => {
     expect(screen.queryByText("Job not found")).not.toBeInTheDocument();
   });
 
+  it.each(["pickup", "delivery"] as const)("blocks a direct %s inspection for an aborted job, including admin routes", (kind) => {
+    mockUseJob.mockReturnValue({ data: job({ status: "aborted" }), isLoading: false, isError: false });
+    mockUseDriverGate.mockReturnValue({
+      status: "ungated", driverProfileId: null, onboardingStatus: null, isDriverOnly: false,
+    });
+    renderFlow(kind);
+    expect(screen.getByText("Collection aborted")).toBeInTheDocument();
+    expect(screen.getByText(/cannot be started or submitted/i)).toBeInTheDocument();
+    expect(screen.queryByText("Start Pickup")).not.toBeInTheDocument();
+  });
+
   it("never blocks an admin regardless of job assignment — useDriverGate reports ungated", () => {
     mockUseJob.mockReturnValue({ data: job({ driver_id: "someone-elses-profile-id" }), isLoading: false, isError: false });
     mockUseDriverGate.mockReturnValue({

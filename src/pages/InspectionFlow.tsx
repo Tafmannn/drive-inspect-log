@@ -404,7 +404,7 @@ export const InspectionFlow = () => {
   };
 
   useEffect(() => {
-    if (!dk || !sessionActive.current) return;
+    if (!dk || !sessionActive.current || !job || job.status === JOB_STATUS.ABORTED) return;
     // Only save serializable fields (exclude File objects)
     const { standardPhotos, additionalPhotos, damages, ...serializable } = formState;
     // Damage close-up Files live in IndexedDB (photoDraftStore); the JSON
@@ -412,7 +412,7 @@ export const InspectionFlow = () => {
     const draftPayload = { ...serializable, damages: serialiseDamagesForDraft(damages), _currentStep: currentStep };
     const timer = setTimeout(() => saveDraft(dk, draftPayload), 500);
     return () => clearTimeout(timer);
-  }, [formState, currentStep, dk]);
+  }, [formState, currentStep, dk, job?.status]);
 
   // ─── INTERRUPTION MARKER ───
   // While this screen is open, remember it so that if Android closes the
@@ -423,8 +423,12 @@ export const InspectionFlow = () => {
   const location = useLocation();
   const inspectionPath = location.pathname;
   useEffect(() => {
+    if (!job || job.status === JOB_STATUS.ABORTED) {
+      clearActiveInspection(inspectionPath);
+      return;
+    }
     markActiveInspection(inspectionPath, user?.id ?? null);
-  }, [inspectionPath, formState, currentStep, user?.id]);
+  }, [inspectionPath, formState, currentStep, user?.id, job?.status]);
   useEffect(() => () => clearActiveInspection(inspectionPath), [inspectionPath]);
   const resumedAfterRestart =
     (location.state as { resumeAfterRestart?: boolean } | null)?.resumeAfterRestart === true;
@@ -1391,6 +1395,26 @@ export const InspectionFlow = () => {
           </p>
           <Button variant="outline" className="min-h-[44px] rounded-lg mt-2" onClick={() => navigate("/jobs")}>
             Back to Jobs
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Direct navigation must not reopen inspection capture after the office has
+  // confirmed an Abort. This applies to admins too; the submit RPC also locks it.
+  if (job.status === JOB_STATUS.ABORTED) {
+    return (
+      <div className="min-h-screen bg-background">
+        <AppHeader title="Inspection unavailable" showBack onBack={() => navigate(`/jobs/${jobId}`)} />
+        <div className="p-4 flex flex-col items-center text-center gap-3 py-16">
+          <AlertTriangle className="w-10 h-10 text-muted-foreground" />
+          <p className="text-sm font-medium text-foreground">Collection aborted</p>
+          <p className="text-[13px] text-muted-foreground max-w-xs">
+            This job is closed. Pickup and delivery inspections cannot be started or submitted.
+          </p>
+          <Button variant="outline" className="min-h-[44px] rounded-lg mt-2" onClick={() => navigate(`/jobs/${jobId}`)}>
+            Back to Job
           </Button>
         </div>
       </div>
