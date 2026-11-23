@@ -17,6 +17,7 @@ type AbortRpcName =
   | "dismiss_job_abort_request"
   | "confirm_job_abort"
   | "review_job_abort_claim"
+  | "amend_approved_job_abort_claim"
   | "notify_customer_job_aborted"
   | "create_abort_replacement_job";
 
@@ -49,6 +50,9 @@ export interface JobAbort {
   reviewed_by: string | null;
   reviewed_at: string | null;
   review_note: string | null;
+  last_amended_at: string | null;
+  last_amended_by: string | null;
+  last_amendment_reason: string | null;
   customer_notified_at: string | null;
   reopened_at: string | null;
 }
@@ -144,6 +148,25 @@ export function reviewAbortClaim(input: {
     p_amount: input.amount ?? undefined,
     p_note: input.note ?? undefined,
   });
+}
+
+/** Exceptional correction of a signed-off fee. Server restricts to Super Admin,
+ * requires a reason, checks the expected old amount and refuses invoiced claims. */
+export function amendApprovedAbortClaim(input: {
+  abortId: string;
+  newAmount: number;
+  expectedAmount: number;
+  reason: string;
+}): Promise<{ financeStatus: AbortFinanceStatus; approvedAmount: number; amendedAt: string }> {
+  return rpc<{ financeStatus: AbortFinanceStatus; approvedAmount: number; amendedAt: string }, "amend_approved_job_abort_claim">(
+    "amend_approved_job_abort_claim",
+    {
+      p_abort_id: input.abortId,
+      p_new_amount: input.newAmount,
+      p_expected_amount: input.expectedAmount,
+      p_reason: input.reason,
+    },
+  );
 }
 
 export async function notifyCustomerAborted(abortId: string): Promise<{ queued: boolean; alreadyQueued: boolean }> {

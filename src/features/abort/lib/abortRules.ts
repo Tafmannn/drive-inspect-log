@@ -24,6 +24,12 @@ export const CONTACT_NAME_MAX = 120;
 export type AbortFinanceStatus = "pending_review" | "approved" | "rejected";
 export type AbortRequestStatus = "pending" | "confirmed" | "dismissed" | "superseded";
 
+/** A finance decision locks ordinary review as soon as it is made.
+ * Invoicing is an additional lock, not the trigger for the first one. */
+export function isAbortFeeReviewLocked(status: AbortFinanceStatus, invoiced: boolean): boolean {
+  return invoiced || status !== "pending_review";
+}
+
 export interface AbortEligibilityJob {
   status: string | null | undefined;
   has_pickup_inspection?: boolean | null;
@@ -176,6 +182,12 @@ export function abortErrorMessage(error: unknown): string {
     ["JOB_ALREADY_ABORTED", "This job has already been aborted."],
     ["ABORT_REQUEST_DENIED", "Only the driver assigned to this job can request an Abort."],
     ["ADMIN_OR_SUPER_ADMIN_ONLY", "Only an admin can do this."],
+    ["ABORT_CLAIM_ALREADY_REVIEWED", "This fee has already been approved or rejected and is locked. A Super Admin must use an exceptional amendment."],
+    ["SUPER_ADMIN_ONLY", "Only a Super Admin can amend an approved Abort fee."],
+    ["AMENDMENT_REASON_REQUIRED", "Enter a reason of at least 15 characters for the exceptional amendment."],
+    ["ABORT_FEE_NOT_APPROVED", "Only an approved Abort fee can be amended."],
+    ["ABORT_FEE_CHANGED", "The fee changed since you opened it. Refresh and review the latest amount."],
+    ["ABORT_AMENDMENT_NO_CHANGE", "Enter an amount different from the approved fee."],
     ["ABORT_CLAIM_INVOICED", "This Abort fee is on an invoice. Cancel the invoice before changing it."],
     ["ABORT_INVOICED", "This Abort has been invoiced. Create a linked replacement job instead of reopening."],
     ["ABORT_REOPENED", "The job was reopened, so this Abort can no longer be claimed."],

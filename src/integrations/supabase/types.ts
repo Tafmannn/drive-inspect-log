@@ -1567,6 +1567,9 @@ export type Database = {
           customer_notified_at: string | null
           customer_notified_by: string | null
           driver_id: string | null
+          last_amended_at: string | null
+          last_amended_by: string | null
+          last_amendment_reason: string | null
           finance_status: string
           from_status: string
           id: string
@@ -1591,6 +1594,9 @@ export type Database = {
           customer_notified_at?: string | null
           customer_notified_by?: string | null
           driver_id?: string | null
+          last_amended_at?: string | null
+          last_amended_by?: string | null
+          last_amendment_reason?: string | null
           finance_status?: string
           from_status: string
           id?: string
@@ -1615,6 +1621,9 @@ export type Database = {
           customer_notified_at?: string | null
           customer_notified_by?: string | null
           driver_id?: string | null
+          last_amended_at?: string | null
+          last_amended_by?: string | null
+          last_amendment_reason?: string | null
           finance_status?: string
           from_status?: string
           id?: string
@@ -3460,6 +3469,15 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      amend_approved_job_abort_claim: {
+        Args: {
+          p_abort_id: string
+          p_new_amount: number
+          p_reason: string
+          p_expected_amount: number
+        }
+        Returns: Json
       }
       review_job_abort_claim: {
         Args: {

@@ -1,0 +1,22 @@
+name: Sonar Gate Diagnostics
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+jobs:
+  conditions:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain Sonar quality gate conditions
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if [ -z "$SONAR_TOKEN" ]; then
+            echo "Sonar credential unavailable."
+            exit 0
+          fi
+          response=$(curl -fsS --max-time 20 --user "$SONAR_TOKEN:" --get \
+            "https://sonarcloud.io/api/qualitygates/project_status" \
+            --data-urlencode "projectKey=axentra" \
+            --data-urlencode "pullRequest=$PR_NUMBER") || exit 0
+          echo "$response" | jq -r '.projectStatus | "Gate: \(.status)", (.conditions[]? | "\(.metricKey): \(.status) actual=\(.actualValue) threshold=\(.errorThreshold)")'
