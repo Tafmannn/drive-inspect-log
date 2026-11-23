@@ -12,14 +12,14 @@ export interface EmailLinkToken {
   type: EmailOtpType;
 }
 
-const TYPES: readonly EmailOtpType[] = ["invite", "recovery", "magiclink", "signup", "email", "email_change"];
+const TYPES = new Set<string>(["invite", "recovery", "magiclink", "signup", "email", "email_change"]);
 
 export function readEmailLinkToken(search: string): EmailLinkToken | null {
   const params = new URLSearchParams(search);
   const tokenHash = params.get("token_hash")?.trim();
-  const type = params.get("type") as EmailOtpType | null;
-  if (!tokenHash || !type || !TYPES.includes(type)) return null;
-  return { tokenHash, type };
+  const type = params.get("type");
+  if (!tokenHash || !type || !TYPES.has(type)) return null;
+  return { tokenHash, type: type as EmailOtpType };
 }
 
 export class EmailLinkExpiredError extends Error {}
