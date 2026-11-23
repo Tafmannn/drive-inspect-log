@@ -39,6 +39,7 @@ REVOKE ALL ON public.driver_digital_credential_events FROM anon, authenticated;
 GRANT SELECT ON public.driver_digital_credentials TO authenticated;
 GRANT SELECT ON public.driver_digital_credential_events TO authenticated;
 
+DROP POLICY IF EXISTS "digital_id_credential_read_self_or_admin" ON public.driver_digital_credentials;
 CREATE POLICY "digital_id_credential_read_self_or_admin"
 ON public.driver_digital_credentials FOR SELECT TO authenticated
 USING (
@@ -50,6 +51,7 @@ USING (
   OR (public.is_admin_or_super_admin() AND org_id = public.user_org_id())
 );
 
+DROP POLICY IF EXISTS "digital_id_history_admin_only" ON public.driver_digital_credential_events;
 CREATE POLICY "digital_id_history_admin_only"
 ON public.driver_digital_credential_events FOR SELECT TO authenticated
 USING (
@@ -142,6 +144,7 @@ $func$;
 REVOKE ALL ON FUNCTION axentra_private.on_digital_id_account_change()
   FROM PUBLIC, anon, authenticated;
 
+DROP TRIGGER IF EXISTS digital_id_account_state_change ON public.user_profiles;
 CREATE TRIGGER digital_id_account_state_change
 AFTER INSERT OR UPDATE OF account_status, role ON public.user_profiles
 FOR EACH ROW EXECUTE FUNCTION axentra_private.on_digital_id_account_change();
@@ -157,6 +160,7 @@ END;
 $func$;
 REVOKE ALL ON FUNCTION axentra_private.on_digital_id_driver_change()
   FROM PUBLIC, anon, authenticated;
+DROP TRIGGER IF EXISTS digital_id_driver_state_change ON public.driver_profiles;
 CREATE TRIGGER digital_id_driver_state_change
 AFTER INSERT OR UPDATE OF is_active, archived_at ON public.driver_profiles
 FOR EACH ROW EXECUTE FUNCTION axentra_private.on_digital_id_driver_change();
@@ -183,6 +187,7 @@ END;
 $func$;
 REVOKE ALL ON FUNCTION public.guard_driver_digital_id_state()
   FROM PUBLIC, anon, authenticated;
+DROP TRIGGER IF EXISTS guard_driver_digital_id_state ON public.driver_profiles;
 CREATE TRIGGER guard_driver_digital_id_state
 BEFORE UPDATE ON public.driver_profiles
 FOR EACH ROW EXECUTE FUNCTION public.guard_driver_digital_id_state();
@@ -196,6 +201,7 @@ ON CONFLICT (id) DO NOTHING;
 
 -- Path convention: organisation_uuid/user_uuid/filename.
 -- Only an admin for the same organisation or a super admin may write.
+DROP POLICY IF EXISTS "digital_id_photo_admin_insert" ON storage.objects;
 CREATE POLICY "digital_id_photo_admin_insert" ON storage.objects
 FOR INSERT TO authenticated
 WITH CHECK (
@@ -212,6 +218,7 @@ WITH CHECK (
       AND (public.is_super_admin() OR c.org_id::text = split_part(name, '/', 1))
   )
 );
+DROP POLICY IF EXISTS "digital_id_photo_admin_update" ON storage.objects;
 CREATE POLICY "digital_id_photo_admin_update" ON storage.objects
 FOR UPDATE TO authenticated
 USING (bucket_id = 'digital-id-photos' AND
@@ -222,12 +229,14 @@ WITH CHECK (bucket_id = 'digital-id-photos' AND
        (public.is_super_admin() OR
         (public.is_admin_or_super_admin() AND
           split_part(name, '/', 1) = public.user_org_id()::text)));
+DROP POLICY IF EXISTS "digital_id_photo_admin_delete" ON storage.objects;
 CREATE POLICY "digital_id_photo_admin_delete" ON storage.objects
 FOR DELETE TO authenticated
 USING (bucket_id = 'digital-id-photos' AND
        (public.is_super_admin() OR
         (public.is_admin_or_super_admin() AND
           split_part(name, '/', 1) = public.user_org_id()::text)));
+DROP POLICY IF EXISTS "digital_id_photo_read" ON storage.objects;
 CREATE POLICY "digital_id_photo_read" ON storage.objects
 FOR SELECT TO authenticated
 USING (
