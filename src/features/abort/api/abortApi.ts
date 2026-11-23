@@ -122,14 +122,14 @@ export function confirmJobAbort(input: {
 }): Promise<ConfirmAbortResult> {
   return rpc<ConfirmAbortResult, "confirm_job_abort">("confirm_job_abort", {
     p_job_id: input.jobId,
-    p_contact_name: input.contactName,
+    p_contact_name: input.contactName ?? "",
     p_no_name_exception: input.noNameException,
     p_expected_status: input.expectedStatus,
   });
 }
 
 export function dismissAbortRequest(requestId: string, note?: string): Promise<{ status: string }> {
-  return rpc<{ status: string }, "dismiss_job_abort_request">("dismiss_job_abort_request", { p_request_id: requestId, p_note: note ?? null });
+  return rpc<{ status: string }, "dismiss_job_abort_request">("dismiss_job_abort_request", { p_request_id: requestId, p_note: note ?? undefined });
 }
 
 export function reviewAbortClaim(input: {
@@ -141,8 +141,8 @@ export function reviewAbortClaim(input: {
   return rpc<{ financeStatus: AbortFinanceStatus; approvedAmount: number | null }, "review_job_abort_claim">("review_job_abort_claim", {
     p_abort_id: input.abortId,
     p_decision: input.decision,
-    p_amount: input.amount ?? null,
-    p_note: input.note ?? null,
+    p_amount: input.amount ?? undefined,
+    p_note: input.note ?? undefined,
   });
 }
 
