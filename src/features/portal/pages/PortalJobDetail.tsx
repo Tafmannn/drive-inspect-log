@@ -287,7 +287,7 @@ export default function PortalJobDetail() {
         <CardContent className="p-4 space-y-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <h1 className="sr-only" aria-label={`Vehicle registration ${job.vehicle_reg}`}>{job.vehicle_reg}</h1>
+              <h1 className="sr-only">Vehicle registration</h1>
               <UKPlate reg={job.vehicle_reg} size="large" />
               <p className="text-sm text-muted-foreground">
                 {[job.vehicle_year, job.vehicle_make, job.vehicle_model, job.vehicle_colour].filter(Boolean).join(" · ") || "Vehicle"}
