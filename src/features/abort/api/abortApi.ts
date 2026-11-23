@@ -18,6 +18,7 @@ type AbortRpcName =
   | "confirm_job_abort"
   | "review_job_abort_claim"
   | "amend_approved_job_abort_claim"
+  | "correct_invoiced_job_abort_fee"
   | "notify_customer_job_aborted"
   | "create_abort_replacement_job";
 
@@ -46,6 +47,9 @@ export interface JobAbort {
   agreed_price: number | null;
   proposed_amount: number | null;
   approved_amount: number | null;
+  client_fee_confirmed_by: string | null;
+  client_fee_confirmed_at: string | null;
+  client_fee_confirmed_amount: number | null;
   finance_status: AbortFinanceStatus;
   reviewed_by: string | null;
   reviewed_at: string | null;
@@ -86,6 +90,7 @@ function toAbort(r: Record<string, unknown>): JobAbort {
     agreed_price: num(r.agreed_price),
     proposed_amount: num(r.proposed_amount),
     approved_amount: num(r.approved_amount),
+    client_fee_confirmed_amount: num(r.client_fee_confirmed_amount),
   };
 }
 
@@ -141,10 +146,12 @@ export function reviewAbortClaim(input: {
   decision: "approved" | "rejected";
   amount?: number | null;
   note?: string | null;
-}): Promise<{ financeStatus: AbortFinanceStatus; approvedAmount: number | null }> {
+  clientConfirmed?: boolean;
+}): Promise<{ financeStatus: AbortFinanceStatus; approvedAmount: number | null; clientConfirmedAt?: string }> {
   return rpc<{ financeStatus: AbortFinanceStatus; approvedAmount: number | null }, "review_job_abort_claim">("review_job_abort_claim", {
     p_abort_id: input.abortId,
     p_decision: input.decision,
+    p_client_confirmed: input.clientConfirmed === true,
     p_amount: input.amount ?? undefined,
     p_note: input.note ?? undefined,
   });
@@ -157,6 +164,7 @@ export function amendApprovedAbortClaim(input: {
   newAmount: number;
   expectedAmount: number;
   reason: string;
+  clientConfirmed?: boolean;
 }): Promise<{ financeStatus: AbortFinanceStatus; approvedAmount: number; amendedAt: string }> {
   return rpc<{ financeStatus: AbortFinanceStatus; approvedAmount: number; amendedAt: string }, "amend_approved_job_abort_claim">(
     "amend_approved_job_abort_claim",
@@ -165,8 +173,126 @@ export function amendApprovedAbortClaim(input: {
       p_new_amount: input.newAmount,
       p_expected_amount: input.expectedAmount,
       p_reason: input.reason,
+      p_client_confirmed: input.clientConfirmed === true,
     },
   );
+}
+
+/** Fully credit the original Abort invoice and amend its approved fee in one
+ * database transaction. Never issues the replacement invoice automatically. */
+export function correctInvoicedAbortFee(input: {
+  abortId: string;
+  originalInvoiceId: string;
+  newAmount: number;
+  expectedAmount: number;
+  reason: string;
+  clientConfirmed: boolean;
+  multiJobAcknowledged: boolean;
+  paidAcknowledged: boolean;
+}): Promise<{
+  correctionId: string;
+  creditNoteId: string | null;
+  originalInvoiceNumber: string;
+  approvedAmount: number;
+  otherJobsToReinvoice: number;
+  originalWasPaid: boolean;
+}> {
+  return rpc("correct_invoiced_job_abort_fee", {
+    p_abort_id: input.abortId,
+    p_original_invoice_id: input.originalInvoiceId,
+    p_new_amount: input.newAmount,
+    p_expected_amount: input.expectedAmount,
+    p_reason: input.reason,
+    p_client_confirmed: input.clientConfirmed,
+    p_multi_job_acknowledged: input.multiJobAcknowledged,
+    p_paid_acknowledged: input.paidAcknowledged,
+  });
+}
+
+export interface AbortInvoiceContext {
+  id: string;
+  invoice_number: string;
+  status: string;
+  total: number | null;
+  client_id: string | null;
+  otherJobCount: number;
+}
+
+export interface AbortInvoiceCorrection {
+  id: string;
+  original_invoice_id: string;
+  credit_note_id: string | null;
+  replacement_invoice_id: string | null;
+  original_invoice_number: string;
+  previous_fee: number;
+  revised_fee: number;
+  other_jobs_on_invoice: number;
+  original_was_paid: boolean;
+  created_at: string;
+  reason: string;
+}
+
+export interface AbortInvoiceDetails {
+  activeInvoice: AbortInvoiceContext | null;
+  corrections: AbortInvoiceCorrection[];
+}
+
+/** Includes both multi-job and legacy invoice paths, and never treats
+ * cancelled or voided invoices as active. */
+export async function getAbortInvoiceDetails(jobId: string): Promise<AbortInvoiceDetails> {
+  const [items, legacy, corrections] = await Promise.all([
+    supabase.from("invoice_items")
+      .select("invoice_id, invoices(id,invoice_number,status,total,client_id,document_type)")
+      .eq("job_id",jobId).eq("voided",false),
+    supabase.from("invoices")
+      .select("id,invoice_number,status,total,client_id,document_type")
+      .eq("job_id",jobId).neq("status","cancelled"),
+    supabase.from("job_abort_invoice_corrections")
+      .select("id,original_invoice_id,credit_note_id,replacement_invoice_id,original_invoice_number,previous_fee,revised_fee,other_jobs_on_invoice,original_was_paid,created_at,reason")
+      .eq("job_id",jobId).order("created_at",{ascending:false}),
+  ]);
+  if (items.error || legacy.error || corrections.error) {
+    throw new Error(items.error?.message ?? legacy.error?.message ?? corrections.error?.message);
+  }
+  type InvoiceRow = { id: string; invoice_number: string; status: string;
+    total: number | null; client_id: string | null; document_type: string | null };
+  const active = new Map<string, InvoiceRow>();
+  for (const entry of items.data ?? []) {
+    const invoice = entry.invoices as InvoiceRow | null;
+    if (invoice?.status !== "cancelled" && invoice?.document_type === "invoice") {
+      active.set(invoice.id, invoice);
+    }
+  }
+  for (const invoice of (legacy.data ?? []) as InvoiceRow[]) {
+    if (invoice.status !== "cancelled" && invoice.document_type === "invoice") {
+      active.set(invoice.id, invoice);
+    }
+  }
+  // Multiple active invoices for one job indicate accounting inconsistency.
+  // Refuse to select one arbitrarily for a credit-note correction.
+  if (active.size > 1) throw new Error("Multiple active invoices found for this job. Resolve the invoice records first.");
+  let activeInvoice: AbortInvoiceContext | null = null;
+  const invoice = [...active.values()][0];
+  if (invoice) {
+    const { data, error } = await supabase.from("invoice_items")
+      .select("job_id").eq("invoice_id",invoice.id).eq("voided",false);
+    if (error) throw new Error(error.message);
+    const otherJobs = new Set((data ?? []).map((row) => row.job_id)
+      .filter((id): id is string => !!id && id !== jobId));
+    activeInvoice = {
+      ...invoice,
+      total: invoice.total == null ? null : Number(invoice.total),
+      otherJobCount: otherJobs.size,
+    };
+  }
+  return {
+    activeInvoice,
+    corrections: (corrections.data ?? []).map((row) => ({
+      ...row,
+      previous_fee: Number(row.previous_fee),
+      revised_fee: Number(row.revised_fee),
+    })),
+  };
 }
 
 export async function notifyCustomerAborted(abortId: string): Promise<{ queued: boolean; alreadyQueued: boolean }> {
