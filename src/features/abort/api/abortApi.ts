@@ -101,7 +101,7 @@ export async function getPendingAbortRequest(jobId: string): Promise<JobAbortReq
     .eq("status", "pending")
     .maybeSingle();
   if (error) throw new Error(error.message);
-  return (data as JobAbortRequest | null) ?? null;
+  return (data as unknown as JobAbortRequest | null) ?? null;
 }
 
 // ── admin ─────────────────────────────────────────────────────────────────
@@ -186,17 +186,17 @@ export async function getJobAbortState(jobId: string): Promise<JobAbortState> {
   if (err) throw new Error(`Could not load the Abort: ${err.message}`);
 
   const history = ((aborts.data ?? []) as unknown as Record<string, unknown>[]).map(toAbort);
-  const liveItems = ((items.data ?? []) as { voided?: boolean; invoices?: { status?: string } | null }[])
+  const liveItems = ((items.data ?? []) as unknown as { voided?: boolean; invoices?: { status?: string } | null }[])
     .filter((i) => !i.voided && i.invoices?.status !== "cancelled");
-  const liveLegacy = ((legacy.data ?? []) as { status?: string; document_type?: string }[])
+  const liveLegacy = ((legacy.data ?? []) as unknown as { status?: string; document_type?: string }[])
     .filter((i) => i.status !== "cancelled" && (i.document_type ?? "invoice") === "invoice");
   const statuses = [...liveItems.map((i) => i.invoices?.status), ...liveLegacy.map((i) => i.status)];
 
   return {
     current: history.find((a) => !a.reopened_at) ?? null,
     history,
-    pendingRequest: ((requests.data ?? []) as JobAbortRequest[])[0] ?? null,
-    events: (events.data ?? []) as JobAbortEvent[],
+    pendingRequest: ((requests.data ?? []) as unknown as JobAbortRequest[])[0] ?? null,
+    events: (events.data ?? []) as unknown as JobAbortEvent[],
     invoiced: statuses.length > 0,
     paid: statuses.length > 0 && statuses.every((s) => s === "paid"),
     replacementJobId: ((replacement.data ?? []) as { id: string }[])[0]?.id ?? null,
@@ -228,7 +228,7 @@ export async function listAbortQueue(): Promise<AbortQueueRow[]> {
   ]);
   const err = reqRes.error ?? abortRes.error;
   if (err) throw new Error(`Could not load Aborts: ${err.message}`);
-  const requests = (reqRes.data ?? []) as JobAbortRequest[];
+  const requests = (reqRes.data ?? []) as unknown as JobAbortRequest[];
   const aborts = ((abortRes.data ?? []) as unknown as Record<string, unknown>[]).map(toAbort);
 
   const jobIds = [...new Set([...requests.map((r) => r.job_id), ...aborts.map((a) => a.job_id)])];
@@ -253,7 +253,7 @@ export async function listAbortQueue(): Promise<AbortQueueRow[]> {
   for (const i of (itemsRes.data ?? []) as unknown as { job_id: string | null; voided?: boolean; invoices?: { status?: string } | null }[]) {
     if (!i.voided) push(i.job_id, i.invoices?.status);
   }
-  for (const i of (legacyRes.data ?? []) as { job_id: string | null; status?: string; document_type?: string }[]) {
+  for (const i of (legacyRes.data ?? []) as unknown as { job_id: string | null; status?: string; document_type?: string }[]) {
     if ((i.document_type ?? "invoice") === "invoice") push(i.job_id, i.status);
   }
 
