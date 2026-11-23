@@ -181,7 +181,9 @@ export function calculateDriverPerformance(
       if (!j.has_customer_signature) missingSignatureCount += 1;
     }
 
-    const ev = jobEvidence(j);
+    // No collection/delivery evidence is required for an Abort. Retain the
+    // Abort count, but do not penalise evidence health or intervention rates.
+    const ev = j.status === JOB_STATUS.ABORTED ? null : jobEvidence(j);
     if (ev) {
       dist[ev.level] += 1;
       healthScoreSum += HEALTH_SCORE[ev.level];
