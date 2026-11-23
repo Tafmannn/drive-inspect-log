@@ -160,14 +160,13 @@ export function abortInvoiceDescription(job: {
 
 /**
  * Validates an approval amount typed by an admin. Null when fine.
- * Unknown agreed price: any non-negative amount; known: up to the agreed price.
+ * Fees may exceed original agreed price when the client has confirmed the amount.
  */
 export function approvalAmountProblem(raw: string, agreedPrice: number | null): string | null {
   const t = raw.trim();
   if (!t) return agreedPrice == null ? "Enter the amount to approve — the agreed price is not known." : null;
   if (!/^\d+(\.\d{1,2})?$/.test(t)) return "Enter an amount in pounds, e.g. 120 or 120.50.";
   const n = Number(t);
-  if (agreedPrice != null && n > agreedPrice) return `Cannot exceed the agreed price of £${agreedPrice.toFixed(2)}.`;
   return null;
 }
 
@@ -191,7 +190,10 @@ export function abortErrorMessage(error: unknown): string {
     ["ABORT_CLAIM_INVOICED", "This Abort fee is on an invoice. Cancel the invoice before changing it."],
     ["ABORT_INVOICED", "This Abort has been invoiced. Create a linked replacement job instead of reopening."],
     ["ABORT_REOPENED", "The job was reopened, so this Abort can no longer be claimed."],
-    ["AMOUNT_ABOVE_AGREED_PRICE", "The approved amount cannot exceed the agreed price."],
+    ["CLIENT_FEE_CONFIRMATION_REQUIRED", "Confirm the client has explicitly agreed to this fee before approval."],
+    ["ABORT_INVOICE_NOT_FOUND", "The original invoice is no longer active or is not associated with this Abort."],
+    ["FULL_CREDIT_OTHER_JOBS_ACK_REQUIRED", "Confirm that you understand the full credit will release every job on this invoice."],
+    ["PAID_INVOICE_REFUND_ACK_REQUIRED", "Acknowledge that the paid invoice needs manual refund or payment reconciliation."],
     ["AMOUNT_REQUIRED", "Enter the amount to approve — the agreed price is not known."],
     ["NO_LINKED_CLIENT", "Link the job to a client before notifying them."],
     ["ABORT_NOT_CURRENT", "This job is no longer aborted."],
