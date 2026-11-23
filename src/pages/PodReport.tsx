@@ -29,7 +29,7 @@ import {
   ImageOff,
   PenLine,
   Images,
-  Receipt,
+  ReceiptPoundSterling as Receipt,
   CheckCircle,
   MoreVertical,
 } from "lucide-react";

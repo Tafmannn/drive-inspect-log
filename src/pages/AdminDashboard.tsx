@@ -43,7 +43,7 @@ import {
 } from "@/features/admin-home/components";
 import {
   UserX, Clock, FileSearch, ImageOff, Zap, Eye, UserPlus, MapPin, AlertTriangle, User,
-  Truck, Users, ClipboardCheck, Receipt, Globe, CheckCircle2, FileText, Layers, Route,
+  Truck, Users, ClipboardCheck, ReceiptPoundSterling as Receipt, Globe, CheckCircle2, FileText, Layers, Route,
   ShieldCheck, FileWarning, IdCard, History, LayoutGrid, ChevronRight, ListChecks, Activity,
 } from "lucide-react";
 

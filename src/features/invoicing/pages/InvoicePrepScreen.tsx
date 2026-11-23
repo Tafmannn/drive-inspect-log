@@ -69,7 +69,7 @@ import { useEvidenceOverrides } from "@/hooks/useEvidenceOverrides";
 import { toast } from "@/hooks/use-toast";
 import {
   FileText,
-  Receipt,
+  ReceiptPoundSterling as Receipt,
   CalendarIcon,
   PoundSterling,
   Hash,

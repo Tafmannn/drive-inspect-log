@@ -18,7 +18,7 @@ import {
 } from "../hooks/useControlProfitabilityData";
 import { formatGbp } from "../lib/financeBreakdown";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, TrendingDown, PoundSterling, Receipt, AlertTriangle } from "lucide-react";
+import { TrendingUp, TrendingDown, PoundSterling, ReceiptPoundSterling as Receipt, AlertTriangle } from "lucide-react";
 
 function shortDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" });

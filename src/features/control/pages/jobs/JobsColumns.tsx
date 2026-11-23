@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { getStatusStyle } from "@/lib/statusConfig";
 import { getWorkflowBrain } from "@/lib/workflowBrain";
 import {
-  Eye, UserPlus, ClipboardCheck, Receipt,
+  Eye, UserPlus, ClipboardCheck, ReceiptPoundSterling as Receipt,
   AlertTriangle, Clock, ShieldCheck,
 } from "lucide-react";
 import {

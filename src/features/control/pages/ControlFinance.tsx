@@ -42,7 +42,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import {
   Search, Plus, PoundSterling, Calendar, CalendarDays,
-  ImageIcon, ImageOff, Eye, ExternalLink, Download, ShieldCheck, Receipt,
+  ImageIcon, ImageOff, Eye, ExternalLink, Download, ShieldCheck, ReceiptPoundSterling as Receipt,
 } from "lucide-react";
 
 type ReceiptFilter = FinanceFilter["receipt"];

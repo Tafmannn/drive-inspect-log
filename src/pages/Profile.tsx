@@ -14,7 +14,6 @@ import { useOwnProfilePhotoPath } from "@/hooks/useProfilePhoto";
 import { useDashboardCounts } from "@/hooks/useJobs";
 import { supabase } from "@/integrations/supabase/client";
 import { getOrgId } from "@/lib/orgHelper";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -25,11 +24,41 @@ import {
   ChevronRight,
   Clock,
   LogOut,
-  Receipt,
+  ReceiptPoundSterling as Receipt,
   Shield,
   Truck,
   Upload,
 } from "lucide-react";
+
+type ProfileLink = { icon: typeof Truck; label: string; path: string };
+
+/** A settings-style group: one card, rows separated by hairlines. */
+function LinkGroup({ title, links, onOpen }: { title?: string; links: ProfileLink[]; onOpen: (path: string) => void }) {
+  return (
+    <section className="space-y-2" aria-label={title}>
+      {title && <h2 className="px-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">{title}</h2>}
+      <Card className="overflow-hidden rounded-2xl">
+        <ul className="divide-y divide-border">
+          {links.map(({ icon: Icon, label, path }) => (
+            <li key={path}>
+              <button
+                type="button"
+                onClick={() => onOpen(path)}
+                className="flex min-h-[56px] w-full items-center gap-3 px-4 text-left transition-colors hover:bg-muted/50 active:bg-muted focus:outline-none focus-visible:bg-muted"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <Icon className="h-[18px] w-[18px]" aria-hidden />
+                </span>
+                <span className="flex-1 text-[15px] font-medium">{label}</span>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden />
+              </button>
+            </li>
+          ))}
+        </ul>
+      </Card>
+    </section>
+  );
+}
 
 export const Profile = () => {
   const navigate = useNavigate();
@@ -110,17 +139,28 @@ export const Profile = () => {
         <div className="flex flex-col items-center gap-2">
           {user?.id && (
             <ProfilePhotoUpload
+              layout="hero"
               userId={user.id}
               orgId={orgId}
               currentPath={ownPhotoPath ?? null}
               displayName={user.name || "Unknown user"}
             />
           )}
-          <p className="text-lg font-semibold">{user?.name || "Unknown user"}</p>
-          <p className="text-sm text-muted-foreground">{user?.email || "No email set"}</p>
-          <div className="flex gap-1.5 mt-1 flex-wrap justify-center">
+          <p className="mt-1 text-xl font-semibold tracking-[-0.01em]">{user?.name || "Unknown user"}</p>
+          <p className="max-w-full truncate text-sm text-muted-foreground">{user?.email || "No email set"}</p>
+          <div className="mt-1 flex flex-wrap justify-center gap-1.5">
             {roleLabels.map((role) => (
-              <Badge key={role} variant="secondary" className="text-xs">{role}</Badge>
+              <span
+                key={role}
+                className={
+                  role === "Driver"
+                    ? "inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground/80"
+                    : "inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary"
+                }
+              >
+                {role !== "Driver" && <Shield className="h-3 w-3" aria-hidden />}
+                {role}
+              </span>
             ))}
           </div>
         </div>
@@ -153,76 +193,39 @@ export const Profile = () => {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3">
-            <Card>
-              <CardContent className="p-4 text-center">
-                <p className="text-2xl font-bold">{jobCount ?? "–"}</p>
-                <p className="text-xs text-muted-foreground">Total Jobs</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4 text-center">
-                <p className="text-2xl font-bold tabular-nums">{expenseTotal ?? "–"}</p>
-                <p className="text-xs text-muted-foreground">Expenses This Month</p>
-              </CardContent>
-            </Card>
+            {[
+              { icon: Truck, value: jobCount == null ? "–" : String(jobCount), label: "Total Jobs" },
+              { icon: Receipt, value: expenseTotal ?? "–", label: "Expenses This Month" },
+            ].map(({ icon: Icon, value, label }) => (
+              <Card key={label} className="rounded-2xl">
+                <CardContent className="flex flex-col gap-2 p-4">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Icon className="h-4 w-4" aria-hidden />
+                  </span>
+                  <p className="text-2xl font-semibold leading-none tabular-nums">{value}</p>
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         )}
 
         {/* Quick links — Expenses for everyone; Pending Uploads is admin-only
             (drivers already have it in the bottom nav and the stat row). */}
-        <div className="space-y-2">
-          {[
+        <LinkGroup
+          links={[
             { icon: Receipt, label: "Expenses", path: "/expenses" },
             ...(!isDriverOnly ? [{ icon: Upload, label: "Pending Uploads", path: "/pending-uploads" }] : []),
-          ].map(({ icon: Icon, label, path }) => (
-            <Card key={path} className="cursor-pointer active:bg-muted/50" onClick={() => navigate(path)}>
-              <CardContent className="p-4 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Icon className="w-5 h-5 text-primary" />
-                </div>
-                <span className="text-sm font-medium flex-1">{label}</span>
-                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+          ]}
+          onOpen={navigate}
+        />
 
-        {adminLinks.length > 0 && (
-          <>
-            <Separator />
-            <div className="space-y-1">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-1 mb-2">
-                Administration
-              </p>
-              {adminLinks.map(({ icon: Icon, label, path }) => (
-                <Card key={path} className="cursor-pointer active:bg-muted/50 border-primary/20" onClick={() => navigate(path)}>
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                      <Icon className="w-5 h-5 text-primary" />
-                    </div>
-                    <span className="text-sm font-medium flex-1">{label}</span>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </>
-        )}
-
-        <Separator />
+        {adminLinks.length > 0 && <LinkGroup title="Administration" links={adminLinks} onOpen={navigate} />}
 
         {/* Driver profile: read-only for drivers, editable for admins */}
         {user?.roles?.includes("DRIVER") && user?.id && (
           <>
-            <Card className="cursor-pointer active:bg-muted/50 border-primary/20" onClick={() => navigate("/profile/id")}>
-              <CardContent className="p-4 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <BadgeCheck className="w-5 h-5 text-primary" />
-                </div>
-                <span className="text-sm font-medium flex-1">Digital ID</span>
-                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-              </CardContent>
-            </Card>
+            <LinkGroup title="Driver" links={[{ icon: BadgeCheck, label: "Digital ID", path: "/profile/id" }]} onOpen={navigate} />
             {isDriverOnly
               ? <DriverReadOnlyProfile userId={user.id} />
               : <DriverProfileForm userId={user.id} orgId={orgId} />}

@@ -26,9 +26,15 @@ interface ProfilePhotoUploadProps {
   currentPath: string | null;
   displayName: string;
   disabled?: boolean;
+  /**
+   * "compact" (default): small avatar with Replace/Remove beside it, for lists.
+   * "hero": large centred avatar with a camera button on it and the actions
+   * underneath — the My Profile page.
+   */
+  layout?: "compact" | "hero";
 }
 
-export function ProfilePhotoUpload({ userId, orgId, currentPath, displayName, disabled }: ProfilePhotoUploadProps) {
+export function ProfilePhotoUpload({ userId, orgId, currentPath, displayName, disabled, layout = "compact" }: ProfilePhotoUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [localPath, setLocalPath] = useState(currentPath);
@@ -78,6 +84,54 @@ export function ProfilePhotoUpload({ userId, orgId, currentPath, displayName, di
     }
   }
 
+  const fileInput = (
+    <input
+      ref={inputRef}
+      type="file"
+      accept="image/*"
+      className="hidden"
+      onChange={(e) => {
+        const file = e.target.files?.[0];
+        if (file) handleUpload(file);
+        e.target.value = "";
+      }}
+    />
+  );
+
+  if (layout === "hero") {
+    const busy = disabled || uploading;
+    return (
+      <div className="flex flex-col items-center gap-2">
+        {fileInput}
+        <div className="relative">
+          <Avatar className="h-24 w-24 ring-4 ring-background shadow-[0_2px_12px_-4px_rgb(15_23_42/0.25)]">
+            {photoUrl && <AvatarImage src={photoUrl} alt={displayName} className="object-cover" />}
+            <AvatarFallback className="bg-primary/10 text-2xl font-semibold text-primary">{initials || "?"}</AvatarFallback>
+          </Avatar>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => inputRef.current?.click()}
+            aria-label={localPath ? "Change photo" : "Add photo"}
+            className="absolute -bottom-0.5 -right-0.5 flex h-9 w-9 items-center justify-center rounded-full border-2 border-background bg-primary text-primary-foreground shadow-md transition-transform active:scale-95 disabled:opacity-60 motion-reduce:transform-none"
+          >
+            {uploading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Camera className="h-4 w-4" aria-hidden />}
+          </button>
+        </div>
+        {localPath && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={handleRemove}
+            className="min-h-8 rounded-lg px-2 text-xs font-medium text-muted-foreground hover:text-destructive disabled:opacity-60"
+          >
+            Remove photo
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center gap-3">
       <Avatar className="h-14 w-14">
@@ -86,17 +140,7 @@ export function ProfilePhotoUpload({ userId, orgId, currentPath, displayName, di
       </Avatar>
 
       <div className="flex flex-col gap-1">
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) handleUpload(file);
-            e.target.value = "";
-          }}
-        />
+        {fileInput}
         <Button
           variant="outline"
           size="sm"
