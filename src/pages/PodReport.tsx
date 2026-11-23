@@ -478,6 +478,20 @@ export const PodReport = () => {
     );
   }
 
+  // An aborted collection is not a delivery. Never offer a POD, PDF, or
+  // review workflow on the direct route, including to admins.
+  if (job.status === "aborted") {
+    return (
+      <DriverJobLocked
+        title="POD Report"
+        heading="POD not applicable — collection aborted"
+        message="The vehicle was not collected or delivered. Review the Abort record on the job instead."
+        backTo={`/jobs/${job.id}`}
+        backLabel="Back to job"
+      />
+    );
+  }
+
   // Completed (POD approved) jobs are record-only for drivers — no POD access.
   if (isJobLockedForDriver(job.status, { isAdmin, isSuperAdmin })) {
     return <DriverJobLocked title="POD Report" heading={lockedJobHeading(job.status)} />;
