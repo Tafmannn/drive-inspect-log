@@ -479,9 +479,9 @@ export const JobDetail = () => {
         <Section>
           <SectionLabel>Inspections</SectionLabel>
           {isAborted ? (
-            <p role="status" className="text-xs text-muted-foreground rounded-lg bg-muted/50 px-3 py-2">
+            <output className="block text-xs text-muted-foreground rounded-lg bg-muted/50 px-3 py-2">
               Not required — collection aborted before handover. Existing inspection records remain preserved.
-            </p>
+            </output>
           ) : (
             <>
               <StatusLine label="Pickup Inspection" done={!!pickupInspection} />
@@ -549,10 +549,10 @@ export const JobDetail = () => {
           {/* Admin-only operational intelligence + controls */}
           <RoleScope admin>
             {isAborted && (
-              <div role="status" data-testid="abort-evidence-status" className="rounded-xl border border-border bg-muted/30 px-3 py-3 text-xs text-muted-foreground space-y-1">
+              <output data-testid="abort-evidence-status" className="rounded-xl border border-border bg-muted/30 px-3 py-3 text-xs text-muted-foreground space-y-1">
                 <p className="font-semibold text-foreground">Evidence Health — Not applicable (Aborted)</p>
                 <p>No pickup or delivery inspection is required for an aborted collection. Existing evidence stays on record; any Abort fee is reviewed separately.</p>
-              </div>
+              </output>
             )}
             {evidenceHealth && (
               <EvidenceHealthBanner
