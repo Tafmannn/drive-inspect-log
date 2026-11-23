@@ -83,6 +83,20 @@ describe("Admin Home UI", () => {
     expect(screen.queryByText("Needs your attention")).toBeNull();
   });
 
+  it("says the queue is empty once (banner), not again in a Needs action card", () => {
+    renderBody();
+    expect(screen.getAllByText("Action queue is empty")).toHaveLength(1);
+    expect(screen.queryByText("Nothing in the queue.")).toBeNull();
+    expect(screen.queryByRole("heading", { name: /Needs action/ })).toBeNull();
+  });
+
+  it("shows the Needs action card when there are items", () => {
+    const u = job("u1", "ready_for_pickup", null);
+    queues = { ...emptyQueues, unassigned: [u], needsAttention: [u] };
+    renderBody();
+    expect(screen.getByText("Needs action")).toBeTruthy();
+  });
+
   it("never reports an empty queue when the queues failed to load", () => {
     queuesError = true;
     renderBody();
