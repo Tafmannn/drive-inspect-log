@@ -336,7 +336,7 @@ export const JobDetail = () => {
 
   // Admin-only evidence health snapshot (presentational; PodReport remains
   // the authoritative gate for closure / PDF generation).
-  const evidenceHealth = canAdmin
+  const evidenceHealth = canAdmin && !isAborted
     ? evaluateEvidenceHealth({
         currentRunId: (job as { current_run_id?: string | null }).current_run_id ?? null,
         photos: (job.photos as any[]) ?? [],
@@ -478,21 +478,30 @@ export const JobDetail = () => {
         {/* ── INSPECTIONS (status only — action lives in Next step) ── */}
         <Section>
           <SectionLabel>Inspections</SectionLabel>
-          <StatusLine label="Pickup Inspection" done={!!pickupInspection} />
-          <StatusLine label="Delivery Inspection" done={!!deliveryInspection} />
+          {isAborted ? (
+            <p role="status" className="text-xs text-muted-foreground rounded-lg bg-muted/50 px-3 py-2">
+              Not required — collection aborted before handover. Existing inspection records remain preserved.
+            </p>
+          ) : (
+            <>
+              <StatusLine label="Pickup Inspection" done={!!pickupInspection} />
+              <StatusLine label="Delivery Inspection" done={!!deliveryInspection} />
+            </>
+          )}
         </Section>
 
         {/* ── 6. QR HANDOVER ── */}
+        {(!isAborted || qrConfirmations.length > 0) && (
         <Section>
           <SectionLabel icon={QrCode}>QR Handover</SectionLabel>
-          <div className="flex gap-2">
+          {!isAborted && <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={() => handleGenerateQr("collection")} disabled={generatingQr} className="min-h-[44px] rounded-lg flex-1">
               Collection QR
             </Button>
             <Button size="sm" variant="outline" onClick={() => handleGenerateQr("delivery")} disabled={generatingQr} className="min-h-[44px] rounded-lg flex-1">
               Delivery QR
             </Button>
-          </div>
+          </div>}
           {qrConfirmations.length > 0 && (
             <div className="space-y-1 mt-2">
               {qrConfirmations.map((qr) => (
@@ -512,6 +521,7 @@ export const JobDetail = () => {
             </div>
           )}
         </Section>
+        )}
 
         {/* ── 7. NOTES ── */}
         {job.job_notes && (
@@ -529,7 +539,7 @@ export const JobDetail = () => {
               <ReceiptPoundSterling className="h-4 w-4 mr-1.5" />
               Expenses{jobExpenses?.length ? ` (${jobExpenses.length})` : ""}
             </Button>
-            {canViewPod && (job.has_pickup_inspection || job.has_delivery_inspection) && (
+            {!isAborted && canViewPod && (job.has_pickup_inspection || job.has_delivery_inspection) && (
               <Button variant="outline" size="sm" className="flex-1 min-h-[44px] rounded-lg" onClick={() => navigate(withFrom(`/jobs/${job.id}/pod`, searchParams))}>
                 <FileText className="h-4 w-4 mr-1.5" /> POD Report
               </Button>
@@ -538,6 +548,12 @@ export const JobDetail = () => {
 
           {/* Admin-only operational intelligence + controls */}
           <RoleScope admin>
+            {isAborted && (
+              <div role="status" data-testid="abort-evidence-status" className="rounded-xl border border-border bg-muted/30 px-3 py-3 text-xs text-muted-foreground space-y-1">
+                <p className="font-semibold text-foreground">Evidence Health — Not applicable (Aborted)</p>
+                <p>No pickup or delivery inspection is required for an aborted collection. Existing evidence stays on record; any Abort fee is reviewed separately.</p>
+              </div>
+            )}
             {evidenceHealth && (
               <EvidenceHealthBanner
                 level={evidenceHealth.level}
