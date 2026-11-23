@@ -228,13 +228,13 @@ export function deriveWorkflowState(input: WorkflowInput): WorkflowState {
   }
 
   const isTerminal = (TERMINAL_STATUSES as string[]).includes(job.status);
-  const isCancelled = job.status === JOB_STATUS.CANCELLED;
+  const isNonMovementClosed = job.status === JOB_STATUS.CANCELLED || job.status === JOB_STATUS.ABORTED;
   const driverAssigned = !!job.driver_id;
 
   // Readiness gates ---------------------------------------------------
   const canStartPickup =
     !isTerminal &&
-    !isCancelled &&
+    !isNonMovementClosed &&
     driverAssigned &&
     blockers.find((b) => b.code === "active_job_lock") === undefined &&
     (job.status === JOB_STATUS.READY_FOR_PICKUP ||
@@ -243,7 +243,7 @@ export function deriveWorkflowState(input: WorkflowInput): WorkflowState {
 
   const canStartDelivery =
     !isTerminal &&
-    !isCancelled &&
+    !isNonMovementClosed &&
     driverAssigned &&
     blockers.find((b) => b.code === "active_job_lock") === undefined &&
     (job.status === JOB_STATUS.IN_TRANSIT ||
@@ -301,7 +301,7 @@ export function deriveWorkflowState(input: WorkflowInput): WorkflowState {
     });
   }
 
-  const canGeneratePod = !isTerminal && !isCancelled && podBlockers.length === 0;
+  const canGeneratePod = !isTerminal && !isNonMovementClosed && podBlockers.length === 0;
 
   // Surface POD blockers only when we're at/past the delivery stage.
   // Showing "missing delivery photos" on a freshly-created job would be
@@ -318,7 +318,7 @@ export function deriveWorkflowState(input: WorkflowInput): WorkflowState {
 
   // Next action -------------------------------------------------------
   let nextAction: WorkflowAction | null = null;
-  if (isCancelled) {
+  if (isNonMovementClosed) {
     nextAction = null;
   } else if (isTerminal) {
     nextAction = {
@@ -650,6 +650,8 @@ export function getWorkflowBrain(input: BrainInput): WorkflowBrain {
       invoiceBlockerMessages.push(
         "Job is awaiting admin review. It must be closed before invoicing.",
       );
+    } else if (rawStatus === JOB_STATUS.ABORTED) {
+      invoiceBlockerMessages.push("Abort invoicing requires a separately approved fee in Jobs → Aborts.");
     } else {
       invoiceBlockerMessages.push("Job must be completed before invoicing.");
     }
