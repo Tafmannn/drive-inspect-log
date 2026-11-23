@@ -1,3 +1,4 @@
+import { UKPlate } from "@/components/UKPlate";
 import { Link } from "react-router-dom";
 import { AlertTriangle, CalendarDays, CheckCircle2, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -43,9 +44,7 @@ export function MovementCard({ job, back }: { job: PortalJobSummary; back: strin
       <article className={cn(portalCard, "flex h-full flex-col p-4 transition-[border-color,box-shadow] duration-150 group-hover:border-[#1E4FA8]/35 group-active:scale-[0.995] motion-reduce:transform-none")}>
         <header className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="inline-flex rounded-md border border-slate-300 bg-slate-50 px-2 py-0.5 font-mono text-[15px] font-semibold tracking-[0.06em] text-slate-900 dark:border-border dark:bg-muted dark:text-foreground">
-              {job.vehicle_reg}
-            </p>
+            <UKPlate reg={job.vehicle_reg} size="standard" />
             <p className="mt-1.5 truncate text-[13px] text-slate-600 dark:text-muted-foreground">
               {vehicleLine(job)} <span aria-hidden>·</span> Ref {job.job_ref}
             </p>

@@ -143,7 +143,7 @@ export const JobCard = ({
       aria-disabled={readOnly || undefined}
     >
       {/* ── HEADER ── */}
-      <div className="flex items-center justify-between px-4 pt-3 pb-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-3 pb-2">
         <div className="flex items-center gap-2 min-w-0">
           <span
             style={{ backgroundColor: statusStyle.backgroundColor, color: statusStyle.color }}
@@ -156,7 +156,7 @@ export const JobCard = ({
           </span>
         </div>
         <div className="shrink-0 ml-2">
-          <UKPlate reg={reg} />
+          <UKPlate size="compact" reg={reg} />
         </div>
       </div>
 

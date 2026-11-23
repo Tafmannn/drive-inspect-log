@@ -264,7 +264,7 @@ export function SuperAdminJobs() {
                         </span>
                       )}
                     </div>
-                    <UKPlate reg={job.vehicle_reg} />
+                    <UKPlate size="compact" reg={job.vehicle_reg} />
                   </div>
 
                   {/* Driver + route */}

@@ -1839,7 +1839,7 @@ export const InspectionFlow = () => {
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border bg-card p-3">
           <div className="flex min-w-0 items-center gap-2 text-sm">
             <span className="truncate font-mono font-medium text-foreground">{jobRef}</span>
-            {job?.vehicle_reg && <UKPlate reg={job.vehicle_reg} />}
+            {job?.vehicle_reg && <UKPlate size="compact" reg={job.vehicle_reg} />}
           </div>
           <div className="flex items-center gap-2">
             {isCollected ? (

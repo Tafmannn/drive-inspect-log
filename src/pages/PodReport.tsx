@@ -663,8 +663,8 @@ export const PodReport = () => {
 
             <div className="p-6 space-y-6 print:p-4 print:space-y-4">
               <Card className="p-4 space-y-1">
-                <div className="flex items-center justify-between mb-2">
-                  <UKPlate reg={job.vehicle_reg} variant="rear" />
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <UKPlate size="standard" reg={job.vehicle_reg} variant="rear" />
                   <span
                     style={{
                       backgroundColor: statusStyle.backgroundColor,
