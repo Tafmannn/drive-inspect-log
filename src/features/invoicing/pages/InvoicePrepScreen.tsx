@@ -546,15 +546,17 @@ export function InvoicePrepScreen() {
             description="Completed moves and approved Abort-fee claims for this client"
             flush
           >
-            {isLoading ? (
+            {isLoading && (
               <div className="p-6 text-center text-sm text-muted-foreground">
                 Loading eligible jobs…
               </div>
-            ) : jobs.length === 0 ? (
+            )}
+            {!isLoading && jobs.length === 0 && (
               <div className="p-6 text-center text-sm text-muted-foreground">
                 No eligible jobs found for this client.
               </div>
-            ) : (
+            )}
+            {!isLoading && jobs.length > 0 && (
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
