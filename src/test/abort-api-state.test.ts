@@ -56,6 +56,7 @@ import {
   requestJobAbort,
   confirmJobAbort,
   reviewAbortClaim,
+  amendApprovedAbortClaim,
   notifyCustomerAborted,
   createReplacementJob,
   getPendingAbortRequest,
@@ -159,6 +160,21 @@ describe("Abort RPC API contracts", () => {
     expect(mockState.rpcCalls[0]).toEqual({
       fn: "review_job_abort_claim",
       args: { p_abort_id: "a1", p_decision: "approved", p_amount: 75, p_note: "Call-out fee" },
+    });
+  });
+
+  it("uses the dedicated amendment RPC with the old amount and mandatory reason", async () => {
+    mockState.rpcData = { financeStatus: "approved", approvedAmount: 225, amendedAt: "2026-11-23T20:00:00Z" };
+    await amendApprovedAbortClaim({
+      abortId: "a1", newAmount: 225, expectedAmount: 240,
+      reason: "Client confirmed a revised Abort fee",
+    });
+    expect(mockState.rpcCalls[0]).toEqual({
+      fn: "amend_approved_job_abort_claim",
+      args: {
+        p_abort_id: "a1", p_new_amount: 225, p_expected_amount: 240,
+        p_reason: "Client confirmed a revised Abort fee",
+      },
     });
   });
 
