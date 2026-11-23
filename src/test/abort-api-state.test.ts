@@ -57,6 +57,7 @@ import {
   confirmJobAbort,
   reviewAbortClaim,
   amendApprovedAbortClaim,
+  correctInvoicedAbortFee,
   notifyCustomerAborted,
   createReplacementJob,
   getPendingAbortRequest,
@@ -175,6 +176,28 @@ describe("Abort RPC API contracts", () => {
         p_abort_id: "a1", p_new_amount: 225, p_expected_amount: 240,
         p_reason: "Client confirmed a revised Abort fee",
         p_client_confirmed: true,
+      },
+    });
+  });
+
+  it("corrects an invoiced fee by passing the expected amount, client agreement and full-credit acknowledgements", async () => {
+    mockState.rpcData = {
+      correctionId: "cor-1", creditNoteId: "cn-1", approvedAmount: 275,
+      originalInvoiceNumber: "AX26-100", otherJobsToReinvoice: 2, originalWasPaid: true,
+    };
+    await correctInvoicedAbortFee({
+      abortId: "a1", originalInvoiceId: "inv-1", newAmount: 275,
+      expectedAmount: 240, reason: "Client confirmed a higher Abort fee",
+      clientConfirmed: true, multiJobAcknowledged: true, paidAcknowledged: true,
+    });
+    expect(mockState.rpcCalls[0]).toEqual({
+      fn: "correct_invoiced_job_abort_fee",
+      args: {
+        p_abort_id: "a1", p_original_invoice_id: "inv-1",
+        p_new_amount: 275, p_expected_amount: 240,
+        p_reason: "Client confirmed a higher Abort fee",
+        p_client_confirmed: true, p_multi_job_acknowledged: true,
+        p_paid_acknowledged: true,
       },
     });
   });
