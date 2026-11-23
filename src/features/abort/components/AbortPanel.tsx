@@ -29,7 +29,7 @@ import {
 } from "../hooks/useAbort";
 import {
   ABORT_STAGE_LABEL, FINANCE_STATUS_LABEL, abortErrorMessage, abortQueueStage, approvalAmountProblem,
-  formatAbortConfirmedAt,
+  formatAbortConfirmedAt, isAbortFeeReviewLocked,
 } from "../lib/abortRules";
 
 const money = (n: number | null | undefined) => (n == null ? "Not set" : `£${Number(n).toFixed(2)}`);
@@ -158,7 +158,7 @@ function ConfirmedAbort({
   const stage = abortQueueStage(abort, { invoiced, paid });
   // A fee decision is final immediately, even before invoicing. The server
   // enforces this independently; the only exception is the audited Super Admin RPC.
-  const locked = invoiced || abort.finance_status !== "pending_review";
+  const locked = isAbortFeeReviewLocked(abort.finance_status, invoiced);
   const amountProblem = approvalAmountProblem(amount, abort.agreed_price);
   const amendmentProblem = approvalAmountProblem(amendAmount, abort.agreed_price);
   const canAmend = isSuperAdmin && abort.finance_status === "approved" && !invoiced && !abort.reopened_at;
