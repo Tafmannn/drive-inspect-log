@@ -116,6 +116,22 @@ describe("emailInvoice", () => {
     expect(result.pdfPath).toBe("org-1/AXENTRA_INV_AX-INV-0042.pdf");
   });
 
+  it("requires the updated email endpoint and confirms the pack is included", async () => {
+    const path = "org-1/pack-v1-inv-1/12345678-1234-1234-1234-123456789abc/AXENTRA_INV_AX-INV-0042.pdf";
+    invokeMock.mockResolvedValueOnce({ data: { invoicePackVersion: 1 }, error: null })
+      .mockResolvedValueOnce({ data: { sent: true, packIncluded: true }, error: null });
+    await expect(emailInvoice({ ...input, storedPdfPath: path })).resolves.toMatchObject({ pdfPath: path });
+    expect(invokeMock).toHaveBeenLastCalledWith("send-invoice-email", { body: { to: input.to, invoiceId: input.invoiceId, downloadUrl: "https://example.com/signed.pdf", expectedPdfPath: path } });
+    expect(uploadMock).not.toHaveBeenCalled();
+  });
+
+  it("does not send a pack-backed invoice through an outdated endpoint", async () => {
+    const path = "org-1/pack-v1-inv-1/12345678-1234-1234-1234-123456789abc/AXENTRA_INV_AX-INV-0042.pdf";
+    await expect(emailInvoice({ ...input, storedPdfPath: path })).rejects.toThrow(/pack email delivery is unavailable/);
+    expect(invokeMock).toHaveBeenCalledTimes(1);
+    expect(createSignedUrlMock).not.toHaveBeenCalled();
+  });
+
   it("throws when the upload fails and never invokes the send function", async () => {
     uploadMock.mockResolvedValue({ error: { message: "quota exceeded" } });
 

@@ -167,6 +167,9 @@ serve(async (req) => {
     }
 
     // Pack paths are bound to the database invoice. Never sign a client-supplied path.
+    if (body.expectedPdfPath && body.expectedPdfPath !== invoice.pdf_url) {
+      return new Response(JSON.stringify({ error: "INVOICE_CHANGED" }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     let packHref: string | undefined;
     if (typeof invoice.pdf_url === "string" && invoice.pdf_url.includes("/pack-v1-")) {
       const path = invoice.pdf_url;
@@ -237,7 +240,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ sent: true, id: resendData?.id ?? null }),
+      JSON.stringify({ sent: true, id: resendData?.id ?? null, packIncluded: !!packHref }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
