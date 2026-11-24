@@ -119,7 +119,7 @@ export async function buildInvoicePack(
   // Never substitute a new render for a previously issued PDF in a pack.
   let pdf: Blob;
   if (record.status === "draft" && failed.length === 0) {
-    pdf = await generateInvoicePdf(await buildInvoiceDocument(record, { settings, withReceipts: false }));
+    pdf = await generateInvoicePdf(await buildInvoiceDocument(record, { settings, withReceipts: false, expenseLines: lines }));
   } else if (record.status !== "draft" && record.pdf_url) {
     const { data, error } = await supabase.storage.from(INVOICE_PDF_BUCKET).download(record.pdf_url);
     if (error || !data || data.size === 0) throw new Error("Could not download the original issued invoice PDF. Please retry.");
