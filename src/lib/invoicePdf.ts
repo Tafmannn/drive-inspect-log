@@ -9,18 +9,20 @@ const MARGIN = 14;
 const PAGE_W = 210; // A4 mm
 
 const THEME = {
-  navy:        [17, 29, 58]    as [number, number, number],
+  navy:        [23, 47, 82]    as [number, number, number],
   navyDeep:    [12, 20, 45]    as [number, number, number],
   white:       [255, 255, 255] as [number, number, number],
-  text:        [40, 42, 48]    as [number, number, number],
-  muted:       [120, 125, 135] as [number, number, number],
-  lightBorder: [225, 228, 235] as [number, number, number],
-  softBg:      [245, 247, 252] as [number, number, number],
-  tableStripe: [250, 251, 254] as [number, number, number],
-  headerText:  [200, 210, 230] as [number, number, number],
-  accent:      [0, 82, 204]    as [number, number, number],
-  accentLight: [230, 240, 255] as [number, number, number],
-  sectionTitle:[17, 29, 58]    as [number, number, number],
+  text:        [23, 47, 82]    as [number, number, number],
+  muted:       [87, 107, 133] as [number, number, number],
+  lightBorder: [212, 226, 240] as [number, number, number],
+  softBg:      [248, 250, 253] as [number, number, number],
+  tableStripe: [251, 252, 254] as [number, number, number],
+  headerText:  [87, 107, 133] as [number, number, number],
+  accent:      [43, 125, 201]    as [number, number, number],
+  accentLight: [237, 245, 252] as [number, number, number],
+  totalBg:     [238, 244, 250] as [number, number, number],
+  totalText:   [24, 59, 96] as [number, number, number],
+  sectionTitle:[23, 47, 82]    as [number, number, number],
 };
 
 /**
@@ -264,44 +266,6 @@ export async function loadInvoiceLogo(preferred?: string): Promise<CachedImage |
   return null;
 }
 
-/** Recolor near-black pixels to navy so the logo blends into the banner */
-async function recolorToNavy(img: CachedImage): Promise<CachedImage> {
-  try {
-    const canvas = document.createElement("canvas");
-    canvas.width = img.w;
-    canvas.height = img.h;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return img;
-
-    const el = new Image();
-    el.crossOrigin = "anonymous";
-    await new Promise<void>((resolve, reject) => {
-      el.onload = () => resolve();
-      el.onerror = () => reject();
-      el.src = img.dataUrl;
-    });
-
-    ctx.drawImage(el, 0, 0);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const d = imageData.data;
-    const [navyR, navyG, navyB] = THEME.navy;
-
-    for (let i = 0; i < d.length; i += 4) {
-      if (d[i] < 35 && d[i + 1] < 35 && d[i + 2] < 35 && d[i + 3] > 100) {
-        d[i] = navyR;
-        d[i + 1] = navyG;
-        d[i + 2] = navyB;
-      }
-    }
-
-    ctx.putImageData(imageData, 0, 0);
-    const newDataUrl = canvas.toDataURL("image/png");
-    return { dataUrl: newDataUrl, format: "PNG", w: img.w, h: img.h };
-  } catch {
-    return img;
-  }
-}
-
 /* ------------------------------------------------------------------ */
 /*  1. Header Banner — Premium Seamless                                */
 /* ------------------------------------------------------------------ */
@@ -313,8 +277,8 @@ function drawHeaderBanner(
 ): number {
   const bannerH = 46;
 
-  // Solid navy banner
-  doc.setFillColor(...THEME.navy);
+  // White banner
+  doc.setFillColor(...THEME.white);
   doc.rect(0, 0, PAGE_W, bannerH, "F");
 
   // --- Left side: logo at ~45% of content width ---
@@ -337,13 +301,13 @@ function drawHeaderBanner(
   const centerY = bannerH / 2;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(isCreditNote(data) ? 22 : 26);
-  doc.setTextColor(...THEME.white);
+  doc.setTextColor(...THEME.sectionTitle);
   doc.text(docLabel(data), PAGE_W - MARGIN, centerY - 4, { align: "right" });
 
-  // Invoice number — prominent white, not muted
+  // Invoice number — blue brand accent
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
-  doc.setTextColor(255, 255, 255);
+  doc.setTextColor(...THEME.accent);
   const invNum = sanitize(data.invoiceNumber, "");
   doc.text(invNum, PAGE_W - MARGIN, centerY + 6, { align: "right" });
 
@@ -368,7 +332,7 @@ function drawHeaderBanner(
 
   // Accent line at bottom
   doc.setDrawColor(...THEME.accent);
-  doc.setLineWidth(0.8);
+  doc.setLineWidth(0.35);
   doc.line(0, bannerH, PAGE_W, bannerH);
 
   return bannerH + 8;
@@ -417,13 +381,13 @@ function drawMetaAndBillTo(doc: jsPDF, data: InvoiceData, y: number): number {
   doc.roundedRect(leftX, y, boxW, boxH, radius, radius);
 
   // Header strip
-  doc.setFillColor(...THEME.accent);
+  doc.setFillColor(...THEME.accentLight);
   doc.roundedRect(leftX, y, boxW, stripH, radius, radius, "F");
   doc.rect(leftX, y + stripH - radius, boxW, radius, "F");
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
-  doc.setTextColor(...THEME.white);
+  doc.setTextColor(...THEME.sectionTitle);
   doc.text(isCreditNote(data) ? "CREDIT NOTE DETAILS" : "INVOICE DETAILS", leftX + 5, y + 5.2);
 
   let ly = y + stripH + 6;
@@ -450,13 +414,13 @@ function drawMetaAndBillTo(doc: jsPDF, data: InvoiceData, y: number): number {
   doc.roundedRect(rightX, y, boxW, boxH, radius, radius);
 
   // Header strip
-  doc.setFillColor(...THEME.navy);
+  doc.setFillColor(...THEME.accentLight);
   doc.roundedRect(rightX, y, boxW, stripH, radius, radius, "F");
   doc.rect(rightX, y + stripH - radius, boxW, radius, "F");
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
-  doc.setTextColor(...THEME.white);
+  doc.setTextColor(...THEME.sectionTitle);
   doc.text("BILL TO", rightX + 5, y + 5.2);
 
   // Client details
@@ -514,8 +478,8 @@ function buildCombinedTable(doc: jsPDF, data: InvoiceData, y: number): number {
       minCellHeight: 8,
     },
     headStyles: {
-      fillColor: THEME.navy,
-      textColor: THEME.white,
+      fillColor: THEME.accentLight,
+      textColor: THEME.sectionTitle,
       fontStyle: "bold",
       fontSize: 7.5,
       cellPadding: { top: 4, bottom: 4, left: 4, right: 4 },
@@ -603,8 +567,8 @@ function buildChargesTable(doc: jsPDF, data: InvoiceData, y: number): number {
       minCellHeight: 8,
     },
     headStyles: {
-      fillColor: THEME.navy,
-      textColor: THEME.white,
+      fillColor: THEME.accentLight,
+      textColor: THEME.sectionTitle,
       fontStyle: "bold",
       fontSize: 7.5,
       cellPadding: { top: 4, bottom: 4, left: 5, right: 5 },
@@ -736,15 +700,17 @@ function buildTotalsBlock(doc: jsPDF, data: InvoiceData, y: number, skipSpaceChe
     y += 3;
   }
 
-  // Total row — navy rounded pill
+  // Total row — understated ice-blue card
   const totalRowH = 11;
   const totalRowX = labelX;
-  doc.setFillColor(...THEME.navy);
-  doc.roundedRect(totalRowX, y - 5, blockW, totalRowH, 2, 2, "F");
+  doc.setFillColor(...THEME.totalBg);
+  doc.setDrawColor(...THEME.lightBorder);
+  doc.setLineWidth(0.2);
+  doc.roundedRect(totalRowX, y - 5, blockW, totalRowH, 2, 2, "FD");
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10.5);
-  doc.setTextColor(...THEME.white);
+  doc.setTextColor(...THEME.totalText);
   doc.text(isCreditNote(data) ? "TOTAL CREDIT" : vatOn(data) ? "TOTAL" : "TOTAL DUE", totalRowX + 5, y + 1.5);
   doc.text(fmt(total), rightEdge - 4, y + 1.5, { align: "right" });
 
@@ -979,15 +945,15 @@ function drawTotalsAndPaymentSideBySide(doc: jsPDF, data: InvoiceData, y: number
 const CONT_BANNER_H = 16;
 
 function drawContinuationHeader(doc: jsPDF, data: InvoiceData, title: string): number {
-  doc.setFillColor(...THEME.navy);
+  doc.setFillColor(...THEME.white);
   doc.rect(0, 0, PAGE_W, CONT_BANNER_H, "F");
   doc.setDrawColor(...THEME.accent);
-  doc.setLineWidth(0.8);
+  doc.setLineWidth(0.35);
   doc.line(0, CONT_BANNER_H, PAGE_W, CONT_BANNER_H);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
-  doc.setTextColor(...THEME.white);
+  doc.setTextColor(...THEME.sectionTitle);
   doc.text(docLabel(data) + " " + sanitize(data.invoiceNumber), MARGIN, CONT_BANNER_H / 2 + 1.5);
 
   doc.setFont("helvetica", "bold");
@@ -1042,8 +1008,8 @@ function drawExpenseSchedule(doc: jsPDF, data: InvoiceData): void {
       textColor: THEME.text,
     },
     headStyles: {
-      fillColor: THEME.navy,
-      textColor: THEME.white,
+      fillColor: THEME.accentLight,
+      textColor: THEME.sectionTitle,
       fontStyle: "bold",
       fontSize: 7,
       cellPadding: { top: 3.5, bottom: 3.5, left: 3, right: 3 },
@@ -1126,11 +1092,11 @@ function drawExpenseSchedule(doc: jsPDF, data: InvoiceData): void {
   doc.line(labelX, y - 2, rightEdge, y - 2);
   y += 3;
 
-  doc.setFillColor(...THEME.navy);
+  doc.setFillColor(...THEME.accentLight);
   doc.roundedRect(labelX, y - 5, blockW, 10, 2, 2, "F");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
-  doc.setTextColor(...THEME.white);
+  doc.setTextColor(...THEME.sectionTitle);
   doc.text("Carried to invoice", labelX + 5, y + 1.3);
   doc.text(fmt(sum("net")), rightEdge - 4, y + 1.3, { align: "right" });
   y += 12;
@@ -1191,16 +1157,16 @@ function drawReceiptGrid(
     doc.roundedRect(x0, y, contentW, slotH, 2, 2);
 
     // Caption strip
-    doc.setFillColor(...THEME.navy);
+    doc.setFillColor(...THEME.accentLight);
     doc.roundedRect(x0, y, contentW, capH, 2, 2, "F");
     doc.rect(x0, y + capH - 2, contentW, 2, "F");
-    doc.setFillColor(...THEME.accent);
+    doc.setFillColor(...THEME.totalBg);
     doc.roundedRect(x0, y, 16, capH, 2, 2, "F");
     doc.rect(x0 + 2, y, 14, capH, "F");
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
-    doc.setTextColor(...THEME.white);
+    doc.setTextColor(...THEME.sectionTitle);
     doc.text(sanitize(r.ref), x0 + 8, y + 5.5, { align: "center" });
     doc.setFont("helvetica", "normal");
     doc.setFontSize(cols === 1 ? 8 : cols === 2 ? 6.8 : 5.6);
@@ -1298,8 +1264,7 @@ function drawFooters(doc: jsPDF, data: InvoiceData): void {
 
 export async function generateInvoicePdf(data: InvoiceData): Promise<Blob> {
   const doc = new jsPDF({ unit: "mm", format: "a4", compress: true });
-  let logo = await loadInvoiceLogo(data.logoUrl);
-  if (logo) logo = await recolorToNavy(logo);
+  const logo = await loadInvoiceLogo(data.logoUrl);
 
   continuationHeader = (d) => drawContinuationHeader(d, data, "Invoice continued");
   let y = drawHeaderBanner(doc, data, logo);
