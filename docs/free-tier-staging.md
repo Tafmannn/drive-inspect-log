@@ -33,3 +33,12 @@ When the staging connection is stored as the STAGING_DB_URL secret, manually run
 - To roll back this testing infrastructure, revert the workflow and scripts only; it makes no persistent hosted Supabase changes.
 
 See official Supabase CLI docs: https://supabase.com/docs/guides/deployment/ci/testing and https://supabase.com/docs/guides/platform/backups.
+
+
+## Creating an encrypted manual staging backup (free plan)
+
+The repo includes scripts/free-tier/backup-staging.mjs. Run it only on a trusted machine with a PostgreSQL 17-compatible pg_dump / pg_restore client and the age encryption tool installed.
+
+Set STAGING_DB_URL to the **existing staging project** connection (never production), AXENTRA_AGE_RECIPIENT to an age public recipient, and AXENTRA_BACKUP_DIR to a private directory *outside the repository*. Run node scripts/free-tier/backup-staging.mjs.
+
+The helper refuses non-staging URLs, runs pg_dump without DB writes, checks the archive format, encrypts the resulting dump, removes its plaintext temporary copy, and writes a checksum manifest. It deliberately records actualIsolatedRestoreVerified=false and storageObjectBytesIncluded=false. Never interpret the encrypted archive or its checksum as a verified recovery until a successful restore and separate Storage-object backup have been demonstrated. Keep the age private identity key separate from the encrypted archive. Do not paste the staging password or private key into a chat.
