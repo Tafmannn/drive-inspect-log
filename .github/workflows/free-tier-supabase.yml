@@ -1,0 +1,99 @@
+name: Free-Tier Supabase Verification
+
+# No production credentials, remote migrations, deployments, or paid branches.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/free-tier-supabase.yml"
+      - "scripts/staging/free-tier-preflight.mjs"
+      - "scripts/staging/verify-local-backup.sh"
+      - "supabase/migrations/**"
+      - "supabase/tests/**"
+      - "supabase/config.toml"
+  workflow_dispatch:
+    inputs:
+      remote_inventory:
+        description: "Read-only inventory of hosted axentra-staging (requires STAGING_DB_URL secret)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: free-tier-supabase-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guardrails:
+    name: Static safety and migration inventory
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node scripts/staging/free-tier-preflight.mjs --self-test
+      - run: node scripts/staging/free-tier-preflight.mjs --inventory
+
+  disposable_database:
+    name: Disposable local Supabase schema and SQL tests
+    needs: guardrails
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      AXENTRA_LOCAL_SUPABASE: "YES"
+      SUPABASE_ENV: "ci"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 3.0.0
+      - name: Install PostgreSQL client
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Start ONLY local Supabase database and apply repo migrations
+        run: supabase db start
+      - name: Confirm essential tables, RLS and migrations on disposable database
+        env:
+          PGHOST: "127.0.0.1"
+          PGPORT: "54322"
+          PGUSER: "postgres"
+          PGDATABASE: "postgres"
+          PGPASSWORD: "postgres"
+          PGSSLMODE: "disable"
+        run: psql -X -v ON_ERROR_STOP=1 -f scripts/staging/free-tier-db-smoke.sql
+      - name: Test abort lifecycle (rollback-only)
+        env:
+          PGHOST: "127.0.0.1"
+          PGPORT: "54322"
+          PGUSER: "postgres"
+          PGDATABASE: "postgres"
+          PGPASSWORD: "postgres"
+          PGSSLMODE: "disable"
+        run: psql -X -v ON_ERROR_STOP=1 -f supabase/tests/job_abort_workflow.sql
+      - name: Verify dump/restore against synthetic local data
+        run: bash scripts/staging/verify-local-backup.sh
+      - name: Stop disposable local database
+        if: always()
+        run: supabase stop --no-backup || true
+
+  hosted_inventory:
+    name: Hosted staging inventory (read-only; optional)
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.remote_inventory == true }}
+    needs: guardrails
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: staging-validation
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install PostgreSQL client
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Read staging metadata only; never apply migrations
+        env:
+          STAGING_DB_URL: ${{ secrets.STAGING_DB_URL }}
+        run: node scripts/staging/free-tier-preflight.mjs --remote
