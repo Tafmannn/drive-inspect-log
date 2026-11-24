@@ -37,6 +37,18 @@ export function credentialWindowMs(checkedAt: string, validUntil: string | null,
   return Math.max(0, Math.min(OFFLINE_GRACE_MS, expiry - issued - Math.max(0, requestElapsedMs)));
 }
 
+/** PostgREST RPC failures are plain objects, not necessarily Error instances.
+ * Preserve their code/message so an explicit server denial fails closed.
+ */
+function credentialErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "object" && error !== null && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string") return message;
+  }
+  return "Unable to check authorisation";
+}
+
 type ParsedCredential = {
   credential: DigitalIdCredential | null;
   state: "missing" | "revoked" | "active";
@@ -114,7 +126,7 @@ export function useDigitalCredential(userId: string) {
       setError(null);
     } catch (err) {
       if (epoch.current !== requestEpoch || latestRequest.current !== requestNumber) return;
-      const message = err instanceof Error ? err.message : "Unable to check authorisation";
+      const message = credentialErrorMessage(err);
       setError(message);
       if (/ACCOUNT_INACTIVE|CREDENTIAL_UNAVAILABLE|NOT_AUTHORISED|UNAUTHENTICATED/.test(message)) {
         lastCheck.current = null;

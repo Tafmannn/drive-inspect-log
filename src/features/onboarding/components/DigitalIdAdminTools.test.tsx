@@ -139,7 +139,7 @@ describe("Digital ID photo assignment atomicity", () => {
       "set_driver_digital_id_photo",
       { p_user_id: credential.user_id, p_photo_path: null },
     ));
-    expect(onChanged).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
     expect(mocks.toast).toHaveBeenCalledWith(
       expect.objectContaining({ title: "ID photograph removed" }),
     );
