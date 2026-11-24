@@ -97,11 +97,12 @@ export async function fetchInvoiceExpenseLines(invoiceId: string): Promise<Invoi
 
   const byExpense = new Map<string, ReceiptRef[]>();
   if (expenseIds.length) {
-    const { data: receipts } = await supabase
+    const { data: receipts, error: receiptError } = await supabase
       .from("expense_receipts")
       .select("expense_id, url, backend, backend_ref, created_at")
       .in("expense_id", expenseIds)
       .order("created_at", { ascending: true });
+    if (receiptError) throw new Error(`Could not load invoice receipts: ${receiptError.message}`);
     for (const r of receipts ?? []) {
       if (!r.url) continue;
       const list = byExpense.get(r.expense_id) ?? [];
@@ -157,13 +158,13 @@ export function receiptCaption(line: Pick<InvoiceExpenseLine, "category" | "expe
  */
 export async function buildInvoiceDocument(
   record: InvoiceRecord,
-  opts: { settings?: OrgInvoiceSettings | null; withReceipts?: boolean } = {},
+  opts: { settings?: OrgInvoiceSettings | null; withReceipts?: boolean; expenseLines?: InvoiceExpenseLine[] } = {},
 ): Promise<InvoiceData> {
   const base = invoiceRecordToPdfData(record);
   const data: InvoiceData = { ...base, ...settingsToPdfFields(opts.settings) };
   if (record.document_type === "credit_note") return data;
 
-  const lines = await fetchInvoiceExpenseLines(record.id);
+  const lines = opts.expenseLines ?? await fetchInvoiceExpenseLines(record.id);
   if (!lines.length) return data;
 
   const jobs = jobMetaFromLineItems(record.line_items);
