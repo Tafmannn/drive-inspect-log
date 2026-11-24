@@ -42,3 +42,12 @@ The repo includes scripts/free-tier/backup-staging.mjs. Run it only on a trusted
 Set STAGING_DB_URL to the **existing staging project** connection (never production), AXENTRA_AGE_RECIPIENT to an age public recipient, and AXENTRA_BACKUP_DIR to a private directory *outside the repository*. Run node scripts/free-tier/backup-staging.mjs.
 
 The helper refuses non-staging URLs, runs pg_dump without DB writes, checks the archive format, encrypts the resulting dump, removes its plaintext temporary copy, and writes a checksum manifest. It deliberately records actualIsolatedRestoreVerified=false and storageObjectBytesIncluded=false. Never interpret the encrypted archive or its checksum as a verified recovery until a successful restore and separate Storage-object backup have been demonstrated. Keep the age private identity key separate from the encrypted archive. Do not paste the staging password or private key into a chat.
+
+
+## Obtaining the missing authoritative migration bootstrap without a paid branch
+
+The first clean-replay failure is migration 20260317122123: it ALTERs driver_profiles when no preceding checked-in migration creates that table. Do not patch historical production migrations or invent a substitute table. The needed input is an authoritative production-derived schema baseline, reviewed before use.
+
+Use scripts/free-tier/capture-production-baseline.mjs on a trusted machine with a version-compatible pg_dump and psql. Set PRODUCTION_DB_URL to the production project's read-only connection and AXENTRA_SCHEMA_OUTPUT_DIR to a private folder outside GitHub; never paste the URL into chat. This helper reads the production catalogue, exports only the public SQL schema (no customer rows), and emits a SHA-256 manifest with restoreTested=false and approvedForCi=false.
+
+The output must be inspected for hardcoded secrets in SQL functions, compared to the actual migration history, and tested restoring into a disposable local database. Only after that review can we write an approved snapshot-bootstrap/replay implementation for CI. No schema export has been produced by this chat: the production Postgres password/backup file was not available through the connector.

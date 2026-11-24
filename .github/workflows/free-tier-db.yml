@@ -38,6 +38,8 @@ jobs:
           node scripts/free-tier/verify-local-db.mjs --static
           node scripts/free-tier/staging-readonly.mjs --self-test
           node scripts/free-tier/backup-staging.mjs --self-test
+          node scripts/free-tier/capture-production-baseline.mjs --self-test
+          node --check scripts/free-tier/capture-production-baseline.mjs
           node --check scripts/free-tier/verify-local-db.mjs
           node --check scripts/free-tier/staging-readonly.mjs
           node --check scripts/free-tier/backup-staging.mjs
