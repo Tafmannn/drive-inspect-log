@@ -24,7 +24,7 @@ const h = vi.hoisted(() => {
   const fn = () => null as unknown as ReturnType<typeof import("vitest").vi.fn>;
   return {
     getInvoicePdf: fn(), markInvoiceSent: fn(), markInvoicePaid: fn(), markInvoiceUnpaid: fn(), cancelInvoice: fn(),
-    buildInvoicePack: fn(), emailInvoice: fn(), buildInvoiceDocument: fn(),
+    buildInvoicePack: fn(), emailInvoice: fn(), buildInvoiceDocument: fn(), prepareInvoiceDelivery: fn(), markPreparedInvoiceSent: fn(),
     downloads: [] as string[],
     toasts: [] as { title?: string; description?: string; variant?: string }[],
     changed: [] as string[],
@@ -47,6 +47,11 @@ vi.mock("@/features/invoicing/api/invoiceLifecycle", () => ({
 vi.mock("@/features/invoicing/api/receiptExport", () => ({
   buildInvoicePack: (...a: unknown[]) => h.buildInvoicePack(...a),
   downloadBlob: (_b: Blob, name: string) => h.downloads.push(name),
+}));
+vi.mock("@/features/invoicing/api/invoiceDelivery", () => ({
+  buildCompleteInvoiceDelivery: (...a: unknown[]) => h.buildInvoicePack(...a),
+  prepareInvoiceDelivery: (...a: unknown[]) => h.prepareInvoiceDelivery(...a),
+  markPreparedInvoiceSent: (...a: unknown[]) => h.markPreparedInvoiceSent(...a),
 }));
 vi.mock("@/features/invoicing/api/emailInvoice", () => ({
   emailInvoice: (...a: unknown[]) => h.emailInvoice(...a),
@@ -116,6 +121,8 @@ beforeEach(() => {
   const blob = new Blob(["pdf"]);
   h.getInvoicePdf = vi.fn().mockResolvedValue(blob);
   h.markInvoiceSent = vi.fn().mockResolvedValue(undefined);
+  h.markPreparedInvoiceSent = vi.fn().mockResolvedValue(undefined);
+  h.prepareInvoiceDelivery = vi.fn().mockResolvedValue("org-1/prepared.pdf");
   h.markInvoicePaid = vi.fn().mockResolvedValue(undefined);
   h.markInvoiceUnpaid = vi.fn().mockResolvedValue(undefined);
   h.cancelInvoice = vi.fn().mockResolvedValue(null);
@@ -215,7 +222,7 @@ describe("invoice actions", () => {
   it("marks a draft as sent and refreshes", async () => {
     renderList([inv({ invoice_number: "AX26-1007" })]);
     await choose("AX26-1007", /Mark as sent/);
-    await waitFor(() => expect(h.markInvoiceSent).toHaveBeenCalledWith(expect.objectContaining({ id: "AX26-1007" }), "org-1", SETTINGS));
+    await waitFor(() => expect(h.markPreparedInvoiceSent).toHaveBeenCalledWith(expect.objectContaining({ id: "AX26-1007" }), "org-1", SETTINGS));
     expect(h.changed).toEqual(["AX26-1007"]);
     expect(h.toasts[0].title).toBe("Marked as sent");
   });
@@ -224,7 +231,7 @@ describe("invoice actions", () => {
     renderList([inv({ invoice_number: "AX26-1007" })], { settings: null });
     await choose("AX26-1007", /Mark as sent/);
     await waitFor(() => expect(h.toasts[0]).toMatchObject({ title: "Could not mark as sent" }));
-    expect(h.markInvoiceSent).not.toHaveBeenCalled();
+    expect(h.markPreparedInvoiceSent).not.toHaveBeenCalled();
   });
 
   it("records a payment with the entered date, method and reference", async () => {
@@ -300,10 +307,19 @@ describe("invoice actions", () => {
     fireEvent.click(await screen.findByText("Send email"));
 
     await waitFor(() => expect(h.emailInvoice).toHaveBeenCalled());
-    expect(h.buildInvoiceDocument).toHaveBeenCalledWith(expect.objectContaining({ id: "AX26-1007" }), { settings: SETTINGS, withReceipts: true });
-    expect(h.emailInvoice.mock.calls[0][0]).toMatchObject({ invoiceId: "AX26-1007", orgId: "org-1", to: "ap@cje.example", storedPdfPath: null });
+    expect(h.buildInvoiceDocument).toHaveBeenCalledWith(expect.objectContaining({ id: "AX26-1007" }), { settings: SETTINGS, withReceipts: false });
+    expect(h.emailInvoice.mock.calls[0][0]).toMatchObject({ invoiceId: "AX26-1007", orgId: "org-1", to: "ap@cje.example", storedPdfPath: "org-1/prepared.pdf" });
     await waitFor(() => expect(h.toasts[0]).toMatchObject({ title: "Invoice emailed", description: "AX26-1007 sent to ap@cje.example." }));
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("does not email a draft when pack preparation fails", async () => {
+    h.prepareInvoiceDelivery.mockRejectedValue(new Error("Invoice pack incomplete: R01"));
+    renderList([inv({ invoice_number: "AX26-1007" })]);
+    await choose("AX26-1007", /Email to client/);
+    fireEvent.click(await screen.findByText("Send email"));
+    await waitFor(() => expect(h.toasts[0]).toMatchObject({ title: "Invoice email failed", description: "Invoice pack incomplete: R01" }));
+    expect(h.emailInvoice).not.toHaveBeenCalled();
   });
 
   it("re-sends an issued invoice using its stored PDF, never a re-render with receipts", async () => {

@@ -2,7 +2,7 @@
  * Invoice pack export: the invoice PDF plus the original receipt files for
  * exactly the expenses recharged on that invoice — never every receipt on
  * the job. Files are named after their receipt reference so they line up
- * with the invoice rows and the receipt pages:
+ * with the invoice rows and any historical receipt pages:
  *
  *   receipts/R01_AX1042_Fuel_54.60.jpg
  *
@@ -10,16 +10,19 @@
  * download (reported back, never silently dropped).
  */
 import JSZip from "jszip";
-import { invoicePdfFileName } from "@/lib/invoicePdf";
+import { supabase } from "@/integrations/supabase/client";
+import { generateInvoicePdf, invoicePdfFileName } from "@/lib/invoicePdf";
 import type { InvoiceRecord } from "../hooks/useInvoices";
 import {
+  buildInvoiceDocument,
   fetchInvoiceExpenseLines,
   receiptFileRef,
   type InvoiceExpenseLine,
   type OrgInvoiceSettings,
 } from "./invoiceDocument";
-import { getInvoicePdf } from "./invoiceLifecycle";
+import { getInvoicePdf, INVOICE_PDF_BUCKET } from "./invoiceLifecycle";
 import { fetchReceiptBlob } from "./receiptImages";
+import { issuedPackPath } from "./invoicePackPath";
 
 export interface InvoicePackResult {
   blob: Blob;
@@ -74,17 +77,26 @@ export async function buildInvoicePack(
   record: InvoiceRecord,
   settings?: OrgInvoiceSettings | null,
   onProgress?: (done: number, total: number) => void,
+  prepared?: { pdf: Blob; lines: InvoiceExpenseLine[] },
 ): Promise<InvoicePackResult> {
+  const frozenPath = record.status !== "draft" ? issuedPackPath(record.pdf_url, record.id) : null;
+  if (frozenPath) {
+    const { data, error } = await supabase.storage.from(INVOICE_PDF_BUCKET).download(frozenPath);
+    if (error || !data?.size) throw new Error("Could not download the original issued invoice pack. Please retry.");
+    const archive = await JSZip.loadAsync(data);
+    const succeeded = Object.values(archive.files).filter(f => !f.dir && f.name.startsWith("receipts/")).length;
+    return { blob: data, fileName: invoicePdfFileName(record.invoice_number).replace(/\.pdf$/, ".zip"), succeeded, failed: [] };
+  }
   const zip = new JSZip();
-  zip.file(invoicePdfFileName(record.invoice_number), await getInvoicePdf(record, settings));
 
-  const lines = await fetchInvoiceExpenseLines(record.id);
+  const lines = prepared?.lines ?? await fetchInvoiceExpenseLines(record.id);
   const jobRefs = jobRefsFromLineItems(record.line_items);
   const failed: string[] = [];
   let succeeded = 0;
   let done = 0;
   const total = lines.reduce((n, l) => n + Math.max(1, l.receipts.length), 0);
-  const folder = lines.length ? zip.folder("receipts") : null;
+  // Do not create an empty folder or duplicate the same underlying file for one expense.
+  const seen = new Set<string>();
 
   for (const line of lines) {
     const jobRef = (line.job_id && jobRefs.get(line.job_id)) || "";
@@ -95,9 +107,15 @@ export async function buildInvoicePack(
     }
     for (let i = 0; i < line.receipts.length; i++) {
       const file = line.receipts[i];
+      const identity = JSON.stringify([line.id, file.backend ?? '', file.backend_ref || file.url]);
+      if (seen.has(identity)) {
+        onProgress?.(++done, total);
+        continue;
+      }
       const blob = await fetchReceiptBlob(file);
-      if (blob && folder) {
-        folder.file(receiptFileStem(line, jobRef, i) + guessExtension(file.url, blob.type), blob);
+      if (blob && blob.size > 0) {
+        zip.file("receipts/" + receiptFileStem(line, jobRef, i) + guessExtension(file.url, blob.type), blob);
+        seen.add(identity);
         succeeded++;
       } else {
         failed.push(`${receiptFileRef(line.ref, i)} (download failed)`);
@@ -106,6 +124,22 @@ export async function buildInvoicePack(
     }
   }
 
+  // A complete draft pack has its evidence alongside the invoice, not embedded.
+  // Standalone delivery and incomplete packs keep the existing document path.
+  // Never substitute a new render for a previously issued PDF in a pack.
+  let pdf: Blob;
+  if (prepared) {
+    pdf = prepared.pdf;
+  } else if (record.status === "draft" && failed.length === 0) {
+    pdf = await generateInvoicePdf(await buildInvoiceDocument(record, { settings, withReceipts: false, expenseLines: lines }));
+  } else if (record.status !== "draft" && record.pdf_url) {
+    const { data, error } = await supabase.storage.from(INVOICE_PDF_BUCKET).download(record.pdf_url);
+    if (error || !data || data.size === 0) throw new Error("Could not download the original issued invoice PDF. Please retry.");
+    pdf = data;
+  } else {
+    pdf = await getInvoicePdf(record, settings);
+  }
+  zip.file(invoicePdfFileName(record.invoice_number), pdf);
   const blob = await zip.generateAsync({ type: "blob" });
   const safeNumber = record.invoice_number.replace(/[^a-zA-Z0-9_-]/g, "_");
   return { blob, fileName: `invoice_pack_${safeNumber}.zip`, succeeded, failed };

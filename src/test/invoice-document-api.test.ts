@@ -284,6 +284,38 @@ describe("receipt files", () => {
 });
 
 describe("buildInvoicePack", () => {
+  it("puts receipts beside a clean draft invoice, not on duplicate PDF pages", async () => {
+    h.tables.invoice_expenses = [EXPENSE_LINES[0]];
+    h.tables.expense_receipts = RECEIPTS;
+    const pack = await buildInvoicePack(record());
+    const zip = await JSZip.loadAsync(await pack.blob.arrayBuffer());
+    const pdf = await zip.file("AXENTRA_INV_AX26-1007.pdf")!.async("string");
+    expect((pdf.match(/\/Type\s*\/Page\b/g) ?? []).length).toBe(1);
+    expect(pack.succeeded).toBe(2);
+    expect(pack.failed).toEqual([]);
+  });
+
+  it("deduplicates identical receipt references for the same expense", async () => {
+    h.tables.invoice_expenses = [EXPENSE_LINES[0]];
+    h.tables.expense_receipts = [RECEIPTS[0], RECEIPTS[0]];
+    const pack = await buildInvoicePack(record({ status: "sent", pdf_url: "p.pdf" }));
+    expect(pack.succeeded).toBe(1);
+    expect(pack.failed).toEqual([]);
+    const zip = await JSZip.loadAsync(await pack.blob.arrayBuffer());
+    expect(Object.keys(zip.files).filter((n) => n.startsWith("receipts/") && !n.endsWith("/"))).toHaveLength(1);
+  });
+
+  it("fails instead of replacing an unreadable issued PDF with a new render", async () => {
+    h.download.mockResolvedValueOnce({ data: null, error: { message: "unavailable" } });
+    await expect(buildInvoicePack(record({ status: "sent", pdf_url: "p.pdf" }))).rejects.toThrow(/original issued invoice PDF/);
+  });
+
+  it("surfaces receipt query errors instead of treating them as missing files", async () => {
+    h.tables.invoice_expenses = [EXPENSE_LINES[0]];
+    h.errors.expense_receipts = { message: "denied" };
+    await expect(buildInvoicePack(record())).rejects.toThrow(/Could not load invoice receipts: denied/);
+  });
+
   it("zips the invoice PDF with only that invoice's receipt files, named by receipt ref", async () => {
     h.tables.invoice_expenses = EXPENSE_LINES;
     h.tables.expense_receipts = RECEIPTS;
@@ -312,6 +344,8 @@ describe("buildInvoicePack", () => {
     const pack = await buildInvoicePack(record({ status: "sent", pdf_url: "p.pdf" }));
     expect(pack.succeeded).toBe(0);
     expect(pack.failed).toEqual(["R01 (download failed)"]);
+    const zip = await JSZip.loadAsync(await pack.blob.arrayBuffer());
+    expect(Object.keys(zip.files)).toEqual(["AXENTRA_INV_AX26-1007.pdf"]);
   });
 
   it("contains just the PDF when nothing was recharged", async () => {

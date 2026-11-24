@@ -10,6 +10,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { invoicePdfFileName } from "@/lib/invoicePdf";
 import type { InvoiceRecord } from "../hooks/useInvoices";
+import { issuedPackPath } from "./invoicePackPath";
 import { generateInvoiceDocumentPdf, type OrgInvoiceSettings } from "./invoiceDocument";
 
 export const INVOICE_PDF_BUCKET = "invoice-pdfs";
@@ -47,7 +48,8 @@ export async function getInvoicePdf(
   if (record.pdf_url && record.status !== "draft") {
     const { data, error } = await supabase.storage.from(INVOICE_PDF_BUCKET).download(record.pdf_url);
     if (!error && data) return data;
-    // Stored copy unreadable: fall back to re-rendering from the snapshot.
+    if (issuedPackPath(record.pdf_url, record.id)) throw new Error("Could not download the original issued invoice PDF.");
+    // Historical stored copy unreadable: retain legacy fallback.
   }
   return generateInvoiceDocumentPdf(record, settings);
 }
