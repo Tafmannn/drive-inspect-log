@@ -218,5 +218,5 @@ export async function generateInvoiceDocumentPdf(
   record: InvoiceRecord,
   settings?: OrgInvoiceSettings | null,
 ): Promise<Blob> {
-  return generateInvoicePdf(await buildInvoiceDocument(record, { settings, withReceipts: true }));
+  return generateInvoicePdf(await buildInvoiceDocument(record, { settings, withReceipts: record.status !== "draft" }));
 }

@@ -51,11 +51,6 @@ export async function getInvoicePdf(
     if (issuedPackPath(record.pdf_url, record.id)) throw new Error("Could not download the original issued invoice PDF.");
     // Historical stored copy unreadable: retain legacy fallback.
   }
-  if (record.status === "draft") {
-    const { buildInvoiceDocument } = await import("./invoiceDocument");
-    const { generateInvoicePdf } = await import("@/lib/invoicePdf");
-    return generateInvoicePdf(await buildInvoiceDocument(record, { settings, withReceipts: false }));
-  }
   return generateInvoiceDocumentPdf(record, settings);
 }
 
