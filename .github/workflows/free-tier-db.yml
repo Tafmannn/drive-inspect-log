@@ -37,6 +37,12 @@ jobs:
         run: |
           node scripts/free-tier/verify-local-db.mjs --static
           node scripts/free-tier/staging-readonly.mjs --self-test
+          node scripts/free-tier/backup-staging.mjs --self-test
+          node --check scripts/free-tier/verify-local-db.mjs
+          node --check scripts/free-tier/staging-readonly.mjs
+          node --check scripts/free-tier/backup-staging.mjs
+          bash -n scripts/free-tier/run-local-scenarios.sh
+          bash -n scripts/free-tier/local-backup-restore-probe.sh
       - name: Fail fast until an authoritative migration bootstrap is reviewed
         run: |
           # A March migration ALTERs public.driver_profiles before it is created
