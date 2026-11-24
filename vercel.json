@@ -8,6 +8,16 @@
     }
   },
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "**": false,
+      "main": true,
+      "deploy-preview/**": true
+    }
+  }
 }

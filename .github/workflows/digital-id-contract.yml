@@ -1,0 +1,51 @@
+name: Digital ID V2 local SQL contract (free tier)
+on:
+  pull_request:
+    paths:
+      - "supabase/migrations/*digital_id_v2.sql"
+      - "supabase/tests/digital_id_v2.integration.sql"
+      - "scripts/free-tier/digital-id-contract-baseline.sql"
+      - ".github/workflows/digital-id-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: digital-id-contract-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  digital-id-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUPABASE_ACCESS_TOKEN: ""
+      STAGING_DB_URL: ""
+      PGHOST: 127.0.0.1
+      PGPORT: "54322"
+      PGUSER: postgres
+      PGDATABASE: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Install PostgreSQL client
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Start isolated Supabase database WITHOUT unreproducible historical migrations
+        run: |
+          mkdir -p "$RUNNER_TEMP/axentra-historical-migrations"
+          mv supabase/migrations/*.sql "$RUNNER_TEMP/axentra-historical-migrations/"
+          supabase db start
+          mv "$RUNNER_TEMP/axentra-historical-migrations/"*.sql supabase/migrations/
+      - name: Apply ONLY synthetic dependency fixtures, then real Digital ID migration
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -f scripts/free-tier/digital-id-contract-baseline.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/migrations/20261123220000_digital_id_v2.sql
+      - name: Validate Digital ID issue/revoke/admin/cross-org/serial contracts
+        run: psql -X -v ON_ERROR_STOP=1 -f supabase/tests/digital_id_v2.integration.sql
+      - name: Stop disposable local database
+        if: always()
+        run: supabase stop --no-backup || true

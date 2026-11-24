@@ -506,6 +506,98 @@ export type Database = {
           },
         ]
       }
+      driver_digital_credentials: {
+        Row: {
+          id: string
+          user_id: string
+          org_id: string | null
+          serial_number: number
+          credential_version: number
+          status: string
+          photo_path: string | null
+          issued_at: string
+          revoked_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          org_id?: string | null
+          serial_number?: number
+          credential_version?: number
+          status?: string
+          photo_path?: string | null
+          issued_at?: string
+          revoked_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          org_id?: string | null
+          serial_number?: number
+          credential_version?: number
+          status?: string
+          photo_path?: string | null
+          issued_at?: string
+          revoked_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_digital_credentials_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "user_profiles"
+            referencedColumns: ["auth_user_id"]
+          },
+          {
+            foreignKeyName: "driver_digital_credentials_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      driver_digital_credential_events: {
+        Row: {
+          id: number
+          credential_id: string
+          actor_user_id: string | null
+          event_type: string
+          credential_version: number
+          details: Json
+          created_at: string
+        }
+        Insert: {
+          id?: number
+          credential_id: string
+          actor_user_id?: string | null
+          event_type: string
+          credential_version: number
+          details?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: number
+          credential_id?: string
+          actor_user_id?: string | null
+          event_type?: string
+          credential_version?: number
+          details?: Json
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_digital_credential_events_credential_id_fkey"
+            columns: ["credential_id"]
+            isOneToOne: false
+            referencedRelation: "driver_digital_credentials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       driver_onboarding: {
         Row: {
           created_at: string
@@ -3460,6 +3552,14 @@ export type Database = {
       driver_can_use_job_path: { Args: { p_name: string }; Returns: boolean }
       driver_owns_job: { Args: { p_job_id: string }; Returns: boolean }
       expense_is_invoiced: { Args: { p_expense_id: string }; Returns: boolean }
+      get_driver_digital_id: {
+        Args: { p_user_id?: string | null }
+        Returns: Json
+      }
+      set_driver_digital_id_photo: {
+        Args: { p_user_id: string; p_photo_path?: string | null }
+        Returns: undefined
+      }
       get_vehicle_catalogue_image: {
         Args: {
           p_colour?: string

@@ -33,6 +33,7 @@ import { ResetPassword } from "./pages/ResetPassword";
 import { Welcome } from "./pages/Welcome";
 import NotFound from "./pages/NotFound";
 import DriverDigitalId from "./features/onboarding/pages/DriverDigitalId";
+import DriverDigitalIdV2 from "./features/onboarding/pages/DriverDigitalIdV2";
 
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { AccountStatusGate } from "./components/AccountStatusGate";
@@ -156,6 +157,9 @@ function BackgroundUploader() {
 }
 
 /* ── Protected route wrapper ── */
+
+// Default off: the legacy ID remains live until credential migrations and tests pass.
+const DigitalIdPage = import.meta.env.VITE_DIGITAL_ID_V2_ENABLED === "true" ? DriverDigitalIdV2 : DriverDigitalId;
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { authEnabled, authLoading, user } = useAuth();
@@ -321,7 +325,7 @@ const App = () => {
                 <Route path="/inspection/:jobId/:inspectionType" element={<ProtectedRoute><InspectionFlow /></ProtectedRoute>} />
                 <Route path="/pending-uploads" element={<ProtectedRoute><PendingUploads /></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-                <Route path="/profile/id" element={<ProtectedRoute><DriverDigitalId /></ProtectedRoute>} />
+                <Route path="/profile/id" element={<ProtectedRoute><DigitalIdPage /></ProtectedRoute>} />
                 <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
                 <Route path="/expenses/new" element={<ProtectedRoute><ExpenseForm /></ProtectedRoute>} />
                 <Route path="/expenses/:expenseId/edit" element={<ProtectedRoute><ExpenseForm /></ProtectedRoute>} />
@@ -339,7 +343,7 @@ const App = () => {
                 <Route path="/admin/onboarding" element={<ProtectedRoute><AdminRoute><AdminOnboarding /></AdminRoute></ProtectedRoute>} />
                 <Route path="/admin/drivers/:userId" element={<ProtectedRoute><AdminRoute><DriverProfileDetail /></AdminRoute></ProtectedRoute>} />
                 <Route path="/admin/drivers/:userId/complete" element={<ProtectedRoute><AdminRoute><DriverOnboardingWizard /></AdminRoute></ProtectedRoute>} />
-                <Route path="/admin/drivers/:userId/id" element={<ProtectedRoute><AdminRoute><DriverDigitalId /></AdminRoute></ProtectedRoute>} />
+                <Route path="/admin/drivers/:userId/id" element={<ProtectedRoute><AdminRoute><DigitalIdPage /></AdminRoute></ProtectedRoute>} />
                 {/* Lives under /control (not /admin) — clients are only ever listed at
                     /control/clients, and ClientProfileDetail's back button points there. */}
                 <Route path="/control/clients/:clientId" element={<ProtectedRoute><AdminRoute><ClientProfileDetail /></AdminRoute></ProtectedRoute>} />

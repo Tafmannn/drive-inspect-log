@@ -1,0 +1,186 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+
+export interface DigitalIdCredential {
+  driver_id: string;
+  credential_id: string;
+  user_id: string;
+  org_id: string | null;
+  full_name: string | null;
+  employment_type: string | null;
+  role_label: string;
+  photo_path: string | null;
+  credential_version: number;
+  status: "active" | "revoked";
+  checked_at: string;
+  valid_until: string | null;
+  company_name: string;
+  company_website: string;
+  company_phone: string | null;
+  issued_by: string;
+}
+
+export type DigitalIdDisplayStatus =
+  | "loading" | "active" | "grace" | "unavailable" | "revoked" | "missing";
+
+const POLL_MS = 15_000;
+export const OFFLINE_GRACE_MS = 30_000;
+
+/**
+ * Bound a server-issued validity window using only server timestamps and
+ * elapsed request time; works even when the device clock is out of sync.
+ */
+export function credentialWindowMs(checkedAt: string, validUntil: string | null, requestElapsedMs: number): number {
+  const issued = Date.parse(checkedAt);
+  const expiry = Date.parse(validUntil ?? "");
+  if (!Number.isFinite(issued) || !Number.isFinite(expiry) || expiry <= issued) return 0;
+  return Math.max(0, Math.min(OFFLINE_GRACE_MS, expiry - issued - Math.max(0, requestElapsedMs)));
+}
+
+/** PostgREST RPC failures are plain objects, not necessarily Error instances.
+ * Preserve their code/message so an explicit server denial fails closed.
+ */
+function credentialErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "object" && error !== null && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string") return message;
+  }
+  return "Unable to check authorisation";
+}
+
+type ParsedCredential = {
+  credential: DigitalIdCredential | null;
+  state: "missing" | "revoked" | "active";
+  windowMs: number;
+};
+
+function parseCredentialResponse(data: unknown, requestElapsedMs: number): ParsedCredential {
+  if (!data) return { credential: null, state: "missing", windowMs: 0 };
+  const credential = data as DigitalIdCredential;
+  if (credential.status !== "active") return { credential, state: "revoked", windowMs: 0 };
+  const windowMs = credentialWindowMs(credential.checked_at, credential.valid_until, requestElapsedMs);
+  if (windowMs <= 0) throw new Error("Current authorisation cannot be confirmed");
+  return { credential, state: "active", windowMs };
+}
+
+function statusAfterResume(current: DigitalIdDisplayStatus, remainingMs: number): DigitalIdDisplayStatus {
+  if (current !== "active" && current !== "grace") return current;
+  return remainingMs > 0 ? "grace" : "unavailable";
+}
+
+type LastValidCheck = {
+  monotonicMs: number;
+  wallMs: number;
+  windowMs: number;
+};
+
+/** Remaining validity is bounded both by the server expiry and local receipt time.
+ * Use monotonic and wall clocks: changing the phone clock must not extend a badge.
+ */
+export function remainingCredentialMs(lastCheck: LastValidCheck | null, nowMono: number, nowWall: number): number {
+  if (!lastCheck) return 0;
+  const elapsed = Math.max(0, nowMono - lastCheck.monotonicMs, nowWall - lastCheck.wallMs);
+  return Math.max(0, lastCheck.windowMs - elapsed);
+}
+
+/**
+ * Server-authoritative company ID. Never persists a credential to PWA caches,
+ * React Query, IndexedDB or localStorage; rechecks on app resume.
+ */
+export function useDigitalCredential(userId: string) {
+  const [credential, setCredential] = useState<DigitalIdCredential | null>(null);
+  const [status, setStatus] = useState<DigitalIdDisplayStatus>("loading");
+  const [error, setError] = useState<string | null>(null);
+  const epoch = useRef(0);
+  const latestRequest = useRef(0);
+  const lastCheck = useRef<LastValidCheck | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (!userId) return;
+    const requestEpoch = epoch.current;
+    const requestNumber = ++latestRequest.current;
+    const requestStarted = performance.now();
+    try {
+      const { data, error: rpcError } = await supabase
+        .rpc("get_driver_digital_id", { p_user_id: userId });
+      if (epoch.current !== requestEpoch || latestRequest.current !== requestNumber) return;
+      if (rpcError) throw rpcError;
+      const receivedAtMonotonic = performance.now();
+      const parsed = parseCredentialResponse(data, receivedAtMonotonic - requestStarted);
+      if (parsed.state !== "active") {
+        lastCheck.current = null;
+        setCredential(parsed.credential);
+        setStatus(parsed.state);
+        setError(null);
+        return;
+      }
+
+      lastCheck.current = {
+        monotonicMs: receivedAtMonotonic,
+        wallMs: Date.now(),
+        windowMs: parsed.windowMs,
+      };
+      setCredential(parsed.credential);
+      setStatus(navigator.onLine ? "active" : "grace");
+      setError(null);
+    } catch (err) {
+      if (epoch.current !== requestEpoch || latestRequest.current !== requestNumber) return;
+      const message = credentialErrorMessage(err);
+      setError(message);
+      if (/ACCOUNT_INACTIVE|CREDENTIAL_UNAVAILABLE|NOT_AUTHORISED|UNAUTHENTICATED/.test(message)) {
+        lastCheck.current = null;
+        setCredential(null);
+        setStatus("revoked");
+        return;
+      }
+      const remaining = remainingCredentialMs(lastCheck.current, performance.now(), Date.now());
+      setStatus(remaining > 0 ? "grace" : "unavailable");
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    epoch.current += 1;
+    latestRequest.current += 1;
+    lastCheck.current = null;
+    setCredential(null);
+    setError(null);
+    setStatus(userId ? "loading" : "missing");
+    if (!userId) return;
+
+    void refresh();
+    const poll = window.setInterval(() => {
+      if (document.visibilityState === "visible" && navigator.onLine) void refresh();
+    }, POLL_MS);
+    const expiry = window.setInterval(() => {
+      if (!lastCheck.current) return;
+      if (remainingCredentialMs(lastCheck.current, performance.now(), Date.now()) <= 0) {
+        setStatus((current) => current === "active" || current === "grace" ? "unavailable" : current);
+      }
+    }, 500);
+    const onOnline = () => void refresh();
+    const onOffline = () => {
+      setStatus((current) => current === "active" ? "grace" : current);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState !== "visible") return;
+      const remaining = remainingCredentialMs(lastCheck.current, performance.now(), Date.now());
+      setStatus((current) => statusAfterResume(current, remaining));
+      void refresh();
+    };
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      epoch.current += 1;
+      latestRequest.current += 1;
+      window.clearInterval(poll);
+      window.clearInterval(expiry);
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [refresh, userId]);
+
+  return { credential, status, error, refresh };
+}
