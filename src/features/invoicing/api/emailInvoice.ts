@@ -10,6 +10,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import { generateInvoicePdf, invoicePdfFileName, type InvoiceData } from "@/lib/invoicePdf";
 
+import { issuedPackPath } from "./invoicePackPath";
+
 const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days, matching the email copy
 
 export interface EmailInvoiceInput {
@@ -55,6 +57,11 @@ export async function emailInvoice({
     }
   }
 
+  const packPath = issuedPackPath(path, invoiceId);
+  if (packPath) {
+    const readiness = await supabase.functions.invoke("send-invoice-email", { body: { action: "invoice-pack-capability" } });
+    if (readiness.error || readiness.data?.invoicePackVersion !== 1) throw new Error("Invoice pack email delivery is unavailable.");
+  }
   const { data: signed, error: signError } = await supabase.storage
     .from("invoice-pdfs")
     .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
@@ -63,7 +70,7 @@ export async function emailInvoice({
   }
 
   const { data, error } = await supabase.functions.invoke("send-invoice-email", {
-    body: { to, invoiceId, downloadUrl: signed.signedUrl },
+    body: { to, invoiceId, downloadUrl: signed.signedUrl, ...(packPath ? { expectedPdfPath: path } : {}) },
   });
   if (error || !data?.sent) {
     throw new Error(
@@ -71,5 +78,6 @@ export async function emailInvoice({
     );
   }
 
+  if (packPath && data.packIncluded !== true) throw new Error("Email delivery did not confirm the invoice pack. Check delivery before retrying.");
   return { recipient: to, pdfPath: path };
 }

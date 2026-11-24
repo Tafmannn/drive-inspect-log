@@ -13,6 +13,7 @@ import { daysBetween, invoicePaymentLabel, invoicePaymentState, localDay } from 
 import { askAboutInvoiceMailto } from "../lib/contact";
 import { usePortalTitle } from "../lib/usePortalTitle";
 import { cn } from "@/lib/utils";
+import { issuedPackPath } from "@/features/invoicing/api/invoicePackPath";
 
 /**
  * Fallback for invoices issued before PDFs were stored: the same mapper the
@@ -82,6 +83,7 @@ export default function PortalInvoiceDetailPage() {
   const { invoiceId } = useParams<{ invoiceId: string }>();
   const { data: inv, isLoading, error } = usePortalInvoice(invoiceId);
   const [downloading, setDownloading] = useState(false);
+  const [downloadingPack, setDownloadingPack] = useState(false);
   const { data: ctx } = usePortalContext();
   const { data: jobs } = usePortalJobs();
   usePortalTitle(inv?.invoice_number, "Invoices", ctx?.operator.name);
@@ -110,6 +112,7 @@ export default function PortalInvoiceDetailPage() {
           return;
         }
       }
+      if (issuedPackPath(inv.pdf_path, inv.id)) throw new Error("Original invoice PDF unavailable.");
       await downloadInvoicePdf(toPdfData(inv));
     } catch {
       toast({ title: "Download failed", description: "Please try again.", variant: "destructive" });
@@ -118,6 +121,24 @@ export default function PortalInvoiceDetailPage() {
     }
   };
 
+  const hasPack = !!issuedPackPath(inv.pdf_path, inv.id);
+  const handlePackDownload = async () => {
+    setDownloadingPack(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("portal-evidence", { body: { action: "invoice-pack", invoiceId: inv.id } });
+      if (error || typeof data?.url !== "string") throw new Error("Pack unavailable");
+      const response = await fetch(data.url);
+      if (!response.ok) throw new Error("Pack download failed");
+      const blob = await response.blob();
+      if (!blob.size) throw new Error("Empty pack");
+      const { invoicePdfFileName } = await import("@/lib/invoicePdf");
+      saveBlob(blob, invoicePdfFileName(inv.invoice_number).replace(/\.pdf$/, ".zip"));
+    } catch {
+      toast({ title: "Pack download failed", description: "Please retry or contact your operator.", variant: "destructive" });
+    } finally {
+      setDownloadingPack(false);
+    }
+  };
   const isCredit = inv.document_type === "credit_note";
   const payState = invoicePaymentState(inv);
   const askHref = ctx ? askAboutInvoiceMailto(ctx, inv.invoice_number) : null;
@@ -166,6 +187,10 @@ export default function PortalInvoiceDetailPage() {
               <a href={askHref}><MessageSquare className="w-4 h-4 mr-1.5" /> Ask about this invoice</a>
             </Button>
           )}
+          {hasPack && <Button size="sm" variant="outline" onClick={handlePackDownload} disabled={downloadingPack}>
+            {downloadingPack ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Download className="w-4 h-4 mr-1.5" />}
+            Download invoice pack
+          </Button>}
           <Button size="sm" onClick={handleDownload} disabled={downloading}>
             {downloading ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Download className="w-4 h-4 mr-1.5" />}
             Download PDF

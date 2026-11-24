@@ -13,6 +13,7 @@ const h = vi.hoisted(() => ({
   loading: false,
   error: null as Error | null,
   download: null as unknown as ReturnType<typeof import("vitest").vi.fn>,
+  invoke: null as unknown as ReturnType<typeof import("vitest").vi.fn>,
   rendered: [] as unknown[],
   saved: [] as string[],
   toasts: [] as { title?: string }[],
@@ -21,7 +22,7 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { storage: { from: () => ({ download: (...a: unknown[]) => h.download(...a) }) } },
+  supabase: { storage: { from: () => ({ download: (...a: unknown[]) => h.download(...a) }) }, functions: { invoke: (...a: unknown[]) => h.invoke(...a) } },
 }));
 vi.mock("@/hooks/use-toast", () => ({ toast: (t: { title?: string }) => h.toasts.push(t) }));
 vi.mock("@/features/portal/api", () => ({
@@ -73,6 +74,7 @@ beforeEach(() => {
   h.loading = false;
   h.error = null;
   h.download = vi.fn().mockResolvedValue({ data: new Blob(["stored"]), error: null });
+  h.invoke = vi.fn().mockResolvedValue({ data: null, error: { message: "denied" } });
   h.rendered = [];
   h.saved = [];
   h.toasts = [];
@@ -131,6 +133,15 @@ describe("PortalInvoiceDetail", () => {
     await waitFor(() => expect(h.saved).toEqual(["AXENTRA_INV_AX26-1007.pdf"]));
     expect(h.download).toHaveBeenCalledWith("org-1/AXENTRA_INV_AX26-1007.pdf");
     expect(h.rendered).toEqual([]);
+  });
+
+  it("only offers the pack for a pack-backed invoice and requests it by invoice id", async () => {
+    h.invoice = detail({ pdf_path: "org-1/pack-v1-inv-1/12345678-1234-1234-1234-123456789abc/AXENTRA_INV_AX26-1007.pdf" });
+    renderDetail();
+    fireEvent.click(screen.getByRole("button", { name: /Download invoice pack/i }));
+    await waitFor(() => expect(h.toasts[0]).toMatchObject({ title: "Pack download failed" }));
+    expect(h.invoke).toHaveBeenCalledWith("portal-evidence", { body: { action: "invoice-pack", invoiceId: "inv-1" } });
+    expect(h.saved).toEqual([]);
   });
 
   it("rebuilds the PDF when there is no stored file, carrying the PO, VAT status and supplier details", async () => {

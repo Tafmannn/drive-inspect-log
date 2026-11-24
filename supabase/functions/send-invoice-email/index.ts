@@ -35,8 +35,9 @@ function renderHtml(opts: {
   issueDate: string;
   dueDate: string | null;
   downloadHref: string;
+  packHref?: string;
 }): string {
-  const { invoiceNumber, clientName, total, issueDate, dueDate, downloadHref } = opts;
+  const { invoiceNumber, clientName, total, issueDate, dueDate, downloadHref, packHref } = opts;
   const dueLine = dueDate
     ? `<p style="margin:0 0 4px;"><strong>Due date:</strong> ${escapeHtml(dueDate)}</p>`
     : "";
@@ -70,7 +71,8 @@ function renderHtml(opts: {
                     Download Invoice
                   </a>
                 </p>
-                <p style="margin:0 0 16px;color:#6b7280;font-size:13px;">Link expires in 30 days.</p>
+                ${packHref ? `<p style="margin:0 0 24px;text-align:center;"><a href="${packHref}" style="background:#2B7DC9;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:bold;display:inline-block;">Download invoice pack (ZIP)</a></p><p style="margin:0 0 16px;">The pack contains the invoice and its supporting receipts and proof of delivery where applicable.</p>` : ""}
+                <p style="margin:0 0 16px;color:#6b7280;font-size:13px;">Links expire in 30 days.</p>
                 <p style="margin:0 0 16px;">Payment details are shown on the invoice. Please use the invoice number as your payment reference.</p>
                 <p style="margin:24px 0 0;">Kind regards,<br/>Axentra Vehicle Logistics<br/>info@axentravehicles.com</p>
               </td>
@@ -109,6 +111,10 @@ serve(async (req) => {
       );
     }
 
+    const body = await req.json();
+    if (body?.action === "invoice-pack-capability") {
+      return new Response(JSON.stringify({ invoicePackVersion: 1 }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
     if (!RESEND_API_KEY) {
       return new Response(
@@ -121,7 +127,6 @@ serve(async (req) => {
       Deno.env.get("POD_EMAIL_FROM") ||
       "Axentra Vehicle Logistics <onboarding@resend.dev>";
 
-    const body = await req.json();
     const { to, invoiceId, downloadUrl } = body ?? {};
 
     if (!to || typeof to !== "string" || !EMAIL_RE.test(to)) {
@@ -136,7 +141,7 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    const downloadHref = typeof downloadUrl === "string" ? safeHref(downloadUrl) : null;
+    let downloadHref = typeof downloadUrl === "string" ? safeHref(downloadUrl) : null;
     if (!downloadHref) {
       return new Response(
         JSON.stringify({ error: "A valid http(s) downloadUrl is required" }),
@@ -150,7 +155,7 @@ serve(async (req) => {
     // the email. Org ownership is enforced the same way as send-pod-email.
     const { data: invoice } = await admin
       .from("invoices")
-      .select("org_id, invoice_number, client_name, total, issue_date, due_date, created_at")
+      .select("org_id, invoice_number, client_name, total, issue_date, due_date, created_at, pdf_url")
       .eq("id", invoiceId)
       .maybeSingle();
 
@@ -161,6 +166,31 @@ serve(async (req) => {
       );
     }
 
+    // Pack paths are bound to the database invoice. Never sign a client-supplied path.
+    if (body.expectedPdfPath && body.expectedPdfPath !== invoice.pdf_url) {
+      return new Response(JSON.stringify({ error: "INVOICE_CHANGED" }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    let packHref: string | undefined;
+    if (typeof invoice.pdf_url === "string" && invoice.pdf_url.includes("/pack-v1-")) {
+      const path = invoice.pdf_url;
+      const parts = path.split("/");
+      if (parts.length !== 4 || parts[0] !== String(invoice.org_id) || parts[1] !== `pack-v1-${invoiceId}` ||
+          !/^[0-9a-f-]{36}$/i.test(parts[2]) || !/^AXENTRA_(?:INV|CN)_[A-Za-z0-9_-]+\.pdf$/.test(parts[3])) {
+        return new Response(JSON.stringify({ error: "INVALID_INVOICE_PACK_PATH" }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const ttl = 60 * 60 * 24 * 30;
+      const [pdfLink, packLink] = await Promise.all([
+        admin.storage.from("invoice-pdfs").createSignedUrl(path, ttl, { download: true }),
+        admin.storage.from("invoice-pdfs").createSignedUrl(path.replace(/\.pdf$/, ".zip"), ttl, { download: true }),
+      ]);
+      const signedPdf = pdfLink.data?.signedUrl ? safeHref(pdfLink.data.signedUrl) : null;
+      const signedPack = packLink.data?.signedUrl ? safeHref(packLink.data.signedUrl) : null;
+      if (pdfLink.error || packLink.error || !signedPdf || !signedPack) {
+        return new Response(JSON.stringify({ error: "INVOICE_PACK_UNAVAILABLE" }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      downloadHref = signedPdf;
+      packHref = signedPack;
+    }
     const issueDate = String(invoice.issue_date ?? invoice.created_at ?? "").slice(0, 10);
     const subject = `Axentra Invoice ${invoice.invoice_number}`;
     const html = renderHtml({
@@ -170,6 +200,7 @@ serve(async (req) => {
       issueDate,
       dueDate: invoice.due_date ? String(invoice.due_date).slice(0, 10) : null,
       downloadHref,
+      packHref,
     });
 
     const resendResp = await fetch("https://api.resend.com/emails", {
@@ -209,7 +240,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ sent: true, id: resendData?.id ?? null }),
+      JSON.stringify({ sent: true, id: resendData?.id ?? null, packIncluded: !!packHref }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {

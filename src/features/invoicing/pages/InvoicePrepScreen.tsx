@@ -51,8 +51,7 @@ import { useInvoiceActions } from "../hooks/useInvoiceActions";
 import { ExpensePicker } from "../components/ExpensePicker";
 import { InvoiceList, InvoiceStatusBadge } from "../components/InvoiceList";
 import { fuelPolicyInvoiceNote, rechargeCategoriesFor } from "@/lib/fuelPolicy";
-import { loadReceiptImage } from "../api/receiptImages";
-import { receiptCaption, receiptFileRef, settingsToPdfFields } from "../api/invoiceDocument";
+import { settingsToPdfFields } from "../api/invoiceDocument";
 import { downloadBlob } from "../api/receiptExport";
 import {
   buildInvoiceDraft,
@@ -84,7 +83,7 @@ import {
   Mail,
   Eye,
 } from "lucide-react";
-import { generateInvoicePdf, type InvoiceData, type ReceiptImage } from "@/lib/invoicePdf";
+import { generateInvoicePdf, type InvoiceData } from "@/lib/invoicePdf";
 import { cn } from "@/lib/utils";
 
 function fmtGbp(n: number): string {
@@ -370,25 +369,13 @@ export function InvoicePrepScreen() {
     }
   };
 
-  // Preview the invoice PDF (with receipt copies) before creating anything.
+  // Preview the clean financial invoice; original receipts are in the pack.
   const handlePreviewPdf = async () => {
     if (!selectedClient || selectedJobs.length === 0) return;
     setIsPreviewing(true);
     try {
       const issueDate = todayIso();
       const jobRefs = new Map(selectedJobs.map((j) => [j.id, jobRef(j)]));
-      const receipts: ReceiptImage[] = [];
-      for (const line of draft.expenseLines) {
-        const files = line.receipts.length ? line.receipts : [null];
-        for (let i = 0; i < files.length; i++) {
-          const file = files[i];
-          receipts.push({
-            ref: receiptFileRef(line.ref, i),
-            caption: receiptCaption(line, jobRefs.get(line.job_id) ?? ""),
-            image: file ? await loadReceiptImage(file) : null,
-          });
-        }
-      }
       const data: InvoiceData = {
         invoiceNumber: "PREVIEW",
         issueDate,
@@ -424,8 +411,6 @@ export function InvoicePrepScreen() {
           vat: l.amount_vat,
           gross: l.amount_gross,
         })),
-        receipts,
-        receiptsPerPage: 6,
       };
       downloadBlob(await generateInvoicePdf(data), "invoice_PREVIEW.pdf");
     } catch (err) {

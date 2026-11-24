@@ -31,8 +31,9 @@ serve(async (req) => {
     if (!authHeader.startsWith("Bearer ")) return jsonRes({ error: "UNAUTHENTICATED" }, 401);
 
     const body = await req.json().catch(() => ({}));
+    const invoiceAction = body?.action === "invoice-pack" || body?.action === "invoice-pack-capability";
     const jobId = typeof body?.jobId === "string" ? body.jobId : "";
-    if (!UUID_RE.test(jobId)) return jsonRes({ error: "INVALID_JOB_ID" }, 400);
+    if (!invoiceAction && !UUID_RE.test(jobId)) return jsonRes({ error: "INVALID_JOB_ID" }, 400);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -41,6 +42,28 @@ serve(async (req) => {
     const asCaller = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
+    if (invoiceAction) {
+      const { data: auth, error: authErr } = await asCaller.auth.getUser();
+      if (authErr || !auth?.user) return jsonRes({ error: "UNAUTHENTICATED" }, 401);
+      if (body.action === "invoice-pack-capability") return jsonRes({ invoicePackVersion: 1 });
+      const invoiceId = typeof body.invoiceId === "string" ? body.invoiceId : "";
+      if (!UUID_RE.test(invoiceId)) return jsonRes({ error: "INVALID_INVOICE_ID" }, 400);
+      // The caller's JWT, not service-role access, decides invoice ownership.
+      const { data: invoice, error: invoiceErr } = await asCaller.rpc("portal_get_invoice", { p_invoice_id: invoiceId });
+      const pdfPath = invoice?.pdf_path;
+      if (invoiceErr || !invoice || typeof pdfPath !== "string") return jsonRes({ error: "NOT_FOUND" }, 404);
+      const parts = pdfPath.split("/");
+      if (parts.length !== 4 || parts[1] !== `pack-v1-${invoiceId}` ||
+          !UUID_RE.test(parts[0]) || !UUID_RE.test(parts[2]) ||
+          !/^AXENTRA_(?:INV|CN)_[A-Za-z0-9_-]+\.pdf$/.test(parts[3])) return jsonRes({ error: "NOT_FOUND" }, 404);
+      const { data: allowed, error: allowErr } = await asCaller.rpc("portal_can_read_invoice_pdf", { p_object_name: pdfPath });
+      if (allowErr || allowed !== true) return jsonRes({ error: "NOT_FOUND" }, 404);
+      const packPath = pdfPath.replace(/\.pdf$/, ".zip");
+      const admin = createClient(supabaseUrl, serviceKey);
+      const { data: signed, error: signErr } = await admin.storage.from("invoice-pdfs").createSignedUrl(packPath, 300, { download: true });
+      if (signErr || !signed?.signedUrl) return jsonRes({ error: "PACK_UNAVAILABLE" }, 404);
+      return jsonRes({ url: signed.signedUrl, expires_in: 300 });
+    }
     const { data: owned, error: ownErr } = await asCaller.rpc("portal_get_job", { p_job_id: jobId });
     if (ownErr || !owned) {
       // Not a portal user, not their job, or no such job — indistinguishable by design.
