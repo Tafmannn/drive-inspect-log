@@ -15,12 +15,12 @@
 `.github/workflows/free-tier-supabase.yml` checks:
 
 1. Staging-target protection, migration-file inventory and history alias logic (without connecting to a database).
-2. Starts an isolated local Supabase database using a fixed CLI version; applies repository migrations.
-3. Asserts core public tables, job abort RPC and row-level security exist.
-4. Executes existing abort scenario tests, which begin a transaction and roll it back.
+2. **Manually selected full replay only:** starts an isolated local Supabase database with a fixed CLI version and applies repository migrations. Ordinary PRs skip this known-broken step to avoid wasting free runner minutes.
+3. On full replay, asserts core public tables, job abort RPC and row-level security exist.
+4. On full replay, executes existing abort scenario tests, which begin a transaction and roll it back.
 5. Separately, a disposable PostgreSQL 16 service dumps and restores a synthetic table and verifies exact row fidelity, even when the migration-replay job is blocked.
 
-The schema replay job is intentionally **red** if migrations cannot replay or a permission assertion fails. The independent synthetic restore PASS never certifies that hosted staging is recoverable. Do not bypass or convert a FAIL into NOT_EXECUTED.
+The optional full-replay job is intentionally **red** if migrations cannot replay or a permission assertion fails; ordinary PR checks explicitly report it as NOT EXECUTED. The independent synthetic restore PASS never certifies that hosted staging is recoverable. Do not bypass or convert a FAIL into NOT_EXECUTED.
 
 ## Optional hosted staging inventory, no cost for a paid branch
 
