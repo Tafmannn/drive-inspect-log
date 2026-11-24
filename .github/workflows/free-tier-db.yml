@@ -1,0 +1,74 @@
+name: Free-tier disposable Supabase DB
+on:
+  pull_request:
+    paths:
+      - "supabase/migrations/**"
+      - "supabase/tests/**"
+      - "scripts/free-tier/**"
+      - ".github/workflows/free-tier-db.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: axentra-db-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  isolated-database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_ACCESS_TOKEN: ""
+      STAGING_DB_URL: ""
+      AXENTRA_DISPOSABLE_DB: "YES"
+      PGHOST: 127.0.0.1
+      PGPORT: "54322"
+      PGUSER: postgres
+      PGDATABASE: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Migration inventory and target guard self-test
+        run: |
+          node scripts/free-tier/verify-local-db.mjs --static
+          node scripts/free-tier/staging-readonly.mjs --self-test
+          node scripts/free-tier/backup-staging.mjs --self-test
+          node scripts/free-tier/capture-production-baseline.mjs --self-test
+          node --check scripts/free-tier/capture-production-baseline.mjs
+          node --check scripts/free-tier/verify-local-db.mjs
+          node --check scripts/free-tier/staging-readonly.mjs
+          node --check scripts/free-tier/backup-staging.mjs
+          bash -n scripts/free-tier/run-local-scenarios.sh
+          bash -n scripts/free-tier/local-backup-restore-probe.sh
+      - name: Fail fast until an authoritative migration bootstrap is reviewed
+        run: |
+          # A March migration ALTERs public.driver_profiles before it is created
+          # by the repository. Historical app-schema bootstrap is missing.
+          # Fail BEFORE pulling Docker images; never insert guessed tables.
+          if [[ ! -f supabase/bootstrap/verified-production-baseline.sql ]]; then
+            echo "::error::BLOCKED: missing reviewed production-equivalent bootstrap schema. 20260317122123 migration references absent public.driver_profiles. See PR #188 release notes."
+            exit 2
+          fi
+          echo "::error::A baseline file exists but its restore and post-baseline replay procedure is not yet approved; fail closed."
+          exit 2
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Install PostgreSQL client
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Start local database and apply ALL repository migrations
+        run: supabase db start
+      - name: Prove migration completeness and RLS
+        run: node scripts/free-tier/verify-local-db.mjs
+      - name: Exercise invoice, abort and Digital ID SQL scenarios
+        run: bash scripts/free-tier/run-local-scenarios.sh
+      - name: Prove synthetic local backup restoration
+        run: bash scripts/free-tier/local-backup-restore-probe.sh
+      - name: Stop only local containers
+        if: always()
+        run: supabase stop --no-backup || true

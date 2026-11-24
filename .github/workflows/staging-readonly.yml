@@ -1,0 +1,22 @@
+name: Axentra staging metadata preflight (read-only)
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install Postgres client
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Read-only staging schema and migration inventory
+        env:
+          STAGING_DB_URL: ${{ secrets.STAGING_DB_URL }}
+        run: node scripts/free-tier/staging-readonly.mjs
