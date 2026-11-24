@@ -1,5 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { authenticateCaller, corsHeaders, inactiveAccountError } from "../_shared/auth.ts";
+import { pickAppOrigin } from "../_shared/appOrigin.ts";
+import { resolveLogoUrl } from "../_shared/podEmail.ts";
+import { renderInvoiceEmailHtml } from "../_shared/invoiceEmail.ts";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -24,66 +27,6 @@ function safeHref(url: string): string | null {
   }
 }
 
-function fmtGbp(n: number): string {
-  return `£${n.toFixed(2)}`;
-}
-
-function renderHtml(opts: {
-  invoiceNumber: string;
-  clientName: string;
-  total: number | null;
-  issueDate: string;
-  dueDate: string | null;
-  downloadHref: string;
-  packHref?: string;
-}): string {
-  const { invoiceNumber, clientName, total, issueDate, dueDate, downloadHref, packHref } = opts;
-  const dueLine = dueDate
-    ? `<p style="margin:0 0 4px;"><strong>Due date:</strong> ${escapeHtml(dueDate)}</p>`
-    : "";
-  const totalLine = total != null
-    ? `<p style="margin:0 0 24px;"><strong>Amount due:</strong> ${escapeHtml(fmtGbp(total))}</p>`
-    : `<p style="margin:0 0 24px;"></p>`;
-  return `<!doctype html>
-<html>
-  <body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:24px 0;">
-      <tr>
-        <td align="center">
-          <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;">
-            <tr>
-              <td style="background:#111827;padding:20px 32px;">
-                <span style="color:#ffffff;font-size:18px;font-weight:bold;">Axentra Vehicle Logistics</span>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:32px;color:#1f2937;font-size:15px;line-height:1.6;">
-                <p style="margin:0 0 16px;">Dear ${escapeHtml(clientName || "Customer")},</p>
-                <p style="margin:0 0 16px;">
-                  Please find your invoice <strong>${escapeHtml(invoiceNumber)}</strong> below.
-                </p>
-                <p style="margin:0 0 4px;"><strong>Invoice date:</strong> ${escapeHtml(issueDate)}</p>
-                ${dueLine}
-                ${totalLine}
-                <p style="margin:0 0 24px;text-align:center;">
-                  <a href="${downloadHref}"
-                     style="background:#111827;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:bold;display:inline-block;">
-                    Download Invoice
-                  </a>
-                </p>
-                ${packHref ? `<p style="margin:0 0 24px;text-align:center;"><a href="${packHref}" style="background:#2B7DC9;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:bold;display:inline-block;">Download invoice pack (ZIP)</a></p><p style="margin:0 0 16px;">The pack contains the invoice and its supporting receipts and proof of delivery where applicable.</p>` : ""}
-                <p style="margin:0 0 16px;color:#6b7280;font-size:13px;">Links expire in 30 days.</p>
-                <p style="margin:0 0 16px;">Payment details are shown on the invoice. Please use the invoice number as your payment reference.</p>
-                <p style="margin:24px 0 0;">Kind regards,<br/>Axentra Vehicle Logistics<br/>info@axentravehicles.com</p>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>`;
-}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -193,7 +136,8 @@ serve(async (req) => {
     }
     const issueDate = String(invoice.issue_date ?? invoice.created_at ?? "").slice(0, 10);
     const subject = `Axentra Invoice ${invoice.invoice_number}`;
-    const html = renderHtml({
+    const html = renderInvoiceEmailHtml({
+      logoUrl: resolveLogoUrl('/axentra-logo.png', pickAppOrigin(Deno.env.get('APP_URL'), Deno.env.get('APP_ALLOWED_ORIGINS'), req.headers.get('origin'))),
       invoiceNumber: String(invoice.invoice_number ?? ""),
       clientName: String(invoice.client_name ?? ""),
       total: invoice.total != null ? Number(invoice.total) : null,
