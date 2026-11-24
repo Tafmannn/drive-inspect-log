@@ -37,6 +37,17 @@ jobs:
         run: |
           node scripts/free-tier/verify-local-db.mjs --static
           node scripts/free-tier/staging-readonly.mjs --self-test
+      - name: Fail fast until an authoritative migration bootstrap is reviewed
+        run: |
+          # A March migration ALTERs public.driver_profiles before it is created
+          # by the repository. Historical app-schema bootstrap is missing.
+          # Fail BEFORE pulling Docker images; never insert guessed tables.
+          if [[ ! -f supabase/bootstrap/verified-production-baseline.sql ]]; then
+            echo "::error::BLOCKED: missing reviewed production-equivalent bootstrap schema. 20260317122123 migration references absent public.driver_profiles. See PR #188 release notes."
+            exit 2
+          fi
+          echo "::error::A baseline file exists but its restore and post-baseline replay procedure is not yet approved; fail closed."
+          exit 2
       - uses: supabase/setup-cli@v1
         with:
           version: latest
