@@ -3,6 +3,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const mockState = vi.hoisted(() => ({
   replacementLookupError: "",
+  invoiceLineRows: [] as Array<{ job_id: string | null }>,
   tableRows: {} as Record<string, unknown[]>,
   tableErrors: {} as Record<string, string>,
   rpcData: null as unknown,
@@ -22,8 +23,9 @@ vi.mock("@/integrations/supabase/client", () => ({
       return { data: mockState.rpcData, error: mockState.rpcError };
     },
     from: (table: string) => ({
-      select: () => {
+      select: (columns?: string) => {
         const chain = {
+          neq: (_column: string, _value: unknown) => chain,
           eq: (_column: string, _value: unknown) => chain,
           order: (_column: string, _options?: unknown) => chain,
           limit: (_count: number) => chain,
@@ -37,7 +39,9 @@ vi.mock("@/integrations/supabase/client", () => ({
           }),
           then: (resolve: (value: { data: unknown[]; error: { message: string } | null }) => unknown) =>
             Promise.resolve({
-              data: mockState.tableRows[table] ?? [],
+              data: table === "invoice_items" && columns === "job_id"
+                ? mockState.invoiceLineRows
+                : mockState.tableRows[table] ?? [],
               error: table === "jobs" && mockState.replacementLookupError
                 ? { message: mockState.replacementLookupError }
                 : mockState.tableErrors[table]
@@ -53,6 +57,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 
 import {
   getJobAbortState,
+  getAbortInvoiceDetails,
   requestJobAbort,
   confirmJobAbort,
   reviewAbortClaim,
@@ -68,6 +73,7 @@ import {
 
 beforeEach(() => {
   mockState.replacementLookupError = "";
+  mockState.invoiceLineRows = [];
   mockState.tableRows = {};
   mockState.tableErrors = {};
 });
@@ -291,6 +297,91 @@ describe("optional Abort RPC fields", () => {
     expect(mockState.rpcCalls[0]).toEqual({
       fn: "review_job_abort_claim",
       args: { p_abort_id: "a1", p_decision: "rejected", p_client_confirmed: false, p_amount: undefined, p_note: undefined },
+    });
+  });
+});
+
+describe("Abort invoice correction history and active-invoice lookup", () => {
+  const invoice = (id: string, status = "sent", total: string | null = "275") => ({
+    id, invoice_number: "AX26-" + id, status, total, client_id: "c1", document_type: "invoice",
+  });
+
+  it("returns empty state without inventing a client invoice", async () => {
+    await expect(getAbortInvoiceDetails("j1")).resolves.toEqual({
+      activeInvoice: null, corrections: [],
+    });
+  });
+
+  it("loads a multi-job issued invoice and distinct other jobs, converts historic numeric strings", async () => {
+    mockState.tableRows.invoice_items = [
+      { invoice_id: "inv1", invoices: invoice("inv1") },
+    ];
+    mockState.invoiceLineRows = [
+      { job_id: "j1" }, { job_id: "other1" }, { job_id: "other1" }, { job_id: "other2" }, { job_id: null },
+    ];
+    mockState.tableRows.job_abort_invoice_corrections = [{
+      id: "cor1", original_invoice_id: "original", credit_note_id: "cn1",
+      replacement_invoice_id: "inv1", original_invoice_number: "AX26-OLD",
+      previous_fee: "240.00", revised_fee: "275.00", other_jobs_on_invoice: 0,
+      original_was_paid: false, reason: "Client confirmed different fee",
+      created_at: "2026-11-23T20:00:00Z",
+    }];
+    const found = await getAbortInvoiceDetails("j1");
+    expect(found.activeInvoice).toMatchObject({
+      id: "inv1", status: "sent", total: 275, otherJobCount: 2,
+    });
+    expect(found.corrections[0]).toMatchObject({
+      previous_fee: 240, revised_fee: 275, replacement_invoice_id: "inv1",
+    });
+  });
+
+  it("recognises a paid legacy single-job invoice and omits cancelled invoices", async () => {
+    mockState.tableRows.invoices = [invoice("legacy1", "paid", "240")];
+    const found = await getAbortInvoiceDetails("j1");
+    expect(found.activeInvoice).toMatchObject({
+      id: "legacy1", status: "paid", otherJobCount: 0, total: 240,
+    });
+    mockState.tableRows.invoices = [invoice("legacy1", "cancelled", "240")];
+    expect((await getAbortInvoiceDetails("j1")).activeInvoice).toBeNull();
+  });
+
+  it("ignores credit notes and voided or cancelled multi-job invoice joins", async () => {
+    mockState.tableRows.invoice_items = [
+      { invoice_id: "cn1", invoices: { ...invoice("cn1"), document_type: "credit_note" } },
+      { invoice_id: "old1", invoices: invoice("old1", "cancelled") },
+      { invoice_id: "missing", invoices: null },
+    ];
+    expect((await getAbortInvoiceDetails("j1")).activeInvoice).toBeNull();
+  });
+
+  it("refuses inconsistent invoices rather than crediting an arbitrary one", async () => {
+    mockState.tableRows.invoice_items = [{ invoice_id: "inv1", invoices: invoice("inv1") }];
+    mockState.tableRows.invoices = [invoice("legacy2")];
+    await expect(getAbortInvoiceDetails("j1")).rejects.toThrow("Multiple active invoices");
+  });
+
+  it("fails closed when any invoice, history, or line-item query fails", async () => {
+    mockState.tableErrors.invoice_items = "Invoice items inaccessible";
+    await expect(getAbortInvoiceDetails("j1")).rejects.toThrow("Invoice items inaccessible");
+    mockState.tableErrors.invoice_items = "";
+    mockState.tableErrors.invoices = "Invoice header inaccessible";
+    await expect(getAbortInvoiceDetails("j1")).rejects.toThrow("Invoice header inaccessible");
+    mockState.tableErrors.invoices = "";
+    mockState.tableErrors.job_abort_invoice_corrections = "History inaccessible";
+    await expect(getAbortInvoiceDetails("j1")).rejects.toThrow("History inaccessible");
+    mockState.tableErrors.job_abort_invoice_corrections = "";
+    mockState.tableRows.invoices = [invoice("legacy")];
+    mockState.tableErrors.invoice_items = "Invoice rows inaccessible";
+    await expect(getAbortInvoiceDetails("j1")).rejects.toThrow("Invoice rows inaccessible");
+  });
+
+  it("preserves nullable totals and handles duplicate item rows for same invoice", async () => {
+    mockState.tableRows.invoice_items = [
+      { invoice_id: "inv1", invoices: invoice("inv1", "draft", null) },
+      { invoice_id: "inv1", invoices: invoice("inv1", "draft", null) },
+    ];
+    expect((await getAbortInvoiceDetails("j1")).activeInvoice).toMatchObject({
+      id: "inv1", total: null, otherJobCount: 0,
     });
   });
 });
