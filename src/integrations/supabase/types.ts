@@ -1556,8 +1556,108 @@ export type Database = {
           },
         ]
       }
+      job_abort_invoice_corrections: {
+        Row: {
+          id: string
+          org_id: string
+          job_id: string
+          abort_id: string
+          original_invoice_id: string
+          credit_note_id: string | null
+          replacement_invoice_id: string | null
+          original_invoice_number: string
+          previous_fee: number
+          revised_fee: number
+          other_jobs_on_invoice: number
+          original_was_paid: boolean
+          reason: string
+          client_confirmed_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          org_id: string
+          job_id: string
+          abort_id: string
+          original_invoice_id: string
+          credit_note_id?: string | null
+          replacement_invoice_id?: string | null
+          original_invoice_number: string
+          previous_fee: number
+          revised_fee: number
+          other_jobs_on_invoice?: number
+          original_was_paid?: boolean
+          reason: string
+          client_confirmed_by: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          org_id?: string
+          job_id?: string
+          abort_id?: string
+          original_invoice_id?: string
+          credit_note_id?: string | null
+          replacement_invoice_id?: string | null
+          original_invoice_number?: string
+          previous_fee?: number
+          revised_fee?: number
+          other_jobs_on_invoice?: number
+          original_was_paid?: boolean
+          reason?: string
+          client_confirmed_by?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_abort_invoice_corrections_abort_id_fkey"
+            columns: ["abort_id"]
+            isOneToOne: false
+            referencedRelation: "job_aborts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_abort_invoice_corrections_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_abort_invoice_corrections_original_invoice_id_fkey"
+            columns: ["original_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_abort_invoice_corrections_credit_note_id_fkey"
+            columns: ["credit_note_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_abort_invoice_corrections_replacement_invoice_id_fkey"
+            columns: ["replacement_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_abort_invoice_corrections_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       job_aborts: {
         Row: {
+          client_fee_confirmed_at: string | null
+          client_fee_confirmed_by: string | null
+          client_fee_confirmed_amount: number | null
           agreed_price: number | null
           approved_amount: number | null
           confirmed_at: string
@@ -1585,6 +1685,9 @@ export type Database = {
           run_id: string | null
         }
         Insert: {
+          client_fee_confirmed_at?: string | null
+          client_fee_confirmed_by?: string | null
+          client_fee_confirmed_amount?: number | null
           agreed_price?: number | null
           approved_amount?: number | null
           confirmed_at?: string
@@ -1612,6 +1715,9 @@ export type Database = {
           run_id?: string | null
         }
         Update: {
+          client_fee_confirmed_at?: string | null
+          client_fee_confirmed_by?: string | null
+          client_fee_confirmed_amount?: number | null
           agreed_price?: number | null
           approved_amount?: number | null
           confirmed_at?: string
@@ -3472,6 +3578,7 @@ export type Database = {
       }
       amend_approved_job_abort_claim: {
         Args: {
+          p_client_confirmed?: boolean
           p_abort_id: string
           p_new_amount: number
           p_reason: string
@@ -3479,8 +3586,22 @@ export type Database = {
         }
         Returns: Json
       }
+      correct_invoiced_job_abort_fee: {
+        Args: {
+          p_abort_id: string
+          p_original_invoice_id: string
+          p_new_amount: number
+          p_expected_amount: number
+          p_reason: string
+          p_client_confirmed: boolean
+          p_multi_job_acknowledged?: boolean
+          p_paid_acknowledged?: boolean
+        }
+        Returns: Json
+      }
       review_job_abort_claim: {
         Args: {
+          p_client_confirmed?: boolean
           p_abort_id: string
           p_amount?: number
           p_decision: string

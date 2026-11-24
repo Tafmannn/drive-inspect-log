@@ -9,6 +9,7 @@ import { Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -42,6 +43,7 @@ function PendingFeeReview({ jobId, abort }: Readonly<PendingProps>) {
   const review = useReviewAbortClaim(jobId);
   const [amount, setAmount] = useState(abort.proposed_amount == null ? "" : abort.proposed_amount.toFixed(2));
   const [note, setNote] = useState("");
+  const [clientConfirmed, setClientConfirmed] = useState(false);
   const amountProblem = approvalAmountProblem(amount, abort.agreed_price);
 
   const decide = async (decision: "approved" | "rejected") => {
@@ -52,6 +54,7 @@ function PendingFeeReview({ jobId, abort }: Readonly<PendingProps>) {
         decision,
         amount: chosenAmount,
         note: note.trim() || null,
+        clientConfirmed: decision === "approved" && clientConfirmed,
       });
 
       let description = "Nothing will be invoiced for this Abort.";
@@ -62,6 +65,7 @@ function PendingFeeReview({ jobId, abort }: Readonly<PendingProps>) {
       }
       toast({ title: decision === "approved" ? "Abort fee approved" : "Abort fee rejected", description });
       setNote("");
+      setClientConfirmed(false);
     } catch (error) {
       toast({ title: "Not saved", description: abortErrorMessage(error), variant: "destructive" });
     }
@@ -81,7 +85,7 @@ function PendingFeeReview({ jobId, abort }: Readonly<PendingProps>) {
         </div>
         <Button
           className="min-h-[44px] rounded-lg"
-          disabled={!!amountProblem || review.isPending}
+          disabled={!!amountProblem || review.isPending || !clientConfirmed}
           onClick={() => void decide("approved")}
         >
           {review.isPending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden />}
@@ -91,6 +95,17 @@ function PendingFeeReview({ jobId, abort }: Readonly<PendingProps>) {
       {amountProblem && amount.trim() !== "" && (
         <p className="text-[12px] text-destructive" role="alert">{amountProblem}</p>
       )}
+      {abort.agreed_price != null && Number(amount) > abort.agreed_price && (
+        <p className="text-xs text-amber-600">
+          Above the original agreed price of {money(abort.agreed_price)}. Client confirmation is required.
+        </p>
+      )}
+      <label className="flex items-start gap-2 text-[13px]">
+        <Checkbox checked={clientConfirmed} disabled={review.isPending}
+          onCheckedChange={(value) => setClientConfirmed(value === true)}
+          aria-label="I confirm the client agreed to this Abort fee" />
+        <span>I confirm the client has explicitly agreed to this Abort fee.</span>
+      </label>
       <Input
         aria-label="Review note (optional)" placeholder="Note (optional)"
         value={note} onChange={(event) => setNote(event.target.value)}
@@ -124,10 +139,11 @@ function LockedFeeReview({ jobId, abort, invoiced, paid }: Readonly<Props>) {
   const [isOpen, setIsOpen] = useState(false);
   const [correctedAmount, setCorrectedAmount] = useState("");
   const [reason, setReason] = useState("");
+  const [clientConfirmed, setClientConfirmed] = useState(false);
 
   const canAmend = isSuperAdmin && abort.finance_status === "approved" && !invoiced && !abort.reopened_at;
   const amountProblem = approvalAmountProblem(correctedAmount, abort.agreed_price);
-  const correctionValid = reason.trim().length >= 15 &&
+  const correctionValid = clientConfirmed && reason.trim().length >= 15 &&
     reason.trim().length <= 500 &&
     !amountProblem && correctedAmount.trim() !== "" &&
     Number(correctedAmount) !== abort.approved_amount;
@@ -135,6 +151,7 @@ function LockedFeeReview({ jobId, abort, invoiced, paid }: Readonly<Props>) {
   const openAmendment = () => {
     setCorrectedAmount(abort.approved_amount?.toFixed(2) ?? "");
     setReason("");
+    setClientConfirmed(false);
     setIsOpen(true);
   };
 
@@ -145,6 +162,7 @@ function LockedFeeReview({ jobId, abort, invoiced, paid }: Readonly<Props>) {
         newAmount: Number(correctedAmount),
         expectedAmount: Number(abort.approved_amount),
         reason: reason.trim(),
+        clientConfirmed,
       });
       setIsOpen(false);
       toast({
@@ -187,6 +205,11 @@ function LockedFeeReview({ jobId, abort, invoiced, paid }: Readonly<Props>) {
                   inputMode="decimal" value={correctedAmount} disabled={amend.isPending}
                   onChange={(event) => setCorrectedAmount(event.target.value)} />
                 {amountProblem && <p role="alert" className="text-xs text-destructive">{amountProblem}</p>}
+                {abort.agreed_price != null && Number(correctedAmount) > abort.agreed_price && (
+                  <p className="text-xs text-amber-600">
+                    Above the original agreed price of {money(abort.agreed_price)}.
+                  </p>
+                )}
                 <label htmlFor="abort-amend-reason" className="text-sm font-medium">
                   Reason for exceptional amendment (required)
                 </label>
@@ -197,6 +220,12 @@ function LockedFeeReview({ jobId, abort, invoiced, paid }: Readonly<Props>) {
                 <p className="text-xs text-muted-foreground">
                   This records who changed the amount, when, the old amount and the reason.
                 </p>
+                <label className="flex items-start gap-2 text-sm">
+                  <Checkbox checked={clientConfirmed} disabled={amend.isPending}
+                    onCheckedChange={(value) => setClientConfirmed(value === true)}
+                    aria-label="Client has agreed to amended Abort fee" />
+                  <span>I confirm the client agreed to this amended Abort fee.</span>
+                </label>
               </div>
               <DialogFooter>
                 <Button variant="outline" disabled={amend.isPending} onClick={() => setIsOpen(false)}>Cancel</Button>

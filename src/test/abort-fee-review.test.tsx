@@ -33,6 +33,9 @@ const base: JobAbort = {
   agreed_price: 240,
   proposed_amount: 240,
   approved_amount: 240,
+  client_fee_confirmed_at: null,
+  client_fee_confirmed_by: null,
+  client_fee_confirmed_amount: null,
   finance_status: "approved",
   reviewed_by: "admin-1",
   reviewed_at: "2026-11-23T20:10:00Z",
@@ -85,13 +88,34 @@ describe("Abort fee-review lock", () => {
     const pending: JobAbort = { ...base, finance_status: "pending_review", approved_amount: null };
     render(<AbortFeeReview jobId="job-1" abort={pending} invoiced={false} paid={false} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    const approve = screen.getByRole("button", { name: "Approve" });
+    expect(approve.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(screen.getByLabelText("I confirm the client agreed to this Abort fee"));
+    expect(approve.hasAttribute("disabled")).toBe(false);
+    fireEvent.click(approve);
     await waitFor(() => {
       expect(state.review).toHaveBeenCalledTimes(1);
       expect(state.review).toHaveBeenCalledWith({
-        abortId: "abort-1", decision: "approved", amount: 240, note: null,
+        abortId: "abort-1", decision: "approved", amount: 240, note: null, clientConfirmed: true,
       });
     });
+  });
+
+  it("approves a client-confirmed fee higher than the original job price without changing pricing", async () => {
+    state.review.mockResolvedValue({ financeStatus: "approved", approvedAmount: 275 });
+    const pending: JobAbort = { ...base, finance_status: "pending_review", approved_amount: null };
+    render(<AbortFeeReview jobId="job-1" abort={pending} invoiced={false} paid={false} />);
+
+    fireEvent.change(screen.getByLabelText("Amount to approve"), { target: { value: "275.00" } });
+    expect(screen.getByText(/Above the original agreed price of £240.00/)).toBeTruthy();
+    const approve = screen.getByRole("button", { name: "Approve" });
+    expect(approve.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(screen.getByLabelText("I confirm the client agreed to this Abort fee"));
+    fireEvent.click(approve);
+    await waitFor(() => expect(state.review).toHaveBeenCalledWith({
+      abortId: "abort-1", decision: "approved", amount: 275, note: null, clientConfirmed: true,
+    }));
+    expect(pending.agreed_price).toBe(240);
   });
 
   it("can reject a pending claim without an approved amount", async () => {
@@ -102,7 +126,7 @@ describe("Abort fee-review lock", () => {
     fireEvent.click(screen.getByRole("button", { name: "Reject fee" }));
     await waitFor(() => {
       expect(state.review).toHaveBeenCalledWith({
-        abortId: "abort-1", decision: "rejected", amount: null, note: null,
+        abortId: "abort-1", decision: "rejected", amount: null, note: null, clientConfirmed: false,
       });
     });
   });
@@ -130,6 +154,8 @@ describe("Abort fee-review lock", () => {
     fireEvent.change(screen.getByLabelText("Reason for exceptional amendment (required)"), {
       target: { value: "Client confirmed a revised Abort fee" },
     });
+    expect(confirm.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(screen.getByLabelText("Client has agreed to amended Abort fee"));
     expect(confirm.hasAttribute("disabled")).toBe(false);
     fireEvent.click(confirm);
 
@@ -137,7 +163,7 @@ describe("Abort fee-review lock", () => {
       expect(state.amend).toHaveBeenCalledTimes(1);
       expect(state.amend).toHaveBeenCalledWith({
         abortId: "abort-1", newAmount: 210, expectedAmount: 240,
-        reason: "Client confirmed a revised Abort fee",
+        reason: "Client confirmed a revised Abort fee", clientConfirmed: true,
       });
     });
   });

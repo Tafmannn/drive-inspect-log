@@ -156,10 +156,10 @@ INSERT INTO public.invoices (id, org_id, invoice_number, status, subtotal, total
 VALUES ('f1b00000-0000-0000-0000-000000000001', 'a1b00000-0000-0000-0000-000000000001', 'ABT-INV-1', 'draft', 100, 100);
 SELECT pg_temp.expect_error($$INSERT INTO public.invoice_items (invoice_id, job_id, description, quantity, unit_price, amount) VALUES ('f1b00000-0000-0000-0000-000000000001','e1b00000-0000-0000-0000-000000000001','x',1,250,250)$$, 'ABORT_NOT_APPROVED');
 
-SELECT pg_temp.expect_error(format($$SELECT public.review_job_abort_claim(%L, 'approved', 300, NULL)$$,
-  (SELECT id FROM public.job_aborts WHERE job_id = 'e1b00000-0000-0000-0000-000000000001')), 'AMOUNT_ABOVE_AGREED_PRICE');
+SELECT pg_temp.expect_error(format($SELECT public.review_job_abort_claim(%L, 'approved', 300, NULL)$,
+  (SELECT id FROM public.job_aborts WHERE job_id = 'e1b00000-0000-0000-0000-000000000001')), 'CLIENT_FEE_CONFIRMATION_REQUIRED');
 SELECT pg_temp.check(
-  (public.review_job_abort_claim((SELECT id FROM public.job_aborts WHERE job_id = 'e1b00000-0000-0000-0000-000000000001'), 'approved', 100, 'Half fee agreed')->>'approvedAmount')::numeric = 100,
+  (public.review_job_abort_claim((SELECT id FROM public.job_aborts WHERE job_id = 'e1b00000-0000-0000-0000-000000000001'), 'approved', 100, 'Half fee agreed', true)->>'approvedAmount')::numeric = 100,
   'partial approval stored');
 
 -- Approval is FINAL immediately, even before an invoice exists.
@@ -177,21 +177,21 @@ SELECT pg_temp.check((SELECT COUNT(*) = 1 FROM public.job_abort_events
 
 -- Only Super Admin may correct an already-approved, still-uninvoiced fee.
 SELECT set_config('request.jwt.claim.sub', 'b1b00000-0000-0000-0000-000000000002', false); -- super admin
-SELECT pg_temp.expect_error(format($SELECT public.amend_approved_job_abort_claim(%L, 90, 'Short', 100)$,
+SELECT pg_temp.expect_error(format($SELECT public.amend_approved_job_abort_claim(%L, 90, 'Short', 100, true)$,
   (SELECT id FROM public.job_aborts WHERE job_id = 'e1b00000-0000-0000-0000-000000000001')), 'AMENDMENT_REASON_REQUIRED');
-SELECT pg_temp.expect_error(format($SELECT public.amend_approved_job_abort_claim(%L, 90, 'Customer revised the full fee', 99)$,
+SELECT pg_temp.expect_error(format($SELECT public.amend_approved_job_abort_claim(%L, 90, 'Customer revised the full fee', 99, true)$,
   (SELECT id FROM public.job_aborts WHERE job_id = 'e1b00000-0000-0000-0000-000000000001')), 'ABORT_FEE_CHANGED');
 SELECT pg_temp.check(
   (public.amend_approved_job_abort_claim((SELECT id FROM public.job_aborts WHERE job_id = 'e1b00000-0000-0000-0000-000000000001'),
-    90, 'Customer revised the full fee', 100)->>'approvedAmount')::numeric = 90,
-  'first exceptional amendment saved');
-SELECT pg_temp.expect_error(format($SELECT public.amend_approved_job_abort_claim(%L, 80, 'Customer revised the full fee again', 100)$,
+    300, 'Customer confirmed fee above original price', 100, true)->>'approvedAmount')::numeric = 300,
+  'first exceptional amendment saved above original agreed price');
+SELECT pg_temp.expect_error(format($SELECT public.amend_approved_job_abort_claim(%L, 80, 'Customer revised the full fee again', 100, true)$,
   (SELECT id FROM public.job_aborts WHERE job_id = 'e1b00000-0000-0000-0000-000000000001')), 'ABORT_FEE_CHANGED');
-SELECT pg_temp.expect_error(format($SELECT public.amend_approved_job_abort_claim(%L, 90, 'Customer revised the full fee again', 90)$,
+SELECT pg_temp.expect_error(format($SELECT public.amend_approved_job_abort_claim(%L, 300, 'Customer revised the full fee again', 300, true)$,
   (SELECT id FROM public.job_aborts WHERE job_id = 'e1b00000-0000-0000-0000-000000000001')), 'ABORT_AMENDMENT_NO_CHANGE');
 SELECT pg_temp.check(
   (public.amend_approved_job_abort_claim((SELECT id FROM public.job_aborts WHERE job_id = 'e1b00000-0000-0000-0000-000000000001'),
-    100, 'Client reverted to original agreed amount', 90)->>'approvedAmount')::numeric = 100,
+    100, 'Client reverted to original agreed amount', 300, true)->>'approvedAmount')::numeric = 100,
   'second exceptional amendment saved');
 SELECT pg_temp.check((SELECT count(*) = 2 FROM public.job_abort_events
   WHERE job_id = 'e1b00000-0000-0000-0000-000000000001' AND action = 'claim_amended'),
@@ -220,13 +220,48 @@ SELECT pg_temp.check((SELECT j.status = 'ready_for_pickup' AND j.driver_id IS NU
                        WHERE j.rebooked_from_job_id = 'e1b00000-0000-0000-0000-000000000001'),
                      'replacement is unassigned, linked and priced');
 
+-- ── 5b. issued Abort invoice correction: full credit, above-price fee ──
+SELECT set_config('request.jwt.claim.sub', 'b1b00000-0000-0000-0000-000000000002', false); -- super admin
+UPDATE public.invoices SET status = 'sent', sent_at = now()
+ WHERE id = 'f1b00000-0000-0000-0000-000000000001';
+SELECT pg_temp.expect_error(format(
+  $q$SELECT public.correct_invoiced_job_abort_fee(%L,'f1b00000-0000-0000-0000-000000000001',275,100,'Client authorised revised Abort fee',false)$q$,
+  (SELECT id FROM public.job_aborts WHERE job_id='e1b00000-0000-0000-0000-000000000001')),
+  'CLIENT_FEE_CONFIRMATION_REQUIRED');
+SELECT pg_temp.check(
+ (public.correct_invoiced_job_abort_fee(
+   (SELECT id FROM public.job_aborts WHERE job_id='e1b00000-0000-0000-0000-000000000001'),
+   'f1b00000-0000-0000-0000-000000000001',275,100,'Client authorised revised Abort fee',true)->>'approvedAmount')::numeric=275,
+ 'issued original fully credited and new higher fee agreed');
+SELECT pg_temp.check((SELECT status='cancelled' FROM public.invoices WHERE id='f1b00000-0000-0000-0000-000000000001'),
+ 'original invoice cancelled');
+SELECT pg_temp.check((SELECT credit_note_id IS NOT NULL AND original_invoice_number='ABT-INV-1'
+  AND previous_fee=100 AND revised_fee=275 FROM public.job_abort_invoice_corrections
+  WHERE job_id='e1b00000-0000-0000-0000-000000000001'),
+ 'credit note and old/new values linked to Abort');
+SELECT pg_temp.check((SELECT total_price=250 FROM public.job_pricing WHERE job_id='e1b00000-0000-0000-0000-000000000001'),
+ 'original transport price remains unchanged');
+INSERT INTO public.invoices (id, org_id, invoice_number, status, subtotal, total)
+ VALUES ('f1b00000-0000-0000-0000-000000000004','a1b00000-0000-0000-0000-000000000001','ABT-INV-4','draft',275,275);
+INSERT INTO public.invoice_items (invoice_id,job_id,description,quantity,unit_price,amount)
+ VALUES ('f1b00000-0000-0000-0000-000000000004','e1b00000-0000-0000-0000-000000000001',
+   'Abort at Collection — ABT-1 — AB12 CDE',1,275,275);
+SELECT pg_temp.check((SELECT replacement_invoice_id='f1b00000-0000-0000-0000-000000000004'
+ FROM public.job_abort_invoice_corrections WHERE job_id='e1b00000-0000-0000-0000-000000000001'),
+ 'revised invoice automatically linked to fully credited original');
+SELECT pg_temp.expect_error(format(
+ $q$SELECT public.correct_invoiced_job_abort_fee(%L,'f1b00000-0000-0000-0000-000000000001',280,275,'Trying to correct a cancelled invoice',true)$q$,
+ (SELECT id FROM public.job_aborts WHERE job_id='e1b00000-0000-0000-0000-000000000001')),
+ 'ABORT_INVOICE_NOT_FOUND');
+SELECT set_config('request.jwt.claim.sub', 'b1b00000-0000-0000-0000-000000000001', false); -- admin1
+
 -- ── 6. no-name exception: never auto-approved; reopen closes the claim ──────
 SELECT pg_temp.check((public.confirm_job_abort('e1b00000-0000-0000-0000-000000000002', NULL, true, NULL)->>'noNameException')::boolean, 'no-name exception accepted');
 SELECT pg_temp.check((SELECT no_name_exception AND contact_name IS NULL AND agreed_price IS NULL AND proposed_amount IS NULL
                              AND finance_status = 'pending_review'
                         FROM public.job_aborts WHERE job_id = 'e1b00000-0000-0000-0000-000000000002'),
                      'unknown price stays NULL and claim is pending');
-SELECT pg_temp.expect_error(format($$SELECT public.review_job_abort_claim(%L, 'approved', NULL, NULL)$$,
+SELECT pg_temp.expect_error(format($SELECT public.review_job_abort_claim(%L, 'approved', NULL, NULL, true)$,
   (SELECT id FROM public.job_aborts WHERE job_id = 'e1b00000-0000-0000-0000-000000000002')), 'AMOUNT_REQUIRED');
 SELECT public.review_job_abort_claim((SELECT id FROM public.job_aborts WHERE job_id = 'e1b00000-0000-0000-0000-000000000002'), 'rejected', NULL, 'Customer disputes');
 INSERT INTO public.invoices (id, org_id, invoice_number, status, subtotal, total)

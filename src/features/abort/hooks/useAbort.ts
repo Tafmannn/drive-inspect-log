@@ -3,6 +3,8 @@ import { invalidateForEvent } from "@/lib/mutationEvents";
 import {
   confirmJobAbort,
   amendApprovedAbortClaim,
+  correctInvoicedAbortFee,
+  getAbortInvoiceDetails,
   createReplacementJob,
   dismissAbortRequest,
   getJobAbortState,
@@ -12,13 +14,14 @@ import {
   requestJobAbort,
   reviewAbortClaim,
 } from "../api/abortApi";
-import type { JobAbortState } from "../api/abortApi";
+import type { AbortInvoiceDetails, JobAbortState } from "../api/abortApi";
 
 export const abortKeys = {
   all: ["aborts"] as const,
   job: (jobId: string) => ["aborts", "job", jobId] as const,
   driverRequest: (jobId: string) => ["aborts", "driver-request", jobId] as const,
   queue: () => ["aborts", "queue"] as const,
+  invoices: (jobId: string) => ["aborts", "invoices", jobId] as const,
 };
 
 function refreshAfterAbortChange(qc: QueryClient, jobId: string) {
@@ -91,7 +94,7 @@ export function useDismissAbortRequest(jobId: string) {
 function cacheFeeDecision(
   qc: QueryClient, jobId: string, abortId: string,
   status: "approved" | "rejected" | "pending_review",
-  amount: number | null, reviewedAt?: string,
+  amount: number | null, confirmedAt?: string,
 ) {
   qc.setQueryData<JobAbortState>(abortKeys.job(jobId), (old) => {
     if (old?.current?.id !== abortId) return old;
@@ -99,7 +102,8 @@ function cacheFeeDecision(
       ...old.current,
       finance_status: status,
       approved_amount: amount,
-      reviewed_at: reviewedAt ?? old.current.reviewed_at,
+      client_fee_confirmed_at: confirmedAt ?? old.current.client_fee_confirmed_at,
+      client_fee_confirmed_amount: status === "approved" ? amount : old.current.client_fee_confirmed_amount,
     };
     return {
       ...old,
@@ -113,7 +117,7 @@ export function useReviewAbortClaim(jobId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: reviewAbortClaim,
-    onSuccess: (result, vars) => cacheFeeDecision(qc, jobId, vars.abortId, result.financeStatus, result.approvedAmount),
+    onSuccess: (result, vars) => cacheFeeDecision(qc, jobId, vars.abortId, result.financeStatus, result.approvedAmount, result.clientConfirmedAt),
     onSettled: () => refreshAfterAbortChange(qc, jobId),
   });
 }
@@ -131,11 +135,33 @@ export function useAmendApprovedAbortClaim(jobId: string) {
           approved_amount: result.approvedAmount,
           last_amended_at: result.amendedAt,
           last_amendment_reason: vars.reason,
+          client_fee_confirmed_amount: result.approvedAmount,
         };
         return { ...old, current, history: old.history.map((a) => a.id === vars.abortId ? current : a) };
       });
     },
     onSettled: () => refreshAfterAbortChange(qc, jobId),
+  });
+}
+
+export function useAbortInvoiceDetails(jobId: string, enabled: boolean) {
+  return useQuery<AbortInvoiceDetails>({
+    queryKey: abortKeys.invoices(jobId),
+    queryFn: () => getAbortInvoiceDetails(jobId),
+    enabled: enabled && !!jobId,
+    staleTime: 15_000,
+  });
+}
+
+export function useCorrectInvoicedAbortFee(jobId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: correctInvoicedAbortFee,
+    retry: false,
+    onSettled: () => {
+      refreshAfterAbortChange(qc, jobId);
+      void qc.invalidateQueries({ queryKey: ["invoicing"] });
+    },
   });
 }
 

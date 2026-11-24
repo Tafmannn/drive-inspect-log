@@ -12,7 +12,8 @@
  * VAT follows the business-level switch (organisations.vat_registered):
  * while it is off, no VAT is charged and none appears on the invoice.
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
 import {
   ControlShell,
@@ -147,6 +148,10 @@ function draftToRecord(args: {
 }
 
 export function InvoicePrepScreen() {
+  const [searchParams] = useSearchParams();
+  const correctionClientId = searchParams.get("clientId");
+  const correctionJobId = searchParams.get("abortCorrectionJob");
+  const correctionAutoSelected = useRef<string | null>(null);
   // Client selection
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const { data: allClients } = useClients();
@@ -190,12 +195,33 @@ export function InvoicePrepScreen() {
 
   const jobs = useMemo(() => eligibleJobs ?? [], [eligibleJobs]);
 
+  // An Abort invoice correction can deep-link back to Invoice Prep.
+  // Only preselect a job that is actually returned as eligible for that client.
+  useEffect(() => {
+    if (!correctionClientId || !allClients?.some((client) => client.id === correctionClientId)) return;
+    if (selectedClientId !== correctionClientId) {
+      setSelectedClientId(correctionClientId);
+      setSelectedJobIds(new Set());
+    }
+  }, [allClients, correctionClientId, selectedClientId]);
+
+  useEffect(() => {
+    if (!correctionJobId || !correctionClientId || selectedClientId !== correctionClientId
+        || !eligibleJobs || correctionAutoSelected.current === correctionJobId) return;
+    const target = eligibleJobs.find((job) => job.id === correctionJobId);
+    if (!target || !target.readiness?.ready || target.readiness?.alreadyInvoiced) return;
+    setSelectedJobIds(new Set([correctionJobId]));
+    correctionAutoSelected.current = correctionJobId;
+  }, [correctionJobId, correctionClientId, selectedClientId, eligibleJobs]);
+
   const selectedJobs = useMemo(
     () => jobs.filter((j) => selectedJobIds.has(j.id)),
     [jobs, selectedJobIds]
   );
   const selectedJobIdList = useMemo(() => selectedJobs.map((j) => j.id), [selectedJobs]);
 
+  // The link is only a convenience: server-side invoice checks still reverify
+  // the approved Abort fee and whether a previous invoice was fully cancelled.
   // Expenses that can be recharged for the selected jobs. Fuel is ticked by
   // default only for clients who pay fuel separately (clients.fuel_policy =
   // 'recharged', the default); an explicit tick/untick by the admin always wins.

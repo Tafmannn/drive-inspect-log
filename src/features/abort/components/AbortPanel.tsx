@@ -21,6 +21,7 @@ import { useAdminChangeStatus } from "@/hooks/useJobs";
 import { JOB_STATUS } from "@/lib/statusConfig";
 import type { JobAbort } from "../api/abortApi";
 import { AbortFeeReview } from "./AbortFeeReview";
+import { AbortInvoiceCorrection } from "./AbortInvoiceCorrection";
 import {
   abortKeys, useCreateReplacementJob, useDismissAbortRequest, useJobAbortState, useNotifyCustomerAborted,
 } from "../hooks/useAbort";
@@ -103,6 +104,7 @@ export function AbortPanel({ job, onAbort }: Props) {
         <ConfirmedAbort
           jobId={job.id}
           hasClient={!!job.client_id}
+          clientId={job.client_id ?? null}
           abort={s.current}
           invoiced={s.invoiced}
           paid={s.paid}
@@ -136,15 +138,16 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 function ConfirmedAbort({
-  jobId, hasClient, abort, invoiced, paid, replacementJobId,
-}: {
+  jobId, hasClient, clientId, abort, invoiced, paid, replacementJobId,
+}: Readonly<{
   jobId: string;
   hasClient: boolean;
+  clientId: string | null;
   abort: JobAbort;
   invoiced: boolean;
   paid: boolean;
   replacementJobId: string | null;
-}) {
+}>) {
   const notify = useNotifyCustomerAborted(jobId);
   const replace = useCreateReplacementJob(jobId);
   const reopen = useAdminChangeStatus();
@@ -174,6 +177,9 @@ function ConfirmedAbort({
         </Row>
         {abort.reviewed_at && <Row label="Reviewed at">{formatAbortConfirmedAt(abort.reviewed_at)}</Row>}
         {abort.review_note && <Row label="Review note">{abort.review_note}</Row>}
+        {abort.client_fee_confirmed_at && (
+          <Row label="Client fee confirmed (admin declaration)">{formatAbortConfirmedAt(abort.client_fee_confirmed_at)}</Row>
+        )}
         {abort.last_amended_at && <Row label="Last fee amendment">{formatAbortConfirmedAt(abort.last_amended_at)}</Row>}
         {abort.last_amendment_reason && <Row label="Amendment reason">{abort.last_amendment_reason}</Row>}
       </dl>
@@ -185,6 +191,7 @@ function ConfirmedAbort({
       )}
 
       <AbortFeeReview jobId={jobId} abort={abort} invoiced={invoiced} paid={paid} />
+      <AbortInvoiceCorrection jobId={jobId} clientId={clientId} abort={abort} />
 
       <div className="grid gap-2 sm:grid-cols-3">
         <Button
