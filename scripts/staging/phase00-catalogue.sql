@@ -1,0 +1,13 @@
+WITH entries AS (
+SELECT 'columns' AS kind, table_name AS object, column_name AS item, json_build_array(ordinal_position,data_type,udt_name,is_nullable,column_default,numeric_precision,numeric_scale)::text AS definition FROM information_schema.columns WHERE table_schema='public'
+UNION ALL SELECT 'policies',schemaname||'.'||tablename,policyname,json_build_array(permissive,cmd,roles,qual,with_check)::text FROM pg_policies WHERE schemaname IN ('public','storage')
+UNION ALL SELECT 'functions',p.proname||'('||pg_get_function_identity_arguments(p.oid)||')','definition',json_build_array(pg_get_functiondef(p.oid),p.prosecdef,p.proconfig,p.proacl,has_function_privilege('anon',p.oid,'execute'),has_function_privilege('authenticated',p.oid,'execute'))::text FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.prokind='f'
+UNION ALL SELECT 'relations',c.relname,'flags',json_build_array(c.relkind,c.relrowsecurity,c.relforcerowsecurity,c.reloptions)::text FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p','v','m')
+UNION ALL SELECT 'constraints',c.relname,con.conname,json_build_array(pg_get_constraintdef(con.oid),con.convalidated)::text FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public'
+UNION ALL SELECT 'indexes',tablename,indexname,indexdef FROM pg_indexes WHERE schemaname='public'
+UNION ALL SELECT 'triggers',c.relname,t.tgname,json_build_array(pg_get_triggerdef(t.oid),t.tgenabled)::text FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND NOT t.tgisinternal
+UNION ALL SELECT 'grants',table_name,concat_ws('|',grantee,privilege_type,grantor),is_grantable FROM information_schema.role_table_grants WHERE table_schema='public' AND grantee IN ('anon','authenticated','service_role','PUBLIC')
+UNION ALL SELECT 'column_grants',table_name,concat_ws('|',column_name,grantee,privilege_type,grantor),is_grantable FROM information_schema.column_privileges WHERE table_schema='public' AND grantee IN ('anon','authenticated','service_role','PUBLIC')
+UNION ALL SELECT 'views',c.relname,'definition',pg_get_viewdef(c.oid) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('v','m')
+UNION ALL SELECT 'buckets',id,'configuration',json_build_array(public,file_size_limit,allowed_mime_types)::text FROM storage.buckets
+) SELECT kind,object,count(*)::int AS entries,md5(string_agg(json_build_array(item,definition)::text,E'\n' ORDER BY item,definition)) AS hash FROM entries GROUP BY kind,object ORDER BY kind,object;
