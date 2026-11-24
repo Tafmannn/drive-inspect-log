@@ -66,6 +66,9 @@ export function DigitalIdAdminTools({
     }
     setBusy(true);
     let uploadedPath: string | null = null;
+    // Once the RPC commits the pointer, the uploaded object is in use.
+    // Later UI refresh errors must never delete the live ID photograph.
+    let pointerCommitted = false;
     try {
       // Use the existing defensive iOS image pipeline for orientation,
       // downscaling and HEIC-to-JPEG conversion where the browser supports it.
@@ -86,15 +89,28 @@ export function DigitalIdAdminTools({
         .upload(uploadedPath, uploadBlob, { upsert: false, contentType: processed.mimeType });
       if (storageError) throw storageError;
       await updatePhoto(uploadedPath);
+      pointerCommitted = true;
       await onChanged();
       await loadEvents();
       toast({ title: "ID photograph updated" });
     } catch (error) {
-      // Remove an orphan created if the DB pointer update was rejected.
-      if (uploadedPath) {
-        await supabase.storage.from("digital-id-photos").remove([uploadedPath]);
+      // Only an uncommitted upload is orphaned. Do not delete a photo that
+      // the credential already points to when a subsequent refresh fails.
+      if (uploadedPath && !pointerCommitted) {
+        try {
+          await supabase.storage.from("digital-id-photos").remove([uploadedPath]);
+        } catch {
+          // Best-effort orphan cleanup; preserve the original error.
+        }
       }
-      toast({ title: "Unable to update ID photo", description: (error as Error).message, variant: "destructive" });
+      if (pointerCommitted) {
+        toast({
+          title: "ID photo saved",
+          description: "The photograph was saved, but the page could not refresh. Reload the page to view it.",
+        });
+      } else {
+        toast({ title: "Unable to update ID photo", description: (error as Error).message, variant: "destructive" });
+      }
     } finally {
       setBusy(false);
     }
