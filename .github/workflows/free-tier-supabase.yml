@@ -95,7 +95,7 @@ jobs:
     # Independent mechanical proof; NOT a backup of hosted staging.
     services:
       postgres:
-        image: postgres:16
+        image: postgres:17
         env:
           POSTGRES_DB: postgres
           POSTGRES_USER: postgres

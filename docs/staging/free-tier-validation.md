@@ -18,7 +18,7 @@
 2. **Manually selected full replay only:** starts an isolated local Supabase database with a fixed CLI version and applies repository migrations. Ordinary PRs skip this known-broken step to avoid wasting free runner minutes.
 3. On full replay, asserts core public tables, job abort RPC and row-level security exist.
 4. On full replay, executes existing abort scenario tests, which begin a transaction and roll it back.
-5. Separately, a disposable PostgreSQL 16 service dumps and restores a synthetic table and verifies exact row fidelity, even when the migration-replay job is blocked.
+5. Separately, a disposable PostgreSQL 17 service dumps and restores a synthetic table and verifies exact row fidelity, even when the migration-replay job is blocked.
 
 The optional full-replay job is intentionally **red** if migrations cannot replay or a permission assertion fails; ordinary PR checks explicitly report it as NOT EXECUTED. The independent synthetic restore PASS never certifies that hosted staging is recoverable. Do not bypass or convert a FAIL into NOT_EXECUTED.
 
