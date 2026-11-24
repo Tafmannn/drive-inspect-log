@@ -1,22 +1,37 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-/** Signed private photo URL, never persisted to local storage or job evidence. */
+type SignedPhoto = { path: string | null; url: string | null };
+
+/**
+ * Signed private photo URL, never persisted to local storage or job evidence.
+ * Always associate a URL with its originating storage path so switching
+ * drivers cannot briefly render the prior driver's photograph before effects run.
+ */
 export function useDigitalIdPhotoUrl(path: string | null | undefined) {
-  const [url, setUrl] = useState<string | null>(null);
+  const currentPath = path ?? null;
+  const [signed, setSigned] = useState<SignedPhoto>({ path: null, url: null });
+
   useEffect(() => {
     let cancelled = false;
-    setUrl(null);
-    if (!path) return;
+    setSigned({ path: currentPath, url: null });
+    if (!currentPath) return;
     const resolve = async () => {
-      const { data, error } = await supabase.storage
-        .from("digital-id-photos")
-        .createSignedUrl(path, 90);
-      if (!cancelled) setUrl(error ? null : data?.signedUrl ?? null);
+      try {
+        const { data, error } = await supabase.storage
+          .from("digital-id-photos")
+          .createSignedUrl(currentPath, 90);
+        if (!cancelled) {
+          setSigned({ path: currentPath, url: error ? null : data?.signedUrl ?? null });
+        }
+      } catch {
+        if (!cancelled) setSigned({ path: currentPath, url: null });
+      }
     };
     void resolve();
     const interval = window.setInterval(() => { void resolve(); }, 60_000);
     return () => { cancelled = true; window.clearInterval(interval); };
-  }, [path]);
-  return url;
+  }, [currentPath]);
+
+  return signed.path === currentPath ? signed.url : null;
 }

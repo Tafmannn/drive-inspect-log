@@ -107,4 +107,52 @@ describe("Digital ID photo assignment atomicity", () => {
       expect.objectContaining({ title: "Unable to update ID photo", variant: "destructive" }),
     );
   });
+  it("reports a successful upload without removing the referenced photo", async () => {
+    const onChanged = vi.fn().mockResolvedValue(undefined);
+    render(<DigitalIdAdminTools credential={credential} onChanged={onChanged} />);
+    selectPhoto();
+    await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "ID photograph updated" }),
+    ));
+    expect(mocks.remove).not.toHaveBeenCalled();
+    expect(onChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses unsupported image formats before uploading or modifying a credential", async () => {
+    const onChanged = vi.fn().mockResolvedValue(undefined);
+    render(<DigitalIdAdminTools credential={credential} onChanged={onChanged} />);
+    fireEvent.change(screen.getByLabelText("Select Digital ID photograph"), {
+      target: { files: [new File(["hello"], "not-an-image.txt", { type: "text/plain" })] },
+    });
+    await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Unsupported image", variant: "destructive" }),
+    ));
+    expect(mocks.rpc).not.toHaveBeenCalled();
+    expect(mocks.upload).not.toHaveBeenCalled();
+  });
+
+  it("allows authorised admins to remove an existing photograph via the RPC", async () => {
+    const onChanged = vi.fn().mockResolvedValue(undefined);
+    render(<DigitalIdAdminTools credential={{ ...credential, photo_path: "org/driver/photo.jpg" }} onChanged={onChanged} />);
+    fireEvent.click(screen.getByRole("button", { name: /Remove photo/i }));
+    await waitFor(() => expect(mocks.rpc).toHaveBeenCalledWith(
+      "set_driver_digital_id_photo",
+      { p_user_id: credential.user_id, p_photo_path: null },
+    ));
+    expect(onChanged).toHaveBeenCalledTimes(1);
+    expect(mocks.toast).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "ID photograph removed" }),
+    );
+  });
+
+  it("does not upload photos for a credential without an organisation", async () => {
+    const onChanged = vi.fn().mockResolvedValue(undefined);
+    render(<DigitalIdAdminTools credential={{ ...credential, org_id: null }} onChanged={onChanged} />);
+    selectPhoto();
+    await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Missing organisation", variant: "destructive" }),
+    ));
+    expect(mocks.rpc).not.toHaveBeenCalled();
+    expect(mocks.upload).not.toHaveBeenCalled();
+  });
 });
