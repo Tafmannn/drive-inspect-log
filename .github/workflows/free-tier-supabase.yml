@@ -73,11 +73,38 @@ jobs:
           PGPASSWORD: "postgres"
           PGSSLMODE: "disable"
         run: psql -X -v ON_ERROR_STOP=1 -f supabase/tests/job_abort_workflow.sql
-      - name: Verify dump/restore against synthetic local data
-        run: bash scripts/staging/verify-local-backup.sh
       - name: Stop disposable local database
         if: always()
         run: supabase stop --no-backup || true
+
+  synthetic_restore:
+    name: Synthetic local dump and restore (independent)
+    needs: guardrails
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    # Independent mechanical proof; NOT a backup of hosted staging.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 54322:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      AXENTRA_LOCAL_TEST_DB: "YES"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Verify synthetic backup and restore against localhost
+        run: bash scripts/staging/verify-local-backup.sh
 
   hosted_inventory:
     name: Hosted staging inventory (read-only; optional)

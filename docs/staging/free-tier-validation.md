@@ -18,9 +18,9 @@
 2. Starts an isolated local Supabase database using a fixed CLI version; applies repository migrations.
 3. Asserts core public tables, job abort RPC and row-level security exist.
 4. Executes existing abort scenario tests, which begin a transaction and roll it back.
-5. Dumps and restores a synthetic table on the local database, asserting exact row fidelity. It deletes its temporary dump afterwards.
+5. Separately, a disposable PostgreSQL 16 service dumps and restores a synthetic table and verifies exact row fidelity, even when the migration-replay job is blocked.
 
-The job is intentionally **red** if migrations cannot replay or a permission assertion fails. Do not bypass or convert a FAIL into NOT_EXECUTED.
+The schema replay job is intentionally **red** if migrations cannot replay or a permission assertion fails. The independent synthetic restore PASS never certifies that hosted staging is recoverable. Do not bypass or convert a FAIL into NOT_EXECUTED.
 
 ## Optional hosted staging inventory, no cost for a paid branch
 

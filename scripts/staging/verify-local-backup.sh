@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Local, disposable, synthetic backup/restore probe. NEVER points to a hosted DB.
 set -Eeuo pipefail
-if [[ "${AXENTRA_LOCAL_SUPABASE:-}" != "YES" ]]; then
-  echo "REFUSED: AXENTRA_LOCAL_SUPABASE=YES is required" >&2
+if [[ "${AXENTRA_LOCAL_TEST_DB:-}" != "YES" ]]; then
+  echo "REFUSED: AXENTRA_LOCAL_TEST_DB=YES is required" >&2
   exit 2
 fi
 if [[ -n "${STAGING_DB_URL:-}" || -n "${DATABASE_URL:-}" || -n "${SUPABASE_DB_URL:-}" ]]; then
