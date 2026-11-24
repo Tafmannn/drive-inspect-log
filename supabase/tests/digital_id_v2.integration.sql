@@ -115,5 +115,55 @@ SELECT pg_temp.require_true(
     JOIN public.driver_digital_credentials c ON c.id=e.credential_id
     WHERE c.user_id='d2d00000-0000-0000-0000-000000000001'),
   'issuance, suspension and reactivation events retained');
+
+-- Private Storage metadata RLS contract: this tests database policy boundaries,
+-- NOT real file upload bytes or actual signed URLs over the Storage HTTP API.
+SELECT pg_temp.require_true(
+ (SELECT NOT public FROM storage.buckets WHERE id='digital-id-photos'),
+ 'Digital ID photographs must use a private bucket');
+
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub','d2d00000-0000-0000-0000-000000000002',true);
+INSERT INTO storage.objects(bucket_id,name) VALUES
+ ('digital-id-photos','d1d00000-0000-0000-0000-000000000001/d2d00000-0000-0000-0000-000000000001/synthetic.jpg');
+SELECT public.set_driver_digital_id_photo(
+ 'd2d00000-0000-0000-0000-000000000001',
+ 'd1d00000-0000-0000-0000-000000000001/d2d00000-0000-0000-0000-000000000001/synthetic.jpg');
+SELECT pg_temp.require_true(
+ (public.get_driver_digital_id('d2d00000-0000-0000-0000-000000000001')->>'photo_path') =
+ 'd1d00000-0000-0000-0000-000000000001/d2d00000-0000-0000-0000-000000000001/synthetic.jpg',
+ 'same-org admin can assign an existing private photo');
+SELECT pg_temp.require_true(
+ (SELECT count(*) FROM public.driver_digital_credential_events e
+   JOIN public.driver_digital_credentials c ON c.id=e.credential_id
+   WHERE c.user_id='d2d00000-0000-0000-0000-000000000001' AND e.event_type='photo_updated')>=1,
+ 'admin photograph changes are audited');
+
+SELECT set_config('request.jwt.claim.sub','d2d00000-0000-0000-0000-000000000003',true);
+SELECT pg_temp.require_true(
+ (SELECT count(*)=0 FROM storage.objects WHERE bucket_id='digital-id-photos'),
+ 'foreign-org admin cannot read another organisation photo');
+SELECT pg_temp.require_denied(
+ 'INSERT INTO storage.objects(bucket_id,name) VALUES (''digital-id-photos'',''d1d00000-0000-0000-0000-000000000001/d2d00000-0000-0000-0000-000000000001/foreign.jpg'')',
+ 'row-level security');
+
+SELECT set_config('request.jwt.claim.sub','d2d00000-0000-0000-0000-000000000001',true);
+SELECT pg_temp.require_true(
+ (SELECT count(*)=1 FROM storage.objects WHERE bucket_id='digital-id-photos'),
+ 'active driver can access only their own ID photo');
+SELECT pg_temp.require_denied(
+ 'INSERT INTO storage.objects(bucket_id,name) VALUES (''digital-id-photos'',''d1d00000-0000-0000-0000-000000000001/d2d00000-0000-0000-0000-000000000001/driver-upload.jpg'')',
+ 'row-level security');
+RESET ROLE;
+
+UPDATE public.user_profiles SET account_status='suspended'
+ WHERE auth_user_id='d2d00000-0000-0000-0000-000000000001';
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub','d2d00000-0000-0000-0000-000000000001',true);
+SELECT pg_temp.require_true(
+ (SELECT count(*)=0 FROM storage.objects WHERE bucket_id='digital-id-photos'),
+ 'suspended driver loses RLS access to private ID photograph');
+RESET ROLE;
+
 \echo 'PASS: DIGITAL ID V2 SQL LIFECYCLE AND ACCESS TESTS'
 ROLLBACK;
