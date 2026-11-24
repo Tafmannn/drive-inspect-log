@@ -44,6 +44,7 @@ import {
   PAYMENT_METHODS,
 } from "../api/invoiceLifecycle";
 import { buildInvoicePack, downloadBlob } from "../api/receiptExport";
+import { buildCompleteInvoiceDelivery, prepareInvoiceDelivery, markPreparedInvoiceSent } from "../api/invoiceDelivery";
 
 export type InvoiceActionKind = "pdf" | "pack" | "email" | "sent" | "paid" | "unpaid" | "cancel";
 
@@ -115,7 +116,9 @@ export function useInvoiceActions(
 
     downloadPack: (inv) => {
       void run(inv, "pack", async () => {
-        const pack = await buildInvoicePack(inv, settings);
+        const pack = inv.status === "draft" && inv.document_type !== "credit_note"
+          ? await buildCompleteInvoiceDelivery(inv, settings)
+          : await buildInvoicePack(inv, settings);
         downloadBlob(pack.blob, pack.fileName);
         if (pack.failed.length > 0) {
           toast({
@@ -137,7 +140,8 @@ export function useInvoiceActions(
     markSent: (inv) => {
       void run(inv, "sent", async () => {
         if (!settings) throw new Error("Organisation settings are still loading. Try again in a moment.");
-        await markInvoiceSent(inv, settings.orgId, settings);
+        if (inv.document_type === "credit_note") await markInvoiceSent(inv, settings.orgId, settings);
+        else await markPreparedInvoiceSent(inv, settings.orgId, settings);
         refresh(inv.id);
         toast({
           title: "Marked as sent",
@@ -173,10 +177,10 @@ export function useInvoiceActions(
     await run(inv, "email", async () => {
       if (!settings) throw new Error("Organisation settings are still loading. Try again in a moment.");
       // Once issued, the stored PDF is what gets emailed — never a re-render.
-      const storedPdfPath = inv.status !== "draft" ? inv.pdf_url : null;
-      const pdfData = storedPdfPath
-        ? await buildInvoiceDocument(inv, { settings, withReceipts: false })
-        : await buildInvoiceDocument(inv, { settings, withReceipts: true });
+      const storedPdfPath = inv.status === "draft" && inv.document_type !== "credit_note"
+        ? await prepareInvoiceDelivery(inv, settings.orgId, settings)
+        : inv.status !== "draft" ? inv.pdf_url : null;
+      const pdfData = await buildInvoiceDocument(inv, { settings, withReceipts: !storedPdfPath });
       const { recipient } = await emailInvoice({
         invoiceId: inv.id,
         invoiceNumber: inv.invoice_number,

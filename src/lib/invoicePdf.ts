@@ -987,7 +987,7 @@ function drawExpenseSchedule(doc: jsPDF, data: InvoiceData): void {
   doc.setFontSize(8.5);
   doc.setTextColor(...THEME.text);
   const intro = "Itemised breakdown of the rechargeable expenses on this invoice. " +
-    "Each reference (R01, R02 ...) matches a receipt copy on the pages that follow.";
+    (data.receipts?.length ? "Each reference (R01, R02 ...) matches a receipt copy on the pages that follow." : "Receipt references (R01, R02 ...) identify the supporting files in the invoice download pack.");
   const introLines = doc.splitTextToSize(intro, PAGE_W - MARGIN * 2);
   doc.text(introLines, MARGIN, y);
   y += introLines.length * 4 + 4;

@@ -22,6 +22,7 @@ import {
 } from "./invoiceDocument";
 import { getInvoicePdf, INVOICE_PDF_BUCKET } from "./invoiceLifecycle";
 import { fetchReceiptBlob } from "./receiptImages";
+import { issuedPackPath } from "./invoicePackPath";
 
 export interface InvoicePackResult {
   blob: Blob;
@@ -76,10 +77,19 @@ export async function buildInvoicePack(
   record: InvoiceRecord,
   settings?: OrgInvoiceSettings | null,
   onProgress?: (done: number, total: number) => void,
+  prepared?: { pdf: Blob; lines: InvoiceExpenseLine[] },
 ): Promise<InvoicePackResult> {
+  const frozenPath = record.status !== "draft" ? issuedPackPath(record.pdf_url, record.id) : null;
+  if (frozenPath) {
+    const { data, error } = await supabase.storage.from(INVOICE_PDF_BUCKET).download(frozenPath);
+    if (error || !data?.size) throw new Error("Could not download the original issued invoice pack. Please retry.");
+    const archive = await JSZip.loadAsync(data);
+    const succeeded = Object.values(archive.files).filter(f => !f.dir && f.name.startsWith("receipts/")).length;
+    return { blob: data, fileName: invoicePdfFileName(record.invoice_number).replace(/\.pdf$/, ".zip"), succeeded, failed: [] };
+  }
   const zip = new JSZip();
 
-  const lines = await fetchInvoiceExpenseLines(record.id);
+  const lines = prepared?.lines ?? await fetchInvoiceExpenseLines(record.id);
   const jobRefs = jobRefsFromLineItems(record.line_items);
   const failed: string[] = [];
   let succeeded = 0;
@@ -118,7 +128,9 @@ export async function buildInvoicePack(
   // Standalone delivery and incomplete packs keep the existing document path.
   // Never substitute a new render for a previously issued PDF in a pack.
   let pdf: Blob;
-  if (record.status === "draft" && failed.length === 0) {
+  if (prepared) {
+    pdf = prepared.pdf;
+  } else if (record.status === "draft" && failed.length === 0) {
     pdf = await generateInvoicePdf(await buildInvoiceDocument(record, { settings, withReceipts: false, expenseLines: lines }));
   } else if (record.status !== "draft" && record.pdf_url) {
     const { data, error } = await supabase.storage.from(INVOICE_PDF_BUCKET).download(record.pdf_url);
