@@ -21,7 +21,7 @@ cannot validate a full release, for two reasons:
 | 4 Security | VERIFIED PASS (DB/API scope) | 15/15 security tests over HTTP with real sign-ins (`scripts/staging/regression/http-regression.mjs`) |
 | 5 Integrations | VERIFIED PASS (staging-safe; live integrations NOT TESTED) | 23/23 repository functions deployed from Git (`scripts/staging/deploy-staging-functions.sh`, commit `76d4875`). Bundle hashes match production for all 23 at `cf0c94e`, so there is zero source drift; 6 were redeployed with the e-mail guard. 7/7 function security tests pass with real JWTs. No provider secrets are set on staging, so e-mail, Google, GCS and DVLA are absent (fail closed), not live. |
 | 6 Environment isolation | VERIFIED PASS for the staging deployment (residual risk below) | Branch-scoped preview vars on `deploy-preview/staging` only. Vercel build log: `building against project mfedxybzajdgavzmajkl (VITE_APP_ENV=staging)`. The deployed `client-*.js` contains the staging URL/key only. In a browser session, all requests went to staging or localhost. Residual risk: every other preview branch still inherits the production values. |
-| 7 Regression | PARTIALLY COMPLETE | 30/30 HTTP tests and 2,082/2,082 unit tests pass. Inspections, POD, offline, signatures, credit notes and invoice packs were NOT TESTED (they need Edge Functions/storage). |
+| 7 Regression | PARTIALLY COMPLETE | 59/59 staging tests pass (`http-regression.mjs` 37 and `workflow-regression.mjs` 22; both re-run to confirm they are repeatable), plus 2,082/2,082 unit tests. Credit notes, revised invoices, invoice packs and GCS file transport are NOT TESTED. |
 | 8 Deployment | VERIFIED PASS (limits below) | `dpl_GVQhaWKF1pMb2th4E8jNZPduXUQt` (preview, commit `a20a0ff`) is READY and serving: https://axentra-app-git-deploy-preview-staging-tafmannns-projects.vercel.app (Vercel Authentication protected). The identical build passed a Playwright sign-in as admin A and driver A against staging: correct org-scoped data, 0 page errors. |
 | 9 Production protection | VERIFIED PASS | Only `SELECT`s against production. No production deploy, merge or config change. The Vercel project was only read. |
 
@@ -127,6 +127,22 @@ All passed:
 
 Fixtures: 9 synthetic users in 2 orgs on the `.test` domain (`scripts/staging/regression/fixtures.sql`).
 The password exists only as a local secret.
+
+## Inspection → POD → completion workflow (`scripts/staging/regression/workflow-regression.mjs`, 22/22)
+Each run uses a fresh job in org A assigned to driver A. Verified:
+- **Submission rules:** another org's driver cannot submit (`JOB_NOT_FOUND`); delivery cannot be submitted before pickup (`PICKUP_NOT_COMPLETE`).
+- **Pickup:** submitted with a damage item, driver/customer signature URLs and readings; the job moves to `pickup_complete`.
+- **Offline retry:** resending the same submission session is an `idempotentReplay` (1 inspection, 1 damage row).
+- **Duplicate submission:** a new session after completion is refused (`INSPECTION_ALREADY_SUBMITTED`); original data unchanged.
+- **Damage and evidence:** damage records and photo evidence are org-scoped. Photo rows are stamped with the org. A retried upload (same `backend_ref`) does not duplicate. Other-org read/insert is refused. Drivers cannot delete evidence.
+- **Delivery:** moves the job to `pod_ready`.
+- **POD PDF:** stored in `pod-pdfs/<org>/`; the signed link returns identical bytes. Anon, other-org and driver reads are refused (driver `pod.view` is off by default). Other-org writes are refused.
+- **POD e-mail:** `send-pod-email` to a real on-file customer address returned **409 `EMAIL_SUPPRESSED` from the deployed delivery guard**.
+- **Completion:** drivers cannot complete. An admin completes from `pod_ready`, after which the job is locked against inspections. Other-org admins cannot reopen. An admin reopens to `ready_for_pickup` with a new run, and pickup can be redone. The activity log records every transition.
+
+**Limits:** signature/photo *file* upload goes through GCS (`gcs-upload`), which has no credentials on staging. Only the persisted URLs/metadata and access rules are tested, not the GCS transfer. The POD PDF here is a minimal test PDF; the app's client-side PDF rendering is covered by unit tests, not this suite.
+
+**E-mail correction:** staging *does* hold a `RESEND_API_KEY`, set before this work; it belongs to a Resend account in test mode. `notify-customers` sends to the client's portal users. For the fixtures that is only `zz-a-client@axentra-staging.test` (allowlisted), and Resend refused those sends (403, test mode). 4 queued notifications show `failed`, 0 sent. Owner decision: replace it with a dedicated staging key, or remove it.
 
 ## Functional results
 Passed:
