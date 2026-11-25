@@ -251,6 +251,54 @@ await test("digital-id", "dual-role admin+driver holds a credential", async () =
   return { pass: !r.error && !!r.data, detail: errMsg(r) };
 });
 
+// ---------- EDGE FUNCTIONS (deployed to staging; real JWTs) ----------
+async function fn(name, who, { method = "POST", body, query = "" } = {}) {
+  const token = who === "anon" ? null : (await clients[who].auth.getSession()).data.session?.access_token;
+  const res = await fetch(`${URL}/functions/v1/${name}${query}`, {
+    method,
+    headers: { apikey: KEY, "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: method === "GET" ? undefined : JSON.stringify(body ?? {}),
+  });
+  let json = null; try { json = await res.json(); } catch { /* non-JSON */ }
+  return { status: res.status, json };
+}
+const short = (r) => `${r.status} ${JSON.stringify(r.json)?.slice(0, 90)}`;
+await test("edge", "retired promote-admin returns 410", async () => {
+  const r = await fn("promote-admin", "aAdmin");
+  return { pass: r.status === 410, detail: short(r) };
+});
+await test("edge", "get-org-users: anon/driver refused, admin A sees only org A", async () => {
+  const a = await fn("get-org-users", "anon"); const d = await fn("get-org-users", "aDriver");
+  const ad = await fn("get-org-users", "aAdmin"); const x = await fn("get-org-users", "aAdmin", { body: { org_id: ORG_B } });
+  const list = (j) => (Array.isArray(j) ? j : j?.users || []);
+  const orgs = new Set([...list(ad.json), ...list(x.json)].map((u) => u.org_id));
+  return { pass: a.status >= 401 && d.status >= 401 && ad.status === 200 && !orgs.has(ORG_B), detail: `anon=${a.status} driver=${d.status} admin=${ad.status} n=${list(ad.json).length} orgs=${[...orgs]}` };
+});
+await test("edge", "user-lifecycle: driver and portal user refused", async () => {
+  const d = await fn("user-lifecycle", "aDriver", { body: { _action: "list" } });
+  const c = await fn("user-lifecycle", "aClient", { body: { _action: "list" } });
+  return { pass: d.status >= 400 && c.status >= 400, detail: `driver=${short(d)} client=${short(c)}` };
+});
+await test("edge", "portal-access: other-org admin cannot manage org A client", async () => {
+  const r = await fn("portal-access", "bAdmin", { body: { action: "list", client_id: CLIENT_A } });
+  const ok = await fn("portal-access", "aAdmin", { body: { action: "list", client_id: CLIENT_A } });
+  return { pass: r.status >= 400 && ok.status === 200, detail: `orgB=${short(r)} orgA=${ok.status}` };
+});
+await test("edge", "gcs-proxy: cross-org evidence path refused", async () => {
+  const r = await fn("gcs-proxy", "bAdmin", { method: "GET", query: `?path=${encodeURIComponent(ORG_A + "/jobs/" + JOB_A1 + "/x.jpg")}` });
+  const a = await fn("gcs-proxy", "anon", { method: "GET", query: `?path=${encodeURIComponent(ORG_A + "/x.jpg")}` });
+  return { pass: r.status === 403 && a.status >= 401, detail: `orgB=${r.status} anon=${a.status}` };
+});
+await test("edge", "notify-customers: refused for driver/portal; staff call sends nothing on staging", async () => {
+  const d = await fn("notify-customers", "aClient"); const s = await fn("notify-customers", "aAdmin");
+  const sent = Number(s.json?.sent ?? 0);
+  return { pass: d.status === 403 && s.status === 200 && sent === 0, detail: `client=${d.status} admin=${short(s)}` };
+});
+await test("edge", "send-invoice-email: no e-mail leaves staging for a real address", async () => {
+  const r = await fn("send-invoice-email", "aAdmin", { body: { to: "someone@example.com", invoiceId: "00000000-0000-0000-0000-000000000000" } });
+  return { pass: r.status !== 200, detail: short(r) };
+});
+
 const counts = results.reduce((m, r) => ((m[r.status] = (m[r.status] || 0) + 1), m), {});
 for (const r of results) console.log(`${r.status.padEnd(13)} [${r.category}] ${r.name} — ${r.detail}`);
 console.log("\nSUMMARY", JSON.stringify(counts), "run", RUN);
