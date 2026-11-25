@@ -1,7 +1,7 @@
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
-import { useAuth } from "@/context/AuthContext";
+import { BrandHeader } from "@/components/BrandHeader";
 
 interface AppHeaderProps {
   title?: string;
@@ -16,7 +16,7 @@ interface AppHeaderProps {
 /**
  * Shared page chrome (UI V2 foundation).
  *
- * Phone: a compact cobalt brand bar (logo, role) and one title row with the
+ * Phone: the shared dashboard brand bar (logo, role, profile) and one title row with the
  * back button — no breadcrumb row, which cost a full line before any content.
  * Tablet/desktop: breadcrumbs return, above the title, where there is room.
  * Route/role behaviour is unchanged: same back handling, same role labels.
@@ -29,8 +29,6 @@ export const AppHeader = ({
   children,
 }: AppHeaderProps) => {
   const navigate = useNavigate();
-  const { isSuperAdmin, isAdmin } = useAuth();
-  const roleLabel = isSuperAdmin ? "Super Admin" : isAdmin ? "Admin" : "Driver App";
 
   const handleBack = () => {
     if (onBack) onBack();
@@ -39,25 +37,7 @@ export const AppHeader = ({
 
   return (
     <div className="sticky top-0 z-40">
-      {/* Brand bar. The cobalt background extends under the iOS status bar in
-          standalone mode; padding-top keeps content below the status icons.
-          env() resolves to 0 in a normal browser tab. */}
-      <div className="bg-[hsl(var(--brand-bar))] pt-[env(safe-area-inset-top)] text-white">
-        <div className="mx-auto flex h-12 max-w-7xl items-center justify-between gap-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] lg:h-14 lg:px-8">
-          <button
-            onClick={() => navigate("/")}
-            className="-ml-1 flex min-h-11 min-w-0 items-center gap-2 rounded-lg px-1"
-            type="button"
-            aria-label="Go to dashboard"
-          >
-            <img src="/axentra-logo.png" alt="" aria-hidden className="-my-1 h-8 w-auto brightness-0 invert lg:h-9" />
-            <span className="truncate text-[15px] font-semibold tracking-[0.14em] lg:text-base">AXENTRA</span>
-          </button>
-          <span className="inline-flex h-7 shrink-0 items-center rounded-full bg-white/15 px-2.5 text-xs font-medium text-white ring-1 ring-inset ring-white/25">
-            {roleLabel}
-          </span>
-        </div>
-      </div>
+      <BrandHeader className="bg-[#F2F5FA] dark:bg-background" rowClassName="max-w-7xl pb-1" />
       {/* Page header: title row (+ breadcrumbs from md up). min-w-0 lets long
           job references truncate instead of widening the layout viewport. */}
       <header className="border-b border-border/70 bg-background/95 supports-[backdrop-filter]:bg-background/85 supports-[backdrop-filter]:backdrop-blur">

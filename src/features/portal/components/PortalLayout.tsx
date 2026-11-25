@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { usePortalContext } from "../api";
+import { BrandLockup, BrandRoleBadge, BrandStatusBar } from "@/components/BrandHeader";
 
 const HEX_COLOUR = /^#[0-9a-f]{6}$/i;
 
@@ -34,24 +35,12 @@ function safeLogo(url: string | null | undefined): string {
  * from the official logo) beside the operator's name.
  */
 function OperatorBrand({ name, logoUrl }: { name: string; logoUrl: string | null }) {
+  const axentra = /^axentra(?: vehicles?| vehicle logistics)?$/i.test(name.trim());
+  if (axentra) return <span className="flex min-w-0 items-center gap-2.5"><BrandLockup /></span>;
   if (logoUrl) {
     return <img src={safeLogo(logoUrl)} alt={name} className="h-8 w-auto max-w-[132px] object-contain sm:h-9" />;
   }
-  const axentra = /axentra/i.test(name);
-  return (
-    <span className="flex min-w-0 items-center gap-2">
-      <img src="/brand/axentra-mark.png" alt="" aria-hidden className="h-6 w-auto shrink-0 sm:h-7" />
-      {axentra ? (
-        <span className="min-w-0 whitespace-nowrap leading-none">
-          <span className="block text-[15px] font-semibold tracking-[0.14em] text-slate-900 dark:text-foreground">AXENTRA</span>
-          <span className="mt-1 block text-[8px] font-medium tracking-[0.2em] text-slate-500 dark:text-muted-foreground">VEHICLE LOGISTICS</span>
-          <span className="sr-only">{name}</span>
-        </span>
-      ) : (
-        <span className="truncate text-[15px] font-semibold text-slate-900 dark:text-foreground">{name}</span>
-      )}
-    </span>
-  );
+  return <span className="truncate text-[15px] font-semibold text-foreground">{name}</span>;
 }
 
 export function PortalLayout() {
@@ -101,23 +90,21 @@ export function PortalLayout() {
   return (
     <div className="min-h-[100dvh] bg-[#F6F8FB] flex flex-col dark:bg-background">
       <header
-        className="border-b border-slate-200/70 bg-white/95 pt-[env(safe-area-inset-top)] supports-[backdrop-filter]:bg-white/85 supports-[backdrop-filter]:backdrop-blur sticky top-0 z-30 dark:border-border dark:bg-card/95"
-        style={accent ? { borderTop: `3px solid ${accent}` } : undefined}
+        className="border-b border-slate-200/70 bg-[#F2F5FA] supports-[backdrop-filter]:bg-white/85 supports-[backdrop-filter]:backdrop-blur sticky top-0 z-30 dark:border-border dark:bg-card/95"
+        style={accent && !/^axentra(?: vehicles?| vehicle logistics)?$/i.test(ctx.operator.name.trim()) ? { borderBottomColor: accent } : undefined}
       >
+        <BrandStatusBar />
         <div className="max-w-5xl mx-auto flex h-14 items-center justify-between gap-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:h-16">
           <div className="flex min-w-0 items-center gap-3">
             <OperatorBrand name={ctx.operator.name} logoUrl={ctx.operator.logo_url} />
-            <span aria-hidden className="hidden h-7 w-px bg-slate-200 sm:block dark:bg-border" />
-            <span className="hidden shrink-0 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-medium text-[#1E4FA8] min-[360px]:inline-flex dark:bg-primary/15 dark:text-primary">
-              Customer Portal
-            </span>
+            <BrandRoleBadge>Customer Portal</BrandRoleBadge>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
                 aria-label="Account"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1E4FA8] dark:border-border dark:bg-card dark:text-foreground"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1E4FA8] "
               >
                 <UserRound className="h-5 w-5" aria-hidden />
               </button>

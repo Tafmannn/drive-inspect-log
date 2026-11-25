@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BrandHeader } from "@/components/BrandHeader";
+import { useNavigate } from "react-router-dom";
 import { useControlAccess } from "../hooks/useControlAccess";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { CommandPalette } from "./CommandPalette";
@@ -18,6 +20,7 @@ export function ControlTopbar({
   leading?: React.ReactNode;
 }) {
   const { userName } = useControlAccess();
+  const navigate = useNavigate();
   const { data: ownPhotoPath } = useOwnProfilePhotoPath();
   const [cmdOpen, setCmdOpen] = useState(false);
 
@@ -35,26 +38,16 @@ export function ControlTopbar({
 
   return (
     <>
-      {/* min-h + safe-area padding (not a fixed h-14): in standalone/home-
-          screen mode, page content now paints under the iOS status bar
-          (viewport-fit=cover), so without this the menu/search/notification/
-          avatar icons sit directly under the clock/signal/battery icons. The
-          bg-card fill still extends to the true top edge; only the content
-          drops below the status bar. env() is 0 in a normal browser tab, so
-          this is a no-op there — matches the same fix already applied to
-          AppHeader (the driver-facing equivalent of this bar). */}
-      <header className="min-h-14 shrink-0 border-b bg-card flex items-center justify-between px-4 lg:px-6 gap-2 lg:gap-4 pt-[env(safe-area-inset-top)]">
+      <BrandHeader className="bg-[#F2F5FA] dark:bg-background" rowClassName="max-w-none pb-1" profile={
+        <button type="button" onClick={() => navigate("/profile")} aria-label="Profile"
+          className="-mr-1 flex h-11 w-11 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+          <UserAvatar photoPath={ownPhotoPath} name={userName} className="h-9 w-9 bg-primary text-primary-foreground shadow-sm [&>span]:bg-primary [&>span]:text-primary-foreground" />
+        </button>
+      } />
+      <header className="min-h-14 shrink-0 border-b bg-card flex items-center justify-between px-4 lg:px-6 gap-2 lg:gap-4">
         {/* Left: leading slot (mobile menu) + breadcrumb / title */}
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {leading}
-          {/* Below lg the persistent sidebar (and its logo) is hidden behind
-              the drawer, so this is the only brand mark visible until the
-              drawer is opened. */}
-          <img
-            src="/axentra-logo.png"
-            alt="Axentra"
-            className="h-6 w-6 object-contain shrink-0 lg:hidden"
-          />
           <div className="min-w-0 hidden sm:block">
             <Breadcrumbs compact />
           </div>
@@ -86,8 +79,6 @@ export function ControlTopbar({
           {/* Notifications */}
           <NotificationsPopover />
 
-          {/* Avatar */}
-          <UserAvatar photoPath={ownPhotoPath} name={userName} />
         </div>
       </header>
 
