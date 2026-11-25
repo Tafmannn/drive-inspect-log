@@ -25,6 +25,7 @@ const h = vi.hoisted(() => {
   return {
     getInvoicePdf: fn(), markInvoiceSent: fn(), markInvoicePaid: fn(), markInvoiceUnpaid: fn(), cancelInvoice: fn(),
     buildInvoicePack: fn(), emailInvoice: fn(), buildInvoiceDocument: fn(), prepareInvoiceDelivery: fn(), markPreparedInvoiceSent: fn(),
+    defer: vi.fn(),
     downloads: [] as string[],
     toasts: [] as { title?: string; description?: string; variant?: string }[],
     changed: [] as string[],
@@ -32,6 +33,7 @@ const h = vi.hoisted(() => {
 });
 
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
+vi.mock("@/features/invoicing/api/invoiceCorrectionRequests", () => ({ deferInvoiceCorrection: (...a: unknown[]) => h.defer(...a) }));
 vi.mock("@/hooks/use-toast", () => ({ toast: (t: { title?: string }) => h.toasts.push(t) }));
 vi.mock("@/features/invoicing/api/invoiceLifecycle", () => ({
   PAYMENT_METHODS: [
@@ -126,6 +128,7 @@ beforeEach(() => {
   h.markInvoicePaid = vi.fn().mockResolvedValue(undefined);
   h.markInvoiceUnpaid = vi.fn().mockResolvedValue(undefined);
   h.cancelInvoice = vi.fn().mockResolvedValue(null);
+  h.defer.mockReset().mockResolvedValue("request-1");
   h.buildInvoicePack = vi.fn().mockResolvedValue({ blob, fileName: "invoice_pack_X.zip", succeeded: 2, failed: [] });
   h.emailInvoice = vi.fn().mockResolvedValue({ recipient: "ap@cje.example", pdfPath: "p" });
   h.buildInvoiceDocument = vi.fn().mockResolvedValue({ invoiceNumber: "X", lineItems: [] });

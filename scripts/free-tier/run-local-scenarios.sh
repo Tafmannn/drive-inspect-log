@@ -7,6 +7,10 @@ fi
 export PGUSER=postgres PGDATABASE=postgres PGPASSWORD=postgres PGSSLMODE=disable
 echo "Invoice lifecycle SQL scenario"
 psql -X -v ON_ERROR_STOP=1 -f supabase/tests/invoice_lifecycle.test.sql
+echo "Job Workspace tenant acknowledgement SQL scenario (rollback)"
+psql -X -v ON_ERROR_STOP=1 -f supabase/tests/job_workspace_attention_scope.sql
+echo "Job Workspace deferred correction SQL scenario (rollback)"
+psql -X -v ON_ERROR_STOP=1 -f supabase/tests/job_workspace_deferred_correction.sql
 echo "Abort fees and authorization SQL scenario (rollback)"
 psql -X -v ON_ERROR_STOP=1 -f supabase/tests/job_abort_workflow.sql
 if ls supabase/migrations/*_digital_id_v2.sql >/dev/null 2>&1; then

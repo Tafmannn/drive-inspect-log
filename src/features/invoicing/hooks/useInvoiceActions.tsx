@@ -35,6 +35,7 @@ import { invoicePdfFileName } from "@/lib/invoicePdf";
 import type { InvoiceRecord } from "./useInvoices";
 import { buildInvoiceDocument, type OrgInvoiceSettings } from "../api/invoiceDocument";
 import { emailInvoice } from "../api/emailInvoice";
+import { deferInvoiceCorrection } from "../api/invoiceCorrectionRequests";
 import {
   cancelInvoice,
   getInvoicePdf,
@@ -55,7 +56,7 @@ export interface InvoiceActions {
   markSent: (inv: InvoiceRecord) => void;
   recordPayment: (inv: InvoiceRecord) => void;
   undoPayment: (inv: InvoiceRecord) => void;
-  cancel: (inv: InvoiceRecord) => void;
+  cancel: (inv: InvoiceRecord, initialReason?: string) => void;
 }
 
 function todayIso(): string {
@@ -166,8 +167,8 @@ export function useInvoiceActions(
       }, "Could not undo the payment");
     },
 
-    cancel: (inv) => {
-      setReason("");
+    cancel: (inv, initialReason) => {
+      setReason(initialReason ?? "");
       setAuthoriseCredit(false);
       setCancelTarget(inv);
     },
@@ -220,6 +221,17 @@ export function useInvoiceActions(
         description: `${inv.invoice_number}: its jobs and expenses can be invoiced again.`,
       });
     }, "Could not cancel the invoice");
+  };
+
+  const deferCancel = async () => {
+    const inv = cancelTarget;
+    if (!inv || inv.status === "draft" || !reason.trim()) return;
+    await run(inv, "cancel", async () => {
+      await deferInvoiceCorrection({ invoiceId: inv.id, reason: reason.trim() });
+      setCancelTarget(null);
+      void queryClient.invalidateQueries({ queryKey: ["invoicing", "corrections"] });
+      toast({ title: "Correction saved for review", description: "The original invoice and balances are unchanged." });
+    }, "Could not save correction");
   };
 
   const emailing = !!emailTarget && busy === `${emailTarget.id}:email`;
@@ -331,6 +343,7 @@ export function useInvoiceActions(
             <Button variant="outline" onClick={() => setCancelTarget(null)} disabled={cancelling}>
               Keep invoice
             </Button>
+            {cancelIssued && <Button variant="outline" disabled={cancelling || !reason.trim()} onClick={() => void deferCancel()}>Review later</Button>}
             <Button variant="destructive" onClick={() => void confirmCancel()} disabled={cancelling || !reason.trim() || (cancelIssued && !authoriseCredit)}>
               {cancelling && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
               {cancelIssued ? "Cancel and raise credit note" : "Cancel draft"}
