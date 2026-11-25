@@ -48,7 +48,7 @@ function humanAge(isoDate: string): string {
 }
 
 function ageHours(isoDate: string): number {
-  return (Date.now() - new Date(isoDate).getTime()) / 3600_000;
+  return (Date.now() - new Date(isoDate).getTime()) / 3_600_000;
 }
 
 /** Returns escalation CSS classes based on age thresholds */
@@ -106,7 +106,7 @@ export function AttentionQueue({ exceptions, showOrg, loading, acknowledged = fa
         p_job_id: ackDialog.exception.jobId,
         p_org_id: ackDialog.exception.orgId,
         p_note: note,
-        p_snoozed_until: mode === "snooze" ? new Date(Date.now() + 24 * 3600_000).toISOString() : undefined,
+        p_snoozed_until: mode === "snooze" ? new Date(Date.now() + 24 * 3_600_000).toISOString() : undefined,
       });
       if (error) throw error;
       toast({ title: mode === "snooze" ? "Snoozed for 24h" : "Acknowledged" });

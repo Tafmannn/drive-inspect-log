@@ -1,6 +1,6 @@
 -- Deferred review is a non-financial record only. Never creates a credit or changes fees.
 BEGIN;
-CREATE TABLE public.invoice_correction_requests (
+CREATE TABLE IF NOT EXISTS public.invoice_correction_requests (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
  org_id uuid NOT NULL REFERENCES public.organisations(id),
  invoice_id uuid NOT NULL REFERENCES public.invoices(id),
@@ -18,10 +18,11 @@ CREATE TABLE public.invoice_correction_requests (
  CHECK ((abort_id IS NULL AND job_id IS NULL AND revised_fee IS NULL AND expected_fee IS NULL)
      OR (abort_id IS NOT NULL AND job_id IS NOT NULL AND revised_fee IS NOT NULL AND expected_fee IS NOT NULL))
 );
-CREATE UNIQUE INDEX invoice_correction_one_pending ON public.invoice_correction_requests(invoice_id) WHERE status='pending';
+CREATE UNIQUE INDEX IF NOT EXISTS invoice_correction_one_pending ON public.invoice_correction_requests(invoice_id) WHERE status='pending';
 ALTER TABLE public.invoice_correction_requests ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.invoice_correction_requests FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.invoice_correction_requests TO authenticated;
+DROP POLICY IF EXISTS invoice_corrections_admin_read ON public.invoice_correction_requests;
 CREATE POLICY invoice_corrections_admin_read ON public.invoice_correction_requests FOR SELECT TO authenticated
  USING(public.is_admin_or_super_admin() AND (org_id=public.user_org_id() OR public.is_super_admin()));
 
@@ -91,17 +92,19 @@ BEGIN
  END IF;
  RETURN NEW;
 END $$;
+DROP TRIGGER IF EXISTS trg_close_invoice_correction_requests ON public.invoices;
 CREATE TRIGGER trg_close_invoice_correction_requests AFTER UPDATE OF status ON public.invoices
  FOR EACH ROW EXECUTE FUNCTION public.close_invoice_correction_requests();
 -- Abort requests close only after the actual fee correction is recorded,
 -- not when an unrelated cancellation reverses the original invoice.
 CREATE OR REPLACE FUNCTION public.close_abort_correction_requests()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO public AS $
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO public AS $$
 BEGIN
  UPDATE public.invoice_correction_requests SET status='closed',closed_at=now(),closed_by=auth.uid()
  WHERE org_id=NEW.org_id AND invoice_id=NEW.original_invoice_id AND abort_id=NEW.abort_id AND status='pending';
  RETURN NEW;
-END $;
+END $$;
+DROP TRIGGER IF EXISTS trg_close_abort_correction_requests ON public.job_abort_invoice_corrections;
 CREATE TRIGGER trg_close_abort_correction_requests AFTER INSERT ON public.job_abort_invoice_corrections
  FOR EACH ROW EXECUTE FUNCTION public.close_abort_correction_requests();
 REVOKE ALL ON FUNCTION public.close_abort_correction_requests() FROM PUBLIC, anon, authenticated;
