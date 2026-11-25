@@ -21,8 +21,8 @@ export const SUPPORT_EMAIL = "info@axentravehicles.com";
 
 /**
  * Axentra-branded action email (invite, portal access, password reset).
- * Table layout with bgcolor attributes and colour-scheme hints so it keeps
- * its navy banner and cobalt button in Gmail/Apple Mail, including dark mode.
+ * Table layout with bgcolor attributes and colour-scheme hints to support
+ * the shared light banner and blue button in Gmail/Apple Mail.
  */
 export function renderActionEmailHtml(opts: {
   firstName: string | null;

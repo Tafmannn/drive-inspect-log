@@ -28,7 +28,7 @@ describe("renderStatusEmail", () => {
     expect(e.html).toContain("Leeds LS1 → York YO1");
     expect(e.html).toContain('href="https://app.axentra.test/portal/jobs/123"');
     expect(e.html).toContain("Track this move");
-    expect(e.html).toContain("background:#0A66C2");
+    expect(e.html).toContain("background:#2B7DC9");
     expect(e.text).toContain("Track this move: https://app.axentra.test/portal/jobs/123");
     expect(e.text).toContain("Hello CJE Transport,");
     expect(e.html).not.toContain("Received by");

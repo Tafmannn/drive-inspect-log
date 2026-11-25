@@ -158,7 +158,7 @@ describe("renderPodEmail — Proof of Collection", () => {
 });
 
 describe("POD/POC email banner", () => {
-  it("is very dark navy (not the old black) with the brand accent under it", () => {
+  it("uses the same light header and accent for both reports", () => {
     for (const kind of ["delivery", "collection"] as const) {
       const e = renderPodEmail({ ...base, kind });
       expect(e.html).toContain('bgcolor="#FFFFFF"');
@@ -170,7 +170,8 @@ describe("POD/POC email banner", () => {
 
   it("falls back to a letter-spaced wordmark when there is no logo", () => {
     const e = renderPodEmail({ ...base, operator: { ...base.operator, logoUrl: null } });
-    expect(e.html).toContain("AXENTRA VEHICLES");
+    expect(e.html).toContain("AXENTRA");
+    expect(e.html).toContain("VEHICLE LOGISTICS");
   });
 });
 
