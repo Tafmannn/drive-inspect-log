@@ -1,5 +1,5 @@
 -- Apply ONE migration file to STAGING, fetched from an immutable Git commit.
--- Template rendered by render-apply.py ({{placeholders}}; values are validated
+-- Template rendered by render-apply.py (double-brace fields; values are validated
 -- there: 40-hex commit, repo-relative .sql path, 64-hex sha256, 14-digit version).
 --   {{commit}}  commit sha on GitHub (Tafmannn/drive-inspect-log)
 --   {{path}}    repo path of the .sql file
