@@ -4,5 +4,5 @@ BEGIN;
 REVOKE INSERT, UPDATE, DELETE ON public.attention_acknowledgements FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.acknowledge_attention_exception(text,uuid,uuid,text,timestamptz) FROM PUBLIC, anon, authenticated;
 COMMIT;
--- To re-enable after review: reapply forward migration, then grant only the
--- previously authorised DML privileges to authenticated (RLS stays enabled).
+-- To re-enable after review: reapply the forward migration, which restores
+-- the authenticated DML grants while keeping tenant RLS enabled.

@@ -40,6 +40,8 @@ CREATE TRIGGER trg_attention_ack_scope BEFORE INSERT OR UPDATE ON public.attenti
  FOR EACH ROW EXECUTE FUNCTION public.guard_attention_acknowledgement_scope();
 
 ALTER TABLE public.attention_acknowledgements ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.attention_acknowledgements FROM PUBLIC, anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.attention_acknowledgements TO authenticated;
 DROP POLICY IF EXISTS "Admins can manage attention acknowledgements" ON public.attention_acknowledgements;
 DROP POLICY IF EXISTS ack_tenant_select ON public.attention_acknowledgements;
 DROP POLICY IF EXISTS ack_tenant_insert ON public.attention_acknowledgements;

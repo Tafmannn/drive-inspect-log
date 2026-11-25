@@ -47,14 +47,14 @@ BEGIN
    THEN RAISE EXCEPTION 'ABORT_NOT_CURRENT' USING ERRCODE='23514'; END IF;
    IF p_client_confirmed IS DISTINCT FROM true OR char_length(v_reason)<15
       OR p_revised_fee IS NULL OR p_revised_fee::text IN ('NaN','Infinity','-Infinity')
-      OR p_revised_fee<0 OR p_revised_fee= v_abort.approved_amount
+      OR p_revised_fee<0 OR p_revised_fee<>round(p_revised_fee,2) OR p_revised_fee= v_abort.approved_amount
       OR p_expected_fee IS NULL OR p_expected_fee IS DISTINCT FROM v_abort.approved_amount
    THEN RAISE EXCEPTION 'CORRECTION_DETAILS_INVALID' USING ERRCODE='23514'; END IF;
  ELSIF p_revised_fee IS NOT NULL OR p_expected_fee IS NOT NULL THEN
    RAISE EXCEPTION 'CORRECTION_DETAILS_INVALID' USING ERRCODE='23514';
  END IF;
  SELECT * INTO v_inv FROM public.invoices WHERE id=p_invoice_id FOR UPDATE;
- IF v_inv.id IS NULL OR (NOT public.is_super_admin() AND v_inv.org_id IS DISTINCT FROM public.user_org_id())
+ IF v_inv.id IS NULL OR v_inv.is_test OR (NOT public.is_super_admin() AND v_inv.org_id IS DISTINCT FROM public.user_org_id())
     OR v_inv.document_type IS DISTINCT FROM 'invoice' OR v_inv.status NOT IN ('sent','paid')
  THEN RAISE EXCEPTION 'ISSUED_INVOICE_NOT_FOUND' USING ERRCODE='23514'; END IF;
  IF p_abort_id IS NOT NULL AND (v_abort.org_id IS DISTINCT FROM v_inv.org_id OR NOT (

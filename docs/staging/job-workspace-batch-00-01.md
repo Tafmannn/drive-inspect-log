@@ -103,3 +103,22 @@ Fail closed: disable affected financial actions during any incompatible frontend
 
 ## Tests
 Run `npm run ci` and `scripts/free-tier/run-local-scenarios.sh` on a verified disposable database; neither may be considered passed without an actual result. The existing invoice SQL fixture uses legacy schema assumptions and may require reconciliation with the latest pricing-table split. Check financial consent stale-status/amount binding, direct table grants, role isolation and real mobile rendering before release. No production merge or deployment authorised.
+
+
+## Follow-up: 25 November 2026, staging remediation verification
+
+The preceding inventory describes the original state, not the current database. PRs #196 and #197 document the independently restored encrypted pre-recovery archive (64/64 table digests, 237/237 catalogue groups), production-parity reconciliation, and subsequent staging workflow tests. Direct catalogue comparison of the reconciled staging and production projects found 44/44 tables, 747/747 column definitions, 93/93 function definitions and 113/113 public RLS policy definitions matching. This does not certify every platform-managed setting, grant, trigger, storage object or migration ledger entry.
+
+The earlier archive predates the new schema, synthetic fixtures and two staging storage object records. Its private bytes were not available for independent restoration in this session. The current-state backup/restore gate remains open: capture the current staging state and storage objects using PR #196's protected recovery tooling, restore outside hosted staging, compare catalogue/table digests and record checksum and restoration evidence. Do not place archives, credentials or private data in Git.
+
+On branch commit `b6398370b67ad4b7d2128bfcaab64f0e405058a5`, staging-only transactions executed the three forward migrations and re-executed them, and then rolled back. Actual database scenarios passed:
+- Same-org acknowledgement upsert, cross-org read/write denial, independent identical IDs in two orgs, actor spoof denial and driver denial.
+- Issued invoice credit consent and legacy bypass denial; stale amount, status and missing confirmation refusal; direct issued cancellation, direct credit insertion and draft conversion into credit note denied.
+- Deferred correction idempotence, unchanged issued original, no credit, withdrawal history, tenant isolation, driver denial; draft cancellation; explicit exact full credit; duplicate refusal; queue closure.
+- Abort fee correction: ordinary admin denied, missing client consent denied, legacy credit bypass denied, stale amount denied, deferred fee unchanged, invalid fee rolls back the credit and invoice cancellation, authorised correction creates one exact credit with an audit record and closes the pending abort review.
+- All three emergency rollback scripts executed within the same transaction: financial and acknowledgement mutations disabled, history and tenant visibility restrictions retained, direct credit guard retained.
+- Post-transaction catalogue checks confirmed the new correction table was absent. No persistent staging migration or production write was made.
+
+PR #193's initial 2,071/2,071 tests passed. The initial Sonar issues were addressed in `4897bb2`; migration reapplication guards and all three containment scripts were added. Subsequent CI runs must be reviewed at their final exact commit; the historical disposable full-replay bootstrap remains blocked. Do not equate rolled-back staging SQL rehearsal with persisted installation or full browser/HTTP release validation.
+
+Cross-branch coordination: #197 and #198 contain staging environment and preview safeguards; review and integrate their compatible changes before a preview is built. Their previous financial scenarios rely on the old implicit-credit semantics and need to be updated for this PR when combined. Do not merge any branch to main or deploy production under this approval.
