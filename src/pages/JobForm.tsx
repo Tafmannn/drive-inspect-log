@@ -20,9 +20,8 @@ import { CAR_MAKES, getModelsForMake } from "@/lib/carData";
 import { isValidUkPostcode, calculateRoute, type RouteResult } from "@/lib/mapsApi";
 import { computeJobCaz, lookupCazZone } from "@/lib/cazLookup";
 import { jobSourceOptions, resolveJobSourceForSave } from "@/lib/jobSource";
-import { lookupVehicle, type VehicleLookupResult } from "@/lib/vehicleLookupApi";
-import { normalizeRegistration } from "@/lib/vehicleCompliance";
-import { VehicleComplianceSummary } from "@/features/jobs/components/VehicleComplianceCard";
+import type { VehicleLookupResult } from "@/lib/vehicleLookupApi";
+import { JobVehicleLookup } from "@/features/jobs/components/JobVehicleLookup";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import { saveDraft, loadDraft, clearDraft, draftKey } from "@/lib/autosave";
 import { hapticSuccess, hapticError } from "@/lib/haptics";
@@ -69,10 +68,6 @@ export const JobForm = () => {
 
   const formRef = useRef<HTMLFormElement | null>(null);
   const [errors, setErrors] = useState<ErrorMap>({});
-  const [dvlaResult, setDvlaResult] = useState<VehicleLookupResult | null>(null);
-  const [dvlaBusy, setDvlaBusy] = useState(false);
-  const dvlaInFlight = useRef(false);
-  const dvlaInputRevision = useRef(0);
 
   // Vehicle make/model selection state — SINGLE SOURCE OF TRUTH
   const [vehicleMake, setVehicleMake] = useState<string>("");
@@ -720,6 +715,30 @@ export const JobForm = () => {
     );
   }
 
+  function setDvlaInputValue(name: string, value: string) {
+    const el = formRef.current?.elements.namedItem(name);
+    if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement)) return;
+    const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), "value")?.set;
+    setter?.call(el, value);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  function applyDvlaResult(result: VehicleLookupResult) {
+    if (result.make) {
+      const known = CAR_MAKES.includes(result.make);
+      setVehicleMake(result.make);
+      setCustomMake(!known);
+      setCustomMakeValue(known ? "" : result.make);
+      setCustomModel(!known);
+      setVehicleModel("");
+      setCustomModelValue("");
+    }
+    if (result.colour) setDvlaInputValue("vehicle_colour", result.colour);
+    if (result.year) setDvlaInputValue("vehicle_year", result.year);
+    saveDraftFromForm();
+  }
+
   const ErrorText = ({ field }: { field: string }) =>
     errors[field] ? (
       <p className="text-xs text-destructive mt-1">
@@ -852,108 +871,9 @@ export const JobForm = () => {
             </div>
 
             {/* Registration + DVLA Lookup */}
-            <div>
-              <Label className="text-sm font-medium">
-                Registration *
-              </Label>
-              <div className="flex gap-2 mt-1">
-                <Input
-                  name="vehicle_reg"
-                  onChange={() => { dvlaInputRevision.current++; setDvlaResult(null); }}
-                  placeholder="Vehicle registration"
-                  defaultValue={existingJob?.vehicle_reg ?? ""}
-                  autoCapitalize="characters"
-                  className="flex-1"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0 gap-1"
-                  disabled={routeLoading || dvlaBusy}
-                  onClick={async () => {
-                    if (!formRef.current || dvlaInFlight.current) return;
-                    const fd = new FormData(formRef.current);
-                    const reg = (fd.get("vehicle_reg") as string || "").trim();
-                    if (!reg) {
-                      toast({ title: "Enter a registration first.", variant: "destructive" });
-                      return;
-                    }
-                    const revision = dvlaInputRevision.current;
-                    dvlaInFlight.current = true;
-                    setDvlaBusy(true);
-                    setDvlaResult(null);
-                    try {
-                      const result = await lookupVehicle(reg);
-                      const current = formRef.current ? String(new FormData(formRef.current).get("vehicle_reg") || "") : "";
-                      if (revision !== dvlaInputRevision.current || normalizeRegistration(current) !== normalizeRegistration(reg)) return;
-                      if (result.success && result.registration && normalizeRegistration(result.registration) === normalizeRegistration(reg)) {
-                        setDvlaResult(result);
-                        const setInputValue = (name: string, value: string) => {
-                          const el = formRef.current?.elements.namedItem(name);
-                          if (!el) return;
-                          if (
-                            el instanceof HTMLInputElement ||
-                            el instanceof HTMLTextAreaElement ||
-                            el instanceof HTMLSelectElement
-                          ) {
-                            const proto = Object.getPrototypeOf(el) as any;
-                            const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
-                            setter?.call(el, value);
-                            el.dispatchEvent(new Event("input", { bubbles: true }));
-                            el.dispatchEvent(new Event("change", { bubbles: true }));
-                          }
-                        };
-
-                        if (result.make) {
-                          const makeKnown = CAR_MAKES.includes(result.make);
-                          if (makeKnown) {
-                            setVehicleMake(result.make);
-                            setCustomMake(false);
-                            setCustomMakeValue("");
-                            // Keep model dropdown available for known makes
-                            setCustomModel(false);
-                            setVehicleModel("");
-                            setCustomModelValue("");
-                          } else {
-                            setCustomMake(true);
-                            setVehicleMake(result.make);
-                            setCustomMakeValue(result.make);
-                            // Unknown make: manual model entry required
-                            setCustomModel(true);
-                            setVehicleModel("");
-                            setCustomModelValue("");
-                          }
-                        }
-
-                        if (result.colour) {
-                          setInputValue("vehicle_colour", result.colour);
-                        }
-                        if (result.year) {
-                          setInputValue("vehicle_year", result.year);
-                        }
-
-                        toast({ title: `Found: ${result.make} (${result.colour})` });
-                        saveDraftFromForm();
-                      } else {
-                        toast({ title: result.error || "Vehicle not found", variant: "destructive" });
-                      }
-                    } catch {
-                      toast({ title: "DVLA lookup failed", variant: "destructive" });
-                    } finally {
-                      dvlaInFlight.current = false;
-                      setDvlaBusy(false);
-                    }
-                  }}
-                >
-                  <Search className="w-4 h-4" />
-                  {dvlaBusy ? "Checking…" : "DVLA"}
-                </Button>
-              </div>
+            <JobVehicleLookup key={jobId ?? "new"} formRef={formRef} initialRegistration={existingJob?.vehicle_reg ?? ""} disabled={routeLoading} onFound={applyDvlaResult}>
               <ErrorText field="vehicle_reg" />
-              {dvlaResult && <div className="mt-3"><VehicleComplianceSummary registration={String(formRef.current ? new FormData(formRef.current).get("vehicle_reg") || "" : "")} result={dvlaResult} /></div>}
-              {!dvlaResult && <p className="mt-2 text-xs text-muted-foreground">MOT and tax unverified until DVLA lookup succeeds.</p>}
-            </div>
+            </JobVehicleLookup>
 
             {/* Make — fully controlled */}
             <div>
