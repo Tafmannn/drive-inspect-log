@@ -87,12 +87,24 @@ RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO public AS $
 BEGIN
  IF NEW.status='cancelled' AND OLD.status IS DISTINCT FROM NEW.status THEN
    UPDATE public.invoice_correction_requests SET status='closed',closed_at=now(),closed_by=auth.uid()
-   WHERE org_id=NEW.org_id AND invoice_id=NEW.id AND status='pending';
+   WHERE org_id=NEW.org_id AND invoice_id=NEW.id AND status='pending' AND abort_id IS NULL;
  END IF;
  RETURN NEW;
 END $$;
 CREATE TRIGGER trg_close_invoice_correction_requests AFTER UPDATE OF status ON public.invoices
  FOR EACH ROW EXECUTE FUNCTION public.close_invoice_correction_requests();
+-- Abort requests close only after the actual fee correction is recorded,
+-- not when an unrelated cancellation reverses the original invoice.
+CREATE OR REPLACE FUNCTION public.close_abort_correction_requests()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO public AS $
+BEGIN
+ UPDATE public.invoice_correction_requests SET status='closed',closed_at=now(),closed_by=auth.uid()
+ WHERE org_id=NEW.org_id AND invoice_id=NEW.original_invoice_id AND abort_id=NEW.abort_id AND status='pending';
+ RETURN NEW;
+END $;
+CREATE TRIGGER trg_close_abort_correction_requests AFTER INSERT ON public.job_abort_invoice_corrections
+ FOR EACH ROW EXECUTE FUNCTION public.close_abort_correction_requests();
+REVOKE ALL ON FUNCTION public.close_abort_correction_requests() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.defer_invoice_correction(uuid,text,uuid,numeric,numeric,boolean) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.withdraw_invoice_correction(uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.close_invoice_correction_requests() FROM PUBLIC, anon, authenticated;

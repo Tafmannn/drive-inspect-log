@@ -315,7 +315,7 @@ export function useInvoiceActions(
             <DialogTitle>Cancel invoice {cancelTarget?.invoice_number}</DialogTitle>
             <DialogDescription>
               {cancelIssued
-                ? "This invoice has been issued, so it is cancelled with a credit note for the full amount. Both stay on record. Send the credit note to the client."
+                ? "If you authorise this correction, the issued invoice is cancelled with a credit note for the full amount. Both stay on record. Sending the credit note is a separate action."
                 : "This draft was never issued, so it is cancelled without a credit note. Its number is not reused."}{" "}
               Its jobs and expenses become available to invoice again. This cannot be undone.
               {cancelTarget?.status === "paid" && " The invoice is marked as paid — refund the client separately."}
@@ -332,6 +332,9 @@ export function useInvoiceActions(
               maxLength={300}
             />
           </div>
+          {cancelIssued && cancelTarget?.total != null && (
+            <p className="text-sm font-medium">Full credit amount: £{Number(cancelTarget.total).toFixed(2)}</p>
+          )}
           {cancelIssued && (
             <label className="flex items-start gap-2 text-sm">
               <input type="checkbox" checked={authoriseCredit} disabled={cancelling}

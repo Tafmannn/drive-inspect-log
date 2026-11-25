@@ -40,11 +40,7 @@ export async function listAcknowledgedEvidenceJobIds(): Promise<Set<string>> {
     // snoozed_until > now   → still snoozed
     // snoozed_until <= now  → expired, treat as not acknowledged
     if (row.snoozed_until && new Date(row.snoozed_until).getTime() <= now) continue;
-    if (row.job_id) {
-      ids.add(row.job_id);
-    } else if (typeof row.exception_id === "string" && row.exception_id.startsWith(EXCEPTION_PREFIX)) {
-      ids.add(row.exception_id.slice(EXCEPTION_PREFIX.length));
-    }
+    if (row.job_id && row.exception_id === exceptionId(row.job_id)) ids.add(row.job_id);
   }
   return ids;
 }

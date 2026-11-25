@@ -222,8 +222,10 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
         if (typeof ack.exception_id !== "string") continue;
         if (!ack.exception_id.startsWith(EVIDENCE_PREFIX)) continue;
         if (ack.snoozed_until && ack.snoozed_until <= now) continue;
-        const jobId = ack.job_id ?? ack.exception_id.slice(EVIDENCE_PREFIX.length);
-        if (jobId && ack.org_id) evidenceAckedJobIds.add(JSON.stringify([ack.org_id, jobId]));
+        const jobId = ack.job_id;
+        if (jobId && ack.org_id && ack.exception_id === EVIDENCE_PREFIX + jobId) {
+          evidenceAckedJobIds.add(JSON.stringify([ack.org_id, jobId]));
+        }
       }
 
       // Separate acknowledged vs active
