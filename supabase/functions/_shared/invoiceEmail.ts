@@ -1,3 +1,5 @@
+import { renderEmailBrandHeader } from "./emailBrand.ts";
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -36,14 +38,7 @@ export function renderInvoiceEmailHtml(opts: {
       <tr>
         <td align="center">
           <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="width:100%;max-width:480px;background:#ffffff;border-radius:12px;overflow:hidden;">
-            <tr>
-              <td bgcolor="#FFFFFF" style="background:#FFFFFF;padding:24px 32px 16px;border-bottom:1px solid #D4E2F0;">
-                <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-                  ${logoUrl ? `<td style="padding-right:12px;vertical-align:middle;"><img src="${escapeHtml(logoUrl)}" width="48" alt="Axentra logo" style="display:block;width:48px;height:auto;border:0;"></td>` : ""}
-                  <td style="vertical-align:middle;"><span style="color:#172F52;font-size:24px;font-weight:bold;letter-spacing:3px;">AXENTRA</span><br><span style="color:#576B85;font-size:11px;letter-spacing:1px;">VEHICLE LOGISTICS</span></td>
-                </tr></table>
-              </td>
-            </tr>
+            ${renderEmailBrandHeader("Axentra Vehicle Logistics", logoUrl)}
             <tr>
               <td style="padding:24px 32px 32px;color:#172F52;font-size:15px;line-height:1.6;">
                 <p style="margin:0 0 16px;">Dear ${escapeHtml(clientName || "Customer")},</p>

@@ -1,3 +1,5 @@
+import { renderEmailBrandHeader } from "./emailBrand.ts";
+
 // Axentra-branded action email template (invite, portal access, password
 // reset). Pure and Deno-free so vitest can import it
 // (src/test/branded-action-email.test.ts); brandedEmail.ts re-exports it.
@@ -11,12 +13,10 @@ function escapeHtml(s: string): string {
 }
 
 // Brand palette (matches the app and the POD email).
-const NAVY = "#08152E";
-const NAVY_GRADIENT = "linear-gradient(135deg,#040B1A 0%,#0C2148 100%)";
-const COBALT = "#1E4FA8"; // app --primary
-const INK = "#0F1B2D";
-const MUTED = "#5B6779";
-const PAGE_BG = "#EEF2F7";
+const COBALT = "#2B7DC9";
+const INK = "#172F52";
+const MUTED = "#576B85";
+const PAGE_BG = "#F4F7FA";
 export const SUPPORT_EMAIL = "info@axentravehicles.com";
 
 /**
@@ -37,9 +37,6 @@ export function renderActionEmailHtml(opts: {
 }): string {
   const greeting = opts.firstName ? `Hi ${escapeHtml(opts.firstName)},` : "Hi,";
   const href = escapeHtml(opts.actionLink);
-  const logo = opts.logoUrl
-    ? `<img src="${escapeHtml(opts.logoUrl)}" width="168" alt="Axentra" style="display:block;width:168px;max-width:168px;height:auto;border:0;margin:0 auto;">`
-    : `<span style="color:#ffffff;font-size:22px;font-weight:bold;letter-spacing:6px;">AXENTRA</span>`;
   const eyebrow = opts.eyebrow
     ? `<p style="margin:0 0 6px;color:${COBALT};font-size:12px;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase;">${escapeHtml(opts.eyebrow)}</p>`
     : "";
@@ -52,21 +49,20 @@ export function renderActionEmailHtml(opts: {
     <meta name="supported-color-schemes" content="light">
     <title>Axentra Vehicle Logistics</title>
   </head>
-  <body style="margin:0;padding:0;background-color:${PAGE_BG};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,Helvetica,sans-serif;">
+  <body style="margin:0;padding:0;background-color:${PAGE_BG};font-family:Arial,Helvetica,sans-serif;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${PAGE_BG}" style="background-color:${PAGE_BG};padding:24px 12px;">
       <tr>
         <td align="center">
-          <table role="presentation" width="520" cellpadding="0" cellspacing="0" bgcolor="#ffffff" style="width:100%;max-width:520px;background-color:#ffffff;border-radius:12px;overflow:hidden;">
-            <tr><td align="center" bgcolor="${NAVY}" style="background-color:${NAVY};background-image:${NAVY_GRADIENT};padding:28px 24px 24px;">${logo}</td></tr>
-            <tr><td bgcolor="${COBALT}" style="height:4px;line-height:4px;font-size:0;background-color:${COBALT};background-image:linear-gradient(90deg,${COBALT} 0%,#0C2148 100%);">&nbsp;</td></tr>
+          <table role="presentation" width="480" cellpadding="0" cellspacing="0" bgcolor="#ffffff" style="width:100%;max-width:480px;background-color:#ffffff;border-radius:12px;overflow:hidden;">
+            ${renderEmailBrandHeader("Axentra Vehicle Logistics", opts.logoUrl)}
             <tr>
-              <td bgcolor="#ffffff" style="background-color:#ffffff;padding:32px 32px 8px;color:${INK};font-size:16px;line-height:1.6;">
+              <td bgcolor="#ffffff" style="background-color:#ffffff;padding:24px 32px 8px;color:${INK};font-size:16px;line-height:1.6;">
                 ${eyebrow}
                 <p style="margin:0 0 16px;font-size:18px;font-weight:bold;color:${INK};">${greeting}</p>
                 <p style="margin:0 0 28px;color:${INK};">${opts.introHtml}</p>
                 <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto 28px;">
                   <tr>
-                    <td align="center" bgcolor="${COBALT}" style="background-color:${COBALT};border-radius:10px;">
+                    <td align="center" bgcolor="${COBALT}" style="background-color:${COBALT};border-radius:8px;">
                       <a href="${href}" style="display:inline-block;padding:14px 32px;color:#ffffff;background-color:${COBALT};border-radius:10px;font-size:16px;font-weight:bold;text-decoration:none;">${escapeHtml(opts.buttonLabel)}</a>
                     </td>
                   </tr>

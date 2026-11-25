@@ -20,7 +20,7 @@ import {
   decidePodRecipient,
   isOwnSignedStorageUrl,
   renderPodEmail,
-  resolveEmailLogoUrl,
+  resolveLightEmailLogoUrl,
 } from "../_shared/podEmail.ts";
 import { pickAppOrigin } from "../_shared/appOrigin.ts";
 
@@ -143,7 +143,7 @@ serve(async (req) => {
       kind: isCollection ? "collection" : "delivery",
       operator: {
         name: operatorName,
-        logoUrl: resolveEmailLogoUrl(org?.logo_url, appBaseUrl(req)),
+        logoUrl: resolveLightEmailLogoUrl(operatorName, org?.logo_url, appBaseUrl(req)),
         primaryColour: org?.primary_colour,
         contactEmail: org?.main_contact_email,
         contactPhone: org?.main_contact_phone,

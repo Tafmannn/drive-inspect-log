@@ -21,7 +21,7 @@ import {
   skipReasonFor,
   type StatusEvent,
 } from "../_shared/customerStatusEmail.ts";
-import { resolveLogoUrl } from "../_shared/podEmail.ts";
+import { resolveLightEmailLogoUrl } from "../_shared/podEmail.ts";
 import { pickAppOrigin } from "../_shared/appOrigin.ts";
 
 const BATCH = 20;
@@ -182,7 +182,7 @@ serve(async (req) => {
           operator: {
             name: (org?.branding_name || org?.name || "").trim(),
             primaryColour: org?.primary_colour,
-            logoUrl: resolveLogoUrl(org?.logo_url, baseUrl),
+            logoUrl: resolveLightEmailLogoUrl((org?.branding_name || org?.name || "").trim(), org?.logo_url, baseUrl),
             contactEmail: org?.main_contact_email,
             contactPhone: org?.main_contact_phone,
           },

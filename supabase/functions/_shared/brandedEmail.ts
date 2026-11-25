@@ -5,7 +5,7 @@
 // default templates.
 
 import { pickAppOrigin } from "./appOrigin.ts";
-import { EMAIL_LOGO_ON_NAVY, resolveLogoUrl } from "./podEmail.ts";
+import { resolveLightEmailLogoUrl } from "./podEmail.ts";
 
 export function escapeHtml(s: string): string {
   return String(s)
@@ -32,7 +32,7 @@ export function resolveRedirectUrl(req: Request, path: string): string {
 }
 
 /**
- * Absolute URL of the transparent Axentra logo for the navy banner, served by
+ * Absolute URL of the Axentra logo for the light banner, served by
  * the app (same asset as the POD email). null when no app origin is known;
  * the template then falls back to a text wordmark.
  */
@@ -42,7 +42,7 @@ export function brandLogoUrl(req: Request): string | null {
     Deno.env.get("APP_ALLOWED_ORIGINS"),
     req.headers.get("origin"),
   );
-  return resolveLogoUrl(EMAIL_LOGO_ON_NAVY, origin);
+  return resolveLightEmailLogoUrl("Axentra Vehicle Logistics", null, origin);
 }
 
 export { renderActionEmailHtml, portalInviteIntroHtml, appTokenLink, SUPPORT_EMAIL } from "./actionEmail.ts";
