@@ -15,7 +15,8 @@ permissions:
   contents: read
 jobs:
   capture:
-    runs-on: ubuntu-latest
+    # Playwright 1.56.1 predates Ubuntu 26.04 browser support.
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
