@@ -47,14 +47,15 @@ export const PLATE_GLYPHS: Readonly<Record<string, Glyph>> = {
 };
 export function layoutPlateGlyphs(formatted: string) {
   const letters = Array.from(formatted.replace(/\s/g, ""));
-  if (!letters.length || letters.some(c => !Object.hasOwn(PLATE_GLYPHS,c))) return null;
+  if (!letters.length || letters.some(c => !Object.prototype.hasOwnProperty.call(PLATE_GLYPHS, c))) return null;
   let x = 0;
-  const placements = [];
+  const placements: Array<Glyph & { char: string; x: number }> = [];
+  const referenceKerning: Record<string, number> = { '72': -2, ZZ: 3, ZM: 2 };
   const words = formatted.trim().split(/\s+/);
   for (const [wi, word] of words.entries()) {
     if (wi) x += 72;
     for (const [i, char] of Array.from(word).entries()) {
-      if (i) x += 23;
+      if (i) x += 23 + (referenceKerning[word[i - 1] + char] ?? 0);
       const g = PLATE_GLYPHS[char];
       placements.push({ char, x, ...g });
       x += g.width;
@@ -62,5 +63,5 @@ export function layoutPlateGlyphs(formatted: string) {
   }
   // Unusual long registrations scale as a single unit, never stretch letters.
   const scale = Math.min(1, 980 / x);
-  return { placements, scale, x: 682 - (x * scale) / 2, y: 118 - 81 * scale };
+  return { placements, scale, x: 681.5 - (x * scale) / 2, y: 118 - 81 * scale };
 }

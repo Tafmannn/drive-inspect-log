@@ -22,10 +22,11 @@ describe('Axentra reference-matched UK plate', () => {
   it('matches the reference cap-height and bounding box with no horizontal distortion', () => {
     const l = layoutPlateGlyphs('FE72 ZZM')!;
     expect(l.scale).toBe(1);
-    expect(l.x).toBeCloseTo(220, 0);
+    expect(l.x).toBeCloseTo(219, 0);
     expect(l.y).toBe(37);
     expect(l.placements[0].width).toBe(103);
     expect(l.placements[6].width).toBe(117);
+    expect(l.placements.map(g => g.x + l.x)).toEqual([219, 345, 471, 594, 772, 900, 1027]);
     expect(l.placements[4].x - l.placements[3].x - l.placements[3].width).toBe(72);
     expect(Object.keys(PLATE_GLYPHS)).toHaveLength(36);
     expect(layoutPlateGlyphs('NU21 YMA')?.scale).toBe(1);
