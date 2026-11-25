@@ -18,8 +18,7 @@ export function formatUKRegistration(reg: string | null | undefined): string {
   const compact = raw.replace(/\s/g, '');
   return MODERN_REG.test(compact) ? compact.slice(0, 4) + ' ' + compact.slice(4) : raw;
 }
-function RegistrationOverlay({ formatted }: { formatted: string }) {
-  const layout = layoutPlateGlyphs(formatted);
+function RegistrationOverlay({ formatted, layout }: { formatted: string; layout: ReturnType<typeof layoutPlateGlyphs> }) {
   if (!layout) return <span className="axentra-uk-plate__registration" aria-hidden="true">{formatted}</span>;
   return (
     <svg className="axentra-uk-plate__svg" viewBox="0 0 1245 245.3"
@@ -33,14 +32,15 @@ function RegistrationOverlay({ formatted }: { formatted: string }) {
 
 export function UKPlate({ reg, size = 'compact', className = '', style }: UKPlateProps) {
   const formatted = formatUKRegistration(reg);
+  const layout = formatted ? layoutPlateGlyphs(formatted) : null;
   return (
     <span className={'axentra-uk-plate axentra-uk-plate--' + size + ' ' + className}
       style={style} role="img" aria-label={formatted ? 'Vehicle registration ' + formatted : 'Vehicle registration unavailable'}
       data-testid="axentra-uk-plate" data-registration={formatted}>
       <img src="/assets/axentra-uk-plate.png" className="axentra-uk-plate__art"
         alt="" aria-hidden="true" draggable={false} loading="eager" decoding="async" />
-      {formatted && layoutPlateGlyphs(formatted) && <span className="sr-only" aria-hidden="true">{formatted}</span>}
-      {formatted && <RegistrationOverlay formatted={formatted} />}
+      {formatted && layout && <span className="sr-only" aria-hidden="true">{formatted}</span>}
+      {formatted && <RegistrationOverlay formatted={formatted} layout={layout} />}
     </span>
   );
 }

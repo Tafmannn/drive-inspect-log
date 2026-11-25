@@ -3,6 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 
+export const BRAND_BANNER_SURFACE = "bg-gradient-to-r from-[#173E80] to-[#24599C]";
+export const BRAND_AVATAR_SURFACE = "border border-white/30 bg-[#173E80] text-white";
+
 const SRC_W = 700;
 const SRC_H = 474;
 const MARK = { x: 114, y: 15, w: 450, h: 236 };
@@ -54,7 +57,7 @@ export function BrandHeader({ className, rowClassName, profile }: { className?: 
   const initial = (user?.name?.trim()[0] ?? "A").toUpperCase();
 
   return (
-    <header className={cn("shrink-0 bg-gradient-to-r from-[#173E80] to-[#24599C]", className)}>
+    <header className={cn("shrink-0", BRAND_BANNER_SURFACE, className)}>
       <BrandStatusBar />
       <div className={cn("mx-auto flex max-w-5xl items-center justify-between gap-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-1.5 sm:px-6 sm:pt-3 lg:px-8", rowClassName)}>
         <button type="button" onClick={() => navigate("/")} aria-label="Go to dashboard"
@@ -67,7 +70,7 @@ export function BrandHeader({ className, rowClassName, profile }: { className?: 
             <button type="button" onClick={() => navigate("/profile")}
               aria-label={`Profile${user?.name ? ` — ${user.name}` : ""}`}
               className="-mr-1 flex h-11 w-11 items-center justify-center rounded-full motion-safe:transition-transform motion-safe:active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
-              <span aria-hidden className="flex h-9 w-9 items-center justify-center rounded-full border border-white/30 bg-[#173E80] text-[15px] font-semibold text-white shadow-[0_1px_2px_rgb(15_23_42/0.15),0_4px_10px_-4px_hsl(var(--primary)/0.55)]">{initial}</span>
+              <span aria-hidden className={cn("flex h-9 w-9 items-center justify-center rounded-full text-[15px] font-semibold shadow-[0_1px_2px_rgb(15_23_42/0.15),0_4px_10px_-4px_hsl(var(--primary)/0.55)]", BRAND_AVATAR_SURFACE)}>{initial}</span>
             </button>
           )}
         </div>

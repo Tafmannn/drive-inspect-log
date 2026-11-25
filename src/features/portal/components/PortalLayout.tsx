@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { usePortalContext } from "../api";
-import { BrandLockup, BrandRoleBadge, BrandStatusBar } from "@/components/BrandHeader";
+import { BRAND_BANNER_SURFACE, BRAND_AVATAR_SURFACE, BrandLockup, BrandRoleBadge, BrandStatusBar } from "@/components/BrandHeader";
 
 const HEX_COLOUR = /^#[0-9a-f]{6}$/i;
 
@@ -95,7 +95,7 @@ export function PortalLayout() {
         style={accent && !/^axentra(?: vehicles?| vehicle logistics)?$/i.test(ctx.operator.name.trim()) ? { borderBottomColor: accent } : undefined}
       >
         <BrandStatusBar />
-        <div className={isAxentra ? "bg-gradient-to-r from-[#173E80] to-[#24599C]" : "bg-card"}>
+        <div className={isAxentra ? BRAND_BANNER_SURFACE : "bg-card"}>
         <div className="max-w-5xl mx-auto flex h-14 items-center justify-between gap-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:h-16">
           <div className="flex min-w-0 items-center gap-3">
             <OperatorBrand name={ctx.operator.name} logoUrl={ctx.operator.logo_url} />
@@ -107,7 +107,7 @@ export function PortalLayout() {
               <button
                 type="button"
                 aria-label="Account"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1E4FA8] "
+                className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full shadow-sm transition-colors focus:outline-none focus-visible:ring-2", isAxentra ? BRAND_AVATAR_SURFACE + " focus-visible:ring-white" : "bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-primary")}
               >
                 <UserRound className="h-5 w-5" aria-hidden />
               </button>

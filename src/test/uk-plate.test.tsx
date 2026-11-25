@@ -51,11 +51,32 @@ describe('Axentra reference-matched UK plate', () => {
     expect(css).not.toContain('width: min(100%, var(--axentra-plate-width));');
   });
 
+  it('keeps proportional subtle corners and native-resolution vector lettering at every size', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/components/UKPlate.css'), 'utf8');
+    expect(css).toContain('border-radius: 2% / 10.15%;');
+    expect(css).toContain('aspect-ratio: 3411 / 672;');
+    expect(css).toContain('shape-rendering: geometricPrecision;');
+    expect(css).not.toContain('image-rendering: pixelated');
+    for (const size of ['table', 'compact', 'standard', 'large'] as const) {
+      const view = render(<UKPlate reg="FE72 ZZM" size={size} />);
+      const plate = view.getByRole('img', { name: 'Vehicle registration FE72 ZZM' });
+      expect(plate.querySelector('svg')?.getAttribute('viewBox')).toBe('0 0 1245 245.3');
+      expect(plate.querySelectorAll('svg path')).toHaveLength(7);
+      expect(plate.querySelector('img')?.getAttribute('src')).toBe('/assets/axentra-uk-plate.png');
+      view.unmount();
+    }
+  });
+
   it('requires both plate assets before release (image must not be missing)', () => {
     const original = resolve(process.cwd(), 'public/assets/axentra-uk-plate-original-4k.png');
     const display = resolve(process.cwd(), 'public/assets/axentra-uk-plate.png');
     expect(existsSync(original)).toBe(true);
     expect(existsSync(display)).toBe(true);
+    if (existsSync(display)) {
+      const png = readFileSync(display);
+      expect(png.readUInt32BE(16)).toBe(3411);
+      expect(png.readUInt32BE(20)).toBe(672);
+    }
     if (existsSync(original)) {
       expect(createHash('sha256').update(readFileSync(original)).digest('hex'))
         .toBe('9bcb5ec96204510a1c7e06a26631b83c1a9404913b12a85dfd72e9e66ad24d2e');
