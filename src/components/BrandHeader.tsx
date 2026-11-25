@@ -36,7 +36,7 @@ export function BrandLockup() {
 
 /** Identical status-bar colour on every signed-in shell; zero height in a browser tab. */
 export function BrandStatusBar() {
-  return <div aria-hidden className="h-[env(safe-area-inset-top,0px)] shrink-0 bg-[#0c1d41]" />;
+  return <div aria-hidden className="h-[env(safe-area-inset-top,0px)] shrink-0 bg-[hsl(221_70%_15%)]" />;
 }
 
 export function BrandRoleBadge({ children }: { children: ReactNode }) {

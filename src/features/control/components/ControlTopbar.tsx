@@ -38,7 +38,7 @@ export function ControlTopbar({
 
   return (
     <>
-      <BrandHeader className="bg-[#F2F5FA] dark:bg-background" rowClassName="max-w-none pb-1" profile={
+      <BrandHeader className="bg-[hsl(216_33%_97%)] dark:bg-background" rowClassName="max-w-none pb-1" profile={
         <button type="button" onClick={() => navigate("/profile")} aria-label="Profile"
           className="-mr-1 flex h-11 w-11 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
           <UserAvatar photoPath={ownPhotoPath} name={userName} className="h-9 w-9 bg-primary text-primary-foreground shadow-sm [&>span]:bg-primary [&>span]:text-primary-foreground" />

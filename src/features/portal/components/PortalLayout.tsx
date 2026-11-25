@@ -18,27 +18,27 @@ const HEX_COLOUR = /^#[0-9a-f]{6}$/i;
 
 /**
  * The operator's logo: an https image URL, or a path served by this app
- * (e.g. "/email/axentra-logo-email.jpg"); anything else falls back to Axentra's.
+ * (e.g. "/email/axentra-logo-email.jpg"); invalid URLs use the operator name.
  */
-function safeLogo(url: string | null | undefined): string {
-  if (!url) return "/axentra-logo.png";
+function safeLogo(url: string | null | undefined): string | null {
+  if (!url) return null;
   if (url.startsWith("/") && !url.startsWith("//")) return url;
   try {
-    return new URL(url).protocol === "https:" ? url : "/axentra-logo.png";
+    return new URL(url).protocol === "https:" ? url : null;
   } catch {
-    return "/axentra-logo.png";
+    return null;
   }
 }
 
 /**
- * The operator's own logo when it has one; otherwise the Axentra mark (cut
- * from the official logo) beside the operator's name.
+ * Axentra uses its shared lockup; other operators keep their own identity.
  */
 function OperatorBrand({ name, logoUrl }: { name: string; logoUrl: string | null }) {
   const axentra = /^axentra(?: vehicles?| vehicle logistics)?$/i.test(name.trim());
   if (axentra) return <span className="flex min-w-0 items-center gap-2.5"><BrandLockup /></span>;
-  if (logoUrl) {
-    return <img src={safeLogo(logoUrl)} alt={name} className="h-8 w-auto max-w-[132px] object-contain sm:h-9" />;
+  const logo = safeLogo(logoUrl);
+  if (logo) {
+    return <img src={logo} alt={name} className="h-8 w-auto max-w-[132px] object-contain sm:h-9" />;
   }
   return <span className="truncate text-[15px] font-semibold text-foreground">{name}</span>;
 }
@@ -90,15 +90,16 @@ export function PortalLayout() {
   return (
     <div className="min-h-[100dvh] bg-[#F6F8FB] flex flex-col dark:bg-background">
       <header
-        className="border-b border-slate-200/70 bg-[#F2F5FA] supports-[backdrop-filter]:bg-white/85 supports-[backdrop-filter]:backdrop-blur sticky top-0 z-30 dark:border-border dark:bg-card/95"
+        className="border-b border-slate-200/70 bg-[hsl(216_33%_97%)] supports-[backdrop-filter]:backdrop-blur sticky top-0 z-30 dark:border-border dark:bg-card/95"
         style={accent && !/^axentra(?: vehicles?| vehicle logistics)?$/i.test(ctx.operator.name.trim()) ? { borderBottomColor: accent } : undefined}
       >
         <BrandStatusBar />
         <div className="max-w-5xl mx-auto flex h-14 items-center justify-between gap-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:h-16">
           <div className="flex min-w-0 items-center gap-3">
             <OperatorBrand name={ctx.operator.name} logoUrl={ctx.operator.logo_url} />
-            <BrandRoleBadge>Customer Portal</BrandRoleBadge>
           </div>
+          <div className="flex shrink-0 items-center gap-2">
+          <BrandRoleBadge>Customer Portal</BrandRoleBadge>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -120,6 +121,7 @@ export function PortalLayout() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          </div>
         </div>
         <nav className="max-w-5xl mx-auto px-4 pb-3" aria-label="Portal">
           <div className="flex gap-1 rounded-xl bg-slate-100 p-1 sm:inline-flex dark:bg-muted">
