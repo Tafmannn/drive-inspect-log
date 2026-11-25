@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - "supabase/migrations/*digital_id_v2.sql"
+      - "supabase/migrations/*digital_id_dual_role_drivers.sql"
       - "supabase/tests/digital_id_v2.integration.sql"
       - "scripts/free-tier/digital-id-contract-baseline.sql"
       - ".github/workflows/digital-id-contract.yml"
@@ -44,6 +45,7 @@ jobs:
         run: |
           psql -X -v ON_ERROR_STOP=1 -f scripts/free-tier/digital-id-contract-baseline.sql
           psql -X -v ON_ERROR_STOP=1 -f supabase/migrations/20261123220000_digital_id_v2.sql
+          psql -X -v ON_ERROR_STOP=1 -f supabase/migrations/20261124223124_digital_id_dual_role_drivers.sql
       - name: Validate Digital ID issue/revoke/admin/cross-org/serial contracts
         run: psql -X -v ON_ERROR_STOP=1 -f supabase/tests/digital_id_v2.integration.sql
       - name: Stop disposable local database
