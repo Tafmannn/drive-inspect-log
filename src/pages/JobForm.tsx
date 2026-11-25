@@ -20,7 +20,9 @@ import { CAR_MAKES, getModelsForMake } from "@/lib/carData";
 import { isValidUkPostcode, calculateRoute, type RouteResult } from "@/lib/mapsApi";
 import { computeJobCaz, lookupCazZone } from "@/lib/cazLookup";
 import { jobSourceOptions, resolveJobSourceForSave } from "@/lib/jobSource";
-import { lookupVehicle } from "@/lib/vehicleLookupApi";
+import { lookupVehicle, type VehicleLookupResult } from "@/lib/vehicleLookupApi";
+import { normalizeRegistration } from "@/lib/vehicleCompliance";
+import { VehicleComplianceSummary } from "@/features/jobs/components/VehicleComplianceCard";
 import { isFeatureEnabled } from "@/lib/featureFlags";
 import { saveDraft, loadDraft, clearDraft, draftKey } from "@/lib/autosave";
 import { hapticSuccess, hapticError } from "@/lib/haptics";
@@ -67,6 +69,10 @@ export const JobForm = () => {
 
   const formRef = useRef<HTMLFormElement | null>(null);
   const [errors, setErrors] = useState<ErrorMap>({});
+  const [dvlaResult, setDvlaResult] = useState<VehicleLookupResult | null>(null);
+  const [dvlaBusy, setDvlaBusy] = useState(false);
+  const dvlaInFlight = useRef(false);
+  const dvlaInputRevision = useRef(0);
 
   // Vehicle make/model selection state — SINGLE SOURCE OF TRUTH
   const [vehicleMake, setVehicleMake] = useState<string>("");
@@ -853,6 +859,7 @@ export const JobForm = () => {
               <div className="flex gap-2 mt-1">
                 <Input
                   name="vehicle_reg"
+                  onChange={() => { dvlaInputRevision.current++; setDvlaResult(null); }}
                   placeholder="Vehicle registration"
                   defaultValue={existingJob?.vehicle_reg ?? ""}
                   autoCapitalize="characters"
@@ -863,18 +870,23 @@ export const JobForm = () => {
                   variant="outline"
                   size="sm"
                   className="shrink-0 gap-1"
-                  disabled={routeLoading}
-                  onClick={async () => {
-                    if (!formRef.current) return;
+
                     const fd = new FormData(formRef.current);
                     const reg = (fd.get("vehicle_reg") as string || "").trim();
                     if (!reg) {
                       toast({ title: "Enter a registration first.", variant: "destructive" });
                       return;
                     }
+                    const revision = dvlaInputRevision.current;
+                    dvlaInFlight.current = true;
+                    setDvlaBusy(true);
+                    setDvlaResult(null);
                     try {
                       const result = await lookupVehicle(reg);
-                      if (result.success) {
+                      const current = formRef.current ? String(new FormData(formRef.current).get("vehicle_reg") || "") : "";
+                      if (revision !== dvlaInputRevision.current || normalizeRegistration(current) !== normalizeRegistration(reg)) return;
+                      if (result.success && result.registration && normalizeRegistration(result.registration) === normalizeRegistration(reg)) {
+                        setDvlaResult(result);
                         const setInputValue = (name: string, value: string) => {
                           const el = formRef.current?.elements.namedItem(name);
                           if (!el) return;
@@ -926,14 +938,19 @@ export const JobForm = () => {
                       }
                     } catch {
                       toast({ title: "DVLA lookup failed", variant: "destructive" });
+                    } finally {
+                      dvlaInFlight.current = false;
+                      setDvlaBusy(false);
                     }
                   }}
                 >
                   <Search className="w-4 h-4" />
-                  DVLA
+                  {dvlaBusy ? "Checking…" : "DVLA"}
                 </Button>
               </div>
               <ErrorText field="vehicle_reg" />
+              {dvlaResult && <div className="mt-3"><VehicleComplianceSummary registration={String(formRef.current ? new FormData(formRef.current).get("vehicle_reg") || "" : "")} result={dvlaResult} /></div>}
+              {!dvlaResult && <p className="mt-2 text-xs text-muted-foreground">MOT and tax unverified until DVLA lookup succeeds.</p>}
             </div>
 
             {/* Make — fully controlled */}
