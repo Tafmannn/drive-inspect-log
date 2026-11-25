@@ -41,6 +41,15 @@ describe("supabaseTarget — staging cannot reach production", () => {
     expect(checkSupabaseTarget({ url: STG_URL, key: "sb_secret_abc" }).ok).toBe(false);
   });
 
+  it("blocks every preview falling back to production regardless of branch", () => {
+    expect(checkSupabaseTarget({ url: PROD_URL, key: PROD_ANON, deploymentEnv: "preview", gitBranch: "deploy-preview/other" }).ok).toBe(false);
+    expect(checkSupabaseTarget({ url: STG_URL, key: STG_ANON, deploymentEnv: "preview", appEnv: "staging" }).ok).toBe(true);
+    expect(checkSupabaseTarget({ url: STG_URL, key: STG_ANON, deploymentEnv: "preview" }).ok).toBe(false);
+    expect(checkSupabaseTarget({ url: STG_URL, key: STG_ANON, deploymentEnv: "production" }).ok).toBe(false);
+    expect(checkSupabaseTarget({ url: PROD_URL, key: PROD_ANON, deploymentEnv: "production" }).ok).toBe(true);
+    expect(projectRefFromUrl(PROD_URL.replace("https:", "http:"))).toBeNull();
+  });
+
   it("production builds are unchanged (no VITE_APP_ENV needed on main)", () => {
     expect(checkSupabaseTarget({ url: PROD_URL, key: PROD_ANON, gitBranch: "main" }).ok).toBe(true);
     expect(checkSupabaseTarget({ url: PROD_URL, key: "sb_publishable_x", appEnv: "production" }).ok).toBe(true);
