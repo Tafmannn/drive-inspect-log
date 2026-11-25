@@ -24,7 +24,7 @@ DO $$ BEGIN
  EXCEPTION WHEN check_violation THEN NULL; END;
 END $$;
 SELECT set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000aaaa',true);
-SELECT public.cancel_invoice_authorised('d5d00000-0000-0000-0000-000000000001','Explicit approval',true);
+SELECT public.cancel_invoice_authorised('d5d00000-0000-0000-0000-000000000001','Explicit approval',true,'sent',100);
 DO $$ BEGIN
  ASSERT (SELECT count(*)=0 FROM public.invoice_correction_requests WHERE invoice_id='d5d00000-0000-0000-0000-000000000001' AND status='pending'), 'explicit cancellation closes queue';
  ASSERT (SELECT count(*)=1 FROM public.invoices WHERE credits_invoice_id='d5d00000-0000-0000-0000-000000000001'), 'one explicitly authorised credit';

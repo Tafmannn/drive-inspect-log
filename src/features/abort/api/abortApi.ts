@@ -190,6 +190,8 @@ export function correctInvoicedAbortFee(input: {
   multiJobAcknowledged: boolean;
   paidAcknowledged: boolean;
   authoriseCredit: boolean;
+  expectedInvoiceStatus: string;
+  expectedInvoiceTotal?: number;
 }): Promise<{
   correctionId: string;
   creditNoteId: string | null;
@@ -215,6 +217,8 @@ export function correctInvoicedAbortFee(input: {
     p_multi_job_acknowledged: input.multiJobAcknowledged,
     p_paid_acknowledged: input.paidAcknowledged,
     p_authorise_credit: input.authoriseCredit,
+    p_expected_invoice_status: input.expectedInvoiceStatus,
+    p_expected_invoice_total: input.expectedInvoiceTotal,
   });
 }
 

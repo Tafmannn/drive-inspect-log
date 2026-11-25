@@ -279,7 +279,7 @@ describe("invoice actions", () => {
     fireEvent.change(dialog.getByLabelText("Reason"), { target: { value: "Created by mistake" } });
     fireEvent.click(confirm);
 
-    await waitFor(() => expect(h.cancelInvoice).toHaveBeenCalledWith("AX26-1007", "Created by mistake", false));
+    await waitFor(() => expect(h.cancelInvoice).toHaveBeenCalledWith("AX26-1007", "Created by mistake", false, "draft", 100));
     await waitFor(() => expect(h.toasts[0].title).toBe("Draft invoice cancelled"));
   });
 
@@ -296,7 +296,7 @@ describe("invoice actions", () => {
     fireEvent.click(dialog.getByRole("checkbox", { name: /I authorise creation/ }));
     expect(creditButton.disabled).toBe(false);
     fireEvent.click(creditButton);
-    await waitFor(() => expect(h.cancelInvoice).toHaveBeenCalledWith("AX26-1007", "Wrong PO", true));
+    await waitFor(() => expect(h.cancelInvoice).toHaveBeenCalledWith("AX26-1007", "Wrong PO", true, "paid", 100));
     await waitFor(() => expect(h.toasts[0].title).toBe("Invoice cancelled — credit note raised"));
     expect(h.changed).toEqual(["AX26-1007"]);
   });

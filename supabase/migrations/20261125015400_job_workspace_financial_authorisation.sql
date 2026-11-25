@@ -1,9 +1,10 @@
 -- Job Workspace V2 Batch 01: explicit financial authorisation.
 -- Do not apply until staging parity and backup/restore gates pass.
 BEGIN;
-CREATE OR REPLACE FUNCTION public.cancel_invoice_authorised(p_invoice_id uuid, p_reason text, p_authorise_credit boolean)
+CREATE OR REPLACE FUNCTION public.cancel_invoice_authorised(p_invoice_id uuid, p_reason text, p_authorise_credit boolean, p_expected_status text DEFAULT NULL, p_expected_total numeric DEFAULT NULL)
  RETURNS uuid
  LANGUAGE plpgsql
+ SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
 DECLARE
@@ -12,7 +13,7 @@ DECLARE
   v_number text;
   v_reason text := NULLIF(btrim(COALESCE(p_reason, '')), '');
 BEGIN
-  IF NOT public.is_admin_or_super_admin() THEN
+  IF auth.uid() IS NULL OR NOT public.is_admin_or_super_admin() THEN
     RAISE EXCEPTION 'only admins can cancel invoices' USING ERRCODE = '42501';
   END IF;
   IF v_reason IS NULL THEN
@@ -20,7 +21,7 @@ BEGIN
   END IF;
 
   SELECT * INTO v_inv FROM public.invoices WHERE id = p_invoice_id FOR UPDATE;
-  IF v_inv.id IS NULL THEN
+  IF v_inv.id IS NULL OR v_inv.is_test OR (v_inv.org_id IS DISTINCT FROM public.user_org_id() AND NOT public.is_super_admin()) THEN
     RAISE EXCEPTION 'invoice not found' USING ERRCODE = 'P0002';
   END IF;
   IF v_inv.document_type <> 'invoice' THEN
@@ -30,11 +31,13 @@ BEGIN
     RAISE EXCEPTION 'invoice % is already cancelled', v_inv.invoice_number USING ERRCODE = '23514';
   END IF;
 
-  IF v_inv.org_id IS DISTINCT FROM public.user_org_id() AND NOT public.is_super_admin() THEN
-    RAISE EXCEPTION 'invoice not found' USING ERRCODE = 'P0002';
-  END IF;
   IF v_inv.status <> 'draft' AND p_authorise_credit IS DISTINCT FROM true THEN
     RAISE EXCEPTION 'CREDIT_NOTE_AUTHORISATION_REQUIRED' USING ERRCODE = '23514';
+  END IF;
+  IF (p_expected_status IS NOT NULL AND p_expected_status IS DISTINCT FROM v_inv.status)
+      OR (p_expected_total IS NOT NULL AND p_expected_total IS DISTINCT FROM v_inv.total)
+      OR (v_inv.status <> 'draft' AND (p_expected_status IS NULL OR p_expected_total IS NULL)) THEN
+    RAISE EXCEPTION 'INVOICE_CONFIRMATION_STALE' USING ERRCODE = '23514';
   END IF;
   IF v_inv.status <> 'draft' THEN
     v_number := public.allocate_credit_note_number(v_inv.org_id);
@@ -71,7 +74,7 @@ BEGIN
   RETURN v_credit_id;
 END;
 $function$;
-CREATE OR REPLACE FUNCTION public.correct_invoiced_job_abort_fee_authorised(p_abort_id uuid, p_original_invoice_id uuid, p_new_amount numeric, p_expected_amount numeric, p_reason text, p_client_confirmed boolean, p_authorise_credit boolean, p_multi_job_acknowledged boolean DEFAULT false, p_paid_acknowledged boolean DEFAULT false)
+CREATE OR REPLACE FUNCTION public.correct_invoiced_job_abort_fee_authorised(p_abort_id uuid, p_original_invoice_id uuid, p_new_amount numeric, p_expected_amount numeric, p_reason text, p_client_confirmed boolean, p_authorise_credit boolean, p_multi_job_acknowledged boolean DEFAULT false, p_paid_acknowledged boolean DEFAULT false, p_expected_invoice_status text DEFAULT NULL, p_expected_invoice_total numeric DEFAULT NULL)
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -112,7 +115,8 @@ BEGIN
   IF v_invoice.id IS NULL OR v_invoice.org_id IS DISTINCT FROM v_abort.org_id
      OR COALESCE(v_invoice.document_type,'invoice') <> 'invoice'
      OR v_invoice.status = 'cancelled'
-     OR NOT (v_invoice.job_id = v_abort.job_id
+     OR v_invoice.is_test
+     OR NOT (v_invoice.job_id IS NOT DISTINCT FROM v_abort.job_id
        OR EXISTS (SELECT 1 FROM public.invoice_items ii
           WHERE ii.invoice_id=v_invoice.id AND ii.job_id=v_abort.job_id
             AND NOT COALESCE(ii.voided,false))) THEN
@@ -140,7 +144,7 @@ BEGIN
   IF v_invoice.status <> 'draft' AND p_authorise_credit IS DISTINCT FROM true THEN
     RAISE EXCEPTION 'CREDIT_NOTE_AUTHORISATION_REQUIRED' USING ERRCODE = '23514';
   END IF;
-  v_credit_id := public.cancel_invoice_authorised(v_invoice.id, v_reason, p_authorise_credit);
+  v_credit_id := public.cancel_invoice_authorised(v_invoice.id, v_reason, p_authorise_credit, p_expected_invoice_status, p_expected_invoice_total);
   v_amended := public.amend_approved_job_abort_claim(
     v_abort.id,p_new_amount,v_reason,p_expected_amount,true);
 
@@ -169,6 +173,32 @@ BEGIN
     'originalWasPaid',v_invoice.status='paid');
 END;
 $function$;
+-- Direct Data API writes must not bypass financial authorisation. Only the
+-- tightly checked SECURITY DEFINER cancellation function (or DB maintenance
+-- acting as its owner) can create credits or cancel issued invoices.
+CREATE OR REPLACE FUNCTION public.guard_invoice_credit_authorisation()
+RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path TO public AS $guard$
+DECLARE
+  v_owner name;
+BEGIN
+  SELECT pg_get_userbyid(proowner) INTO v_owner FROM pg_proc
+    WHERE oid='public.cancel_invoice_authorised(uuid,text,boolean,text,numeric)'::regprocedure;
+  IF current_user = v_owner THEN RETURN NEW; END IF;
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.document_type = 'credit_note' OR NEW.credits_invoice_id IS NOT NULL THEN
+      RAISE EXCEPTION 'CREDIT_NOTE_DIRECT_WRITE_DENIED' USING ERRCODE='42501';
+    END IF;
+  ELSIF (NEW.document_type = 'credit_note' AND OLD.document_type IS DISTINCT FROM 'credit_note')
+      OR NEW.credits_invoice_id IS DISTINCT FROM OLD.credits_invoice_id
+      OR (OLD.status <> 'draft' AND OLD.status <> 'cancelled' AND NEW.status = 'cancelled') THEN
+    RAISE EXCEPTION 'CREDIT_NOTE_DIRECT_WRITE_DENIED' USING ERRCODE='42501';
+  END IF;
+  RETURN NEW;
+END $guard$;
+DROP TRIGGER IF EXISTS trg_invoice_credit_authorisation ON public.invoices;
+CREATE TRIGGER trg_invoice_credit_authorisation BEFORE INSERT OR UPDATE ON public.invoices
+ FOR EACH ROW EXECUTE FUNCTION public.guard_invoice_credit_authorisation();
+REVOKE ALL ON FUNCTION public.guard_invoice_credit_authorisation() FROM PUBLIC, anon, authenticated;
 -- Legacy clients can still cancel drafts but cannot issue a credit note.
 CREATE OR REPLACE FUNCTION public.cancel_invoice(p_invoice_id uuid, p_reason text)
 RETURNS uuid LANGUAGE sql SECURITY INVOKER SET search_path TO public AS $$
@@ -182,12 +212,12 @@ RETURNS jsonb LANGUAGE sql SECURITY INVOKER SET search_path TO public AS $$
  SELECT public.correct_invoiced_job_abort_fee_authorised(p_abort_id,p_original_invoice_id,
  p_new_amount,p_expected_amount,p_reason,p_client_confirmed,false,p_multi_job_acknowledged,p_paid_acknowledged);
 $$;
-REVOKE ALL ON FUNCTION public.cancel_invoice_authorised(uuid,text,boolean) FROM PUBLIC, anon;
-REVOKE ALL ON FUNCTION public.correct_invoiced_job_abort_fee_authorised(uuid,uuid,numeric,numeric,text,boolean,boolean,boolean,boolean) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.cancel_invoice_authorised(uuid,text,boolean,text,numeric) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.correct_invoiced_job_abort_fee_authorised(uuid,uuid,numeric,numeric,text,boolean,boolean,boolean,boolean,text,numeric) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.cancel_invoice(uuid,text) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.correct_invoiced_job_abort_fee(uuid,uuid,numeric,numeric,text,boolean,boolean,boolean) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.cancel_invoice_authorised(uuid,text,boolean) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.correct_invoiced_job_abort_fee_authorised(uuid,uuid,numeric,numeric,text,boolean,boolean,boolean,boolean) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.cancel_invoice_authorised(uuid,text,boolean,text,numeric) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.correct_invoiced_job_abort_fee_authorised(uuid,uuid,numeric,numeric,text,boolean,boolean,boolean,boolean,text,numeric) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.cancel_invoice(uuid,text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.correct_invoiced_job_abort_fee(uuid,uuid,numeric,numeric,text,boolean,boolean,boolean) TO authenticated;
 COMMIT;

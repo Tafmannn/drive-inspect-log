@@ -82,6 +82,8 @@ export function AbortInvoiceCorrection({
         multiJobAcknowledged: multiAcknowledged,
         paidAcknowledged,
         authoriseCredit: activeInvoice.status !== "draft" && authoriseCredit,
+        expectedInvoiceStatus: activeInvoice.status,
+        expectedInvoiceTotal: activeInvoice.total ?? undefined,
       });
       setOpen(false);
       toast({

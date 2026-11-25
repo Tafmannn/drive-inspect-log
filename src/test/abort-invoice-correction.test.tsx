@@ -83,7 +83,7 @@ describe("invoiced Abort fee correction", () => {
         abortId: "abort-1", originalInvoiceId: "invoice-1",
         newAmount: 275, expectedAmount: 240,
         reason: "Client confirmed a higher Abort fee", clientConfirmed: true,
-        multiJobAcknowledged: false, paidAcknowledged: false, authoriseCredit: true,
+        multiJobAcknowledged: false, paidAcknowledged: false, authoriseCredit: true, expectedInvoiceStatus: "sent", expectedInvoiceTotal: 240,
       });
     });
   });

@@ -3445,7 +3445,7 @@ export type Database = {
         Returns: undefined
       }
       cancel_invoice_authorised: {
-        Args: { p_invoice_id: string; p_reason: string; p_authorise_credit: boolean }
+        Args: { p_invoice_id: string; p_reason: string; p_authorise_credit: boolean; p_expected_status?: string; p_expected_total?: number }
         Returns: string
       }
       cancel_invoice: {
@@ -3748,6 +3748,8 @@ export type Database = {
           p_reason: string
           p_client_confirmed: boolean
           p_authorise_credit: boolean
+          p_expected_invoice_status?: string
+          p_expected_invoice_total?: number
           p_multi_job_acknowledged?: boolean
           p_paid_acknowledged?: boolean
         }

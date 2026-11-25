@@ -235,7 +235,7 @@ SELECT pg_temp.expect_error(format(
 SELECT pg_temp.check(
  (public.correct_invoiced_job_abort_fee_authorised(
    (SELECT id FROM public.job_aborts WHERE job_id='e1b00000-0000-0000-0000-000000000001'),
-   'f1b00000-0000-0000-0000-000000000001',275,100,'Client authorised revised Abort fee',true,true)->>'approvedAmount')::numeric=275,
+   'f1b00000-0000-0000-0000-000000000001',275,100,'Client authorised revised Abort fee',true,true,false,false,'sent',100)->>'approvedAmount')::numeric=275,
  'issued original fully credited and new higher fee agreed');
 SELECT pg_temp.check((SELECT status='cancelled' FROM public.invoices WHERE id='f1b00000-0000-0000-0000-000000000001'),
  'original invoice cancelled');
