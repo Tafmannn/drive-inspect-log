@@ -7,6 +7,14 @@ export interface VehicleLookupResult {
   colour?: string;
   year?: string;
   fuelType?: string | null;
+  engineCapacity?: number | null;
+  taxStatus?: string | null;
+  motStatus?: string | null;
+  motExpiryDate?: string | null;
+  taxDueDate?: string | null;
+  markedAsScrapped?: boolean | null;
+  markedForExport?: boolean | null;
+  checkedAt?: string | null;
   error?: string;
 }
 
