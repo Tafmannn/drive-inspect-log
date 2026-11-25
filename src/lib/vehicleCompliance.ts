@@ -26,6 +26,14 @@ export function complianceNotices(result: VehicleLookupResult | null, registrati
   const tax = result.taxStatus?.trim().toLowerCase();
   if (result.markedAsScrapped === true) notices.push({ severity: "stop", message: "Scrapped marker reported. Do not drive; contact admin." });
   if (result.markedForExport === true) notices.push({ severity: "review", message: "Export marker reported. Confirm UK road-use eligibility with admin." });
+  notices.push(...motNotices(mot, expiry, earliest, today), ...taxNotices(tax, result.taxDueDate, today));
+  if (!result.checkedAt || !Number.isFinite(Date.parse(result.checkedAt)) || Date.parse(result.checkedAt) > now.getTime() + 60000 || now.getTime() - Date.parse(result.checkedAt) > 86400000) notices.push({ severity: "review", message: "Check timestamp missing or stale. Refresh before relying on these details." });
+  if (!notices.length) notices.push({ severity: "info", message: "No MOT or tax warning identified from this response. This is not roadworthiness, insurance or legal clearance." });
+  return notices;
+}
+
+function motNotices(mot: string | undefined, expiry: string | null, earliest: string | null, today: string): ComplianceNotice[] {
+  const notices: ComplianceNotice[] = [];
   if (mot === "not valid" || (expiry && expiry < today)) {
     notices.push({ severity: "stop", message: "MOT not valid or expired. Do not begin normal road movement; contact admin to verify any lawful exemption." });
   } else if (mot !== "valid" || !expiry) {
@@ -35,11 +43,13 @@ export function complianceNotices(result: VehicleLookupResult | null, registrati
   } else if ((Date.parse(expiry) - Date.parse(today)) / 86400000 <= 7) {
     notices.push({ severity: "review", message: "MOT expires within seven days. Verify it covers the full journey." });
   }
+  return notices;
+}
+function taxNotices(tax: string | undefined, taxDueDate: string | null | undefined, today: string): ComplianceNotice[] {
+  const notices: ComplianceNotice[] = [];
   if (tax === "untaxed" || tax === "not taxed for on road use") notices.push({ severity: "review", message: "Untaxed: verify authorised trade plate use before driving." });
   else if (tax === "sorn") notices.push({ severity: "review", message: "SORN: confirm lawful road use and trade plate eligibility with admin." });
   else if (tax !== "taxed") notices.push({ severity: "review", message: "Tax status unverified. Confirm lawful taxation or trade plate use." });
-  else if (dateOnly(result.taxDueDate) && dateOnly(result.taxDueDate)! <= today) notices.push({ severity: "review", message: "Tax due date reached. Recheck current status before driving." });
-  if (!result.checkedAt || !Number.isFinite(Date.parse(result.checkedAt)) || Date.parse(result.checkedAt) > now.getTime() + 60000 || now.getTime() - Date.parse(result.checkedAt) > 86400000) notices.push({ severity: "review", message: "Check timestamp missing or stale. Refresh before relying on these details." });
-  if (!notices.length) notices.push({ severity: "info", message: "No MOT or tax warning identified from this response. This is not roadworthiness, insurance or legal clearance." });
+  else if (dateOnly(taxDueDate) && dateOnly(taxDueDate)! <= today) notices.push({ severity: "review", message: "Tax due date reached. Recheck current status before driving." });
   return notices;
 }
