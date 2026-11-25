@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { usePortalContext } from "../api";
-import { BRAND_BANNER_SURFACE, BRAND_AVATAR_SURFACE, BrandLockup, BrandRoleBadge, BrandStatusBar } from "@/components/BrandHeader";
+import { BRAND_BANNER_SURFACE, BRAND_AVATAR_SURFACE, BRAND_ROW_LAYOUT, BrandLockup, BrandRoleBadge, BrandStatusBar } from "@/components/BrandHeader";
 
 const HEX_COLOUR = /^#[0-9a-f]{6}$/i;
 
@@ -96,7 +96,7 @@ export function PortalLayout() {
       >
         <BrandStatusBar />
         <div className={isAxentra ? BRAND_BANNER_SURFACE : "bg-card"}>
-        <div className="max-w-5xl mx-auto flex h-14 items-center justify-between gap-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:h-16">
+        <div data-axentra-brand-row={isAxentra ? true : undefined} className={BRAND_ROW_LAYOUT}>
           <div className="flex min-w-0 items-center gap-3">
             <OperatorBrand name={ctx.operator.name} logoUrl={ctx.operator.logo_url} />
           </div>

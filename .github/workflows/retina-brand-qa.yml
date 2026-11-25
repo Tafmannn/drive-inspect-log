@@ -1,0 +1,49 @@
+name: Retina brand visual QA
+on:
+  pull_request:
+    paths:
+      - 'src/components/BrandHeader.tsx'
+      - 'src/components/UKPlate*'
+      - 'src/components/ukPlateGlyphs.ts'
+      - 'src/components/AppHeader.tsx'
+      - 'src/features/admin-home/HomeHeader.tsx'
+      - 'src/features/control/components/ControlTopbar.tsx'
+      - 'src/features/portal/components/PortalLayout.tsx'
+      - 'scripts/mobile-viewport/**'
+      - '.github/workflows/retina-brand-qa.yml'
+permissions:
+  contents: read
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Install isolated browser tooling
+        run: |
+          npm install --prefix /tmp/axentra-browser --no-save playwright@1.56.1
+          /tmp/axentra-browser/node_modules/.bin/playwright install --with-deps chromium
+      - name: Start fixture-only app servers
+        run: |
+          VITE_ENABLE_AUTH=false VITE_SUPABASE_URL=http://fake-supabase.test VITE_SUPABASE_PUBLISHABLE_KEY=fake-key npm run dev -- --host 127.0.0.1 --port 8080 --strictPort > /tmp/axentra-8080.log 2>&1 &
+          VITE_ENABLE_AUTH=true VITE_SUPABASE_URL=http://fake-supabase.test VITE_SUPABASE_PUBLISHABLE_KEY=fake-key npm run dev -- --host 127.0.0.1 --port 8081 --strictPort > /tmp/axentra-8081.log 2>&1 &
+          for port in 8080 8081; do
+            for i in $(seq 1 30); do curl -fsS "http://127.0.0.1:$port/" >/dev/null && break; sleep 1; done
+            curl -fsS "http://127.0.0.1:$port/" >/dev/null
+          done
+      - name: Capture and assert real application renders
+        run: NODE_PATH=/tmp/axentra-browser/node_modules node scripts/mobile-viewport/retina-brand-plate.cjs
+      - name: Upload screenshots and measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retina-brand-qa
+          path: |
+            scripts/mobile-viewport/shots/retina-brand-plate/
+            /tmp/axentra-8080.log
+            /tmp/axentra-8081.log
+          retention-days: 7

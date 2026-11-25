@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 
 export const BRAND_BANNER_SURFACE = "bg-gradient-to-r from-[#173E80] to-[#24599C]";
 export const BRAND_AVATAR_SURFACE = "border border-white/30 bg-[#173E80] text-white";
+export const BRAND_ROW_LAYOUT = "mx-auto flex min-h-14 max-w-5xl items-center justify-between gap-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] py-1.5 sm:px-6 lg:px-8";
 
 const SRC_W = 700;
 const SRC_H = 474;
@@ -59,7 +60,7 @@ export function BrandHeader({ className, rowClassName, profile }: { className?: 
   return (
     <header className={cn("shrink-0", BRAND_BANNER_SURFACE, className)}>
       <BrandStatusBar />
-      <div className={cn("mx-auto flex max-w-5xl items-center justify-between gap-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-1.5 sm:px-6 sm:pt-3 lg:px-8", rowClassName)}>
+      <div data-axentra-brand-row className={cn(BRAND_ROW_LAYOUT, rowClassName)}>
         <button type="button" onClick={() => navigate("/")} aria-label="Go to dashboard"
           className="-ml-1.5 flex min-h-11 min-w-0 items-center gap-2.5 rounded-xl px-1.5">
           <BrandLockup />
