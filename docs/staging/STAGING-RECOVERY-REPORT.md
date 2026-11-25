@@ -4,7 +4,7 @@ Branch `claude/axentra-staging-recovery-r97icv`. The executed apply set is pinne
 `2281b284745d88a7f813524a2418384670e40681`. Staging project `mfedxybzajdgavzmajkl`. Production
 project `lynkvfduzqdyvlzgriyh` was read only: catalogue queries, the ledger, 2 reference tables and advisors.
 
-## Decision: **NO-GO** for release validation · **GO** for database-level development and testing on staging
+## Decision (updated 25 Nov, 20:10 UTC): **GO** for development and integration testing on staging · **NO-GO** for release sign-off until Gate 7 covers inspections, POD, signatures, offline, credit notes and invoice packs
 
 The staging database now matches production and has passed real-identity security tests. It still
 cannot validate a full release, for two reasons:
@@ -20,9 +20,9 @@ cannot validate a full release, for two reasons:
 | 3 Database parity | VERIFIED PASS with 2 documented exceptions | Live staging vs production: 425/425 groups present; 4 groups differ, covering the 2 exceptions below. Live staging = rehearsal exactly. Extensions and security advisors are identical to production. |
 | 4 Security | VERIFIED PASS (DB/API scope) | 15/15 security tests over HTTP with real sign-ins (`scripts/staging/regression/http-regression.mjs`) |
 | 5 Integrations | VERIFIED PASS (staging-safe; live integrations NOT TESTED) | 23/23 repository functions deployed from Git (`scripts/staging/deploy-staging-functions.sh`, commit `76d4875`). Bundle hashes match production for all 23 at `cf0c94e`, so there is zero source drift; 6 were redeployed with the e-mail guard. 7/7 function security tests pass with real JWTs. No provider secrets are set on staging, so e-mail, Google, GCS and DVLA are absent (fail closed), not live. |
-| 6 Environment isolation | PARTIALLY COMPLETE | Build- and runtime fail-closed checks are proven. The Vercel preview scope is still production. |
+| 6 Environment isolation | VERIFIED PASS for the staging deployment (residual risk below) | Branch-scoped preview vars on `deploy-preview/staging` only. Vercel build log: `building against project mfedxybzajdgavzmajkl (VITE_APP_ENV=staging)`. The deployed `client-*.js` contains the staging URL/key only. In a browser session, all requests went to staging or localhost. Residual risk: every other preview branch still inherits the production values. |
 | 7 Regression | PARTIALLY COMPLETE | 30/30 HTTP tests and 2,082/2,082 unit tests pass. Inspections, POD, offline, signatures, credit notes and invoice packs were NOT TESTED (they need Edge Functions/storage). |
-| 8 Deployment | BLOCKED | No staging deployment made (depends on 5 and 6) |
+| 8 Deployment | VERIFIED PASS (limits below) | `dpl_GVQhaWKF1pMb2th4E8jNZPduXUQt` (preview, commit `a20a0ff`) is READY and serving: https://axentra-app-git-deploy-preview-staging-tafmannns-projects.vercel.app (Vercel Authentication protected). The identical build passed a Playwright sign-in as admin A and driver A against staging: correct org-scoped data, 0 page errors. |
 | 9 Production protection | VERIFIED PASS | Only `SELECT`s against production. No production deploy, merge or config change. The Vercel project was only read. |
 
 ## Root cause of the staging failure
@@ -178,6 +178,11 @@ abort fee correction, credit notes, revised invoices, invoice packs, photo manag
     the project (production scope).
 
 ## Blockers and minimum owner actions
+Items 1 and 2 were completed on 25 Nov: functions are deployed, and the staging preview is deployed with branch-scoped variables. Still open:
+- revoke the Supabase access token when you are finished with it (it cannot read production)
+- add sandbox provider secrets
+- narrow the production+preview `VITE_SUPABASE_*` variables to production only
+
 1. **Edge Function deploy (Gate 5).** The only tool path pastes ~551 KB by hand, which is error-prone.
    Choose one:
    - (a) run `supabase functions deploy --project-ref mfedxybzajdgavzmajkl` locally from this branch, or
