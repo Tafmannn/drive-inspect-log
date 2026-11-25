@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import './UKPlate.css';
+import { layoutPlateGlyphs } from './ukPlateGlyphs';
 
 export type UKPlateSize = 'table' | 'compact' | 'standard' | 'large';
 
@@ -17,33 +18,17 @@ export function formatUKRegistration(reg: string | null | undefined): string {
   const compact = raw.replace(/\s/g, '');
   return MODERN_REG.test(compact) ? compact.slice(0, 4) + ' ' + compact.slice(4) : raw;
 }
-/** Seven glyph positions matched against the supplied FE72 ZZM visual reference. */
-const SLOTS = [
-  { x: 207, w: 124 }, { x: 334, w: 123 }, { x: 463, w: 122 },
-  { x: 587, w: 122 }, { x: 766, w: 114 }, { x: 894, w: 114 },
-  { x: 1016, w: 140 },
-] as const;
-
 function RegistrationOverlay({ formatted }: { formatted: string }) {
-  const compact = formatted.replace(/\s/g, '');
-  if (MODERN_REG.test(compact)) {
-    return (
-      <svg className="axentra-uk-plate__svg" viewBox="0 0 1245 245.3"
-        preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false">
-        {Array.from(compact).map((char, i) => {
-          const slot = SLOTS[i];
-          const narrow = char === 'I' || char === '1';
-          const width = narrow ? slot.w * 0.65 : slot.w;
-          return (
-            <text key={i} x={narrow ? slot.x + (slot.w - width) / 2 : slot.x}
-              y="203" textLength={width} lengthAdjust="spacingAndGlyphs">{char}</text>
-          );
-        })}
-      </svg>
-    );
-  }
-  return <span className={'axentra-uk-plate__registration' + (compact.length > 7 ? ' axentra-uk-plate__registration--long' : '')}
-    aria-hidden="true">{formatted}</span>;
+  const layout = layoutPlateGlyphs(formatted);
+  if (!layout) return <span className="axentra-uk-plate__registration" aria-hidden="true">{formatted}</span>;
+  return (
+    <svg className="axentra-uk-plate__svg" viewBox="0 0 1245 245.3"
+      preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false">
+      <g transform={`translate(${layout.x} ${layout.y}) scale(${layout.scale})`} fill="#000" fillRule="evenodd">
+        {layout.placements.map((g, i) => <path key={i} data-glyph={g.char} d={g.d} transform={`translate(${g.x} 0)`} />)}
+      </g>
+    </svg>
+  );
 }
 
 export function UKPlate({ reg, size = 'compact', className = '', style }: UKPlateProps) {
@@ -54,7 +39,7 @@ export function UKPlate({ reg, size = 'compact', className = '', style }: UKPlat
       data-testid="axentra-uk-plate" data-registration={formatted}>
       <img src="/assets/axentra-uk-plate.png" className="axentra-uk-plate__art"
         alt="" aria-hidden="true" draggable={false} loading="eager" decoding="async" />
-      {formatted && MODERN_REG.test(formatted.replace(/\s/g, '')) && <span className="sr-only" aria-hidden="true">{formatted}</span>}
+      {formatted && layoutPlateGlyphs(formatted) && <span className="sr-only" aria-hidden="true">{formatted}</span>}
       {formatted && <RegistrationOverlay formatted={formatted} />}
     </span>
   );

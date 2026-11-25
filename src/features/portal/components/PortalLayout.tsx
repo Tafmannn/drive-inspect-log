@@ -75,6 +75,7 @@ export function PortalLayout() {
     );
   }
 
+  const isAxentra = /^axentra(?: vehicles?| vehicle logistics)?$/i.test(ctx.operator.name.trim());
   const accent = ctx.operator.primary_colour && HEX_COLOUR.test(ctx.operator.primary_colour)
     ? ctx.operator.primary_colour
     : undefined;
@@ -94,12 +95,13 @@ export function PortalLayout() {
         style={accent && !/^axentra(?: vehicles?| vehicle logistics)?$/i.test(ctx.operator.name.trim()) ? { borderBottomColor: accent } : undefined}
       >
         <BrandStatusBar />
+        <div className={isAxentra ? "bg-gradient-to-r from-[#173E80] to-[#24599C]" : "bg-card"}>
         <div className="max-w-5xl mx-auto flex h-14 items-center justify-between gap-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:h-16">
           <div className="flex min-w-0 items-center gap-3">
             <OperatorBrand name={ctx.operator.name} logoUrl={ctx.operator.logo_url} />
           </div>
           <div className="flex shrink-0 items-center gap-2">
-          <BrandRoleBadge>Customer Portal</BrandRoleBadge>
+          {isAxentra ? <BrandRoleBadge>Customer Portal</BrandRoleBadge> : <span className="hidden min-[360px]:inline-flex h-6 items-center rounded-full border bg-card px-2 text-xs text-muted-foreground">Customer Portal</span>}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -122,6 +124,7 @@ export function PortalLayout() {
             </DropdownMenuContent>
           </DropdownMenu>
           </div>
+        </div>
         </div>
         <nav className="max-w-5xl mx-auto px-4 pb-3" aria-label="Portal">
           <div className="flex gap-1 rounded-xl bg-slate-100 p-1 sm:inline-flex dark:bg-muted">

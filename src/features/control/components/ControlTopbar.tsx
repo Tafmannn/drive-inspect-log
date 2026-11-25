@@ -38,10 +38,10 @@ export function ControlTopbar({
 
   return (
     <>
-      <BrandHeader className="bg-[hsl(216_33%_97%)] dark:bg-background" rowClassName="max-w-none pb-1" profile={
+      <BrandHeader rowClassName="max-w-none pb-1" profile={
         <button type="button" onClick={() => navigate("/profile")} aria-label="Profile"
-          className="-mr-1 flex h-11 w-11 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-          <UserAvatar photoPath={ownPhotoPath} name={userName} className="h-9 w-9 bg-primary text-primary-foreground shadow-sm [&>span]:bg-primary [&>span]:text-primary-foreground" />
+          className="-mr-1 flex h-11 w-11 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
+          <UserAvatar photoPath={ownPhotoPath} name={userName} className="h-9 w-9 border border-white/30 bg-[#173E80] text-white shadow-sm [&>span]:bg-[#173E80] [&>span]:text-white" />
         </button>
       } />
       <header className="min-h-14 shrink-0 border-b bg-card flex items-center justify-between px-4 lg:px-6 gap-2 lg:gap-4">

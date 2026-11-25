@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { layoutPlateGlyphs, PLATE_GLYPHS } from '../components/ukPlateGlyphs';
 import { UKPlate, formatUKRegistration } from '../components/UKPlate';
 describe('Axentra reference-matched UK plate', () => {
   it('formats modern registration for display only', () => {
@@ -10,13 +11,25 @@ describe('Axentra reference-matched UK plate', () => {
     expect(formatUKRegistration('BL74FTD')).toBe('BL74 FTD');
     expect(formatUKRegistration('A 1')).toBe('A 1');
   });
-  it('renders seven calibrated glyph slots', () => {
+  it('renders seven calibrated vector glyphs', () => {
     render(<UKPlate reg="FE72ZZM" size="standard" />);
     const element = screen.getByRole('img', { name: 'Vehicle registration FE72 ZZM' });
-    expect(Array.from(element.querySelectorAll('svg text')).map(n => n.textContent).join('')).toBe('FE72ZZM');
+    expect(Array.from(element.querySelectorAll('svg path')).map(n => n.getAttribute('data-glyph')).join('')).toBe('FE72ZZM');
     expect(element.querySelector('img')?.getAttribute('src')).toBe('/assets/axentra-uk-plate.png');
     // Admin/home and portal tests must be able to find the complete registration as text.
     expect(screen.getByText('FE72 ZZM').className).toContain('sr-only');
+  });
+  it('matches the reference cap-height and bounding box with no horizontal distortion', () => {
+    const l = layoutPlateGlyphs('FE72 ZZM')!;
+    expect(l.scale).toBe(1);
+    expect(l.x).toBeCloseTo(220, 0);
+    expect(l.y).toBe(37);
+    expect(l.placements[0].width).toBe(103);
+    expect(l.placements[6].width).toBe(117);
+    expect(l.placements[4].x - l.placements[3].x - l.placements[3].width).toBe(72);
+    expect(Object.keys(PLATE_GLYPHS)).toHaveLength(36);
+    expect(layoutPlateGlyphs('NU21 YMA')?.scale).toBe(1);
+    expect(layoutPlateGlyphs('WW99 WWW')?.scale).toBeLessThan(1);
   });
   it('does not duplicate text for older or nonstandard plates', () => {
     render(<UKPlate reg="LIST9" />);

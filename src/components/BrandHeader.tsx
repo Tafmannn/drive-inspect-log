@@ -22,13 +22,13 @@ export function BrandLockup() {
               alt=""
               decoding="async"
               draggable={false}
-              className="absolute max-w-none select-none"
+              className="absolute max-w-none select-none brightness-0 invert"
               style={{ width: SRC_W * k, height: SRC_H * k, left: -MARK.x * k, top: -MARK.y * k }}
             />
           </span>
           <span className="flex min-w-0 flex-col items-start text-left">
-            <span className="text-[15px] font-semibold leading-[18px] tracking-[0.1em] text-foreground">AXENTRA</span>
-            <span className="truncate text-[11px] font-medium leading-[14px] tracking-[0.01em] text-muted-foreground">Vehicle Logistics</span>
+            <span className="text-[15px] font-semibold leading-[18px] tracking-[0.1em] text-white">AXENTRA</span>
+            <span className="truncate text-[11px] font-medium leading-[14px] tracking-[0.01em] text-white/90">Vehicle Logistics</span>
           </span>
     </>
   );
@@ -36,12 +36,12 @@ export function BrandLockup() {
 
 /** Identical status-bar colour on every signed-in shell; zero height in a browser tab. */
 export function BrandStatusBar() {
-  return <div aria-hidden className="h-[env(safe-area-inset-top,0px)] shrink-0 bg-[hsl(221_70%_15%)]" />;
+  return <div aria-hidden className="h-[env(safe-area-inset-top,0px)] shrink-0 bg-[#101F3D]" />;
 }
 
 export function BrandRoleBadge({ children }: { children: ReactNode }) {
   return (
-    <span className="hidden h-6 shrink-0 items-center rounded-full border border-border bg-card px-2 text-[12px] font-medium text-muted-foreground min-[360px]:inline-flex">
+    <span className="hidden h-6 shrink-0 items-center rounded-full border border-white/35 bg-white/10 px-2 text-[12px] font-medium text-white min-[360px]:inline-flex">
       {children}
     </span>
   );
@@ -54,7 +54,7 @@ export function BrandHeader({ className, rowClassName, profile }: { className?: 
   const initial = (user?.name?.trim()[0] ?? "A").toUpperCase();
 
   return (
-    <header className={cn("shrink-0", className)}>
+    <header className={cn("shrink-0 bg-gradient-to-r from-[#173E80] to-[#24599C]", className)}>
       <BrandStatusBar />
       <div className={cn("mx-auto flex max-w-5xl items-center justify-between gap-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-1.5 sm:px-6 sm:pt-3 lg:px-8", rowClassName)}>
         <button type="button" onClick={() => navigate("/")} aria-label="Go to dashboard"
@@ -66,8 +66,8 @@ export function BrandHeader({ className, rowClassName, profile }: { className?: 
           {profile ?? (
             <button type="button" onClick={() => navigate("/profile")}
               aria-label={`Profile${user?.name ? ` — ${user.name}` : ""}`}
-              className="-mr-1 flex h-11 w-11 items-center justify-center rounded-full motion-safe:transition-transform motion-safe:active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-              <span aria-hidden className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-[15px] font-semibold text-primary-foreground shadow-[0_1px_2px_rgb(15_23_42/0.15),0_4px_10px_-4px_hsl(var(--primary)/0.55)]">{initial}</span>
+              className="-mr-1 flex h-11 w-11 items-center justify-center rounded-full motion-safe:transition-transform motion-safe:active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
+              <span aria-hidden className="flex h-9 w-9 items-center justify-center rounded-full border border-white/30 bg-[#173E80] text-[15px] font-semibold text-white shadow-[0_1px_2px_rgb(15_23_42/0.15),0_4px_10px_-4px_hsl(var(--primary)/0.55)]">{initial}</span>
             </button>
           )}
         </div>

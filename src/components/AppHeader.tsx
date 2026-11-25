@@ -37,7 +37,7 @@ export const AppHeader = ({
 
   return (
     <div className="sticky top-0 z-40">
-      <BrandHeader className="bg-[hsl(216_33%_97%)] dark:bg-background" rowClassName="max-w-7xl pb-1" />
+      <BrandHeader rowClassName="max-w-7xl pb-1" />
       {/* Page header: title row (+ breadcrumbs from md up). min-w-0 lets long
           job references truncate instead of widening the layout viewport. */}
       <header className="border-b border-border/70 bg-background/95 supports-[backdrop-filter]:bg-background/85 supports-[backdrop-filter]:backdrop-blur">
