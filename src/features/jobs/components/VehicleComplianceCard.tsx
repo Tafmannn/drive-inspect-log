@@ -2,9 +2,15 @@ import { useState, useRef } from "react";
 import { ShieldCheck, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { lookupVehicle, type VehicleLookupResult } from "@/lib/vehicleLookupApi";
-import { complianceNotices, normalizeRegistration } from "@/lib/vehicleCompliance";
+import { complianceNotices, normalizeRegistration, type ComplianceSeverity } from "@/lib/vehicleCompliance";
 
-export function VehicleComplianceSummary({ registration, result, earliestDelivery }: { registration: string; result: VehicleLookupResult | null; earliestDelivery?: string | null }) {
+function noticePrefix(severity: ComplianceSeverity) {
+  if (severity === "stop") return "Do not drive — ";
+  if (severity === "review") return "Review — ";
+  return "";
+}
+
+export function VehicleComplianceSummary({ registration, result, earliestDelivery }: Readonly<{ registration: string; result: VehicleLookupResult | null; earliestDelivery?: string | null }>) {
   const valid = result?.success && result.registration && normalizeRegistration(result.registration) === normalizeRegistration(registration) ? result : null;
   const notices = complianceNotices(valid, registration, earliestDelivery);
   return (
@@ -22,7 +28,7 @@ export function VehicleComplianceSummary({ registration, result, earliestDeliver
         </div>
       </div>
       <div aria-live="polite" className="space-y-1">
-        {notices.map(n => <p key={n.message} className={`text-xs leading-relaxed ${n.severity === "stop" ? "text-destructive font-semibold" : "text-foreground"}`}>{n.severity === "stop" ? "Do not drive — " : n.severity === "review" ? "Review — " : ""}{n.message}</p>)}
+        {notices.map(n => <p key={n.message} className={`text-xs leading-relaxed ${n.severity === "stop" ? "text-destructive font-semibold" : "text-foreground"}`}>{noticePrefix(n.severity)}{n.message}</p>)}
       </div>
       <p className="text-xs text-muted-foreground">DVLA · {valid?.checkedAt && Number.isFinite(Date.parse(valid.checkedAt)) ? new Date(valid.checkedAt).toLocaleString("en-GB", { timeZone: "Europe/London" }) + " UK" : "No verified timestamp"}</p>
       <p className="text-xs text-muted-foreground">Always verify insurance, roadworthiness and authorised trade plate use independently.</p>
@@ -30,7 +36,7 @@ export function VehicleComplianceSummary({ registration, result, earliestDeliver
   );
 }
 
-export function VehicleComplianceCard({ registration, earliestDelivery }: { registration: string; earliestDelivery?: string | null }) {
+export function VehicleComplianceCard({ registration, earliestDelivery }: Readonly<{ registration: string; earliestDelivery?: string | null }>) {
   const [result, setResult] = useState<VehicleLookupResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
