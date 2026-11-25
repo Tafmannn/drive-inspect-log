@@ -870,7 +870,9 @@ export const JobForm = () => {
                   variant="outline"
                   size="sm"
                   className="shrink-0 gap-1"
-
+                  disabled={routeLoading || dvlaBusy}
+                  onClick={async () => {
+                    if (!formRef.current || dvlaInFlight.current) return;
                     const fd = new FormData(formRef.current);
                     const reg = (fd.get("vehicle_reg") as string || "").trim();
                     if (!reg) {
