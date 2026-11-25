@@ -51,26 +51,11 @@ export async function listAcknowledgedEvidenceJobIds(): Promise<Set<string>> {
 
 /** Persist a dismissal so this job stops appearing in the missing-evidence queue. */
 export async function acknowledgeMissingEvidence(jobId: string, note?: string): Promise<void> {
-  const { data: auth } = await supabase.auth.getUser();
-  const acknowledged_by = auth.user?.id;
-  if (!acknowledged_by) throw new Error("Not authenticated");
-
-  // Best-effort dedupe: remove any prior ack for this job/exception pair so
-  // we never accumulate stale rows. The unique key is logical (job, exception).
-  await supabase
-    .from("attention_acknowledgements")
-    .delete()
-    .eq("exception_id", exceptionId(jobId));
-
-  const { error } = await supabase
-    .from("attention_acknowledgements")
-    .insert({
-      exception_id: exceptionId(jobId),
-      job_id: jobId,
-      acknowledged_by,
-      note: note ?? "Missing evidence dismissed by admin",
-    });
-
+  const { error } = await supabase.rpc("acknowledge_attention_exception", {
+    p_exception_id: exceptionId(jobId),
+    p_job_id: jobId,
+    p_note: note ?? "Missing evidence dismissed by admin",
+  });
   if (error) throw error;
 }
 
@@ -79,6 +64,7 @@ export async function unacknowledgeMissingEvidence(jobId: string): Promise<void>
   const { error } = await supabase
     .from("attention_acknowledgements")
     .delete()
-    .eq("exception_id", exceptionId(jobId));
+    .eq("exception_id", exceptionId(jobId))
+    .eq("job_id", jobId);
   if (error) throw error;
 }

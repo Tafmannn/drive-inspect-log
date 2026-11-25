@@ -71,6 +71,8 @@ describe("invoiced Abort fee correction", () => {
     });
     expect(confirm.hasAttribute("disabled")).toBe(true);
     fireEvent.click(screen.getByText("I confirm the client has agreed to this revised Abort fee."));
+    expect(confirm.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(screen.getByText("I authorise creation of a full credit note for the original invoice."));
     expect(confirm.hasAttribute("disabled")).toBe(false);
     fireEvent.click(confirm);
     await waitFor(() => {
@@ -78,7 +80,7 @@ describe("invoiced Abort fee correction", () => {
         abortId: "abort-1", originalInvoiceId: "invoice-1",
         newAmount: 275, expectedAmount: 240,
         reason: "Client confirmed a higher Abort fee", clientConfirmed: true,
-        multiJobAcknowledged: false, paidAcknowledged: false,
+        multiJobAcknowledged: false, paidAcknowledged: false, authoriseCredit: true,
       });
     });
   });
@@ -99,6 +101,8 @@ describe("invoiced Abort fee correction", () => {
     fireEvent.click(screen.getByText("I understand the whole invoice will be credited."));
     expect(confirm.hasAttribute("disabled")).toBe(true);
     fireEvent.click(screen.getByText("I will reconcile the original payment/refund separately."));
+    expect(confirm.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(screen.getByText("I authorise creation of a full credit note for the original invoice."));
     expect(confirm.hasAttribute("disabled")).toBe(false);
   });
 

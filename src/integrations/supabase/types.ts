@@ -78,6 +78,7 @@ export type Database = {
           exception_id: string
           id: string
           job_id: string | null
+          org_id: string | null
           note: string | null
           snoozed_until: string | null
         }
@@ -87,6 +88,7 @@ export type Database = {
           exception_id: string
           id?: string
           job_id?: string | null
+          org_id?: string | null
           note?: string | null
           snoozed_until?: string | null
         }
@@ -96,6 +98,7 @@ export type Database = {
           exception_id?: string
           id?: string
           job_id?: string | null
+          org_id?: string | null
           note?: string | null
           snoozed_until?: string | null
         }
@@ -3407,6 +3410,10 @@ export type Database = {
       can_actor_manage_target_user: {
         Args: { p_actor_user_id: string; p_target_user_id: string }
         Returns: boolean
+      }
+      acknowledge_attention_exception: {
+        Args: { p_exception_id: string; p_job_id?: string; p_org_id?: string; p_note?: string; p_snoozed_until?: string }
+        Returns: undefined
       }
       cancel_invoice_authorised: {
         Args: { p_invoice_id: string; p_reason: string; p_authorise_credit: boolean }

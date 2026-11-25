@@ -32,6 +32,7 @@ export interface AcknowledgementRow {
   id: string;
   exception_id: string;
   job_id: string | null;
+  org_id: string | null;
   acknowledged_by: string;
   note: string | null;
   snoozed_until: string | null;
@@ -123,16 +124,17 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
       const completedJobs = (completedJobsRes.data ?? []) as JobRow[];
       const logEntries = (logEntriesRes.data ?? []) as any[];
       const orgs = (orgsRes as any).data ?? [];
+      if (acksRes.error) throw acksRes.error;
       const acknowledgements = (acksRes.data ?? []) as AcknowledgementRow[];
       const docs = (docsRes.data ?? []) as any[];
       const drivers = (driversRes.data ?? []) as any[];
 
-      // Build ack lookup: exception_id -> ack row (most recent)
+      // Exception IDs are scoped by tenant, including platform-wide views.
       const ackMap = new Map<string, AcknowledgementRow>();
       for (const ack of acknowledgements) {
-        if (!ackMap.has(ack.exception_id)) {
-          ackMap.set(ack.exception_id, ack);
-        }
+        if (!ack.org_id) continue;
+        const key = JSON.stringify([ack.org_id, ack.exception_id]);
+        if (!ackMap.has(key)) ackMap.set(key, ack);
       }
 
       // Fetch inspections scoped to completed job IDs
@@ -221,7 +223,7 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
         if (!ack.exception_id.startsWith(EVIDENCE_PREFIX)) continue;
         if (ack.snoozed_until && ack.snoozed_until <= now) continue;
         const jobId = ack.job_id ?? ack.exception_id.slice(EVIDENCE_PREFIX.length);
-        if (jobId) evidenceAckedJobIds.add(jobId);
+        if (jobId && ack.org_id) evidenceAckedJobIds.add(JSON.stringify([ack.org_id, jobId]));
       }
 
       // Separate acknowledged vs active
@@ -230,11 +232,11 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
 
       for (const ex of allExceptions) {
         // Job-scoped evidence resolution → treat as acknowledged.
-        if (ex.category === "evidence" && ex.jobId && evidenceAckedJobIds.has(ex.jobId)) {
+        if (ex.category === "evidence" && ex.jobId && ex.orgId && evidenceAckedJobIds.has(JSON.stringify([ex.orgId, ex.jobId]))) {
           acknowledgedExceptions.push(ex);
           continue;
         }
-        const ack = ackMap.get(ex.id);
+        const ack = ex.orgId ? ackMap.get(JSON.stringify([ex.orgId, ex.id])) : undefined;
         if (ack) {
           // If snoozed and snooze hasn't expired, treat as acknowledged
           if (ack.snoozed_until && ack.snoozed_until > now) {

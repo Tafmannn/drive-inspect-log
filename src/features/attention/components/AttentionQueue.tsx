@@ -98,27 +98,21 @@ export function AttentionQueue({ exceptions, showOrg, loading, acknowledged = fa
     setSubmitting(true);
     const exId = ackDialog.exception.id;
     try {
-      const { error } = await supabase.from("attention_acknowledgements").insert({
-        exception_id: exId,
-        job_id: ackDialog.exception.jobId ?? null,
-        acknowledged_by: user.id,
-        note: note || null,
-        snoozed_until: mode === "snooze" ? new Date(Date.now() + 24 * 3600_000).toISOString() : null,
+      if (!ackDialog.exception.jobId && !ackDialog.exception.orgId) {
+        throw new Error("The organisation for this exception could not be verified.");
+      }
+      const { error } = await supabase.rpc("acknowledge_attention_exception", {
+        p_exception_id: exId,
+        p_job_id: ackDialog.exception.jobId,
+        p_org_id: ackDialog.exception.orgId,
+        p_note: note,
+        p_snoozed_until: mode === "snooze" ? new Date(Date.now() + 24 * 3600_000).toISOString() : undefined,
       });
       if (error) throw error;
       toast({ title: mode === "snooze" ? "Snoozed for 24h" : "Acknowledged" });
       setAckDialog(null);
       setNote("");
-      // Immediately remove from local cache for instant UI feedback
-      qc.setQueriesData({ queryKey: ["attention-center"] }, (old: any) => {
-        if (!old) return old;
-        return {
-          ...old,
-          exceptions: (old.exceptions ?? []).filter((e: any) => e.id !== exId),
-          acknowledgedExceptions: [...(old.acknowledgedExceptions ?? []), ackDialog.exception],
-          acknowledgedCount: (old.acknowledgedCount ?? 0) + 1,
-        };
-      });
+      // Refetch tenant-scoped queries; do not mutate caches across organisations.
       // Then refetch every admin operational surface to ensure consistency
       // — the resolved exception may also affect Needs Action / POD review /
       // operations bucket counts.
