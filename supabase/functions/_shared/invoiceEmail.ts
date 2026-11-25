@@ -13,8 +13,13 @@ function fmtGbp(n: number): string {
   return `£${n.toFixed(2)}`;
 }
 
+export function invoiceEmailSubject(invoiceNumber: string, documentType?: string | null): string {
+  return `Axentra ${documentType === "credit_note" ? "Credit Note" : "Invoice"} ${invoiceNumber}`;
+}
+
 export function renderInvoiceEmailHtml(opts: {
   invoiceNumber: string;
+  documentType?: string | null;
   clientName: string;
   total: number | null;
   issueDate: string;
@@ -24,11 +29,16 @@ export function renderInvoiceEmailHtml(opts: {
   logoUrl: string | null;
 }): string {
   const { invoiceNumber, clientName, total, issueDate, dueDate, downloadHref, packHref, logoUrl } = opts;
-  const dueLine = dueDate
+  const isCredit = opts.documentType === "credit_note";
+  const documentLabel = isCredit ? "credit note" : "invoice";
+  const titleLabel = isCredit ? "Credit Note" : "Invoice";
+  const amountLabel = isCredit ? "Total credit" : "Amount due";
+  const displayTotal = total != null && isCredit ? Math.abs(total) : total;
+  const dueLine = !isCredit && dueDate
     ? `<p style="margin:0 0 4px;"><strong>Due date:</strong> ${escapeHtml(dueDate)}</p>`
     : "";
-  const totalLine = total != null
-    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:12px 0 24px;"><tr><td bgcolor="#EEF4FA" style="background:#EEF4FA;border:1px solid #D4E2F0;border-radius:8px;padding:16px;color:#183B60;"><span style="font-size:13px;">Amount due</span><br><strong style="font-size:28px;line-height:1.3;">${escapeHtml(fmtGbp(total))}</strong></td></tr></table>`
+  const totalLine = displayTotal != null
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:12px 0 24px;"><tr><td bgcolor="#EEF4FA" style="background:#EEF4FA;border:1px solid #D4E2F0;border-radius:8px;padding:16px;color:#183B60;"><span style="font-size:13px;">${amountLabel}</span><br><strong style="font-size:28px;line-height:1.3;">${escapeHtml(fmtGbp(displayTotal))}</strong></td></tr></table>`
     : `<p style="margin:0 0 24px;"></p>`;
   return `<!doctype html>
 <html lang="en">
@@ -43,20 +53,20 @@ export function renderInvoiceEmailHtml(opts: {
               <td style="padding:24px 32px 32px;color:#172F52;font-size:15px;line-height:1.6;">
                 <p style="margin:0 0 16px;">Dear ${escapeHtml(clientName || "Customer")},</p>
                 <p style="margin:0 0 16px;">
-                  Please find your invoice <strong>${escapeHtml(invoiceNumber)}</strong> below.
+                  Please find your ${documentLabel} <strong>${escapeHtml(invoiceNumber)}</strong> below.
                 </p>
-                <p style="margin:0 0 4px;"><strong>Invoice date:</strong> ${escapeHtml(issueDate)}</p>
+                <p style="margin:0 0 4px;"><strong>${titleLabel} date:</strong> ${escapeHtml(issueDate)}</p>
                 ${dueLine}
                 ${totalLine}
                 <p style="margin:0 0 24px;text-align:center;">
                   <a href="${downloadHref}"
                      style="background:#172F52;color:#ffffff;text-decoration:none;padding:13px 20px;border-radius:8px;font-weight:bold;display:block;">
-                    Download Invoice PDF
+                    Download ${titleLabel} PDF
                   </a>
                 </p>
-                ${packHref ? `<p style="margin:0 0 24px;text-align:center;"><a href="${packHref}" style="background:#2B7DC9;color:#ffffff;text-decoration:none;padding:13px 20px;border-radius:8px;font-weight:bold;display:block;">Download Complete Invoice Pack (ZIP)</a></p><p style="margin:0 0 16px;">The pack contains the invoice and its supporting receipts and proof of delivery where applicable.</p>` : ""}
+                ${packHref ? `<p style="margin:0 0 24px;text-align:center;"><a href="${packHref}" style="background:#2B7DC9;color:#ffffff;text-decoration:none;padding:13px 20px;border-radius:8px;font-weight:bold;display:block;">Download Complete ${titleLabel} Pack (ZIP)</a></p><p style="margin:0 0 16px;">${isCredit ? "The pack contains the credit note and its supporting documents where applicable." : "The pack contains the invoice and its supporting receipts and proof of delivery where applicable."}</p>` : ""}
                 <p style="margin:0 0 16px;color:#576B85;font-size:13px;">Links expire in 30 days.</p>
-                <p style="margin:0 0 16px;">Payment details are shown on the invoice. Please use the invoice number as your payment reference.</p>
+                <p style="margin:0 0 16px;">${isCredit ? "This credit note records a credit to your account. No payment is requested by this document." : "Payment details are shown on the invoice. Please use the invoice number as your payment reference."}</p>
                 <p style="margin:24px 0 0;">Kind regards,<br/>Axentra Vehicle Logistics<br/>info@axentravehicles.com</p>
               </td>
             </tr>
