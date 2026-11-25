@@ -87,8 +87,13 @@ serve(async (req) => {
         year,
         fuelType: vehicle.fuelType || null,
         engineCapacity: vehicle.engineCapacity || null,
-        taxStatus: vehicle.taxStatus || null,
-        motStatus: vehicle.motStatus || null,
+        taxStatus: typeof vehicle.taxStatus === "string" ? vehicle.taxStatus : null,
+        motStatus: typeof vehicle.motStatus === "string" ? vehicle.motStatus : null,
+        motExpiryDate: typeof vehicle.motExpiryDate === "string" ? vehicle.motExpiryDate : typeof vehicle.motExpiry === "string" ? vehicle.motExpiry : null,
+        taxDueDate: typeof vehicle.taxDueDate === "string" ? vehicle.taxDueDate : null,
+        markedAsScrapped: typeof vehicle.markedAsScrapped === "boolean" ? vehicle.markedAsScrapped : null,
+        markedForExport: typeof vehicle.markedForExport === "boolean" ? vehicle.markedForExport : null,
+        checkedAt: new Date().toISOString(),
       }
     );
   } catch (e: unknown) {
