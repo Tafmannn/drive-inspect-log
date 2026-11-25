@@ -4,12 +4,16 @@ Branch `claude/axentra-staging-recovery-r97icv`. The executed apply set is pinne
 `2281b284745d88a7f813524a2418384670e40681`. Staging project `mfedxybzajdgavzmajkl`. Production
 project `lynkvfduzqdyvlzgriyh` was read only: catalogue queries, the ledger, 2 reference tables and advisors.
 
-## Decision (updated 25 Nov, 20:10 UTC): **GO** for development and integration testing on staging · **NO-GO** for release sign-off until Gate 7 covers inspections, POD, signatures, offline, credit notes and invoice packs
+## Decision (updated 25 Nov, late evening): **GO** for development and integration testing on staging · **NO-GO** for release sign-off until the remaining gaps below are closed
 
-The staging database now matches production and has passed real-identity security tests. It still
-cannot validate a full release, for two reasons:
-- No Edge Functions are deployed to staging (Gate 5).
-- Vercel previews are still wired to production (Gates 6 and 8).
+The staging database matches production, Edge Functions are deployed to staging, and the
+`deploy-preview/staging` preview builds against staging only. 108/108 staging regression checks pass
+(37 HTTP security, 22 inspection/POD workflow, 49 invoice lifecycle), plus 2,082/2,082 unit tests.
+
+Release sign-off is still blocked by:
+- **Untested on staging:** GCS file transport (signature/photo uploads), the app's own rendering of invoice-pack bytes, live e-mail/Google/DVLA delivery. Staging has no sandbox credentials for those providers.
+- **Isolation gap:** every preview branch other than `deploy-preview/staging` still inherits the production `VITE_SUPABASE_*` values (Gate 6 residual risk).
+- **Owner decisions** listed under *Blockers and minimum owner actions*.
 
 ## Gates
 
@@ -21,7 +25,7 @@ cannot validate a full release, for two reasons:
 | 4 Security | VERIFIED PASS (DB/API scope) | 15/15 security tests over HTTP with real sign-ins (`scripts/staging/regression/http-regression.mjs`) |
 | 5 Integrations | VERIFIED PASS (staging-safe; live integrations NOT TESTED) | 23/23 repository functions deployed from Git (`scripts/staging/deploy-staging-functions.sh`, commit `76d4875`). Bundle hashes match production for all 23 at `cf0c94e`, so there is zero source drift; 6 were redeployed with the e-mail guard. 7/7 function security tests pass with real JWTs. No provider secrets are set on staging, so e-mail, Google, GCS and DVLA are absent (fail closed), not live. |
 | 6 Environment isolation | VERIFIED PASS for the staging deployment (residual risk below) | Branch-scoped preview vars on `deploy-preview/staging` only. Vercel build log: `building against project mfedxybzajdgavzmajkl (VITE_APP_ENV=staging)`. The deployed `client-*.js` contains the staging URL/key only. In a browser session, all requests went to staging or localhost. Residual risk: every other preview branch still inherits the production values. |
-| 7 Regression | PARTIALLY COMPLETE | 59/59 staging tests pass (`http-regression.mjs` 37 and `workflow-regression.mjs` 22; both re-run to confirm they are repeatable), plus 2,082/2,082 unit tests. Credit notes, revised invoices, invoice packs and GCS file transport are NOT TESTED. |
+| 7 Regression | VERIFIED PASS except GCS transport | 108/108 staging checks pass: `http-regression.mjs` 37, `workflow-regression.mjs` 22 (both re-run to confirm they are repeatable) and `invoice-lifecycle-regression.sql` 49 (credit notes, revised invoices, invoice-pack storage access; fully rolled back). Plus 2,082/2,082 unit tests. GCS file transport is NOT TESTED (no staging credentials). |
 | 8 Deployment | VERIFIED PASS (limits below) | `dpl_GVQhaWKF1pMb2th4E8jNZPduXUQt` (preview, commit `a20a0ff`) is READY and serving: https://axentra-app-git-deploy-preview-staging-tafmannns-projects.vercel.app (Vercel Authentication protected). The identical build passed a Playwright sign-in as admin A and driver A against staging: correct org-scoped data, 0 page errors. |
 | 9 Production protection | VERIFIED PASS | Only `SELECT`s against production. No production deploy, merge or config change. The Vercel project was only read. |
 
@@ -155,8 +159,33 @@ Passed:
 - portal shows only own client's jobs; unsent invoices are hidden
 - digital ID: auto-issue, own-only, admin same-org, dual-role
 
-Not tested: inspections and evidence, signatures, offline retries, POD generation, completion/reopen,
-abort fee correction, credit notes, revised invoices, invoice packs, photo management, revocation UI.
+Covered since by the workflow suite (below): inspections and evidence, signatures (persisted URLs), offline retries, POD generation, completion/reopen.
+Covered since by the invoice suite (below): credit notes, revised invoices, invoice-pack storage.
+Still not tested: abort fee correction, photo management UI, revocation UI.
+
+## Credit notes, revised invoices and invoice packs (`scripts/staging/regression/invoice-lifecycle-regression.sql`, 49/49)
+Runs as the postgres role on staging via the Supabase MCP `execute_sql`. Each step impersonates a
+fixture identity (`role=authenticated` plus JWT claims), so RLS, triggers and `SECURITY DEFINER` checks
+apply exactly as they do for the app. The script always ends by raising an exception carrying the
+results, so **the whole run is rolled back**. Afterwards staging still had 4 invoices, 0 invoice
+lines, 0 `invoice-pdfs` objects and `last_credit_seq = 0`. Verified:
+- **Isolation:** another org's admin cannot see or cancel the invoice. Drivers see no invoices and cannot cancel. Portal users cannot read `invoices` directly.
+- **Invoice pack storage:** an admin stores the pack PDF and ZIP under `invoice-pdfs/<org>/pack-v1-<invoice>/…`. Another org's admin cannot write there or list it, and neither can a driver. The portal client cannot read the PDF before it is sent. After sending, the portal client can read **the PDF only, not the ZIP**. Another client cannot read either.
+- **Issued invoices cannot be changed:** a sent invoice's total, lines and status cannot be edited back to draft, and it cannot be deleted.
+- **Duplicate guard:** a job on a live invoice cannot be added to a second one (`JOB_ALREADY_INVOICED`).
+- **Credit notes:** cancelling requires a reason. Cancelling a sent invoice issues a credit note immediately, which:
+  - mirrors the subtotal, VAT and total negated
+  - is linked through `credits_invoice_id`
+  - leaves the original `cancelled` with its reason, and voids the original's lines
+
+  A credit note cannot be cancelled, edited or deleted. At most one exists per invoice. A cancelled invoice cannot be reopened.
+- **Portal:** the client sees the credit note (`portal_get_invoice` / `portal_list_invoices`) together with the original's number. Another client cannot see it (`NOT_FOUND`).
+- **Revised invoices:** after the credit, the same job goes onto a revised invoice and can be issued. Cancelling the revision issues the next credit number. Credit numbers are sequential and separate from the invoice series.
+- **Draft cancellation:** cancelling a draft raises no credit note and frees the job for a new invoice.
+- **Aborted jobs:** an aborted job whose fee is not approved cannot be invoiced (`ABORT_NOT_APPROVED`).
+- **Super admin:** sees org A's credit notes.
+
+**Limits:** the PDF/ZIP *bytes* are built in the browser (`buildCompleteInvoiceDelivery`) and are covered by unit tests. This suite tests storage access rules and database behaviour, not the rendered files.
 
 ## Edge Functions
 - **Deployed 25 Nov:** all 23 repository functions on staging, `verify_jwt=false` to mirror production. The deploy token cannot read production (HTTP 403), so it is effectively staging-scoped. Function tests:
@@ -194,27 +223,15 @@ abort fee correction, credit notes, revised invoices, invoice packs, photo manag
     the project (production scope).
 
 ## Blockers and minimum owner actions
-Items 1 and 2 were completed on 25 Nov: functions are deployed, and the staging preview is deployed with branch-scoped variables. Still open:
-- revoke the Supabase access token when you are finished with it (it cannot read production)
-- add sandbox provider secrets
-- narrow the production+preview `VITE_SUPABASE_*` variables to production only
+Done on 25 Nov: all 23 Edge Functions deployed to staging; `deploy-preview/staging` deployed with branch-scoped variables; credit-note, revised-invoice and invoice-pack checks added (49/49).
 
-1. **Edge Function deploy (Gate 5).** The only tool path pastes ~551 KB by hand, which is error-prone.
-   Choose one:
-   - (a) run `supabase functions deploy --project-ref mfedxybzajdgavzmajkl` locally from this branch, or
-   - (b) provide a deploy path from Git, e.g. a CI secret.
-
-   Then set staging-only secrets: test Resend key, sandbox Google/GCS project, `STAGING_EMAIL_ALLOWLIST`.
-   Do not copy production secrets.
-2. **Vercel (Gates 6/8).** Add *branch-scoped* preview variables for `deploy-preview/staging`:
-   - `VITE_SUPABASE_URL=https://mfedxybzajdgavzmajkl.supabase.co`
-   - the staging publishable key
-   - `VITE_APP_ENV=staging`
-
-   Then push `deploy-preview/staging`. Production variables stay untouched. Also consider narrowing
-   the existing production+preview variables to production only, so no other preview reaches production.
-3. **Owner review:** the orphan `driver_profiles` row; production's `verify-gcs-upload-fix` function;
-   leaked-password protection being off in production Auth.
+Still open, all **owner decisions** (none were changed by this work):
+1. **Revoke** the Supabase access token used for the staging deploy once you are finished with it. It cannot read production.
+2. **Staging e-mail key:** the `RESEND_API_KEY` on staging belongs to a Resend account in test mode. Replace it with a dedicated staging key or remove it. Set `STAGING_EMAIL_ALLOWLIST` if you need anything beyond `axentra-staging.test`.
+3. **Sandbox provider secrets** for staging (Google, GCS, DVLA), so GCS transport can be tested. Never copy production secrets.
+4. **Vercel:** narrow the existing production+preview `VITE_SUPABASE_URL/KEY` to **production only**, so no other preview branch reaches the production database. Separately, review the production service-role, JWT-secret and Postgres values that the Supabase integration placed in the Vercel project.
+5. **Orphan row:** delete the orphan `driver_profiles` row on staging, then `VALIDATE CONSTRAINT driver_profiles_user_id_fkey`.
+6. **Production review:** `verify-gcs-upload-fix` (deployed, not in Git); leaked-password protection is off in production Auth; capture the production-only permission subsystem in an idempotent baseline migration.
 
 ## Production findings (reported, not changed)
 - The permission subsystem and other objects exist only in production, not in Git.
