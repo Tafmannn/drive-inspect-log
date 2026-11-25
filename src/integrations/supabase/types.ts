@@ -3408,6 +3408,10 @@ export type Database = {
         Args: { p_actor_user_id: string; p_target_user_id: string }
         Returns: boolean
       }
+      cancel_invoice_authorised: {
+        Args: { p_invoice_id: string; p_reason: string; p_authorise_credit: boolean }
+        Returns: string
+      }
       cancel_invoice: {
         Args: { p_invoice_id: string; p_reason: string }
         Returns: string
@@ -3694,6 +3698,20 @@ export type Database = {
           p_expected_amount: number
           p_reason: string
           p_client_confirmed: boolean
+          p_multi_job_acknowledged?: boolean
+          p_paid_acknowledged?: boolean
+        }
+        Returns: Json
+      }
+      correct_invoiced_job_abort_fee_authorised: {
+        Args: {
+          p_abort_id: string
+          p_original_invoice_id: string
+          p_new_amount: number
+          p_expected_amount: number
+          p_reason: string
+          p_client_confirmed: boolean
+          p_authorise_credit: boolean
           p_multi_job_acknowledged?: boolean
           p_paid_acknowledged?: boolean
         }

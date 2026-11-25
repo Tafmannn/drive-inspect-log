@@ -34,6 +34,7 @@ export function AbortInvoiceCorrection({
   const [clientConfirmed, setClientConfirmed] = useState(false);
   const [multiAcknowledged, setMultiAcknowledged] = useState(false);
   const [paidAcknowledged, setPaidAcknowledged] = useState(false);
+  const [authoriseCredit, setAuthoriseCredit] = useState(false);
 
   if (details.isLoading) return <p className="text-xs text-muted-foreground">Loading invoice history…</p>;
   if (details.isError) {
@@ -50,7 +51,8 @@ export function AbortInvoiceCorrection({
     && reason.trim().length <= 500 && !problem && amount.trim() !== ""
     && Number(amount) !== abort.approved_amount && !correct.isPending
     && (activeInvoice.otherJobCount === 0 || multiAcknowledged)
-    && (activeInvoice.status !== "paid" || paidAcknowledged);
+    && (activeInvoice.status !== "paid" || paidAcknowledged)
+    && (activeInvoice.status === "draft" || authoriseCredit);
 
   const openCorrection = () => {
     setAmount(abort.approved_amount?.toFixed(2) ?? "");
@@ -58,6 +60,7 @@ export function AbortInvoiceCorrection({
     setClientConfirmed(false);
     setMultiAcknowledged(false);
     setPaidAcknowledged(false);
+    setAuthoriseCredit(false);
     setOpen(true);
   };
 
@@ -73,6 +76,7 @@ export function AbortInvoiceCorrection({
         clientConfirmed,
         multiJobAcknowledged: multiAcknowledged,
         paidAcknowledged,
+        authoriseCredit: activeInvoice.status !== "draft" && authoriseCredit,
       });
       setOpen(false);
       toast({
@@ -189,6 +193,13 @@ export function AbortInvoiceCorrection({
                   onCheckedChange={(value) => setClientConfirmed(value === true)} />
                 <span>I confirm the client has agreed to this revised Abort fee.</span>
               </label>
+              {activeInvoice.status !== "draft" && (
+                <label className="flex items-start gap-2 text-sm">
+                  <Checkbox checked={authoriseCredit} disabled={correct.isPending}
+                    onCheckedChange={(value) => setAuthoriseCredit(value === true)} />
+                  <span>I authorise creation of a full credit note for the original invoice.</span>
+                </label>
+              )}
               {activeInvoice.otherJobCount > 0 && (
                 <div className="space-y-2 rounded-lg border border-amber-400/40 bg-amber-500/5 p-3">
                   <p className="flex items-center gap-2 text-sm font-medium">
@@ -221,7 +232,7 @@ export function AbortInvoiceCorrection({
             <Button variant="outline" disabled={correct.isPending} onClick={() => setOpen(false)}>Keep original</Button>
             <Button disabled={!canSubmit} onClick={() => void submit()}>
               {correct.isPending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
-              Issue full credit & update fee
+              {activeInvoice?.status === "draft" ? "Cancel draft & update fee" : "Issue full credit & update fee"}
             </Button>
           </DialogFooter>
         </DialogContent>

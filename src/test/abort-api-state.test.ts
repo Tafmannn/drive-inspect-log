@@ -194,16 +194,17 @@ describe("Abort RPC API contracts", () => {
     await correctInvoicedAbortFee({
       abortId: "a1", originalInvoiceId: "inv-1", newAmount: 275,
       expectedAmount: 240, reason: "Client confirmed a higher Abort fee",
-      clientConfirmed: true, multiJobAcknowledged: true, paidAcknowledged: true,
+      clientConfirmed: true, multiJobAcknowledged: true, paidAcknowledged: true, authoriseCredit: true,
     });
     expect(mockState.rpcCalls[0]).toEqual({
-      fn: "correct_invoiced_job_abort_fee",
+      fn: "correct_invoiced_job_abort_fee_authorised",
       args: {
         p_abort_id: "a1", p_original_invoice_id: "inv-1",
         p_new_amount: 275, p_expected_amount: 240,
         p_reason: "Client confirmed a higher Abort fee",
         p_client_confirmed: true, p_multi_job_acknowledged: true,
         p_paid_acknowledged: true,
+        p_authorise_credit: true,
       },
     });
   });

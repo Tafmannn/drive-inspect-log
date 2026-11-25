@@ -88,6 +88,7 @@ export function useInvoiceActions(
   const [method, setMethod] = useState<string>(PAYMENT_METHODS[0].value);
   const [reference, setReference] = useState("");
   const [reason, setReason] = useState("");
+  const [authoriseCredit, setAuthoriseCredit] = useState(false);
 
   const refresh = (invoiceId: string) => {
     // Cancelling releases jobs and expenses, so the prep lists refresh too.
@@ -167,6 +168,7 @@ export function useInvoiceActions(
 
     cancel: (inv) => {
       setReason("");
+      setAuthoriseCredit(false);
       setCancelTarget(inv);
     },
   };
@@ -208,9 +210,9 @@ export function useInvoiceActions(
 
   const confirmCancel = async () => {
     const inv = cancelTarget;
-    if (!inv) return;
+    if (!inv || (inv.status !== "draft" && !authoriseCredit)) return;
     await run(inv, "cancel", async () => {
-      const creditNoteId = await cancelInvoice(inv.id, reason);
+      const creditNoteId = await cancelInvoice(inv.id, reason, inv.status !== "draft" && authoriseCredit);
       setCancelTarget(null);
       refresh(inv.id);
       toast({
@@ -318,11 +320,18 @@ export function useInvoiceActions(
               maxLength={300}
             />
           </div>
+          {cancelIssued && (
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" checked={authoriseCredit} disabled={cancelling}
+                onChange={(e) => setAuthoriseCredit(e.target.checked)} />
+              <span>I authorise creation of a full credit note for this invoice.</span>
+            </label>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setCancelTarget(null)} disabled={cancelling}>
               Keep invoice
             </Button>
-            <Button variant="destructive" onClick={() => void confirmCancel()} disabled={cancelling || !reason.trim()}>
+            <Button variant="destructive" onClick={() => void confirmCancel()} disabled={cancelling || !reason.trim() || (cancelIssued && !authoriseCredit)}>
               {cancelling && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
               {cancelIssued ? "Cancel and raise credit note" : "Cancel draft"}
             </Button>

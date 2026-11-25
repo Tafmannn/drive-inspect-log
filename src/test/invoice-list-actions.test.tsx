@@ -276,7 +276,7 @@ describe("invoice actions", () => {
     fireEvent.change(dialog.getByLabelText("Reason"), { target: { value: "Created by mistake" } });
     fireEvent.click(confirm);
 
-    await waitFor(() => expect(h.cancelInvoice).toHaveBeenCalledWith("AX26-1007", "Created by mistake"));
+    await waitFor(() => expect(h.cancelInvoice).toHaveBeenCalledWith("AX26-1007", "Created by mistake", false));
     await waitFor(() => expect(h.toasts[0].title).toBe("Draft invoice cancelled"));
   });
 
@@ -288,7 +288,12 @@ describe("invoice actions", () => {
     expect(dialog.getByText(/cancelled with a credit note for the full amount/)).toBeTruthy();
     expect(dialog.getByText(/refund the client separately/)).toBeTruthy();
     fireEvent.change(dialog.getByLabelText("Reason"), { target: { value: "Wrong PO" } });
-    fireEvent.click(dialog.getByRole("button", { name: "Cancel and raise credit note" }));
+    const creditButton = dialog.getByRole("button", { name: "Cancel and raise credit note" }) as HTMLButtonElement;
+    expect(creditButton.disabled).toBe(true);
+    fireEvent.click(dialog.getByRole("checkbox", { name: /I authorise creation/ }));
+    expect(creditButton.disabled).toBe(false);
+    fireEvent.click(creditButton);
+    await waitFor(() => expect(h.cancelInvoice).toHaveBeenCalledWith("AX26-1007", "Wrong PO", true));
     await waitFor(() => expect(h.toasts[0].title).toBe("Invoice cancelled — credit note raised"));
     expect(h.changed).toEqual(["AX26-1007"]);
   });
