@@ -23,6 +23,7 @@ import {
 } from "../_shared/customerStatusEmail.ts";
 import { resolveLogoUrl } from "../_shared/podEmail.ts";
 import { pickAppOrigin } from "../_shared/appOrigin.ts";
+import { emailDeliveryGate } from "../_shared/deliveryGuard.ts";
 
 const BATCH = 20;
 const MAX_ATTEMPTS = 5;
@@ -206,6 +207,11 @@ serve(async (req) => {
         const errors: string[] = [];
         // One email per person: recipients never see each other's address.
         for (const to of recipients) {
+          const gate = emailDeliveryGate(to);
+          if (!gate.send) {
+            errors.push(String(gate.reason));
+            continue;
+          }
           const resp = await fetch("https://api.resend.com/emails", {
             method: "POST",
             headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
