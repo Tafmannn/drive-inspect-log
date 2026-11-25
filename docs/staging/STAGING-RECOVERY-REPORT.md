@@ -19,7 +19,7 @@ cannot validate a full release, for two reasons:
 | 2 Recovery | VERIFIED PASS (limits below) | Encrypted archive restored into a disposable local PG 17.12 from ciphertext. 237/237 catalogue groups and 64/64 table digests identical. Live staging digests were re-checked as unchanged before the first write. |
 | 3 Database parity | VERIFIED PASS with 2 documented exceptions | Live staging vs production: 425/425 groups present; 4 groups differ, covering the 2 exceptions below. Live staging = rehearsal exactly. Extensions and security advisors are identical to production. |
 | 4 Security | VERIFIED PASS (DB/API scope) | 15/15 security tests over HTTP with real sign-ins (`scripts/staging/regression/http-regression.mjs`) |
-| 5 Integrations | BLOCKED | 0/24 functions deployed (see blockers). An e-mail delivery guard is implemented and unit-tested. |
+| 5 Integrations | VERIFIED PASS (staging-safe; live integrations NOT TESTED) | 23/23 repository functions deployed from Git (`scripts/staging/deploy-staging-functions.sh`, commit `76d4875`). Bundle hashes match production for all 23 at `cf0c94e`, so there is zero source drift; 6 were redeployed with the e-mail guard. 7/7 function security tests pass with real JWTs. No provider secrets are set on staging, so e-mail, Google, GCS and DVLA are absent (fail closed), not live. |
 | 6 Environment isolation | PARTIALLY COMPLETE | Build- and runtime fail-closed checks are proven. The Vercel preview scope is still production. |
 | 7 Regression | PARTIALLY COMPLETE | 30/30 HTTP tests and 2,082/2,082 unit tests pass. Inspections, POD, offline, signatures, credit notes and invoice packs were NOT TESTED (they need Edge Functions/storage). |
 | 8 Deployment | BLOCKED | No staging deployment made (depends on 5 and 6) |
@@ -143,9 +143,17 @@ Not tested: inspections and evidence, signatures, offline retries, POD generatio
 abort fee correction, credit notes, revised invoices, invoice packs, photo management, revocation UI.
 
 ## Edge Functions
+- **Deployed 25 Nov:** all 23 repository functions on staging, `verify_jwt=false` to mirror production. The deploy token cannot read production (HTTP 403), so it is effectively staging-scoped. Function tests:
+  - `promote-admin` returns 410
+  - `get-org-users` refuses anon/driver and stays org-scoped
+  - `user-lifecycle` refuses driver/portal users
+  - `portal-access` refuses cross-org admins
+  - `gcs-proxy` refuses a cross-org path (403)
+  - `notify-customers` refuses portal users and sends 0 on staging
+  - `send-invoice-email` sent nothing (it rejected the request on input validation; the e-mail guard is proven by unit tests)
 - **Inventory.** Production has 24 functions: the 23 repo functions plus **`verify-gcs-upload-fix`**,
   which is not in Git (production finding). All 24 run with `verify_jwt=false`; `config.toml`
-  declares that for only 6. Source drift vs repo was **NOT TESTED**: it needs a byte-exact deploy path.
+  declares that for only 6. Source drift vs repo: **none**. Deploying `cf0c94e` to staging reproduced production's `ezbr_sha256` for all 23 functions.
 - **Safety.** `_shared/deliveryGuard.ts` guards all 4 Resend send paths:
   - production is unchanged
   - staging sends only to `STAGING_EMAIL_ALLOWLIST` (default `axentra-staging.test`)
