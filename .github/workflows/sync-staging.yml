@@ -56,6 +56,9 @@ jobs:
           supabase db start
           mv "$RUNNER_TEMP/m/"*.sql supabase/migrations/
           export L=postgresql://postgres:postgres@127.0.0.1:54322/postgres
+          for e in $(psql "$STAGING_DB_URL" -Atc "select extname||':'||extnamespace::regnamespace from pg_extension where extname<>'plpgsql'"); do
+            psql "$L" -q -c "create extension if not exists \"${e%%:*}\" with schema ${e#*:}" 2>/dev/null || echo "extension ${e%%:*} not installable locally"
+          done
           psql "$L" -q -c "drop schema public cascade; create schema public;" 2>/dev/null
           pg_restore -l "$RUNNER_TEMP/bk/public.dump" | grep -v ' SCHEMA - public ' > "$RUNNER_TEMP/bk/public.list"
           pg_restore -d "$L" --no-owner --exit-on-error -L "$RUNNER_TEMP/bk/public.list" "$RUNNER_TEMP/bk/public.dump"
