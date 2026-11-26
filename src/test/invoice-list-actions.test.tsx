@@ -301,6 +301,43 @@ describe("invoice actions", () => {
     expect(h.changed).toEqual(["AX26-1007"]);
   });
 
+  it("defers an issued invoice correction for review without cancelling or crediting", async () => {
+    renderList([inv({ invoice_number: "AX26-1007", status: "sent" })]);
+    await choose("AX26-1007", /Cancel invoice/);
+    const dialog = within(await screen.findByRole("dialog"));
+    const later = dialog.getByRole("button", { name: "Review later" }) as HTMLButtonElement;
+    expect(later.disabled).toBe(true);
+    fireEvent.change(dialog.getByLabelText("Reason"), { target: { value: "  Check PO with client  " } });
+    expect(later.disabled).toBe(false);
+    fireEvent.click(later);
+
+    await waitFor(() => expect(h.defer).toHaveBeenCalledWith({ invoiceId: "AX26-1007", reason: "Check PO with client" }));
+    expect(h.cancelInvoice).not.toHaveBeenCalled();
+    await waitFor(() => expect(h.toasts[0]).toMatchObject({
+      title: "Correction saved for review",
+      description: "The original invoice and balances are unchanged.",
+    }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("reports a failed deferral and leaves the invoice untouched", async () => {
+    h.defer.mockRejectedValue(new Error("CORRECTION_ALREADY_PENDING"));
+    renderList([inv({ invoice_number: "AX26-1007", status: "paid" })]);
+    await choose("AX26-1007", /Cancel invoice/);
+    const dialog = within(await screen.findByRole("dialog"));
+    fireEvent.change(dialog.getByLabelText("Reason"), { target: { value: "Duplicate" } });
+    fireEvent.click(dialog.getByRole("button", { name: "Review later" }));
+    await waitFor(() => expect(h.toasts[0]).toMatchObject({ title: "Could not save correction", variant: "destructive" }));
+    expect(h.cancelInvoice).not.toHaveBeenCalled();
+  });
+
+  it("offers no deferral for a draft (nothing was issued)", async () => {
+    renderList([inv({ invoice_number: "AX26-1007" })]);
+    await choose("AX26-1007", /Cancel invoice/);
+    const dialog = within(await screen.findByRole("dialog"));
+    expect(dialog.queryByRole("button", { name: "Review later" })).toBeNull();
+  });
+
   it("keeps the invoice when the cancel dialog is dismissed", async () => {
     renderList([inv({ invoice_number: "AX26-1007" })]);
     await choose("AX26-1007", /Cancel invoice/);

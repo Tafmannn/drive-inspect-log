@@ -1,11 +1,24 @@
--- Requires the disposable invoice_lifecycle.test.sql fixtures. No persistent writes.
+-- Disposable/staging-equivalent database only. Self-contained synthetic
+-- fixtures, seeded as the superuser before switching to the authenticated
+-- role, so it does not depend on another scenario's (rolled-back) rows.
+-- The whole transaction is rolled back: no persistent writes.
 BEGIN;
-SET LOCAL ROLE authenticated;
-SELECT set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000aaaa',true);
--- New issued fixture: use existing org and avoid the already-cancelled originals.
+INSERT INTO public.organisations(id,name) VALUES
+ ('00000000-0000-0000-0000-0000000000a1','Synthetic Org A'),
+ ('00000000-0000-0000-0000-0000000000b1','Synthetic Org B');
+INSERT INTO auth.users(id,email) VALUES
+ ('00000000-0000-0000-0000-00000000aaaa','defer-admin-a@example.test'),
+ ('00000000-0000-0000-0000-00000000bbbb','defer-admin-b@example.test');
+INSERT INTO public.user_profiles(auth_user_id,org_id,role,account_status,email) VALUES
+ ('00000000-0000-0000-0000-00000000aaaa','00000000-0000-0000-0000-0000000000a1','admin','active','defer-admin-a@example.test'),
+ ('00000000-0000-0000-0000-00000000bbbb','00000000-0000-0000-0000-0000000000b1','admin','active','defer-admin-b@example.test')
+ ON CONFLICT(auth_user_id) DO UPDATE SET org_id=EXCLUDED.org_id,role=EXCLUDED.role,account_status=EXCLUDED.account_status;
+-- Issued (sent) invoice belonging to org A.
 INSERT INTO public.invoices(id,org_id,client_name,invoice_number,subtotal,total)
 VALUES ('d5d00000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000a1','Synthetic client','DEFER-TEST',100,100);
 UPDATE public.invoices SET status='sent',sent_at=now() WHERE id='d5d00000-0000-0000-0000-000000000001';
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub','00000000-0000-0000-0000-00000000aaaa',true);
 DO $$ DECLARE v_id uuid; BEGIN
  v_id:=public.defer_invoice_correction('d5d00000-0000-0000-0000-000000000001','Check reference');
  ASSERT v_id=public.defer_invoice_correction('d5d00000-0000-0000-0000-000000000001','Check reference'), 'idempotent defer';
