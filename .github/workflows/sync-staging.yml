@@ -56,7 +56,7 @@ jobs:
           supabase db start
           mv "$RUNNER_TEMP/m/"*.sql supabase/migrations/
           export L=postgresql://postgres:postgres@127.0.0.1:54322/postgres
-          psql "$L" -q -c "drop schema public cascade; create schema public;"
+          psql "$L" -q -c "drop schema public cascade;"
           pg_restore -d "$L" --no-owner --exit-on-error "$RUNNER_TEMP/bk/public.dump"
           psql "$L" -q -c "create schema if not exists supabase_migrations; create table if not exists supabase_migrations.schema_migrations (version text primary key, statements text[], name text);"
           pg_restore -d "$L" --no-owner --data-only --disable-triggers --exit-on-error "$RUNNER_TEMP/bk/platform.dump"
