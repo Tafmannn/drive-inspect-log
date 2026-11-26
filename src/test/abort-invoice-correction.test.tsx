@@ -15,6 +15,7 @@ const state = vi.hoisted(() => ({
   },
   corrections: [] as Array<Record<string, unknown>>,
   mutate: vi.fn(),
+  defer: vi.fn(),
 }));
 vi.mock("@/context/AuthContext", () => ({
   useAuth: () => ({ isSuperAdmin: state.superAdmin }),
@@ -29,6 +30,7 @@ vi.mock("@/features/abort/hooks/useAbort", () => ({
   useCorrectInvoicedAbortFee: () => ({ isPending: false, mutateAsync: state.mutate }),
 }));
 vi.mock("@/hooks/use-toast", () => ({ toast: vi.fn() }));
+vi.mock("@/features/invoicing/api/invoiceCorrectionRequests", () => ({ useDeferInvoiceCorrection: () => ({ isPending: false, mutateAsync: state.defer }) }));
 
 const abort = {
   id: "abort-1", job_id: "job-1", agreed_price: 240, approved_amount: 240,
@@ -49,6 +51,7 @@ beforeEach(() => {
     total: 240, client_id: "client-1", otherJobCount: 0,
   };
   state.corrections = [];
+  state.defer.mockReset().mockResolvedValue("request-1");
   state.mutate.mockReset();
   state.mutate.mockResolvedValue({
     correctionId: "correction-1", creditNoteId: "credit-1",
@@ -71,6 +74,8 @@ describe("invoiced Abort fee correction", () => {
     });
     expect(confirm.hasAttribute("disabled")).toBe(true);
     fireEvent.click(screen.getByText("I confirm the client has agreed to this revised Abort fee."));
+    expect(confirm.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(screen.getByText("I authorise creation of a full credit note for the original invoice."));
     expect(confirm.hasAttribute("disabled")).toBe(false);
     fireEvent.click(confirm);
     await waitFor(() => {
@@ -78,7 +83,7 @@ describe("invoiced Abort fee correction", () => {
         abortId: "abort-1", originalInvoiceId: "invoice-1",
         newAmount: 275, expectedAmount: 240,
         reason: "Client confirmed a higher Abort fee", clientConfirmed: true,
-        multiJobAcknowledged: false, paidAcknowledged: false,
+        multiJobAcknowledged: false, paidAcknowledged: false, authoriseCredit: true, expectedInvoiceStatus: "sent", expectedInvoiceTotal: 240,
       });
     });
   });
@@ -99,7 +104,23 @@ describe("invoiced Abort fee correction", () => {
     fireEvent.click(screen.getByText("I understand the whole invoice will be credited."));
     expect(confirm.hasAttribute("disabled")).toBe(true);
     fireEvent.click(screen.getByText("I will reconcile the original payment/refund separately."));
+    expect(confirm.hasAttribute("disabled")).toBe(true);
+    fireEvent.click(screen.getByText("I authorise creation of a full credit note for the original invoice."));
     expect(confirm.hasAttribute("disabled")).toBe(false);
+  });
+
+  it("defers a correction without authorising a credit note or amending the fee", async () => {
+    renderCorrection();
+    fireEvent.click(screen.getByRole("button", { name: "Correct invoiced Abort fee" }));
+    fireEvent.change(screen.getByLabelText("Client-confirmed revised Abort fee (£)"), { target: { value: "275" } });
+    fireEvent.change(screen.getByLabelText("Reason for correction"), { target: { value: "Client agreed a revised fee" } });
+    fireEvent.click(screen.getByText("I confirm the client has agreed to this revised Abort fee."));
+    fireEvent.click(screen.getByRole("button", { name: "Review later" }));
+    await waitFor(() => expect(state.defer).toHaveBeenCalledWith({
+      invoiceId: "invoice-1", reason: "Client agreed a revised fee", abortId: "abort-1",
+      revisedFee: 275, expectedFee: 240, clientConfirmed: true,
+    }));
+    expect(state.mutate).not.toHaveBeenCalled();
   });
 
   it("does not offer a credit correction to ordinary administrators", () => {

@@ -217,9 +217,10 @@ describe("cancelInvoice", () => {
 
   it("returns the credit note id for an issued invoice, null for a draft", async () => {
     h.rpc.mockResolvedValueOnce({ data: "cn-1", error: null });
-    await expect(cancelInvoice("inv-1", " Wrong PO ")).resolves.toBe("cn-1");
-    expect(h.rpc).toHaveBeenCalledWith("cancel_invoice", { p_invoice_id: "inv-1", p_reason: "Wrong PO" });
+    await expect(cancelInvoice("inv-1", " Wrong PO ", true, "sent", 100)).resolves.toBe("cn-1");
+    expect(h.rpc).toHaveBeenCalledWith("cancel_invoice_authorised", { p_invoice_id: "inv-1", p_reason: "Wrong PO", p_authorise_credit: true, p_expected_status: "sent", p_expected_total: 100 });
     await expect(cancelInvoice("inv-1", "Mistake")).resolves.toBeNull();
+    expect(h.rpc).toHaveBeenLastCalledWith("cancel_invoice_authorised", { p_invoice_id: "inv-1", p_reason: "Mistake", p_authorise_credit: false, p_expected_status: undefined, p_expected_total: undefined });
   });
 
   it("passes the database's refusal through", async () => {

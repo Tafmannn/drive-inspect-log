@@ -130,11 +130,14 @@ export async function markInvoiceUnpaid(invoiceId: string): Promise<void> {
  * expenses become available to invoice again.
  * Returns the credit note's id, or null when none was raised.
  */
-export async function cancelInvoice(invoiceId: string, reason: string): Promise<string | null> {
+export async function cancelInvoice(invoiceId: string, reason: string, authoriseCredit = false, expectedStatus?: string, expectedTotal?: number): Promise<string | null> {
   if (!reason.trim()) throw new Error("Enter a reason for cancelling this invoice.");
-  const { data, error } = await supabase.rpc("cancel_invoice", {
+  const { data, error } = await supabase.rpc("cancel_invoice_authorised", {
     p_invoice_id: invoiceId,
     p_reason: reason.trim(),
+    p_authorise_credit: authoriseCredit,
+    p_expected_status: expectedStatus,
+    p_expected_total: expectedTotal,
   });
   if (error) throw new Error(error.message);
   return (data as string | null) ?? null;

@@ -52,6 +52,7 @@ import { PricingAuditTimeline } from "@/components/PricingAuditTimeline";
 import { JobPriceEditor } from "@/components/JobPriceEditor";
 import { RoleScope, EvidenceHealthBanner, JobHeaderCard } from "@/components/ui-kit";
 import { JobAdminControls } from "@/features/jobs/components/JobAdminControls";
+import { VehicleComplianceCard } from "@/features/jobs/components/VehicleComplianceCard";
 import { SuperAdminStatusOverride } from "@/features/jobs/components/SuperAdminStatusOverride";
 import { evaluateEvidenceHealth } from "@/lib/evidenceHealth";
 import { useEvidenceOverrides } from "@/hooks/useEvidenceOverrides";
@@ -390,6 +391,10 @@ export const JobDetail = () => {
             </div>
           )}
         </JobHeaderCard>
+
+        {(["ready_for_pickup", "assigned", "pickup_in_progress"].includes(job.status)) && (
+          <VehicleComplianceCard key={`${job.id}:${job.vehicle_reg}`} registration={job.vehicle_reg || ""} earliestDelivery={job.earliest_delivery_date} />
+        )}
 
         {/* ── 2. ALERT STRIP ── */}
         {restrictions.length > 0 && (

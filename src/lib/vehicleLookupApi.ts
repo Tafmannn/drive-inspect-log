@@ -7,7 +7,30 @@ export interface VehicleLookupResult {
   colour?: string;
   year?: string;
   fuelType?: string | null;
+  engineCapacity?: number | null;
+  taxStatus?: string | null;
+  motStatus?: string | null;
+  motExpiryDate?: string | null;
+  taxDueDate?: string | null;
+  markedAsScrapped?: boolean | null;
+  markedForExport?: boolean | null;
+  checkedAt?: string | null;
   error?: string;
+}
+
+/** User-facing text for the lookup function's error codes (unknown codes are shown as given). */
+const LOOKUP_ERRORS: Record<string, string> = {
+  BAD_REG: "Enter a valid registration.",
+  "Invalid registration": "Enter a valid registration.",
+  DVLA_UNAVAILABLE: "DVLA is not responding. Try again shortly; MOT and tax remain unverified.",
+  DVLA_AUTH_FAILED: "DVLA lookup is not available (service authentication failed). Contact your admin.",
+  DVLA_INVALID_RESPONSE: "DVLA returned an unreadable response. MOT and tax remain unverified.",
+  DVLA_ERROR: "DVLA could not check this registration. MOT and tax remain unverified.",
+  INTERNAL: "DVLA lookup failed. Please try again.",
+};
+
+export function lookupErrorMessage(code: string): string {
+  return LOOKUP_ERRORS[code] ?? code;
 }
 
 export async function lookupVehicle(registration: string): Promise<VehicleLookupResult> {
@@ -34,7 +57,7 @@ export async function lookupVehicle(registration: string): Promise<VehicleLookup
   }
 
   if (data?.error) {
-    return { success: false, error: data.error };
+    return { success: false, error: lookupErrorMessage(String(data.error)) };
   }
 
   return data as VehicleLookupResult;

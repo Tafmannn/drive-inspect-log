@@ -18,7 +18,7 @@ type AbortRpcName =
   | "confirm_job_abort"
   | "review_job_abort_claim"
   | "amend_approved_job_abort_claim"
-  | "correct_invoiced_job_abort_fee"
+  | "correct_invoiced_job_abort_fee_authorised"
   | "notify_customer_job_aborted"
   | "create_abort_replacement_job";
 
@@ -189,6 +189,9 @@ export function correctInvoicedAbortFee(input: {
   clientConfirmed: boolean;
   multiJobAcknowledged: boolean;
   paidAcknowledged: boolean;
+  authoriseCredit: boolean;
+  expectedInvoiceStatus: string;
+  expectedInvoiceTotal?: number;
 }): Promise<{
   correctionId: string;
   creditNoteId: string | null;
@@ -204,7 +207,7 @@ export function correctInvoicedAbortFee(input: {
     approvedAmount: number;
     otherJobsToReinvoice: number;
     originalWasPaid: boolean;
-  }, "correct_invoiced_job_abort_fee">("correct_invoiced_job_abort_fee", {
+  }, "correct_invoiced_job_abort_fee_authorised">("correct_invoiced_job_abort_fee_authorised", {
     p_abort_id: input.abortId,
     p_original_invoice_id: input.originalInvoiceId,
     p_new_amount: input.newAmount,
@@ -213,6 +216,9 @@ export function correctInvoicedAbortFee(input: {
     p_client_confirmed: input.clientConfirmed,
     p_multi_job_acknowledged: input.multiJobAcknowledged,
     p_paid_acknowledged: input.paidAcknowledged,
+    p_authorise_credit: input.authoriseCredit,
+    p_expected_invoice_status: input.expectedInvoiceStatus,
+    p_expected_invoice_total: input.expectedInvoiceTotal,
   });
 }
 

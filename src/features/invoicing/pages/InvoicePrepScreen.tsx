@@ -50,6 +50,7 @@ import { useBillableExpenses, useOrgInvoiceSettings } from "../hooks/useInvoiceS
 import { useInvoiceActions } from "../hooks/useInvoiceActions";
 import { ExpensePicker } from "../components/ExpensePicker";
 import { InvoiceList, InvoiceStatusBadge } from "../components/InvoiceList";
+import { InvoiceCorrectionQueue } from "../components/InvoiceCorrectionQueue";
 import { fuelPolicyInvoiceNote, rechargeCategoriesFor } from "@/lib/fuelPolicy";
 import { settingsToPdfFields } from "../api/invoiceDocument";
 import { downloadBlob } from "../api/receiptExport";
@@ -1006,6 +1007,8 @@ export function InvoicePrepScreen() {
           </ControlSection>
         </>
       )}
+
+      <InvoiceCorrectionQueue onReview={(invoice, reason) => actions.cancel(invoice, reason)} />
 
       {/* Every invoice and credit note, with status + actions */}
       <ControlSection

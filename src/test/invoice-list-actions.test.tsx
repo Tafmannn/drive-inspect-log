@@ -25,6 +25,7 @@ const h = vi.hoisted(() => {
   return {
     getInvoicePdf: fn(), markInvoiceSent: fn(), markInvoicePaid: fn(), markInvoiceUnpaid: fn(), cancelInvoice: fn(),
     buildInvoicePack: fn(), emailInvoice: fn(), buildInvoiceDocument: fn(), prepareInvoiceDelivery: fn(), markPreparedInvoiceSent: fn(),
+    defer: vi.fn(),
     downloads: [] as string[],
     toasts: [] as { title?: string; description?: string; variant?: string }[],
     changed: [] as string[],
@@ -32,6 +33,7 @@ const h = vi.hoisted(() => {
 });
 
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
+vi.mock("@/features/invoicing/api/invoiceCorrectionRequests", () => ({ deferInvoiceCorrection: (...a: unknown[]) => h.defer(...a) }));
 vi.mock("@/hooks/use-toast", () => ({ toast: (t: { title?: string }) => h.toasts.push(t) }));
 vi.mock("@/features/invoicing/api/invoiceLifecycle", () => ({
   PAYMENT_METHODS: [
@@ -126,6 +128,7 @@ beforeEach(() => {
   h.markInvoicePaid = vi.fn().mockResolvedValue(undefined);
   h.markInvoiceUnpaid = vi.fn().mockResolvedValue(undefined);
   h.cancelInvoice = vi.fn().mockResolvedValue(null);
+  h.defer.mockReset().mockResolvedValue("request-1");
   h.buildInvoicePack = vi.fn().mockResolvedValue({ blob, fileName: "invoice_pack_X.zip", succeeded: 2, failed: [] });
   h.emailInvoice = vi.fn().mockResolvedValue({ recipient: "ap@cje.example", pdfPath: "p" });
   h.buildInvoiceDocument = vi.fn().mockResolvedValue({ invoiceNumber: "X", lineItems: [] });
@@ -276,7 +279,7 @@ describe("invoice actions", () => {
     fireEvent.change(dialog.getByLabelText("Reason"), { target: { value: "Created by mistake" } });
     fireEvent.click(confirm);
 
-    await waitFor(() => expect(h.cancelInvoice).toHaveBeenCalledWith("AX26-1007", "Created by mistake"));
+    await waitFor(() => expect(h.cancelInvoice).toHaveBeenCalledWith("AX26-1007", "Created by mistake", false, "draft", 100));
     await waitFor(() => expect(h.toasts[0].title).toBe("Draft invoice cancelled"));
   });
 
@@ -288,9 +291,51 @@ describe("invoice actions", () => {
     expect(dialog.getByText(/cancelled with a credit note for the full amount/)).toBeTruthy();
     expect(dialog.getByText(/refund the client separately/)).toBeTruthy();
     fireEvent.change(dialog.getByLabelText("Reason"), { target: { value: "Wrong PO" } });
-    fireEvent.click(dialog.getByRole("button", { name: "Cancel and raise credit note" }));
+    const creditButton = dialog.getByRole("button", { name: "Cancel and raise credit note" }) as HTMLButtonElement;
+    expect(creditButton.disabled).toBe(true);
+    fireEvent.click(dialog.getByRole("checkbox", { name: /I authorise creation/ }));
+    expect(creditButton.disabled).toBe(false);
+    fireEvent.click(creditButton);
+    await waitFor(() => expect(h.cancelInvoice).toHaveBeenCalledWith("AX26-1007", "Wrong PO", true, "paid", 100));
     await waitFor(() => expect(h.toasts[0].title).toBe("Invoice cancelled — credit note raised"));
     expect(h.changed).toEqual(["AX26-1007"]);
+  });
+
+  it("defers an issued invoice correction for review without cancelling or crediting", async () => {
+    renderList([inv({ invoice_number: "AX26-1007", status: "sent" })]);
+    await choose("AX26-1007", /Cancel invoice/);
+    const dialog = within(await screen.findByRole("dialog"));
+    const later = dialog.getByRole("button", { name: "Review later" }) as HTMLButtonElement;
+    expect(later.disabled).toBe(true);
+    fireEvent.change(dialog.getByLabelText("Reason"), { target: { value: "  Check PO with client  " } });
+    expect(later.disabled).toBe(false);
+    fireEvent.click(later);
+
+    await waitFor(() => expect(h.defer).toHaveBeenCalledWith({ invoiceId: "AX26-1007", reason: "Check PO with client" }));
+    expect(h.cancelInvoice).not.toHaveBeenCalled();
+    await waitFor(() => expect(h.toasts[0]).toMatchObject({
+      title: "Correction saved for review",
+      description: "The original invoice and balances are unchanged.",
+    }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("reports a failed deferral and leaves the invoice untouched", async () => {
+    h.defer.mockRejectedValue(new Error("CORRECTION_ALREADY_PENDING"));
+    renderList([inv({ invoice_number: "AX26-1007", status: "paid" })]);
+    await choose("AX26-1007", /Cancel invoice/);
+    const dialog = within(await screen.findByRole("dialog"));
+    fireEvent.change(dialog.getByLabelText("Reason"), { target: { value: "Duplicate" } });
+    fireEvent.click(dialog.getByRole("button", { name: "Review later" }));
+    await waitFor(() => expect(h.toasts[0]).toMatchObject({ title: "Could not save correction", variant: "destructive" }));
+    expect(h.cancelInvoice).not.toHaveBeenCalled();
+  });
+
+  it("offers no deferral for a draft (nothing was issued)", async () => {
+    renderList([inv({ invoice_number: "AX26-1007" })]);
+    await choose("AX26-1007", /Cancel invoice/);
+    const dialog = within(await screen.findByRole("dialog"));
+    expect(dialog.queryByRole("button", { name: "Review later" })).toBeNull();
   });
 
   it("keeps the invoice when the cancel dialog is dismissed", async () => {

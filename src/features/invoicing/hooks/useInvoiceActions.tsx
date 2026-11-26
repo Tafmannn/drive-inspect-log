@@ -35,6 +35,7 @@ import { invoicePdfFileName } from "@/lib/invoicePdf";
 import type { InvoiceRecord } from "./useInvoices";
 import { buildInvoiceDocument, type OrgInvoiceSettings } from "../api/invoiceDocument";
 import { emailInvoice } from "../api/emailInvoice";
+import { deferInvoiceCorrection } from "../api/invoiceCorrectionRequests";
 import {
   cancelInvoice,
   getInvoicePdf,
@@ -55,7 +56,7 @@ export interface InvoiceActions {
   markSent: (inv: InvoiceRecord) => void;
   recordPayment: (inv: InvoiceRecord) => void;
   undoPayment: (inv: InvoiceRecord) => void;
-  cancel: (inv: InvoiceRecord) => void;
+  cancel: (inv: InvoiceRecord, initialReason?: string) => void;
 }
 
 function todayIso(): string {
@@ -88,6 +89,7 @@ export function useInvoiceActions(
   const [method, setMethod] = useState<string>(PAYMENT_METHODS[0].value);
   const [reference, setReference] = useState("");
   const [reason, setReason] = useState("");
+  const [authoriseCredit, setAuthoriseCredit] = useState(false);
 
   const refresh = (invoiceId: string) => {
     // Cancelling releases jobs and expenses, so the prep lists refresh too.
@@ -165,8 +167,9 @@ export function useInvoiceActions(
       }, "Could not undo the payment");
     },
 
-    cancel: (inv) => {
-      setReason("");
+    cancel: (inv, initialReason) => {
+      setReason(initialReason ?? "");
+      setAuthoriseCredit(false);
       setCancelTarget(inv);
     },
   };
@@ -208,9 +211,9 @@ export function useInvoiceActions(
 
   const confirmCancel = async () => {
     const inv = cancelTarget;
-    if (!inv) return;
+    if (!inv || (inv.status !== "draft" && !authoriseCredit)) return;
     await run(inv, "cancel", async () => {
-      const creditNoteId = await cancelInvoice(inv.id, reason);
+      const creditNoteId = await cancelInvoice(inv.id, reason, inv.status !== "draft" && authoriseCredit, inv.status ?? undefined, inv.total ?? undefined);
       setCancelTarget(null);
       refresh(inv.id);
       toast({
@@ -218,6 +221,17 @@ export function useInvoiceActions(
         description: `${inv.invoice_number}: its jobs and expenses can be invoiced again.`,
       });
     }, "Could not cancel the invoice");
+  };
+
+  const deferCancel = async () => {
+    const inv = cancelTarget;
+    if (!inv || inv.status === "draft" || !reason.trim()) return;
+    await run(inv, "cancel", async () => {
+      await deferInvoiceCorrection({ invoiceId: inv.id, reason: reason.trim() });
+      setCancelTarget(null);
+      void queryClient.invalidateQueries({ queryKey: ["invoicing", "corrections"] });
+      toast({ title: "Correction saved for review", description: "The original invoice and balances are unchanged." });
+    }, "Could not save correction");
   };
 
   const emailing = !!emailTarget && busy === `${emailTarget.id}:email`;
@@ -301,7 +315,7 @@ export function useInvoiceActions(
             <DialogTitle>Cancel invoice {cancelTarget?.invoice_number}</DialogTitle>
             <DialogDescription>
               {cancelIssued
-                ? "This invoice has been issued, so it is cancelled with a credit note for the full amount. Both stay on record. Send the credit note to the client."
+                ? "If you authorise this correction, the issued invoice is cancelled with a credit note for the full amount. Both stay on record. Sending the credit note is a separate action."
                 : "This draft was never issued, so it is cancelled without a credit note. Its number is not reused."}{" "}
               Its jobs and expenses become available to invoice again. This cannot be undone.
               {cancelTarget?.status === "paid" && " The invoice is marked as paid — refund the client separately."}
@@ -318,11 +332,22 @@ export function useInvoiceActions(
               maxLength={300}
             />
           </div>
+          {cancelIssued && cancelTarget?.total != null && (
+            <p className="text-sm font-medium">Full credit amount: £{Number(cancelTarget.total).toFixed(2)}</p>
+          )}
+          {cancelIssued && (
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" checked={authoriseCredit} disabled={cancelling}
+                onChange={(e) => setAuthoriseCredit(e.target.checked)} />
+              <span>I authorise creation of a full credit note for this invoice.</span>
+            </label>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setCancelTarget(null)} disabled={cancelling}>
               Keep invoice
             </Button>
-            <Button variant="destructive" onClick={() => void confirmCancel()} disabled={cancelling || !reason.trim()}>
+            {cancelIssued && <Button variant="outline" disabled={cancelling || !reason.trim()} onClick={() => void deferCancel()}>Review later</Button>}
+            <Button variant="destructive" onClick={() => void confirmCancel()} disabled={cancelling || !reason.trim() || (cancelIssued && !authoriseCredit)}>
               {cancelling && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
               {cancelIssued ? "Cancel and raise credit note" : "Cancel draft"}
             </Button>

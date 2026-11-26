@@ -71,6 +71,27 @@ export type Database = {
         }
         Relationships: []
       }
+      invoice_correction_requests: {
+        Row: {
+          id: string
+          org_id: string
+          invoice_id: string
+          invoice_number: string
+          abort_id: string | null
+          job_id: string | null
+          reason: string
+          revised_fee: number | null
+          expected_fee: number | null
+          requested_by: string
+          created_at: string
+          status: string
+          closed_at: string | null
+          closed_by: string | null
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
       attention_acknowledgements: {
         Row: {
           acknowledged_by: string
@@ -78,6 +99,7 @@ export type Database = {
           exception_id: string
           id: string
           job_id: string | null
+          org_id: string | null
           note: string | null
           snoozed_until: string | null
         }
@@ -87,6 +109,7 @@ export type Database = {
           exception_id: string
           id?: string
           job_id?: string | null
+          org_id?: string | null
           note?: string | null
           snoozed_until?: string | null
         }
@@ -96,6 +119,7 @@ export type Database = {
           exception_id?: string
           id?: string
           job_id?: string | null
+          org_id?: string | null
           note?: string | null
           snoozed_until?: string | null
         }
@@ -3408,6 +3432,22 @@ export type Database = {
         Args: { p_actor_user_id: string; p_target_user_id: string }
         Returns: boolean
       }
+      acknowledge_attention_exception: {
+        Args: { p_exception_id: string; p_job_id?: string; p_org_id?: string; p_note?: string; p_snoozed_until?: string }
+        Returns: undefined
+      }
+      defer_invoice_correction: {
+        Args: { p_invoice_id: string; p_reason: string; p_abort_id?: string; p_revised_fee?: number; p_expected_fee?: number; p_client_confirmed?: boolean }
+        Returns: string
+      }
+      withdraw_invoice_correction: {
+        Args: { p_request_id: string }
+        Returns: undefined
+      }
+      cancel_invoice_authorised: {
+        Args: { p_invoice_id: string; p_reason: string; p_authorise_credit: boolean; p_expected_status?: string; p_expected_total?: number }
+        Returns: string
+      }
       cancel_invoice: {
         Args: { p_invoice_id: string; p_reason: string }
         Returns: string
@@ -3694,6 +3734,22 @@ export type Database = {
           p_expected_amount: number
           p_reason: string
           p_client_confirmed: boolean
+          p_multi_job_acknowledged?: boolean
+          p_paid_acknowledged?: boolean
+        }
+        Returns: Json
+      }
+      correct_invoiced_job_abort_fee_authorised: {
+        Args: {
+          p_abort_id: string
+          p_original_invoice_id: string
+          p_new_amount: number
+          p_expected_amount: number
+          p_reason: string
+          p_client_confirmed: boolean
+          p_authorise_credit: boolean
+          p_expected_invoice_status?: string
+          p_expected_invoice_total?: number
           p_multi_job_acknowledged?: boolean
           p_paid_acknowledged?: boolean
         }
