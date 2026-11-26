@@ -36,11 +36,16 @@ INSERT INTO auth.users (id,email) VALUES
  ('d2d00000-0000-0000-0000-000000000003','synthetic-foreign@digital-id.invalid'),
  ('d2d00000-0000-0000-0000-000000000004','synthetic-pending@digital-id.invalid');
 
-INSERT INTO public.user_profiles (auth_user_id,org_id,role,account_status,full_name) VALUES
- ('d2d00000-0000-0000-0000-000000000001','d1d00000-0000-0000-0000-000000000001','driver','active','Test Driver'),
- ('d2d00000-0000-0000-0000-000000000002','d1d00000-0000-0000-0000-000000000001','admin','active','Test Admin'),
- ('d2d00000-0000-0000-0000-000000000003','d1d00000-0000-0000-0000-000000000002','admin','active','Foreign Admin'),
- ('d2d00000-0000-0000-0000-000000000004','d1d00000-0000-0000-0000-000000000001','driver','pending','Pending Driver');
+-- email is NOT NULL in production, and its on_auth_user_created trigger may
+-- already have created each profile from auth.users.
+INSERT INTO public.user_profiles (auth_user_id,email,org_id,role,account_status,full_name) VALUES
+ ('d2d00000-0000-0000-0000-000000000001','synthetic-driver@digital-id.invalid','d1d00000-0000-0000-0000-000000000001','driver','active','Test Driver'),
+ ('d2d00000-0000-0000-0000-000000000002','synthetic-admin@digital-id.invalid','d1d00000-0000-0000-0000-000000000001','admin','active','Test Admin'),
+ ('d2d00000-0000-0000-0000-000000000003','synthetic-foreign@digital-id.invalid','d1d00000-0000-0000-0000-000000000002','admin','active','Foreign Admin'),
+ ('d2d00000-0000-0000-0000-000000000004','synthetic-pending@digital-id.invalid','d1d00000-0000-0000-0000-000000000001','driver','pending_activation','Pending Driver')
+ON CONFLICT (auth_user_id) DO UPDATE
+  SET email = EXCLUDED.email, org_id = EXCLUDED.org_id, role = EXCLUDED.role,
+      account_status = EXCLUDED.account_status, full_name = EXCLUDED.full_name;
 
 -- Issuance occurs automatically only on activation.
 SELECT pg_temp.require_true(
@@ -163,6 +168,29 @@ SELECT set_config('request.jwt.claim.sub','d2d00000-0000-0000-0000-000000000001'
 SELECT pg_temp.require_true(
  (SELECT count(*)=0 FROM storage.objects WHERE bucket_id='digital-id-photos'),
  'suspended driver loses RLS access to private ID photograph');
+RESET ROLE;
+
+-- Administrative role alone is not a driver credential.
+SELECT pg_temp.require_true(NOT EXISTS (
+  SELECT 1 FROM public.driver_digital_credentials WHERE user_id='d2d00000-0000-0000-0000-000000000002'
+), 'admin without driving profile does not receive an ID');
+INSERT INTO public.driver_profiles(user_id,org_id,full_name,is_active) VALUES
+ ('d2d00000-0000-0000-0000-000000000002','d1d00000-0000-0000-0000-000000000001','Test Admin Driver',true);
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub','d2d00000-0000-0000-0000-000000000002',true);
+SELECT pg_temp.require_true(
+ (public.get_driver_digital_id(NULL)->>'status')='active',
+ 'active dual-role admin can obtain own driver ID');
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub','',true);
+UPDATE public.driver_profiles SET is_active=false
+ WHERE user_id='d2d00000-0000-0000-0000-000000000002';
+SELECT pg_temp.require_true(
+ (SELECT status='revoked' FROM public.driver_digital_credentials WHERE user_id='d2d00000-0000-0000-0000-000000000002'),
+ 'disabled driving profile revokes dual-role credential');
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub','d2d00000-0000-0000-0000-000000000002',true);
+SELECT pg_temp.require_denied('SELECT public.get_driver_digital_id(NULL)','CREDENTIAL_UNAVAILABLE');
 RESET ROLE;
 
 \echo 'PASS: DIGITAL ID V2 SQL LIFECYCLE AND ACCESS TESTS'

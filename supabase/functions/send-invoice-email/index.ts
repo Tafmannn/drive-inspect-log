@@ -3,6 +3,7 @@ import { authenticateCaller, corsHeaders, inactiveAccountError } from "../_share
 import { pickAppOrigin } from "../_shared/appOrigin.ts";
 import { resolveLogoUrl } from "../_shared/podEmail.ts";
 import { invoiceEmailSubject, renderInvoiceEmailHtml } from "../_shared/invoiceEmail.ts";
+import { emailDeliveryGate } from "../_shared/deliveryGuard.ts";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -147,6 +148,14 @@ serve(async (req) => {
       downloadHref,
       packHref,
     });
+
+    const gate = emailDeliveryGate(to);
+    if (!gate.send) {
+      return new Response(
+        JSON.stringify({ error: "EMAIL_SUPPRESSED", detail: gate.reason }),
+        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const resendResp = await fetch("https://api.resend.com/emails", {
       method: "POST",

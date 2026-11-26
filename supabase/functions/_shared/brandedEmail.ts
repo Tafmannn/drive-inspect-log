@@ -6,6 +6,7 @@
 
 import { pickAppOrigin } from "./appOrigin.ts";
 import { resolveLightEmailLogoUrl } from "./podEmail.ts";
+import { emailDeliveryGate } from "./deliveryGuard.ts";
 
 export function escapeHtml(s: string): string {
   return String(s)
@@ -60,6 +61,9 @@ export async function sendBrandedEmail(opts: {
     Deno.env.get("INVITE_EMAIL_FROM") ||
     Deno.env.get("POD_EMAIL_FROM") ||
     "Axentra Vehicle Logistics <onboarding@resend.dev>";
+
+  const gate = emailDeliveryGate(opts.to);
+  if (!gate.send) return { ok: false, detail: gate.reason };
 
   const resp = await fetch("https://api.resend.com/emails", {
     method: "POST",

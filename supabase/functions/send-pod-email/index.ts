@@ -23,6 +23,7 @@ import {
   resolveLightEmailLogoUrl,
 } from "../_shared/podEmail.ts";
 import { pickAppOrigin } from "../_shared/appOrigin.ts";
+import { emailDeliveryGate } from "../_shared/deliveryGuard.ts";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -168,6 +169,10 @@ serve(async (req) => {
     });
 
     const replyTo = cleanRecipients([org?.main_contact_email])[0];
+    const gate = emailDeliveryGate(recipient);
+    if (!gate.send) {
+      return jsonRes({ error: "EMAIL_SUPPRESSED", message: "Email delivery is disabled for this recipient in this environment.", detail: gate.reason }, 409);
+    }
     const resendResp = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
