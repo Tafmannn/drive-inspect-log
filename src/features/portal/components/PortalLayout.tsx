@@ -12,46 +12,35 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { usePortalContext } from "../api";
+import { BRAND_BANNER_SURFACE, BRAND_AVATAR_SURFACE, BRAND_ROW_LAYOUT, BrandLockup, BrandRoleBadge, BrandStatusBar } from "@/components/BrandHeader";
 
 const HEX_COLOUR = /^#[0-9a-f]{6}$/i;
 
 /**
  * The operator's logo: an https image URL, or a path served by this app
- * (e.g. "/email/axentra-logo-email.jpg"); anything else falls back to Axentra's.
+ * (e.g. "/email/axentra-logo-email.jpg"); invalid URLs use the operator name.
  */
-function safeLogo(url: string | null | undefined): string {
-  if (!url) return "/axentra-logo.png";
+function safeLogo(url: string | null | undefined): string | null {
+  if (!url) return null;
   if (url.startsWith("/") && !url.startsWith("//")) return url;
   try {
-    return new URL(url).protocol === "https:" ? url : "/axentra-logo.png";
+    return new URL(url).protocol === "https:" ? url : null;
   } catch {
-    return "/axentra-logo.png";
+    return null;
   }
 }
 
 /**
- * The operator's own logo when it has one; otherwise the Axentra mark (cut
- * from the official logo) beside the operator's name.
+ * Axentra uses its shared lockup; other operators keep their own identity.
  */
 function OperatorBrand({ name, logoUrl }: { name: string; logoUrl: string | null }) {
-  if (logoUrl) {
-    return <img src={safeLogo(logoUrl)} alt={name} className="h-8 w-auto max-w-[132px] object-contain sm:h-9" />;
+  const axentra = /^axentra(?: vehicles?| vehicle logistics)?$/i.test(name.trim());
+  if (axentra) return <span className="flex min-w-0 items-center gap-2.5"><BrandLockup /></span>;
+  const logo = safeLogo(logoUrl);
+  if (logo) {
+    return <img src={logo} alt={name} className="h-8 w-auto max-w-[132px] object-contain sm:h-9" />;
   }
-  const axentra = /axentra/i.test(name);
-  return (
-    <span className="flex min-w-0 items-center gap-2">
-      <img src="/brand/axentra-mark.png" alt="" aria-hidden className="h-6 w-auto shrink-0 sm:h-7" />
-      {axentra ? (
-        <span className="min-w-0 whitespace-nowrap leading-none">
-          <span className="block text-[15px] font-semibold tracking-[0.14em] text-slate-900 dark:text-foreground">AXENTRA</span>
-          <span className="mt-1 block text-[8px] font-medium tracking-[0.2em] text-slate-500 dark:text-muted-foreground">VEHICLE LOGISTICS</span>
-          <span className="sr-only">{name}</span>
-        </span>
-      ) : (
-        <span className="truncate text-[15px] font-semibold text-slate-900 dark:text-foreground">{name}</span>
-      )}
-    </span>
-  );
+  return <span className="truncate text-[15px] font-semibold text-foreground">{name}</span>;
 }
 
 export function PortalLayout() {
@@ -86,6 +75,7 @@ export function PortalLayout() {
     );
   }
 
+  const isAxentra = /^axentra(?: vehicles?| vehicle logistics)?$/i.test(ctx.operator.name.trim());
   const accent = ctx.operator.primary_colour && HEX_COLOUR.test(ctx.operator.primary_colour)
     ? ctx.operator.primary_colour
     : undefined;
@@ -101,23 +91,23 @@ export function PortalLayout() {
   return (
     <div className="min-h-[100dvh] bg-[#F6F8FB] flex flex-col dark:bg-background">
       <header
-        className="border-b border-slate-200/70 bg-white/95 pt-[env(safe-area-inset-top)] supports-[backdrop-filter]:bg-white/85 supports-[backdrop-filter]:backdrop-blur sticky top-0 z-30 dark:border-border dark:bg-card/95"
-        style={accent ? { borderTop: `3px solid ${accent}` } : undefined}
+        className="border-b border-slate-200/70 bg-[hsl(216_33%_97%)] supports-[backdrop-filter]:backdrop-blur sticky top-0 z-30 dark:border-border dark:bg-card/95"
+        style={accent && !/^axentra(?: vehicles?| vehicle logistics)?$/i.test(ctx.operator.name.trim()) ? { borderBottomColor: accent } : undefined}
       >
-        <div className="max-w-5xl mx-auto flex h-14 items-center justify-between gap-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:h-16">
+        <BrandStatusBar />
+        <div className={isAxentra ? BRAND_BANNER_SURFACE : "bg-card"}>
+        <div data-axentra-brand-row={isAxentra ? true : undefined} className={BRAND_ROW_LAYOUT}>
           <div className="flex min-w-0 items-center gap-3">
             <OperatorBrand name={ctx.operator.name} logoUrl={ctx.operator.logo_url} />
-            <span aria-hidden className="hidden h-7 w-px bg-slate-200 sm:block dark:bg-border" />
-            <span className="hidden shrink-0 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-medium text-[#1E4FA8] min-[360px]:inline-flex dark:bg-primary/15 dark:text-primary">
-              Customer Portal
-            </span>
           </div>
+          <div className="flex shrink-0 items-center gap-2">
+          {isAxentra ? <BrandRoleBadge>Customer Portal</BrandRoleBadge> : <span className="hidden min-[360px]:inline-flex h-6 items-center rounded-full border bg-card px-2 text-xs text-muted-foreground">Customer Portal</span>}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
                 aria-label="Account"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1E4FA8] dark:border-border dark:bg-card dark:text-foreground"
+                className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full shadow-sm transition-colors focus:outline-none focus-visible:ring-2", isAxentra ? BRAND_AVATAR_SURFACE + " focus-visible:ring-white" : "bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-primary")}
               >
                 <UserRound className="h-5 w-5" aria-hidden />
               </button>
@@ -133,6 +123,8 @@ export function PortalLayout() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          </div>
+        </div>
         </div>
         <nav className="max-w-5xl mx-auto px-4 pb-3" aria-label="Portal">
           <div className="flex gap-1 rounded-xl bg-slate-100 p-1 sm:inline-flex dark:bg-muted">
