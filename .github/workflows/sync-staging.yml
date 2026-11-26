@@ -62,7 +62,9 @@ jobs:
           psql "$L" -q -c "drop schema public cascade; drop schema if exists axentra_private cascade; create schema public;" 2>/dev/null
           pg_restore -l "$RUNNER_TEMP/bk/public.dump" | grep -v ' SCHEMA - public ' > "$RUNNER_TEMP/bk/public.list"
           pg_restore -d "$L" --no-owner --exit-on-error -L "$RUNNER_TEMP/bk/public.list" "$RUNNER_TEMP/bk/public.dump"
-          psql "$L" -q -c "create schema if not exists supabase_migrations; create table if not exists supabase_migrations.schema_migrations (version text primary key, statements text[], name text);"
+          psql "$L" -q -c "create schema if not exists supabase_migrations; drop table if exists supabase_migrations.schema_migrations;"
+          pg_dump "$STAGING_DB_URL" --schema-only --no-owner --no-privileges --table=supabase_migrations.schema_migrations \
+            | grep -vE '^(CREATE SCHEMA|ALTER SCHEMA)' | psql "$L" -q -v ON_ERROR_STOP=1
           pg_restore -d "$L" --no-owner --data-only --disable-triggers "$RUNNER_TEMP/bk/platform.dump" || echo "platform restore reported errors; digests decide"
       - name: Verify restore matches staging (row counts + content digests)
         run: |
