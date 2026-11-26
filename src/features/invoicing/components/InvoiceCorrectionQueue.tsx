@@ -8,7 +8,7 @@ import { ControlSection } from "../../control/components/shared/ControlShell";
 import { usePendingInvoiceCorrections, useWithdrawInvoiceCorrection, type CorrectionRequest } from "../api/invoiceCorrectionRequests";
 import { INVOICE_LIST_COLUMNS, type InvoiceRecord } from "../hooks/useInvoices";
 
-export function InvoiceCorrectionQueue({ onReview }: { onReview: (invoice: InvoiceRecord, reason: string) => void }) {
+export function InvoiceCorrectionQueue({ onReview }: Readonly<{ onReview: (invoice: InvoiceRecord, reason: string) => void }>) {
   const { isSuperAdmin } = useAuth();
   const { data, isLoading, isError, refetch } = usePendingInvoiceCorrections();
   const withdraw = useWithdrawInvoiceCorrection();

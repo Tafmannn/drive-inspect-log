@@ -20,15 +20,28 @@ INSERT INTO auth.users (id) VALUES
   ('00000000-0000-0000-0000-00000000aaaa'),  -- admin, org A
   ('00000000-0000-0000-0000-00000000dddd'),  -- driver, org A
   ('00000000-0000-0000-0000-00000000bbbb');  -- admin, org B
-INSERT INTO user_profiles (auth_user_id, org_id, role) VALUES
-  ('00000000-0000-0000-0000-00000000aaaa', '00000000-0000-0000-0000-0000000000a1', 'admin'),
-  ('00000000-0000-0000-0000-00000000dddd', '00000000-0000-0000-0000-0000000000a1', 'driver'),
-  ('00000000-0000-0000-0000-00000000bbbb', '00000000-0000-0000-0000-0000000000b1', 'admin');
+-- email is NOT NULL and account_status defaults to pending_activation in production.
+INSERT INTO user_profiles (auth_user_id, email, org_id, role, account_status) VALUES
+  ('00000000-0000-0000-0000-00000000aaaa', 'admin-a@invoice-test.invalid', '00000000-0000-0000-0000-0000000000a1', 'admin', 'active'),
+  ('00000000-0000-0000-0000-00000000dddd', 'driver-a@invoice-test.invalid', '00000000-0000-0000-0000-0000000000a1', 'driver', 'active'),
+  ('00000000-0000-0000-0000-00000000bbbb', 'admin-b@invoice-test.invalid', '00000000-0000-0000-0000-0000000000b1', 'admin', 'active')
+-- production's on_auth_user_created trigger may already have created the profile
+ ON CONFLICT (auth_user_id) DO UPDATE
+  SET email = EXCLUDED.email, org_id = EXCLUDED.org_id, role = EXCLUDED.role, account_status = EXCLUDED.account_status;
 INSERT INTO clients (id, org_id, name) VALUES
   ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000a1', 'Client A');
-INSERT INTO jobs (id, org_id, client_id, total_price) VALUES
-  ('00000000-0000-0000-0000-000000000101', '00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000c1', 100),
-  ('00000000-0000-0000-0000-000000000102', '00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000c1', 150);
+-- Production: vehicle/contact columns are NOT NULL and prices live in job_pricing.
+INSERT INTO jobs (id, org_id, client_id, vehicle_reg, vehicle_make, vehicle_model, vehicle_colour,
+  pickup_contact_name, pickup_contact_phone, pickup_address_line1, pickup_city, pickup_postcode,
+  delivery_contact_name, delivery_contact_phone, delivery_address_line1, delivery_city, delivery_postcode)
+SELECT v.id::uuid, '00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000c1', v.reg, 'Test', 'Car', 'Grey',
+  'Pickup Contact', '07000000000', '1 Pickup Street', 'Leeds', 'LS1 1AA',
+  'Delivery Contact', '07000000001', '2 Delivery Road', 'York', 'YO1 1AA'
+FROM (VALUES ('00000000-0000-0000-0000-000000000101', 'INV101'), ('00000000-0000-0000-0000-000000000102', 'INV102')) AS v(id, reg);
+INSERT INTO job_pricing (job_id, org_id, total_price) VALUES
+  ('00000000-0000-0000-0000-000000000101', '00000000-0000-0000-0000-0000000000a1', 100),
+  ('00000000-0000-0000-0000-000000000102', '00000000-0000-0000-0000-0000000000a1', 150)
+ON CONFLICT (job_id) DO UPDATE SET total_price = EXCLUDED.total_price;
 INSERT INTO expenses (id, org_id, job_id, amount, category) VALUES
   ('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-000000000101', 54.60, 'Fuel'),
   ('00000000-0000-0000-0000-0000000000e2', '00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-000000000102', 8.90, 'Tolls');
@@ -89,7 +102,8 @@ SELECT pg_temp.expect_error(
      VALUES ('00000000-0000-0000-0000-000000000f02', 'R09', CURRENT_DATE, 'Fuel', 1, 1)$q$,
   '%row-level security%', 'driver cannot add invoice expenses');
 DO $$ BEGIN
-  ASSERT (SELECT count(*) FROM invoice_expenses) = 2, 'driver in the same org can read invoice expenses';
+  -- 20261116140000_driver_scope_finance_and_evidence_storage: invoice data is admin-only.
+  ASSERT (SELECT count(*) FROM invoice_expenses) = 0, 'driver cannot read invoice expenses (admin-only since 20261116140000)';
 END $$;
 SELECT pg_temp.expect_error(
   $q$SELECT cancel_invoice('00000000-0000-0000-0000-000000000f01', 'nope')$q$,
@@ -142,10 +156,11 @@ SELECT pg_temp.act_as('00000000-0000-0000-0000-00000000aaaa');
 SELECT pg_temp.expect_error($q$SELECT cancel_invoice('00000000-0000-0000-0000-000000000f01', '  ')$q$, '%reason is required%', 'reason required');
 SELECT pg_temp.expect_error($q$SELECT cancel_invoice('00000000-0000-0000-0000-000000000f01', 'Legacy client')$q$, '%CREDIT_NOTE_AUTHORISATION_REQUIRED%', 'legacy issued cancellation blocked');
 SELECT pg_temp.expect_error($q$SELECT cancel_invoice_authorised('00000000-0000-0000-0000-000000000f01', 'No consent', false)$q$, '%CREDIT_NOTE_AUTHORISATION_REQUIRED%', 'explicit refusal blocked');
-DO $
+SELECT pg_temp.expect_error($q$SELECT cancel_invoice_authorised('00000000-0000-0000-0000-000000000f01', 'Stale amount', true, 'sent', 1)$q$, '%INVOICE_CONFIRMATION_STALE%', 'stale amount blocked');
+DO $$
 DECLARE v_cn uuid; r record;
 BEGIN
-  v_cn := cancel_invoice_authorised('00000000-0000-0000-0000-000000000f01', 'Wrong client ref', true);
+  v_cn := cancel_invoice_authorised('00000000-0000-0000-0000-000000000f01', 'Wrong client ref', true, 'sent', 313.50);
   ASSERT v_cn IS NOT NULL, 'issued invoice must get a credit note';
   SELECT * INTO r FROM invoices WHERE id = v_cn;
   ASSERT r.document_type = 'credit_note' AND r.status = 'sent' AND r.sent_at IS NOT NULL, 'credit note is issued';
@@ -199,10 +214,13 @@ INSERT INTO clients (id, org_id, name) VALUES
   ('00000000-0000-0000-0000-0000000000c2', '00000000-0000-0000-0000-0000000000a1', 'Client Two');
 INSERT INTO auth.users (id) VALUES
   ('00000000-0000-0000-0000-00000000c1c1'), ('00000000-0000-0000-0000-00000000c2c2');
-INSERT INTO user_profiles (auth_user_id, org_id, role, client_id) VALUES
-  ('00000000-0000-0000-0000-00000000c1c1', NULL, 'client', '00000000-0000-0000-0000-0000000000c1'),
-  ('00000000-0000-0000-0000-00000000c2c2', NULL, 'client', '00000000-0000-0000-0000-0000000000c2');
-INSERT INTO storage.buckets (id, name, public) VALUES ('invoice-pdfs', 'invoice-pdfs', false);
+INSERT INTO user_profiles (auth_user_id, email, org_id, role, client_id, account_status) VALUES
+  ('00000000-0000-0000-0000-00000000c1c1', 'client-1@invoice-test.invalid', NULL, 'client', '00000000-0000-0000-0000-0000000000c1', 'active'),
+  ('00000000-0000-0000-0000-00000000c2c2', 'client-2@invoice-test.invalid', NULL, 'client', '00000000-0000-0000-0000-0000000000c2', 'active')
+ ON CONFLICT (auth_user_id) DO UPDATE
+  SET email = EXCLUDED.email, org_id = EXCLUDED.org_id, role = EXCLUDED.role, client_id = EXCLUDED.client_id, account_status = EXCLUDED.account_status;
+-- The bucket exists already when restored from the production baseline.
+INSERT INTO storage.buckets (id, name, public) VALUES ('invoice-pdfs', 'invoice-pdfs', false) ON CONFLICT (id) DO NOTHING;
 INSERT INTO storage.objects (bucket_id, name) VALUES
   ('invoice-pdfs', 'a1/AXENTRA_INV_AX26-2001.pdf'),   -- AX26-2001: client 1, sent then cancelled
   ('invoice-pdfs', 'a1/AXENTRA_INV_AX26-2010.pdf'),   -- AX26-2010: client 1, still a draft

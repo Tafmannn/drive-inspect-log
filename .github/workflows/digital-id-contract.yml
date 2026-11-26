@@ -2,9 +2,10 @@ name: Digital ID V2 local SQL contract (free tier)
 on:
   pull_request:
     paths:
-      - "supabase/migrations/*digital_id_v2.sql"
+      - "supabase/migrations/*digital_id*.sql"
       - "supabase/tests/digital_id_v2.integration.sql"
-      - "scripts/free-tier/digital-id-contract-baseline.sql"
+      - "supabase/bootstrap/**"
+      - "scripts/free-tier/restore-production-baseline.sh"
       - ".github/workflows/digital-id-contract.yml"
   workflow_dispatch:
 
@@ -27,6 +28,7 @@ jobs:
       PGUSER: postgres
       PGDATABASE: postgres
       PGPASSWORD: postgres
+      AXENTRA_DISPOSABLE_DB: "YES"
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - uses: supabase/setup-cli@v1
@@ -34,16 +36,19 @@ jobs:
           version: latest
       - name: Install PostgreSQL client
         run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends postgresql-client
-      - name: Start isolated Supabase database WITHOUT unreproducible historical migrations
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Start isolated Supabase database WITHOUT replaying history
         run: |
           mkdir -p "$RUNNER_TEMP/axentra-historical-migrations"
           mv supabase/migrations/*.sql "$RUNNER_TEMP/axentra-historical-migrations/"
           supabase db start
           mv "$RUNNER_TEMP/axentra-historical-migrations/"*.sql supabase/migrations/
-      - name: Apply ONLY synthetic dependency fixtures, then real Digital ID migration
-        run: |
-          psql -X -v ON_ERROR_STOP=1 -f scripts/free-tier/digital-id-contract-baseline.sql
-          psql -X -v ON_ERROR_STOP=1 -f supabase/migrations/20261123220000_digital_id_v2.sql
+      # Real production schema (reviewed baseline) instead of synthetic fixtures,
+      # then every Digital ID migration production has not yet recorded.
+      - name: Restore production baseline and replay newer migrations
+        run: bash scripts/free-tier/restore-production-baseline.sh
       - name: Validate Digital ID issue/revoke/admin/cross-org/serial contracts
         run: psql -X -v ON_ERROR_STOP=1 -f supabase/tests/digital_id_v2.integration.sql
       - name: Stop disposable local database

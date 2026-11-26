@@ -213,7 +213,7 @@ export function useInvoiceActions(
     const inv = cancelTarget;
     if (!inv || (inv.status !== "draft" && !authoriseCredit)) return;
     await run(inv, "cancel", async () => {
-      const creditNoteId = await cancelInvoice(inv.id, reason, inv.status !== "draft" && authoriseCredit);
+      const creditNoteId = await cancelInvoice(inv.id, reason, inv.status !== "draft" && authoriseCredit, inv.status ?? undefined, inv.total ?? undefined);
       setCancelTarget(null);
       refresh(inv.id);
       toast({

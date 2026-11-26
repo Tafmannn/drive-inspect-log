@@ -3,14 +3,14 @@ BEGIN;
 INSERT INTO public.organisations(id,name) VALUES
  ('a9a00000-0000-0000-0000-000000000001','Synthetic Org A'),
  ('a9a00000-0000-0000-0000-000000000002','Synthetic Org B');
-INSERT INTO auth.users(id) VALUES
- ('a9a00000-0000-0000-0000-000000000011'),
- ('a9a00000-0000-0000-0000-000000000012'),
- ('a9a00000-0000-0000-0000-000000000013');
-INSERT INTO public.user_profiles(auth_user_id,org_id,role,account_status) VALUES
- ('a9a00000-0000-0000-0000-000000000011','a9a00000-0000-0000-0000-000000000001','admin','active'),
- ('a9a00000-0000-0000-0000-000000000012','a9a00000-0000-0000-0000-000000000002','admin','active'),
- ('a9a00000-0000-0000-0000-000000000013','a9a00000-0000-0000-0000-000000000001','driver','active')
+INSERT INTO auth.users(id,email) VALUES
+ ('a9a00000-0000-0000-0000-000000000011','jw193-admin-a@example.test'),
+ ('a9a00000-0000-0000-0000-000000000012','jw193-admin-b@example.test'),
+ ('a9a00000-0000-0000-0000-000000000013','jw193-driver-a@example.test');
+INSERT INTO public.user_profiles(auth_user_id,org_id,role,account_status,email) VALUES
+ ('a9a00000-0000-0000-0000-000000000011','a9a00000-0000-0000-0000-000000000001','admin','active','jw193-admin-a@example.test'),
+ ('a9a00000-0000-0000-0000-000000000012','a9a00000-0000-0000-0000-000000000002','admin','active','jw193-admin-b@example.test'),
+ ('a9a00000-0000-0000-0000-000000000013','a9a00000-0000-0000-0000-000000000001','driver','active','jw193-driver-a@example.test')
  ON CONFLICT(auth_user_id) DO UPDATE SET org_id=EXCLUDED.org_id,role=EXCLUDED.role,account_status=EXCLUDED.account_status;
 SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claim.sub','a9a00000-0000-0000-0000-000000000011',true);

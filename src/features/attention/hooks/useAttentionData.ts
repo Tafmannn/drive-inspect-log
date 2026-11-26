@@ -44,6 +44,133 @@ interface UseAttentionDataOpts {
   filters: AttentionFiltersState;
 }
 
+function buildAckMap(acknowledgements: AcknowledgementRow[]) {
+  // Exception IDs are scoped by tenant, including platform-wide views.
+  const ackMap = new Map<string, AcknowledgementRow>();
+  for (const ack of acknowledgements) {
+    if (!ack.org_id) continue;
+    const key = JSON.stringify([ack.org_id, ack.exception_id]);
+    if (!ackMap.has(key)) ackMap.set(key, ack);
+  }
+
+  return ackMap;
+}
+
+async function loadInspections(completedJobs: JobRow[]) {
+  // Fetch inspections scoped to completed job IDs
+  const completedJobIds = completedJobs.map(j => j.id);
+  let inspections: any[] = [];
+  if (completedJobIds.length > 0) {
+    const chunks: string[][] = [];
+    for (let i = 0; i < completedJobIds.length; i += 100) {
+      chunks.push(completedJobIds.slice(i, i + 100));
+    }
+    const results = await Promise.all(
+      chunks.map(chunk =>
+        (supabase.from("inspections")
+          .select("id, job_id, org_id, driver_signature_url, customer_signature_url")
+          .in("job_id", chunk) as any)
+          .is("archived_at", null)
+      )
+    );
+    for (const r of results) {
+      if (r.data) inspections.push(...r.data);
+    }
+  }
+
+  return inspections;
+}
+
+async function loadBilling(billingJobsRes: { data: unknown; error: unknown }) {
+  // Billing: throws (→ query error state) rather than raising false
+  // "not invoiced" alerts if either lookup fails.
+  if (billingJobsRes.error) throw billingJobsRes.error;
+  const billingJobs = await withPricing((billingJobsRes.data ?? []) as BillingJobRow[]);
+  const staleBillingJobs = await fetchStaleCompletedJobs();
+  const billingIds = billingJobs.map((j) => j.id);
+  const invoicedJobIds = new Set<string>();
+  for (let i = 0; i < billingIds.length; i += 100) {
+    for (const id of await findAlreadyInvoicedJobs(billingIds.slice(i, i + 100))) invoicedJobIds.add(id);
+  }
+
+  return { billingJobs, staleBillingJobs, invoicedJobIds };
+}
+
+async function loadDriverLookups(docs: { related_type: string; related_id: string }[]) {
+  // Driver lookups keyed by driver_profile.id (for documents.related_id):
+  //  - name for display
+  //  - user_id for routing to /admin/drivers/:userId
+  const driverNameByProfileId = new Map<string, string>();
+  const driverUserIdByProfileId = new Map<string, string>();
+  if (docs.some((d) => d.related_type === "driver")) {
+    const driverProfileIds = Array.from(
+      new Set(docs.filter((d) => d.related_type === "driver").map((d) => d.related_id))
+    );
+    if (driverProfileIds.length > 0) {
+      const { data: profileRows } = await supabase
+        .from("driver_profiles")
+        .select("id, user_id, full_name")
+        .in("id", driverProfileIds);
+      for (const r of profileRows ?? []) {
+        if (r.full_name) driverNameByProfileId.set(r.id, r.full_name);
+        if (r.user_id) driverUserIdByProfileId.set(r.id, r.user_id);
+      }
+    }
+  }
+
+  return { driverNameByProfileId, driverUserIdByProfileId };
+}
+
+function activeAck(ack: AcknowledgementRow | undefined, now: string): boolean {
+  return !!ack && (!ack.snoozed_until || ack.snoozed_until > now);
+}
+
+function evidenceAckKeys(acknowledgements: AcknowledgementRow[], now: string) {
+  const keys = new Set<string>();
+  for (const ack of acknowledgements) {
+    if (ack.job_id && ack.org_id && ack.exception_id === "evidence:" + ack.job_id && activeAck(ack, now)) {
+      keys.add(JSON.stringify([ack.org_id, ack.job_id]));
+    }
+  }
+  return keys;
+}
+
+export function partitionAttentionExceptions(allExceptions: AttentionException[], acknowledgements: AcknowledgementRow[], now: string) {
+  const ackMap = buildAckMap(acknowledgements);
+  const evidenceKeys = evidenceAckKeys(acknowledgements, now);
+  const activeExceptions: AttentionException[] = [];
+  const acknowledgedExceptions: AttentionException[] = [];
+  for (const ex of allExceptions) {
+    const ack = ex.orgId ? ackMap.get(JSON.stringify([ex.orgId, ex.id])) : undefined;
+    const evidenceResolved = ex.category === "evidence" && !!ex.jobId && !!ex.orgId && evidenceKeys.has(JSON.stringify([ex.orgId, ex.jobId]));
+    (evidenceResolved || activeAck(ack, now) ? acknowledgedExceptions : activeExceptions).push(ex);
+  }
+  return { activeExceptions, acknowledgedExceptions, ackMap };
+}
+
+function filterExceptions(activeExceptions: AttentionException[], filters: AttentionFiltersState, scope: UseAttentionDataOpts["scope"]) {
+  let exceptions = activeExceptions;
+
+  // Apply filters
+  if (filters.severity !== "all") {
+    exceptions = exceptions.filter(e => e.severity === filters.severity);
+  }
+  if (filters.category !== "all") {
+    exceptions = exceptions.filter(e => e.category === filters.category);
+  }
+  if (filters.orgId !== "all" && scope === "all") {
+    exceptions = exceptions.filter(e => e.orgId === filters.orgId);
+  }
+  if (filters.dateFrom) {
+    exceptions = exceptions.filter(e => e.createdAt >= filters.dateFrom);
+  }
+  if (filters.dateTo) {
+    exceptions = exceptions.filter(e => e.createdAt <= filters.dateTo + "T23:59:59");
+  }
+
+  return exceptions;
+}
+
 export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
   return useQuery({
     queryKey: ["attention-center", scope, filters],
@@ -129,72 +256,17 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
       const docs = (docsRes.data ?? []) as any[];
       const drivers = (driversRes.data ?? []) as any[];
 
-      // Exception IDs are scoped by tenant, including platform-wide views.
-      const ackMap = new Map<string, AcknowledgementRow>();
-      for (const ack of acknowledgements) {
-        if (!ack.org_id) continue;
-        const key = JSON.stringify([ack.org_id, ack.exception_id]);
-        if (!ackMap.has(key)) ackMap.set(key, ack);
-      }
+      const inspections = await loadInspections(completedJobs);
 
-      // Fetch inspections scoped to completed job IDs
-      const completedJobIds = completedJobs.map(j => j.id);
-      let inspections: any[] = [];
-      if (completedJobIds.length > 0) {
-        const chunks: string[][] = [];
-        for (let i = 0; i < completedJobIds.length; i += 100) {
-          chunks.push(completedJobIds.slice(i, i + 100));
-        }
-        const results = await Promise.all(
-          chunks.map(chunk =>
-            (supabase.from("inspections")
-              .select("id, job_id, org_id, driver_signature_url, customer_signature_url")
-              .in("job_id", chunk) as any)
-              .is("archived_at", null)
-          )
-        );
-        for (const r of results) {
-          if (r.data) inspections.push(...r.data);
-        }
-      }
-
-      // Billing: throws (→ query error state) rather than raising false
-      // "not invoiced" alerts if either lookup fails.
-      if (billingJobsRes.error) throw billingJobsRes.error;
-      const billingJobs = await withPricing((billingJobsRes.data ?? []) as BillingJobRow[]);
-      const staleBillingJobs = await fetchStaleCompletedJobs();
-      const billingIds = billingJobs.map((j) => j.id);
-      const invoicedJobIds = new Set<string>();
-      for (let i = 0; i < billingIds.length; i += 100) {
-        for (const id of await findAlreadyInvoicedJobs(billingIds.slice(i, i + 100))) invoicedJobIds.add(id);
-      }
+      const { billingJobs, staleBillingJobs, invoicedJobIds } = await loadBilling(billingJobsRes);
 
       const orgLookup = new Map<string, string>();
       for (const o of orgs) orgLookup.set(o.id, o.name);
 
-      // Driver lookups keyed by driver_profile.id (for documents.related_id):
-      //  - name for display
-      //  - user_id for routing to /admin/drivers/:userId
-      const driverNameByProfileId = new Map<string, string>();
-      const driverUserIdByProfileId = new Map<string, string>();
-      if (docs.some((d) => d.related_type === "driver")) {
-        const driverProfileIds = Array.from(
-          new Set(docs.filter((d) => d.related_type === "driver").map((d) => d.related_id))
-        );
-        if (driverProfileIds.length > 0) {
-          const { data: profileRows } = await supabase
-            .from("driver_profiles")
-            .select("id, user_id, full_name")
-            .in("id", driverProfileIds);
-          for (const r of profileRows ?? []) {
-            if (r.full_name) driverNameByProfileId.set(r.id, r.full_name);
-            if (r.user_id) driverUserIdByProfileId.set(r.id, r.user_id);
-          }
-        }
-      }
+      const { driverNameByProfileId, driverUserIdByProfileId } = await loadDriverLookups(docs);
 
       // Derive all exceptions
-      let allExceptions: AttentionException[] = sortExceptions([
+      const allExceptions: AttentionException[] = sortExceptions([
         ...deriveTimingExceptions(activeJobs, orgLookup),
         ...deriveEvidenceExceptions(completedJobs, inspections, logEntries, orgLookup),
         ...deriveSyncExceptions(logEntries),
@@ -210,69 +282,9 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
         ...deriveStaleUnpricedSummary(staleBillingJobs, orgLookup),
       ]);
 
-      // Build a set of jobIds that an admin has explicitly resolved
-      // via the "Mark resolved" action on the Missing Evidence queue.
-      // Those acks live in the same `attention_acknowledgements` table
-      // under exception_id `evidence:<jobId>`. When present, we suppress
-      // ALL evidence exceptions for that job from the dashboard, so the
-      // single resolution action clears every related surface.
-      const evidenceAckedJobIds = new Set<string>();
-      const EVIDENCE_PREFIX = "evidence:";
-      for (const ack of acknowledgements) {
-        if (typeof ack.exception_id !== "string") continue;
-        if (!ack.exception_id.startsWith(EVIDENCE_PREFIX)) continue;
-        if (ack.snoozed_until && ack.snoozed_until <= now) continue;
-        const jobId = ack.job_id;
-        if (jobId && ack.org_id && ack.exception_id === EVIDENCE_PREFIX + jobId) {
-          evidenceAckedJobIds.add(JSON.stringify([ack.org_id, jobId]));
-        }
-      }
+      const { activeExceptions, acknowledgedExceptions, ackMap } = partitionAttentionExceptions(allExceptions, acknowledgements, now);
 
-      // Separate acknowledged vs active
-      const activeExceptions: AttentionException[] = [];
-      const acknowledgedExceptions: AttentionException[] = [];
-
-      for (const ex of allExceptions) {
-        // Job-scoped evidence resolution → treat as acknowledged.
-        if (ex.category === "evidence" && ex.jobId && ex.orgId && evidenceAckedJobIds.has(JSON.stringify([ex.orgId, ex.jobId]))) {
-          acknowledgedExceptions.push(ex);
-          continue;
-        }
-        const ack = ex.orgId ? ackMap.get(JSON.stringify([ex.orgId, ex.id])) : undefined;
-        if (ack) {
-          // If snoozed and snooze hasn't expired, treat as acknowledged
-          if (ack.snoozed_until && ack.snoozed_until > now) {
-            acknowledgedExceptions.push(ex);
-          } else if (!ack.snoozed_until) {
-            // Permanently acknowledged
-            acknowledgedExceptions.push(ex);
-          } else {
-            // Snooze expired — back to active
-            activeExceptions.push(ex);
-          }
-        } else {
-          activeExceptions.push(ex);
-        }
-      }
-
-      let exceptions = activeExceptions;
-
-      // Apply filters
-      if (filters.severity !== "all") {
-        exceptions = exceptions.filter(e => e.severity === filters.severity);
-      }
-      if (filters.category !== "all") {
-        exceptions = exceptions.filter(e => e.category === filters.category);
-      }
-      if (filters.orgId !== "all" && scope === "all") {
-        exceptions = exceptions.filter(e => e.orgId === filters.orgId);
-      }
-      if (filters.dateFrom) {
-        exceptions = exceptions.filter(e => e.createdAt >= filters.dateFrom);
-      }
-      if (filters.dateTo) {
-        exceptions = exceptions.filter(e => e.createdAt <= filters.dateTo + "T23:59:59");
-      }
+      const exceptions = filterExceptions(activeExceptions, filters, scope);
 
       // KPIs (based on active only)
       const allActiveCount = (await supabase.from("jobs").select("id", { count: "exact", head: true }).eq("is_hidden", false).in("status", ACTIVE_STATUSES as string[])).count ?? 0;
