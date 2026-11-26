@@ -2270,6 +2270,12 @@ export const InspectionFlow = () => {
         onBack={() => navigate(`/jobs/${jobId}${window.location.search}`)}
       />
 
+      {currentStep === 1 && job.vehicle_reg && (
+        <div className="px-4 pt-3 flex justify-center">
+          <UKPlate size="compact" reg={job.vehicle_reg} />
+        </div>
+      )}
+
       <div className="px-4 pt-2">
         <div
           className="w-full bg-muted rounded-full h-1.5"

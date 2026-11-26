@@ -1,3 +1,5 @@
+import { EMAIL_BRAND, emailBrandColour, isAxentraBrand, renderEmailBrandHeader } from "./emailBrand.ts";
+
 // Proof of Delivery email: branded content, recipient rules, link checks.
 //
 // Pure and dependency-free (no Deno or Supabase imports) so it can be
@@ -8,7 +10,6 @@ import {
   cleanRecipients,
   escapeHtml,
   formatUkDateTime,
-  safeColour,
   safeHttpsUrl,
 } from "./customerStatusEmail.ts";
 
@@ -43,6 +44,12 @@ export function resolveEmailLogoUrl(logoUrl: string | null | undefined, appBaseU
   const v = (logoUrl ?? "").trim();
   if (!v || v === LEGACY_DEFAULT_LOGO) return resolveLogoUrl(EMAIL_LOGO_ON_NAVY, appBaseUrl);
   return resolveLogoUrl(v, appBaseUrl);
+}
+
+/** Preserve custom organisation logos; use the approved light Axentra mark for Axentra. */
+export function resolveLightEmailLogoUrl(name: string, logoUrl: string | null | undefined, appBaseUrl: string | null): string | null {
+  if (isAxentraBrand(name)) return resolveLogoUrl(EMAIL_BRAND.logoPath, appBaseUrl);
+  return resolveLogoUrl(logoUrl, appBaseUrl);
 }
 
 // ── Links ───────────────────────────────────────────────────────────────────
@@ -136,13 +143,10 @@ export interface RenderedPodEmail {
   text: string;
 }
 
-// Banner: very dark navy (a solid fallback for clients that ignore gradients).
-const HEADER_BG = "#08152E";
-const HEADER_GRADIENT = "linear-gradient(135deg,#040B1A 0%,#0C2148 100%)";
 
 export function renderPodEmail(input: PodEmailInput): RenderedPodEmail {
   const operator = (input.operator.name || "").trim() || "Your vehicle logistics provider";
-  const brand = safeColour(input.operator.primaryColour);
+  const brand = emailBrandColour(operator, input.operator.primaryColour);
   const logo = safeHttpsUrl(input.operator.logoUrl);
   const reg = (input.job.reg || "").trim().toUpperCase() || "Your vehicle";
   const ref = (input.job.ref || "").trim();
@@ -202,14 +206,10 @@ export function renderPodEmail(input: PodEmailInput): RenderedPodEmail {
   const rowsHtml = rows
     .map(
       ([k, v], i) =>
-        `<tr><td style="padding:10px 16px;color:#6b7280;font-size:13px;width:38%;vertical-align:top;${i ? "border-top:1px solid #eef0f3;" : ""}">${escapeHtml(k)}</td>` +
-        `<td style="padding:10px 16px;color:#111827;font-size:14px;font-weight:600;vertical-align:top;${i ? "border-top:1px solid #eef0f3;" : ""}">${escapeHtml(v)}</td></tr>`,
+        `<tr><td style="padding:10px 16px;color:#576B85;font-size:13px;width:38%;vertical-align:top;${i ? "border-top:1px solid #D4E2F0;" : ""}">${escapeHtml(k)}</td>` +
+        `<td style="padding:10px 16px;color:#172F52;font-size:14px;font-weight:600;vertical-align:top;${i ? "border-top:1px solid #D4E2F0;" : ""}">${escapeHtml(v)}</td></tr>`,
     )
     .join("");
-
-  const header = logo
-    ? `<img src="${escapeHtml(logo)}" width="176" alt="${escapeHtml(operator)}" style="display:block;width:176px;max-width:176px;height:auto;border:0;margin:0 auto;">`
-    : `<span style="color:#ffffff;font-size:22px;font-weight:bold;letter-spacing:4px;">${escapeHtml(operator.toUpperCase())}</span>`;
 
   const podButton = podUrl
     ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px auto 12px;"><tr><td style="border-radius:8px;background:${brand};">
@@ -228,33 +228,33 @@ export function renderPodEmail(input: PodEmailInput): RenderedPodEmail {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light">
+    <meta name="supported-color-schemes" content="light">
     <title>${escapeHtml(subject)}</title>
   </head>
-  <body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;-webkit-text-size-adjust:100%;">
+  <body style="margin:0;padding:0;background:#F4F7FA;font-family:Arial,Helvetica,sans-serif;-webkit-text-size-adjust:100%;">
     <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(`${reg} has been ${verb}. Your ${docName} is ready to download.`)}</div>
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:24px 12px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F4F7FA;padding:24px 12px;">
       <tr><td align="center">
-        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
-          <tr><td align="center" bgcolor="${HEADER_BG}" style="background-color:${HEADER_BG};background-image:${HEADER_GRADIENT};padding:28px 24px 24px;">${header}</td></tr>
-          <tr><td bgcolor="${brand}" style="height:4px;line-height:4px;font-size:0;background-color:${brand};background-image:linear-gradient(90deg,${brand} 0%,#0C2148 100%);">&nbsp;</td></tr>
-          <tr><td style="padding:32px 32px 8px;color:#1f2937;font-size:15px;line-height:1.6;">
+        <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="width:100%;max-width:480px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+          ${renderEmailBrandHeader(operator, logo)}
+          <tr><td style="padding:24px 32px 8px;color:#172F52;font-size:15px;line-height:1.6;">
             <p style="margin:0 0 6px;color:${brand};font-size:12px;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase;">${docName}</p>
-            <h1 style="margin:0 0 20px;color:#111827;font-size:24px;line-height:1.3;font-weight:bold;">${escapeHtml(reg)} has been ${verb}</h1>
+            <h1 style="margin:0 0 20px;color:#172F52;font-size:24px;line-height:1.3;font-weight:bold;">${escapeHtml(reg)} has been ${verb}</h1>
             <p style="margin:0 0 12px;">${escapeHtml(greeting)}</p>
             <p style="margin:0 0 24px;">${escapeHtml(lead)}</p>
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;border-collapse:separate;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #D4E2F0;border-radius:8px;border-collapse:separate;">
               ${rowsHtml}
             </table>
             ${podButton}
             ${photosLink}
-            <p style="margin:16px 0 0;text-align:center;color:#6b7280;font-size:12px;">These links are valid for 30 days. Please save a copy for your records.</p>
+            <p style="margin:16px 0 0;text-align:center;color:#576B85;font-size:12px;">These links are valid for 30 days. Please save a copy for your records.</p>
           </td></tr>
-          <tr><td style="padding:24px 32px 32px;color:#374151;font-size:14px;line-height:1.6;">
+          <tr><td style="padding:24px 32px 32px;color:#172F52;font-size:14px;line-height:1.6;">
             <p style="margin:0 0 16px;">Questions about this ${isCollection ? "collection" : "delivery"}? Please ${escapeHtml(contactLine)}.</p>
             <p style="margin:0;">Kind regards,<br><strong>${escapeHtml(operator)}</strong></p>
           </td></tr>
-          <tr><td style="padding:18px 32px;background:#f9fafb;border-top:1px solid #eef0f3;color:#6b7280;font-size:12px;line-height:1.6;text-align:center;">
-            <strong style="color:#374151;">${escapeHtml(operator)}</strong>${footerBits ? `<br>${footerBits}` : ""}${address ? `<br>${escapeHtml(address)}` : ""}
+          <tr><td style="padding:18px 32px;background:#f9fafb;border-top:1px solid #D4E2F0;color:#576B85;font-size:12px;line-height:1.6;text-align:center;">
+            <strong style="color:#172F52;">${escapeHtml(operator)}</strong>${footerBits ? `<br>${footerBits}` : ""}${address ? `<br>${escapeHtml(address)}` : ""}
           </td></tr>
         </table>
       </td></tr>

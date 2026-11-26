@@ -34,7 +34,7 @@ describe("renderPodEmail", () => {
     const e = renderPodEmail(base);
     expect(e.subject).toBe("Proof of Delivery – YD66 OWP (AX0070)");
     expect(e.html).toContain('src="https://app.axentra.test/email/axentra-logo-email.jpg"');
-    expect(e.html).toContain("background:#0052CC");
+    expect(e.html).toContain("background:#2B7DC9");
     expect(e.html).toContain("YD66 OWP has been delivered");
     expect(e.html).toContain("Hello Sam Jones,");
     expect(e.html).toContain("YD66 OWP · Ford Focus");
@@ -72,7 +72,7 @@ describe("renderPodEmail", () => {
     expect(e.html).not.toContain("insecure.test");
     expect(e.html).toContain("Your vehicle logistics provider");
     expect(e.html).toContain("Hello,");
-    expect(e.html).toContain("#111827");
+    expect(e.html).toContain("#172F52");
     expect(e.html).not.toContain("Download vehicle photos");
     expect(e.html).not.toContain("Received by");
   });
@@ -158,19 +158,20 @@ describe("renderPodEmail — Proof of Collection", () => {
 });
 
 describe("POD/POC email banner", () => {
-  it("is very dark navy (not the old black) with the brand accent under it", () => {
+  it("uses the same light header and accent for both reports", () => {
     for (const kind of ["delivery", "collection"] as const) {
       const e = renderPodEmail({ ...base, kind });
-      expect(e.html).toContain("#08152E");
-      expect(e.html).toContain("linear-gradient(135deg,#040B1A 0%,#0C2148 100%)");
+      expect(e.html).toContain('bgcolor="#FFFFFF"');
+      expect(e.html).toContain("#F4F7FA");
       expect(e.html).not.toContain("#060606");
-      expect(e.html).toContain("background-color:#0052CC");
+      expect(e.html).toContain("background:#2B7DC9");
     }
   });
 
   it("falls back to a letter-spaced wordmark when there is no logo", () => {
     const e = renderPodEmail({ ...base, operator: { ...base.operator, logoUrl: null } });
-    expect(e.html).toContain("AXENTRA VEHICLES");
+    expect(e.html).toContain("AXENTRA");
+    expect(e.html).toContain("VEHICLE LOGISTICS");
   });
 });
 
