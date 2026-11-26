@@ -154,10 +154,13 @@ END $$;
 -- ── 9. cancelling an issued invoice raises a credit note + releases ────
 SELECT pg_temp.act_as('00000000-0000-0000-0000-00000000aaaa');
 SELECT pg_temp.expect_error($q$SELECT cancel_invoice('00000000-0000-0000-0000-000000000f01', '  ')$q$, '%reason is required%', 'reason required');
+SELECT pg_temp.expect_error($q$SELECT cancel_invoice('00000000-0000-0000-0000-000000000f01', 'Legacy client')$q$, '%CREDIT_NOTE_AUTHORISATION_REQUIRED%', 'legacy issued cancellation blocked');
+SELECT pg_temp.expect_error($q$SELECT cancel_invoice_authorised('00000000-0000-0000-0000-000000000f01', 'No consent', false)$q$, '%CREDIT_NOTE_AUTHORISATION_REQUIRED%', 'explicit refusal blocked');
+SELECT pg_temp.expect_error($q$SELECT cancel_invoice_authorised('00000000-0000-0000-0000-000000000f01', 'Stale amount', true, 'sent', 1)$q$, '%INVOICE_CONFIRMATION_STALE%', 'stale amount blocked');
 DO $$
 DECLARE v_cn uuid; r record;
 BEGIN
-  v_cn := cancel_invoice('00000000-0000-0000-0000-000000000f01', 'Wrong client ref');
+  v_cn := cancel_invoice_authorised('00000000-0000-0000-0000-000000000f01', 'Wrong client ref', true, 'sent', 313.50);
   ASSERT v_cn IS NOT NULL, 'issued invoice must get a credit note';
   SELECT * INTO r FROM invoices WHERE id = v_cn;
   ASSERT r.document_type = 'credit_note' AND r.status = 'sent' AND r.sent_at IS NOT NULL, 'credit note is issued';

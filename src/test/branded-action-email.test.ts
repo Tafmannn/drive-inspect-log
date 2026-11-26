@@ -4,12 +4,12 @@ import { appTokenLink, portalInviteIntroHtml, renderActionEmailHtml, SUPPORT_EMA
 const base = { firstName: "Terrence", introHtml: "Intro", buttonLabel: "Set up my portal access", actionLink: "https://x.supabase.co/auth/v1/verify?token=abc&type=invite", noteHtml: "Valid 24h" };
 
 describe("Axentra-branded action email", () => {
-  it("has the navy logo banner, cobalt button and dark-mode hints", () => {
-    const html = renderActionEmailHtml({ ...base, logoUrl: "https://axentra-app.vercel.app/email/axentra-logo-email-dark.png", eyebrow: "Customer portal" });
+  it("has the shared light logo banner, blue button and dark-mode hints", () => {
+    const html = renderActionEmailHtml({ ...base, logoUrl: "https://axentra-app.vercel.app/axentra-logo.png", eyebrow: "Customer portal" });
     expect(html).toContain('<meta name="color-scheme" content="light">');
-    expect(html).toContain('bgcolor="#08152E"');
-    expect(html).toContain('src="https://axentra-app.vercel.app/email/axentra-logo-email-dark.png"');
-    expect(html).toMatch(/bgcolor="#1E4FA8"[^>]*>\s*<a href="https:\/\/x\.supabase\.co\/auth\/v1\/verify\?token=abc&amp;type=invite"/);
+    expect(html).toContain('bgcolor="#FFFFFF"');
+    expect(html).toContain('src="https://axentra-app.vercel.app/axentra-logo.png"');
+    expect(html).toMatch(/bgcolor="#2B7DC9"[^>]*>\s*<a href="https:\/\/x\.supabase\.co\/auth\/v1\/verify\?token=abc&amp;type=invite"/);
     expect(html).toContain("Customer portal");
     expect(html).toContain("Hi Terrence,");
     expect(html).toContain(`mailto:${SUPPORT_EMAIL}`);

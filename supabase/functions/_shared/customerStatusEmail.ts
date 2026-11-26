@@ -1,3 +1,5 @@
+import { emailBrandColour, renderEmailBrandHeader } from "./emailBrand.ts";
+
 // Customer-facing "collected" / "delivered" status emails, and the "aborted" notice an
 // admin sends on purpose (never automatic; see notify_customer_job_aborted()).
 //
@@ -107,7 +109,7 @@ export function renderStatusEmail(input: StatusEmailInput): RenderedEmail {
   const operator = (input.operator.name || "").trim() || "Your vehicle logistics provider";
   const reg = (input.job.reg || "").trim().toUpperCase() || "your vehicle";
   const job = { ...input.job, reg };
-  const colour = safeColour(input.operator.primaryColour);
+  const colour = emailBrandColour(operator, input.operator.primaryColour);
   const logo = safeHttpsUrl(input.operator.logoUrl);
   const portalUrl = safePortalUrl(input.portalUrl);
   const when = formatUkDateTime(input.at);
@@ -160,39 +162,37 @@ export function renderStatusEmail(input: StatusEmailInput): RenderedEmail {
   const rowsHtml = rows
     .map(
       ([k, v]) =>
-        `<tr><td style="padding:6px 0;color:#6b7280;font-size:14px;width:120px;vertical-align:top;">${escapeHtml(k)}</td>` +
+        `<tr><td style="padding:6px 0;color:#576B85;font-size:14px;width:120px;vertical-align:top;">${escapeHtml(k)}</td>` +
         `<td style="padding:6px 0;color:#111827;font-size:14px;">${escapeHtml(v)}</td></tr>`,
     )
     .join("");
-  const header = logo
-    ? `<img src="${escapeHtml(logo)}" alt="${escapeHtml(operator)}" style="max-height:40px;max-width:200px;display:block;">`
-    : `<span style="color:#ffffff;font-size:18px;font-weight:bold;">${escapeHtml(operator)}</span>`;
   const buttonHtml = portalUrl
-    ? `<p style="margin:24px 0;text-align:center;"><a href="${escapeHtml(portalUrl)}" style="background:${colour};color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:bold;display:inline-block;">${escapeHtml(button)}</a></p>`
+    ? `<p style="margin:24px 0;text-align:center;"><a href="${escapeHtml(portalUrl)}" style="background:${colour};color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:bold;display:inline-block;">${escapeHtml(button)}</a></p>`
     : "";
   const contactHtml = contactBits.length
-    ? `<p style="margin:16px 0 0;color:#6b7280;font-size:13px;">Questions? Contact ${escapeHtml(operator)}: ${contactBits.map(escapeHtml).join(" · ")}</p>`
+    ? `<p style="margin:16px 0 0;color:#576B85;font-size:13px;">Questions? Contact ${escapeHtml(operator)}: ${contactBits.map(escapeHtml).join(" · ")}</p>`
     : "";
 
   const html = `<!doctype html>
-<html>
-  <body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:24px 0;">
+<html lang="en">
+  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"></head>
+  <body style="margin:0;padding:0;background:#F4F7FA;font-family:Arial,Helvetica,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F4F7FA;padding:24px 12px;">
       <tr><td align="center">
-        <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background:#ffffff;border-radius:8px;overflow:hidden;">
-          <tr><td style="background:${logo ? "#ffffff" : colour};padding:20px 32px;border-bottom:3px solid ${colour};">${header}</td></tr>
-          <tr><td style="padding:28px 32px;color:#1f2937;font-size:15px;line-height:1.6;">
+        <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;">
+          ${renderEmailBrandHeader(operator, logo)}
+          <tr><td style="padding:24px 32px;color:#172F52;font-size:15px;line-height:1.6;">
             <p style="margin:0 0 4px;font-size:20px;font-weight:bold;color:#111827;">${escapeHtml(headline)}</p>
             <p style="margin:0 0 16px;">${escapeHtml(greeting)}</p>
             <p style="margin:0 0 16px;">${escapeHtml(lead)}</p>
-            <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;margin:8px 0;">
-              <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;width:120px;">Vehicle</td><td style="padding:6px 0;color:#111827;font-size:14px;font-weight:bold;">${escapeHtml(vehicleLine(job))}</td></tr>
+            <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-top:1px solid #D4E2F0;border-bottom:1px solid #D4E2F0;margin:8px 0;">
+              <tr><td style="padding:6px 0;color:#576B85;font-size:14px;width:120px;">Vehicle</td><td style="padding:6px 0;color:#111827;font-size:14px;font-weight:bold;">${escapeHtml(vehicleLine(job))}</td></tr>
               ${rowsHtml}
             </table>
             ${buttonHtml}
             ${contactHtml}
           </td></tr>
-          <tr><td style="padding:16px 32px;background:#f9fafb;color:#9ca3af;font-size:12px;">
+          <tr><td style="padding:16px 32px;background:#f9fafb;color:#576B85;font-size:12px;">
             You're receiving this because you have access to ${escapeHtml(operator)}'s customer portal.
           </td></tr>
         </table>
