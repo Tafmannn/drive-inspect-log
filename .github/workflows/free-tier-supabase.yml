@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       run_full_replay:
-        description: "Attempt all historical migrations on disposable local Supabase (currently known BLOCKED)"
+        description: "Restore the production baseline + newer migrations on disposable local Supabase and run SQL tests"
         type: boolean
         default: false
       remote_inventory:
@@ -41,11 +41,10 @@ jobs:
           node-version: "22"
       - run: node scripts/staging/free-tier-preflight.mjs --self-test
       - run: node scripts/staging/free-tier-preflight.mjs --inventory
-      - name: Report outstanding database bootstrap restriction
+      - name: Where the database is actually tested
         run: |
-          echo "### Migration schema replay: NOT EXECUTED on ordinary PRs" >> "$GITHUB_STEP_SUMMARY"
-          echo "The historical migration chain is known to fail at 20260317122123 because driver_profiles lacks a reproducible base CREATE TABLE." >> "$GITHUB_STEP_SUMMARY"
-          echo "Use workflow_dispatch/run_full_replay after adding an independently verified baseline. Green guardrails do NOT mean the database is release-ready." >> "$GITHUB_STEP_SUMMARY"
+          echo "### Database schema and SQL tests" >> "$GITHUB_STEP_SUMMARY"
+          echo "Run on every migration PR by **Free-tier disposable Supabase DB / isolated-database**: reviewed production baseline (supabase/bootstrap) + post-baseline migrations + supabase/tests. Green guardrails here alone do NOT mean the database is release-ready." >> "$GITHUB_STEP_SUMMARY"
 
   disposable_database:
     name: Disposable local Supabase schema and SQL tests
@@ -55,7 +54,13 @@ jobs:
     timeout-minutes: 30
     env:
       AXENTRA_LOCAL_SUPABASE: "YES"
+      AXENTRA_DISPOSABLE_DB: "YES"
       SUPABASE_ENV: "ci"
+      PGHOST: "127.0.0.1"
+      PGPORT: "54322"
+      PGUSER: "postgres"
+      PGDATABASE: "postgres"
+      PGPASSWORD: "postgres"
     steps:
       - uses: actions/checkout@v4
       - uses: supabase/setup-cli@v1
@@ -63,17 +68,21 @@ jobs:
           version: 3.0.0
       - name: Install PostgreSQL client
         run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
-      - name: Start ONLY local Supabase database and apply repo migrations
-        run: supabase db start
-      - name: Confirm essential tables, RLS and migrations on disposable database
-        env:
-          PGHOST: "127.0.0.1"
-          PGPORT: "54322"
-          PGUSER: "postgres"
-          PGDATABASE: "postgres"
-          PGPASSWORD: "postgres"
-          PGSSLMODE: "disable"
-        run: psql -X -v ON_ERROR_STOP=1 -f scripts/staging/free-tier-db-smoke.sql
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Start ONLY local Supabase database (no history replay)
+        run: |
+          mkdir -p "$RUNNER_TEMP/axentra-migrations"
+          mv supabase/migrations/*.sql "$RUNNER_TEMP/axentra-migrations/"
+          supabase db start
+          mv "$RUNNER_TEMP/axentra-migrations/"*.sql supabase/migrations/
+      - name: Restore production baseline and replay newer migrations
+        run: bash scripts/free-tier/restore-production-baseline.sh
+      # verify-local-db.mjs enforces the loopback target client-side; the older
+      # scripts/staging/free-tier-db-smoke.sql refuses Docker's container address.
+      - name: Confirm essential tables, RLS and complete migration ledger
+        run: node scripts/free-tier/verify-local-db.mjs
       - name: Test abort lifecycle (rollback-only)
         env:
           PGHOST: "127.0.0.1"

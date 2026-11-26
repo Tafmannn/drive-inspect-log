@@ -1,0 +1,76 @@
+name: Production database and functions release
+
+# The ONLY supported path for applying migrations and Edge Functions to
+# production, so production always matches main. Manual, main-only, and
+# dry-run unless a box is ticked. Use a GitHub "production" environment with
+# required reviewers so each run needs the owner's approval.
+#
+# Never use the Supabase MCP apply_migration tool or the SQL editor for
+# repository migrations: they record a different version and cause drift.
+on:
+  workflow_dispatch:
+    inputs:
+      apply_migrations:
+        description: "Apply pending migrations to PRODUCTION (unticked = dry run only)"
+        type: boolean
+        default: false
+      deploy_functions:
+        description: "Deploy all Edge Functions from main to PRODUCTION"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    env:
+      PROJECT_REF: lynkvfduzqdyvlzgriyh
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    steps:
+      - name: Refuse anything but main
+        if: ${{ github.ref != 'refs/heads/main' }}
+        run: |
+          echo "::error::Production releases run from main only (got ${{ github.ref }})."
+          exit 2
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Pre-flight checks
+        run: |
+          [ -n "$SUPABASE_ACCESS_TOKEN" ] || { echo "::error::SUPABASE_ACCESS_TOKEN secret missing"; exit 2; }
+          node scripts/check-vercel-deployment-policy.mjs
+          node scripts/free-tier/verify-local-db.mjs --static
+          grep -q "project_id = \"$PROJECT_REF\"" supabase/config.toml
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Link production project
+        run: supabase link --project-ref "$PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+      - name: Migrations — dry run
+        run: supabase db push --dry-run --password "$SUPABASE_DB_PASSWORD"
+      - name: Migrations — apply
+        if: ${{ inputs.apply_migrations }}
+        run: supabase db push --password "$SUPABASE_DB_PASSWORD"
+      - name: Edge Functions — deploy from main
+        if: ${{ inputs.deploy_functions }}
+        # verify_jwt for every function comes from supabase/config.toml
+        # (all false, matching production; enforced by a unit test).
+        run: supabase functions deploy --project-ref "$PROJECT_REF" --use-api
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Production release from $(git rev-parse --short HEAD)"
+            echo "- migrations: ${{ inputs.apply_migrations && 'APPLIED' || 'dry run only' }}"
+            echo "- edge functions: ${{ inputs.deploy_functions && 'DEPLOYED' || 'not deployed' }}"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -42,11 +42,13 @@ export default {
     const checks = [];
     for (const line of r.stdout.split("\n")) {
       const [name, result, detail] = line.split("|");
-      if (!name || !result) continue;
+      if (!name || !["PASS", "FAIL", "NOT_EXECUTED"].includes(result?.trim())) continue;
       checks.push(
         result.trim() === "PASS"
           ? pass(name.trim(), detail?.trim() || "PASS")
-          : fail(name.trim(), `${result.trim()} ${detail?.trim() || ""}`),
+          : result.trim() === "NOT_EXECUTED"
+            ? notExecuted(name.trim(), detail?.trim() || "Fixture missing")
+            : fail(name.trim(), `${result.trim()} ${detail?.trim() || ""}`),
       );
     }
     if (!checks.length)
