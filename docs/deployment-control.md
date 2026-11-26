@@ -38,12 +38,11 @@ The `git.deploymentEnabled` rules use Vercel's documented minimatch branch patte
 
 ## Previews never reach production data by accident
 
-The build check (`src/lib/supabaseTarget.ts`, run by `vite.config.ts`) fails any Vercel **preview** build that targets the production Supabase project. That includes a preview that silently fell back to the committed production `.env`. For a preview, either:
+The build check (`src/lib/supabaseTarget.ts`, run by `vite.config.ts`) requires **every** Vercel preview build to declare and target staging. That includes a preview that would otherwise fall back to the committed production `.env`. There is no opt-in for previews on production data.
 
-- add branch-scoped preview variables in Vercel (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` for staging, `VITE_APP_ENV=staging`), as `deploy-preview/staging` has, or
-- set `VITE_ALLOW_PRODUCTION_PREVIEW=true` on that one preview branch, as a deliberate and recorded choice.
+Give each `deploy-preview/<slug>` branch-scoped preview variables in Vercel: the staging `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`, plus `VITE_APP_ENV=staging`, as `deploy-preview/staging` has.
 
-Production builds from `main` are unchanged.
+A Vercel production build must target the production project. Production builds from `main` are otherwise unchanged.
 
 ## Releasing database migrations and Edge Functions
 
