@@ -11,6 +11,8 @@
   max-width: 100%;
   min-width: 0;
   aspect-ratio: 3411 / 672;
+  /* Subtle proportional radius: about 2.8px at compact size; the master artwork is unchanged. */
+  border-radius: 2% / 10.15%;
   isolation: isolate;
   overflow: hidden;
   vertical-align: middle;
@@ -31,15 +33,7 @@
   user-select: none;
 }
 .axentra-uk-plate__art { object-fit: contain; max-width: none; }
-.axentra-uk-plate__svg { overflow: visible; }
-.axentra-uk-plate__svg text {
-  fill: #000;
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 236px;
-  font-weight: 700;
-  line-height: 1;
-  stroke: none;
-}
+.axentra-uk-plate__svg { overflow: visible; shape-rendering: geometricPrecision; }
 .axentra-uk-plate__registration {
   position: absolute;
   left: 12%;
@@ -51,20 +45,16 @@
   justify-content: center;
   color: #000;
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 18cqw;
+  font-size: 12cqw;
   font-weight: 700;
   letter-spacing: .01em;
   line-height: 1;
   white-space: nowrap;
   text-align: center;
-  transform: scaleX(.83);
-  transform-origin: center;
   pointer-events: none;
 }
-.axentra-uk-plate__registration--long { font-size: 14.5cqw; }
 @supports not (font-size: 1cqw) {
-  .axentra-uk-plate__registration { font-size: 24px; }
-  .axentra-uk-plate__registration--long { font-size: 20px; }
+  .axentra-uk-plate__registration { font-size: 15px; }
 }
 @media print {
   .axentra-uk-plate,

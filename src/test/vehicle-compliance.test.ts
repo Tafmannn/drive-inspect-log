@@ -1,0 +1,22 @@
+import { describe, expect, it } from "vitest";
+import { complianceNotices, todayInUk } from "@/lib/vehicleCompliance";
+import type { VehicleLookupResult } from "@/lib/vehicleLookupApi";
+const now = new Date("2026-11-25T12:00:00Z");
+const base: VehicleLookupResult = { success: true, registration: "AB21CDE", motStatus: "Valid", motExpiryDate: "2027-01-01", taxStatus: "Taxed", taxDueDate: "2027-02-01", checkedAt: now.toISOString() };
+const check = (patch: Partial<VehicleLookupResult> = {}, delivery?: string) => complianceNotices({ ...base, ...patch }, "AB21 CDE", delivery, now);
+describe("DVLA compliance notices", () => {
+  it("never treats successful status as legal clearance", () => expect(check()[0].message).toContain("not roadworthiness"));
+  it("stops invalid MOT", () => expect(check({ motStatus: "Not valid" }).some(n => n.severity === "stop")).toBe(true));
+  it("stops expired date even when status is valid", () => expect(check({ motExpiryDate: "2026-11-24" }).some(n => n.severity === "stop")).toBe(true));
+  it("warns rather than blocks untaxed vehicles", () => expect(check({ taxStatus: "Untaxed" }).map(n => n.severity)).toEqual(["review"]));
+  it("reviews SORN and no results", () => expect(check({ motStatus: "No results returned", taxStatus: "SORN" }).map(n => n.severity)).toEqual(["review", "review"]));
+  it("does not infer exemption from a missing expiry", () => expect(check({ motExpiryDate: null })[0].severity).toBe("review"));
+  it("rejects an impossible expiry", () => expect(check({ motExpiryDate: "2027-02-30" })[0].severity).toBe("review"));
+  it("rejects wrong registration", () => expect(check({ registration: "ZZ99ZZZ" })[0].message).toContain("unverified"));
+  it("rejects missing response", () => expect(complianceNotices(null, "AB21CDE", null, now)[0].severity).toBe("review"));
+  it("warns before expiry", () => expect(check({ motExpiryDate: "2026-11-30" })[0].severity).toBe("review"));
+  it("flags expiry before earliest delivery", () => expect(check({}, "2027-01-02")[0].severity).toBe("stop"));
+  it("flags scrapped and export markers", () => expect(check({ markedAsScrapped: true, markedForExport: true }).map(n => n.severity)).toEqual(["stop","review"]));
+  it("warns when timestamp is stale", () => expect(check({ checkedAt: "2026-11-23T12:00:00Z" })[0].severity).toBe("review"));
+  it("uses UK local date at summer midnight", () => expect(todayInUk(new Date("2026-07-01T23:30:00Z"))).toBe("2026-07-02"));
+});

@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { authenticateCaller, corsHeaders, inactiveAccountError } from "../_shared/auth.ts";
 import { pickAppOrigin } from "../_shared/appOrigin.ts";
 import { resolveLogoUrl } from "../_shared/podEmail.ts";
-import { renderInvoiceEmailHtml } from "../_shared/invoiceEmail.ts";
+import { invoiceEmailSubject, renderInvoiceEmailHtml } from "../_shared/invoiceEmail.ts";
 import { emailDeliveryGate } from "../_shared/deliveryGuard.ts";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -99,7 +99,7 @@ serve(async (req) => {
     // the email. Org ownership is enforced the same way as send-pod-email.
     const { data: invoice } = await admin
       .from("invoices")
-      .select("org_id, invoice_number, client_name, total, issue_date, due_date, created_at, pdf_url")
+      .select("org_id, invoice_number, client_name, total, issue_date, due_date, created_at, pdf_url, document_type")
       .eq("id", invoiceId)
       .maybeSingle();
 
@@ -136,10 +136,11 @@ serve(async (req) => {
       packHref = signedPack;
     }
     const issueDate = String(invoice.issue_date ?? invoice.created_at ?? "").slice(0, 10);
-    const subject = `Axentra Invoice ${invoice.invoice_number}`;
+    const subject = invoiceEmailSubject(String(invoice.invoice_number ?? ""), invoice.document_type);
     const html = renderInvoiceEmailHtml({
       logoUrl: resolveLogoUrl('/axentra-logo.png', pickAppOrigin(Deno.env.get('APP_URL'), Deno.env.get('APP_ALLOWED_ORIGINS'), req.headers.get('origin'))),
       invoiceNumber: String(invoice.invoice_number ?? ""),
+      documentType: invoice.document_type,
       clientName: String(invoice.client_name ?? ""),
       total: invoice.total != null ? Number(invoice.total) : null,
       issueDate,
