@@ -6,7 +6,9 @@ if [[ "$AXENTRA_DISPOSABLE_DB" != YES || "$PGHOST" != 127.0.0.1 || "$PGPORT" != 
 fi
 export PGUSER=postgres PGDATABASE=postgres PGPASSWORD=postgres PGSSLMODE=disable
 echo "Invoice lifecycle SQL scenario"
-psql -X -v ON_ERROR_STOP=1 -f supabase/tests/invoice_lifecycle.test.sql
+# invoice_lifecycle.test.sql commits its fixtures by design; wrap it so it never
+# leaks rows into the scenarios that follow (or into a reused local database).
+{ echo "BEGIN;"; cat supabase/tests/invoice_lifecycle.test.sql; echo; echo "ROLLBACK;"; } | psql -X -v ON_ERROR_STOP=1
 echo "Job Workspace tenant acknowledgement SQL scenario (rollback)"
 psql -X -v ON_ERROR_STOP=1 -f supabase/tests/job_workspace_attention_scope.sql
 echo "Job Workspace deferred correction SQL scenario (rollback)"
