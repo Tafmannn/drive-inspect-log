@@ -1,6 +1,7 @@
-# Manually bring the staging database's migrations up to date with this repo.
-# Dry run by default; tick "apply" to actually apply. Never touches production
-# (the script refuses a URL containing the production project ref).
+# STAGING ONLY. Release 1 gate: prove a fresh, restorable staging backup, then
+# apply pending migrations, exercise SQL scenarios (all rolled back), rehearse
+# the rollback scripts and re-apply. Never touches production: every step
+# refuses a URL that is not the staging project.
 name: Sync staging migrations
 
 on:
@@ -20,17 +21,88 @@ concurrency:
 
 jobs:
   sync:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      STAGING_DB_URL: ${{ secrets.STAGING_DB_URL }}
     steps:
       - uses: actions/checkout@v4
-      - name: Install psql
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
-      - name: Sync
+      - name: Refuse anything but staging
+        run: |
+          [ -n "$STAGING_DB_URL" ] || { echo "::error::STAGING_DB_URL missing"; exit 2; }
+          case "$STAGING_DB_URL" in *lynkvfduzqdyvlzgriyh*) echo "::error::production URL refused"; exit 2;; esac
+          case "$STAGING_DB_URL" in *mfedxybzajdgavzmajkl*) echo "staging target confirmed";; *) echo "::error::not staging"; exit 2;; esac
+      - name: Install PostgreSQL 17 client
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y >/dev/null
+          sudo apt-get install -y -qq postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Fresh staging backup (runner-local, never uploaded)
+        run: |
+          mkdir -p "$RUNNER_TEMP/bk" && chmod 700 "$RUNNER_TEMP/bk"
+          pg_dump "$STAGING_DB_URL" --format=custom --no-owner --no-privileges \
+            --schema=public -f "$RUNNER_TEMP/bk/public.dump"
+          pg_dump "$STAGING_DB_URL" --format=custom --no-owner --no-privileges --data-only \
+            --table=auth.users --table=auth.identities --table=storage.buckets --table=storage.objects \
+            --table=supabase_migrations.schema_migrations -f "$RUNNER_TEMP/bk/platform.dump"
+          sha256sum "$RUNNER_TEMP"/bk/*.dump | sed "s#$RUNNER_TEMP/bk/##"
+      - name: Independent restore into a disposable local Supabase
+        run: |
+          mkdir -p "$RUNNER_TEMP/m" && mv supabase/migrations/*.sql "$RUNNER_TEMP/m/"
+          supabase db start
+          mv "$RUNNER_TEMP/m/"*.sql supabase/migrations/
+          export L=postgresql://postgres:postgres@127.0.0.1:54322/postgres
+          psql "$L" -q -c "drop schema public cascade; create schema public;"
+          pg_restore -d "$L" --no-owner --exit-on-error "$RUNNER_TEMP/bk/public.dump"
+          psql "$L" -q -c "create schema if not exists supabase_migrations; create table if not exists supabase_migrations.schema_migrations (version text primary key, statements text[], name text);"
+          pg_restore -d "$L" --no-owner --data-only --disable-triggers --exit-on-error "$RUNNER_TEMP/bk/platform.dump"
+      - name: Verify restore matches staging (row counts + content digests)
+        run: |
+          export L=postgresql://postgres:postgres@127.0.0.1:54322/postgres
+          Q="select string_agg(format('%s.%s', n.nspname, c.relname), ' ' order by 1) from pg_class c join pg_namespace n on n.oid=c.relnamespace where c.relkind='r' and (n.nspname='public' or (n.nspname,c.relname) in (('auth','users'),('auth','identities'),('storage','buckets'),('storage','objects'),('supabase_migrations','schema_migrations')))"
+          TABLES=$(psql "$STAGING_DB_URL" -Atc "$Q")
+          fail=0; n=0
+          for t in $TABLES; do
+            d="select count(*)||':'||coalesce(md5(string_agg(x::text, E'\n' order by x::text)),'-') from $t x"
+            a=$(psql "$STAGING_DB_URL" -Atc "$d"); b=$(psql "$L" -Atc "$d"); n=$((n+1))
+            if [ "$a" != "$b" ]; then echo "MISMATCH $t"; fail=1; fi
+          done
+          echo "tables compared: $n"
+          psql "$STAGING_DB_URL" -Atc "select 'storage objects (metadata): '||count(*) from storage.objects"
+          [ $fail = 0 ] && echo "RESTORE VERIFIED: every table identical" || { echo "::error::restore mismatch"; exit 1; }
+      - name: Sync (dry run / apply)
         env:
-          STAGING_DB_URL: ${{ secrets.STAGING_DB_URL }}
+          STAGING_BACKUP_VERIFIED: ${{ inputs.apply && 'YES' || '' }}
         run: |
           if [ "${{ inputs.apply }}" = "true" ]; then
             scripts/sync-staging-migrations.sh --apply
           else
             scripts/sync-staging-migrations.sh
           fi
+      - name: Post-apply verification on staging (every scenario rolls back)
+        if: ${{ inputs.apply }}
+        run: |
+          psql "$STAGING_DB_URL" -Atc "select version||' '||name from supabase_migrations.schema_migrations where version like '2026112501%' or name like '2026112501%' order by 1"
+          for f in job_workspace_attention_scope job_workspace_deferred_correction job_abort_workflow digital_id_v2.integration; do
+            echo "== $f"; psql "$STAGING_DB_URL" -X -q -v ON_ERROR_STOP=1 -f supabase/tests/$f.sql > "$RUNNER_TEMP/$f.log" 2>&1 \
+              && echo "PASS $f" || { tail -5 "$RUNNER_TEMP/$f.log"; echo "::error::$f failed"; exit 1; }
+          done
+          { echo "BEGIN;"; cat supabase/tests/invoice_lifecycle.test.sql; echo; echo "ROLLBACK;"; } | psql "$STAGING_DB_URL" -X -q -v ON_ERROR_STOP=1 > "$RUNNER_TEMP/inv.log" 2>&1 \
+            && echo "PASS invoice_lifecycle" || { tail -5 "$RUNNER_TEMP/inv.log"; exit 1; }
+      - name: Rollback rehearsal then re-apply (idempotency)
+        if: ${{ inputs.apply }}
+        run: |
+          P="select has_function_privilege('authenticated','public.cancel_invoice_authorised(uuid,text,boolean,text,numeric)','execute')||','||has_function_privilege('authenticated','public.acknowledge_attention_exception(text,uuid,uuid,text,timestamptz)','execute')||','||has_function_privilege('authenticated','public.defer_invoice_correction(uuid,text,uuid,numeric,numeric,boolean)','execute')||','||has_table_privilege('authenticated','public.attention_acknowledgements','select')"
+          echo "before:   $(psql "$STAGING_DB_URL" -Atc "$P")"
+          for f in supabase/rollback/2026112501*.down.sql; do psql "$STAGING_DB_URL" -X -q -v ON_ERROR_STOP=1 -f "$f"; done
+          echo "rollback: $(psql "$STAGING_DB_URL" -Atc "$P")"
+          for f in supabase/migrations/2026112501*.sql; do psql "$STAGING_DB_URL" -X -q -v ON_ERROR_STOP=1 -f "$f"; done
+          echo "reapply:  $(psql "$STAGING_DB_URL" -Atc "$P")"
+          psql "$STAGING_DB_URL" -Atc "select count(*) from supabase_migrations.schema_migrations where version like '2026112501%'"
+      - name: Stop local containers
+        if: always()
+        run: supabase stop --no-backup || true
