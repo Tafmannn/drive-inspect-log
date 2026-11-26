@@ -32,7 +32,7 @@ serve(async (req) => {
     }
 
     // ─── Input validation ───
-    const body = await req.json();
+    const body = await req.json().catch(() => null);
     if (!body?.registration || typeof body.registration !== "string") {
       return jsonResponse({ success: false, error: "BAD_REG" }, 400);
     }
@@ -48,28 +48,46 @@ serve(async (req) => {
       return jsonResponse({ success: false, error: "Invalid registration" }, 400);
     }
 
-    // Call DVLA VES API
-    const dvlaRes = await fetch("https://driver-vehicle-licensing.api.gov.uk/vehicle-enquiry/v1/vehicles", {
-      method: "POST",
-      headers: {
-        "x-api-key": DVLA_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ registrationNumber: registration }),
-    });
+    // Call DVLA VES API. Outages, authentication failures and malformed
+    // responses never surface raw details to the caller and never return a
+    // partial vehicle record (the app must treat MOT/tax as unverified).
+    let dvlaRes: Response;
+    try {
+      dvlaRes = await fetch("https://driver-vehicle-licensing.api.gov.uk/vehicle-enquiry/v1/vehicles", {
+        method: "POST",
+        headers: {
+          "x-api-key": DVLA_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ registrationNumber: registration }),
+        signal: AbortSignal.timeout(10_000),
+      });
+    } catch (e: unknown) {
+      console.error("DVLA unreachable:", e instanceof Error ? e.name : "error");
+      return jsonResponse({ success: false, error: "DVLA_UNAVAILABLE" });
+    }
 
     if (!dvlaRes.ok) {
-      const errText = await dvlaRes.text();
-      console.error("DVLA lookup failed:", dvlaRes.status, errText);
+      const errText = await dvlaRes.text().catch(() => "");
+      console.error("DVLA lookup failed:", dvlaRes.status, errText.slice(0, 300));
 
       if (dvlaRes.status === 404) {
         return jsonResponse({ success: false, error: "Vehicle not found" });
       }
-
+      if (dvlaRes.status === 401 || dvlaRes.status === 403) {
+        return jsonResponse({ success: false, error: "DVLA_AUTH_FAILED" });
+      }
+      if (dvlaRes.status === 429 || dvlaRes.status >= 500) {
+        return jsonResponse({ success: false, error: "DVLA_UNAVAILABLE" });
+      }
       return jsonResponse({ success: false, error: "DVLA_ERROR" });
     }
 
-    const vehicle = await dvlaRes.json();
+    const vehicle = await dvlaRes.json().catch(() => null);
+    if (!vehicle || typeof vehicle !== "object" || Array.isArray(vehicle)) {
+      console.error("DVLA returned a non-object response");
+      return jsonResponse({ success: false, error: "DVLA_INVALID_RESPONSE" });
+    }
 
     let year = "";
     if (vehicle.yearOfManufacture) {
@@ -87,12 +105,17 @@ serve(async (req) => {
         year,
         fuelType: vehicle.fuelType || null,
         engineCapacity: vehicle.engineCapacity || null,
-        taxStatus: vehicle.taxStatus || null,
-        motStatus: vehicle.motStatus || null,
+        taxStatus: typeof vehicle.taxStatus === "string" ? vehicle.taxStatus : null,
+        motStatus: typeof vehicle.motStatus === "string" ? vehicle.motStatus : null,
+        motExpiryDate: typeof vehicle.motExpiryDate === "string" ? vehicle.motExpiryDate : typeof vehicle.motExpiry === "string" ? vehicle.motExpiry : null,
+        taxDueDate: typeof vehicle.taxDueDate === "string" ? vehicle.taxDueDate : null,
+        markedAsScrapped: typeof vehicle.markedAsScrapped === "boolean" ? vehicle.markedAsScrapped : null,
+        markedForExport: typeof vehicle.markedForExport === "boolean" ? vehicle.markedForExport : null,
+        checkedAt: new Date().toISOString(),
       }
     );
   } catch (e: unknown) {
-    console.error("vehicle-lookup error:", e);
-    return jsonResponse({ success: false, error: e instanceof Error ? e.message : String(e) }, 500);
+    console.error("vehicle-lookup error:", e instanceof Error ? e.message : e);
+    return jsonResponse({ success: false, error: "INTERNAL" }, 500);
   }
 });
