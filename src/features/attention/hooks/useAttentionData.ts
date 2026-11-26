@@ -56,7 +56,7 @@ function buildAckMap(acknowledgements: AcknowledgementRow[]) {
   return ackMap;
 }
 
-async function loadInspections(completedJobs: JobRow[]) {
+export async function loadInspections(completedJobs: JobRow[]) {
   // Fetch inspections scoped to completed job IDs
   const completedJobIds = completedJobs.map(j => j.id);
   let inspections: any[] = [];
@@ -96,7 +96,7 @@ async function loadBilling(billingJobsRes: { data: unknown; error: unknown }) {
   return { billingJobs, staleBillingJobs, invoicedJobIds };
 }
 
-async function loadDriverLookups(docs: { related_type: string; related_id: string }[]) {
+export async function loadDriverLookups(docs: { related_type: string; related_id: string }[]) {
   // Driver lookups keyed by driver_profile.id (for documents.related_id):
   //  - name for display
   //  - user_id for routing to /admin/drivers/:userId
@@ -148,7 +148,7 @@ export function partitionAttentionExceptions(allExceptions: AttentionException[]
   return { activeExceptions, acknowledgedExceptions, ackMap };
 }
 
-function filterExceptions(activeExceptions: AttentionException[], filters: AttentionFiltersState, scope: UseAttentionDataOpts["scope"]) {
+export function filterExceptions(activeExceptions: AttentionException[], filters: AttentionFiltersState, scope: UseAttentionDataOpts["scope"]) {
   let exceptions = activeExceptions;
 
   // Apply filters

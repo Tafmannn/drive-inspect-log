@@ -27,7 +27,13 @@ BEGIN
    END IF;
    NEW.org_id:=v_org;
  END IF;
- IF NEW.exception_id LIKE 'evidence:%' AND (NEW.job_id IS NULL OR NEW.exception_id IS DISTINCT FROM ('evidence:' || NEW.job_id::text)) THEN
+ -- Evidence IDs must be bound to their job: the job-level resolution marker
+ -- 'evidence:<job>' or an engine exception 'evidence:<job>:<key>' for the SAME
+ -- job, or a job-less 'evidence:global:<key>' (e.g. a signature lookup with no job).
+ IF starts_with(NEW.exception_id, 'evidence:') AND NOT (
+      (NEW.job_id IS NOT NULL AND (NEW.exception_id = 'evidence:' || NEW.job_id::text
+         OR starts_with(NEW.exception_id, 'evidence:' || NEW.job_id::text || ':')))
+   OR (NEW.job_id IS NULL AND starts_with(NEW.exception_id, 'evidence:global:'))) THEN
    RAISE EXCEPTION 'ACK_EVIDENCE_ID_INVALID' USING ERRCODE='23514';
  END IF;
  IF NEW.org_id IS NULL THEN
