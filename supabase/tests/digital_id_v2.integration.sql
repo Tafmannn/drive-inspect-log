@@ -170,5 +170,28 @@ SELECT pg_temp.require_true(
  'suspended driver loses RLS access to private ID photograph');
 RESET ROLE;
 
+-- Administrative role alone is not a driver credential.
+SELECT pg_temp.require_true(NOT EXISTS (
+  SELECT 1 FROM public.driver_digital_credentials WHERE user_id='d2d00000-0000-0000-0000-000000000002'
+), 'admin without driving profile does not receive an ID');
+INSERT INTO public.driver_profiles(user_id,org_id,full_name,is_active) VALUES
+ ('d2d00000-0000-0000-0000-000000000002','d1d00000-0000-0000-0000-000000000001','Test Admin Driver',true);
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub','d2d00000-0000-0000-0000-000000000002',true);
+SELECT pg_temp.require_true(
+ (public.get_driver_digital_id(NULL)->>'status')='active',
+ 'active dual-role admin can obtain own driver ID');
+RESET ROLE;
+SELECT set_config('request.jwt.claim.sub','',true);
+UPDATE public.driver_profiles SET is_active=false
+ WHERE user_id='d2d00000-0000-0000-0000-000000000002';
+SELECT pg_temp.require_true(
+ (SELECT status='revoked' FROM public.driver_digital_credentials WHERE user_id='d2d00000-0000-0000-0000-000000000002'),
+ 'disabled driving profile revokes dual-role credential');
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub','d2d00000-0000-0000-0000-000000000002',true);
+SELECT pg_temp.require_denied('SELECT public.get_driver_digital_id(NULL)','CREDENTIAL_UNAVAILABLE');
+RESET ROLE;
+
 \echo 'PASS: DIGITAL ID V2 SQL LIFECYCLE AND ACCESS TESTS'
 ROLLBACK;

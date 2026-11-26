@@ -17,8 +17,7 @@ export default defineConfig(({ mode, command }) => {
       key: env.VITE_SUPABASE_PUBLISHABLE_KEY,
       appEnv: env.VITE_APP_ENV,
       gitBranch: process.env.VERCEL_GIT_COMMIT_REF,
-      vercelEnv: process.env.VERCEL_ENV,
-      allowProductionPreview: env.VITE_ALLOW_PRODUCTION_PREVIEW,
+      deploymentEnv: process.env.VERCEL_ENV,
     });
     if (!target.ok) throw new Error("Supabase target check failed: " + target.errors.join("; "));
     console.log(`[supabase-target] building against project ${target.ref} (VITE_APP_ENV=${env.VITE_APP_ENV || "unset"})`);

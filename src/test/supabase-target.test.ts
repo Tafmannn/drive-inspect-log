@@ -41,6 +41,15 @@ describe("supabaseTarget — staging cannot reach production", () => {
     expect(checkSupabaseTarget({ url: STG_URL, key: "sb_secret_abc" }).ok).toBe(false);
   });
 
+  it("blocks every preview falling back to production regardless of branch", () => {
+    expect(checkSupabaseTarget({ url: PROD_URL, key: PROD_ANON, deploymentEnv: "preview", gitBranch: "deploy-preview/other" }).ok).toBe(false);
+    expect(checkSupabaseTarget({ url: STG_URL, key: STG_ANON, deploymentEnv: "preview", appEnv: "staging" }).ok).toBe(true);
+    expect(checkSupabaseTarget({ url: STG_URL, key: STG_ANON, deploymentEnv: "preview" }).ok).toBe(false);
+    expect(checkSupabaseTarget({ url: STG_URL, key: STG_ANON, deploymentEnv: "production" }).ok).toBe(false);
+    expect(checkSupabaseTarget({ url: PROD_URL, key: PROD_ANON, deploymentEnv: "production" }).ok).toBe(true);
+    expect(projectRefFromUrl(PROD_URL.replace("https:", "http:"))).toBeNull();
+  });
+
   it("production builds are unchanged (no VITE_APP_ENV needed on main)", () => {
     expect(checkSupabaseTarget({ url: PROD_URL, key: PROD_ANON, gitBranch: "main" }).ok).toBe(true);
     expect(checkSupabaseTarget({ url: PROD_URL, key: "sb_publishable_x", appEnv: "production" }).ok).toBe(true);
@@ -50,21 +59,19 @@ describe("supabaseTarget — staging cannot reach production", () => {
 
 describe("supabaseTarget — Vercel previews cannot reach production by accident", () => {
   const PROD = "https://lynkvfduzqdyvlzgriyh.supabase.co";
-  const STG = "https://mfedxybzajdgavzmajkl.supabase.co";
-  it("fails a preview build that targets production (e.g. fell back to the committed .env)", () => {
-    const r = checkSupabaseTarget({ url: PROD, key: "sb_publishable_x", vercelEnv: "preview", gitBranch: "deploy-preview/abort-ui" });
+  it("fails a preview that fell back to the committed production .env", () => {
+    const committed = readFileSync(".env", "utf8");
+    const url = /VITE_SUPABASE_URL="([^"]+)"/.exec(committed)?.[1];
+    const r = checkSupabaseTarget({ url, key: "sb_publishable_x", deploymentEnv: "preview", gitBranch: "deploy-preview/abort-ui" });
     expect(r.ok).toBe(false);
-    expect(r.errors.join(" ")).toMatch(/preview builds must use the staging project/);
+    expect(r.errors.join(" ")).toMatch(/Every Vercel preview must explicitly target staging/);
   });
-  it("allows a preview on staging", () => {
-    expect(checkSupabaseTarget({ url: STG, key: "sb_publishable_x", appEnv: "staging", vercelEnv: "preview" }).ok).toBe(true);
-  });
-  it("allows a deliberate, explicit production preview opt-in", () => {
-    expect(checkSupabaseTarget({ url: PROD, key: "sb_publishable_x", vercelEnv: "preview", allowProductionPreview: "true" }).ok).toBe(true);
-    expect(checkSupabaseTarget({ url: PROD, key: "sb_publishable_x", vercelEnv: "preview", allowProductionPreview: "1" }).ok).toBe(false);
+  it("has no production opt-in for previews", () => {
+    const input = { url: PROD, key: "sb_publishable_x", deploymentEnv: "preview", allowProductionPreview: "true" };
+    expect(checkSupabaseTarget(input as Parameters<typeof checkSupabaseTarget>[0]).ok).toBe(false);
   });
   it("leaves production and local builds unchanged", () => {
-    expect(checkSupabaseTarget({ url: PROD, key: "sb_publishable_x", vercelEnv: "production", gitBranch: "main" }).ok).toBe(true);
+    expect(checkSupabaseTarget({ url: PROD, key: "sb_publishable_x", deploymentEnv: "production", gitBranch: "main" }).ok).toBe(true);
     expect(checkSupabaseTarget({ url: PROD, key: "sb_publishable_x" }).ok).toBe(true);
   });
 });

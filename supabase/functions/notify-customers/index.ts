@@ -205,11 +205,12 @@ serve(async (req) => {
         const sentTo: string[] = [];
         const providerIds: string[] = [];
         const errors: string[] = [];
+        const suppressed: string[] = [];
         // One email per person: recipients never see each other's address.
         for (const to of recipients) {
           const gate = emailDeliveryGate(to);
           if (!gate.send) {
-            errors.push(String(gate.reason));
+            suppressed.push(gate.reason ?? "DELIVERY_GUARD_SUPPRESSED");
             continue;
           }
           const resp = await fetch("https://api.resend.com/emails", {
@@ -239,11 +240,14 @@ serve(async (req) => {
             sent_at: new Date().toISOString(),
             recipients: sentTo,
             provider_ids: providerIds,
-            last_error: errors.length ? errors.join("; ").slice(0, 1000) : null,
+            last_error: [...errors, ...suppressed].length ? [...errors, ...suppressed].join("; ").slice(0, 1000) : null,
           });
           summary.sent++;
+        } else if (suppressed.length === recipients.length && errors.length === 0) {
+          await finish({ status: "skipped", skip_reason: "delivery_guard_suppressed", last_error: suppressed.join("; ").slice(0, 1000) });
+          summary.skipped++;
         } else {
-          await finish({ status: "failed", last_error: errors.join("; ").slice(0, 1000) || "send failed" });
+          await finish({ status: "failed", last_error: [...errors, ...suppressed].join("; ").slice(0, 1000) || "send failed" });
           summary.failed++;
         }
       } catch (e) {
