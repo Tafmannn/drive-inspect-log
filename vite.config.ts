@@ -1,11 +1,29 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
+import { checkSupabaseTarget } from "./src/lib/supabaseTarget";
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode, command }) => {
+  // Fail the build (not just the page) when the target project is wrong — e.g.
+  // a staging branch whose own variables are missing would otherwise silently
+  // fall back to the committed production .env.
+  if (command === "build") {
+    const env = loadEnv(mode, process.cwd(), "");
+    const target = checkSupabaseTarget({
+      url: env.VITE_SUPABASE_URL,
+      key: env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      appEnv: env.VITE_APP_ENV,
+      gitBranch: process.env.VERCEL_GIT_COMMIT_REF,
+      vercelEnv: process.env.VERCEL_ENV,
+      allowProductionPreview: env.VITE_ALLOW_PRODUCTION_PREVIEW,
+    });
+    if (!target.ok) throw new Error("Supabase target check failed: " + target.errors.join("; "));
+    console.log(`[supabase-target] building against project ${target.ref} (VITE_APP_ENV=${env.VITE_APP_ENV || "unset"})`);
+  }
+  return {
   server: {
     host: "::",
     port: 8080,
@@ -77,4 +95,5 @@ export default defineConfig(({ mode }) => ({
       },
     },
   },
-}));
+};
+});

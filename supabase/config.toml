@@ -1,5 +1,10 @@
 project_id = "lynkvfduzqdyvlzgriyh"
 
+# Local stack (supabase db start) must match production's Postgres major
+# version: the CI baseline in supabase/bootstrap is restored into it.
+[db]
+major_version = 17
+
 [functions.maps-directions]
 verify_jwt = false
 
@@ -68,4 +73,11 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.promote-admin]
+verify_jwt = false
+
+# Every function authenticates the caller in code (release-validation suite 06),
+# and production runs all of them with verify_jwt = false. Declaring each one
+# here keeps a plain `supabase functions deploy` from silently turning the
+# gateway check back on (the CLI default), which would reject publishable keys.
+[functions.send-push]
 verify_jwt = false

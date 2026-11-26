@@ -1,0 +1,49 @@
+name: Production migration drift (read-only)
+
+# Compares production's migration ledger with supabase/migrations on main.
+# Fails only on DRIFT (a change applied to production that is not in Git, as
+# happened with 20261124223124). Pending migrations after a merge are a
+# warning: release them with "Production database and functions release".
+# Read-only: default_transaction_read_only=on; never applies anything.
+on:
+  schedule:
+    - cron: "17 7 * * 1" # Mondays 07:17 UTC
+  push:
+    branches: [main]
+    paths:
+      - "supabase/migrations/**"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install PostgreSQL client
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends postgresql-client
+      - run: node scripts/free-tier/production-drift.mjs --self-test
+      - name: Compare production ledger with Git
+        env:
+          PRODUCTION_READONLY_DB_URL: ${{ secrets.PRODUCTION_READONLY_DB_URL }}
+        run: |
+          if [ -z "$PRODUCTION_READONLY_DB_URL" ]; then
+            echo "::warning::PRODUCTION_READONLY_DB_URL is not set; drift check NOT EXECUTED (see docs/deployment-control.md)."
+            echo "### Production drift check: NOT EXECUTED (no read-only credential)" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          set +e
+          node scripts/free-tier/production-drift.mjs
+          code=$?
+          set -e
+          if [ "$code" -eq 1 ]; then
+            echo "::warning::Migrations on main are not yet applied to production. Run the production release workflow."
+            exit 0
+          fi
+          exit "$code"

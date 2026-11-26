@@ -1,58 +1,56 @@
--- release-validation :: suite 13 — cross-tenant isolation runtime proof
---
--- Run against a STAGING database only. Emits pipe-separated tuples:
---   <check-name>|PASS|<detail>  or  <check-name>|FAIL|<detail>
--- (psql -At -F'|' -f this-file).
---
--- Requires a driver identity. Supply it explicitly for a deterministic test:
---   psql ... -v driver_sub="<auth_user_id>" -v org_a="<org-uuid>" -f org-isolation.sql
--- If not supplied, the script auto-selects the first driver with an org.
--- The runner passes -v values when STAGING_DRIVER_SUB / STAGING_ORG_A are set;
--- otherwise it gates the suite as NOT_EXECUTED.
-
+-- Suite 13: staging-only, read-only RLS proof under an actual driver claim.
+-- Select a non-vacuous fixture before assuming the authenticated role.
 \set ON_ERROR_STOP on
-
--- Resolve the test driver into a temp table so both statements agree.
--- No ON COMMIT DROP: psql runs in autocommit mode (each statement is its
--- own implicit transaction), so ON COMMIT DROP would drop this table the
--- instant the CREATE statement commits, before any later statement could
--- see it. A plain TEMP TABLE lives for the psql session and is cleaned up
--- automatically when the connection closes at the end of this script.
-CREATE TEMP TABLE _vd AS
-SELECT auth_user_id, org_id
-FROM public.user_profiles
-WHERE role = 'driver' AND org_id IS NOT NULL
-  AND (:'driver_sub' = '' OR auth_user_id::text = :'driver_sub')
-ORDER BY auth_user_id
-LIMIT 1;
-
--- Impersonate that driver as the RLS-bound `authenticated` role.
-SELECT set_config(
-  'request.jwt.claims',
-  json_build_object('sub', (SELECT auth_user_id FROM _vd), 'role', 'authenticated')::text,
-  true
-) \gset _ignore_
-
+BEGIN READ ONLY;
+WITH candidate AS (
+ SELECT u.auth_user_id,u.org_id
+ FROM public.user_profiles u
+ WHERE u.role='driver' AND u.account_status='active' AND u.org_id IS NOT NULL
+   AND (:'driver_sub'='' OR u.auth_user_id::text=:'driver_sub')
+   AND (:'org_a'='' OR u.org_id::text=:'org_a')
+   AND EXISTS (
+      SELECT 1 FROM public.driver_profiles d JOIN public.jobs j ON j.driver_id=d.id
+      WHERE d.user_id=u.auth_user_id AND d.org_id=u.org_id
+        AND j.org_id=u.org_id AND j.is_test=false
+   )
+   AND EXISTS (SELECT 1 FROM public.jobs j WHERE j.org_id<>u.org_id AND j.is_test=false)
+ ORDER BY u.auth_user_id LIMIT 1
+)
+SELECT EXISTS(SELECT 1 FROM candidate) AS fixture_ok,
+ coalesce((SELECT auth_user_id::text FROM candidate),'') AS fixture_sub,
+ coalesce((SELECT org_id::text FROM candidate),'') AS fixture_org
+\gset
+\if :fixture_ok
+-- Capture foreign object paths with the baseline role. Never rely on the
+-- driver's filtered expenses query to enumerate records belonging to org B.
+SELECT coalesce(json_agg(o.name ORDER BY o.name),'[]'::json)::text AS foreign_receipt_names
+FROM storage.objects o JOIN public.expenses e ON split_part(o.name,'/',1)=e.id::text
+WHERE o.bucket_id='expense-receipts' AND e.org_id::text<>:'fixture_org'
+\gset
+SELECT set_config('request.jwt.claims',json_build_object('sub',:'fixture_sub','role','authenticated')::text,true) \gset _ignore_
 SET LOCAL ROLE authenticated;
-
--- Under the driver's claims, no other org's jobs may be visible.
+SELECT 'driver_rls_context' AS check,
+ CASE WHEN current_user='authenticated' AND auth.uid()::text=:'fixture_sub'
+   AND public.user_org_id()::text=:'fixture_org' AND public.user_role()::text='driver'
+   AND row_security_active('public.jobs'::regclass) THEN 'PASS' ELSE 'FAIL' END AS result,
+ 'role, subject, organisation and RLS context' AS detail;
 SELECT 'driver_sees_only_own_org' AS check,
-       CASE WHEN count(*) FILTER (WHERE org_id <> (SELECT org_id FROM _vd)) = 0
-            THEN 'PASS' ELSE 'FAIL' END AS result,
-       count(*) || ' visible jobs, '
-         || count(*) FILTER (WHERE org_id <> (SELECT org_id FROM _vd)) || ' cross-org' AS detail
+ CASE WHEN count(*) FILTER (WHERE org_id::text=:'fixture_org')>0
+   AND count(*) FILTER (WHERE org_id::text IS DISTINCT FROM :'fixture_org')=0
+ THEN 'PASS' ELSE 'FAIL' END AS result,
+ count(*)||' visible jobs, '||count(*) FILTER (WHERE org_id::text IS DISTINCT FROM :'fixture_org')||' cross-org' AS detail
 FROM public.jobs;
-
-RESET ROLE;
-
--- Receipts are org-scoped (Phase 1 Stage 5): no cross-org receipt objects visible.
-SET LOCAL ROLE authenticated;
 SELECT 'driver_no_cross_org_receipts' AS check,
-       CASE WHEN count(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS result,
-       count(*) || ' cross-org receipt objects' AS detail
+ CASE WHEN json_array_length(:'foreign_receipt_names'::json)=0 THEN 'NOT_EXECUTED'
+ WHEN count(*)=0 AND row_security_active('storage.objects'::regclass) THEN 'PASS' ELSE 'FAIL' END AS result,
+ CASE WHEN json_array_length(:'foreign_receipt_names'::json)=0 THEN 'No foreign receipt fixtures exist'
+ ELSE count(*)||' foreign receipt objects visible' END AS detail
 FROM storage.objects o
-WHERE o.bucket_id = 'expense-receipts'
-  AND split_part(o.name, '/', 1) IN (
-        SELECT id::text FROM public.expenses WHERE org_id <> (SELECT org_id FROM _vd)
-      );
+WHERE o.bucket_id='expense-receipts' AND o.name IN (SELECT json_array_elements_text(:'foreign_receipt_names'::json));
 RESET ROLE;
+\else
+SELECT 'driver_rls_context','NOT_EXECUTED','No active assigned driver and foreign visible job fixtures matching requested scope';
+SELECT 'driver_sees_only_own_org','NOT_EXECUTED','Required positive and negative fixtures absent';
+SELECT 'driver_no_cross_org_receipts','NOT_EXECUTED','Required driver fixture absent';
+\endif
+ROLLBACK;

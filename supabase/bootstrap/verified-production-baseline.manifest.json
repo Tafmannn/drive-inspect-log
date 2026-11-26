@@ -1,0 +1,21 @@
+{
+  "source": "Axentra production (read-only catalogue export)",
+  "projectRef": "lynkvfduzqdyvlzgriyh",
+  "serverVersion": "17.6",
+  "capturedAt": "2026-11-26T00:58:00Z",
+  "capturedWith": "scripts/free-tier/export-production-baseline.sql via Supabase MCP execute_sql (SELECT only)",
+  "serverMd5": "877772a4fc7c79de49944333dde8156e",
+  "sha256": "e0b09d4a37a74dab4974cedb96db5f9ed95e1ecfe1cbe6fac19c3219f7590f72",
+  "bytes": 511994,
+  "statements": 2322,
+  "maxRecordedMigration": "20261124223124",
+  "ledgerRows": 122,
+  "scope": "public + axentra_private full DDL; Axentra trigger on auth.users; storage.* policies; grants; realtime publication membership; migration ledger (version + name)",
+  "dataRowsIncluded": "configuration only: storage.buckets (10), permissions_catalog, role_permission_templates; no auth users, org, customer, job, invoice or storage object rows",
+  "securityReviewed": true,
+  "securityReview": "No API keys, JWTs, provider tokens, URLs, e-mail addresses, vault access or outbound HTTP (pg_net/dblink) in any function body; no role passwords or attributes (no custom roles referenced).",
+  "restoreTested": "plain PostgreSQL 17 + scripts/free-tier/platform-shim.sql, then supabase/tests/*.sql",
+  "approvedForCi": true,
+  "approvedBy": "repository owner, 26 Nov 2026 (PR #197: 'Approve a new production baseline')",
+  "refresh": "Optional. New migrations replay on top automatically. Re-capture after any change applied to production outside supabase/migrations, then re-review and update sha256."
+}
