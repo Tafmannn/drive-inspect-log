@@ -36,11 +36,16 @@ INSERT INTO auth.users (id,email) VALUES
  ('d2d00000-0000-0000-0000-000000000003','synthetic-foreign@digital-id.invalid'),
  ('d2d00000-0000-0000-0000-000000000004','synthetic-pending@digital-id.invalid');
 
-INSERT INTO public.user_profiles (auth_user_id,org_id,role,account_status,full_name) VALUES
- ('d2d00000-0000-0000-0000-000000000001','d1d00000-0000-0000-0000-000000000001','driver','active','Test Driver'),
- ('d2d00000-0000-0000-0000-000000000002','d1d00000-0000-0000-0000-000000000001','admin','active','Test Admin'),
- ('d2d00000-0000-0000-0000-000000000003','d1d00000-0000-0000-0000-000000000002','admin','active','Foreign Admin'),
- ('d2d00000-0000-0000-0000-000000000004','d1d00000-0000-0000-0000-000000000001','driver','pending','Pending Driver');
+-- email is NOT NULL in production, and its on_auth_user_created trigger may
+-- already have created each profile from auth.users.
+INSERT INTO public.user_profiles (auth_user_id,email,org_id,role,account_status,full_name) VALUES
+ ('d2d00000-0000-0000-0000-000000000001','synthetic-driver@digital-id.invalid','d1d00000-0000-0000-0000-000000000001','driver','active','Test Driver'),
+ ('d2d00000-0000-0000-0000-000000000002','synthetic-admin@digital-id.invalid','d1d00000-0000-0000-0000-000000000001','admin','active','Test Admin'),
+ ('d2d00000-0000-0000-0000-000000000003','synthetic-foreign@digital-id.invalid','d1d00000-0000-0000-0000-000000000002','admin','active','Foreign Admin'),
+ ('d2d00000-0000-0000-0000-000000000004','synthetic-pending@digital-id.invalid','d1d00000-0000-0000-0000-000000000001','driver','pending_activation','Pending Driver')
+ON CONFLICT (auth_user_id) DO UPDATE
+  SET email = EXCLUDED.email, org_id = EXCLUDED.org_id, role = EXCLUDED.role,
+      account_status = EXCLUDED.account_status, full_name = EXCLUDED.full_name;
 
 -- Issuance occurs automatically only on activation.
 SELECT pg_temp.require_true(

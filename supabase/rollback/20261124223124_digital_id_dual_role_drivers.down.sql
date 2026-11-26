@@ -1,6 +1,30 @@
--- Revert the dual-role eligibility change only; preserve credential history and serials.
--- Review and test on a disposable database before applying.
+-- Rollback for 20261124223124_digital_id_dual_role_drivers.
+-- Restores the three objects that migration replaced, byte-for-byte as defined
+-- by 20261123220000_digital_id_v2.sql:
+--   * axentra_private.sync_driver_digital_credential(uuid)  (driver role only)
+--   * public.get_driver_digital_id(uuid)
+--   * policy digital_id_credential_read_self_or_admin       (self-read: role = 'driver' only)
+--
+-- Data is NOT touched. Credentials the forward migration's backfill issued to
+-- dual-role (admin + active driver) accounts, their serials and their event
+-- history are kept. After this rollback those holders can no longer read their
+-- own credential, and the next account/driver state change runs the V2 sync,
+-- which treats them as ineligible and revokes the credential through the
+-- normal audited path. Do NOT delete credential rows by hand.
 BEGIN;
+
+DROP POLICY IF EXISTS "digital_id_credential_read_self_or_admin" ON public.driver_digital_credentials;
+CREATE POLICY "digital_id_credential_read_self_or_admin"
+ON public.driver_digital_credentials FOR SELECT TO authenticated
+USING (
+  (user_id = (SELECT auth.uid()) AND status = 'active'
+   AND EXISTS (SELECT 1 FROM public.user_profiles u
+               WHERE u.auth_user_id = (SELECT auth.uid())
+                 AND u.account_status = 'active' AND u.role = 'driver'))
+  OR public.is_super_admin()
+  OR (public.is_admin_or_super_admin() AND org_id = public.user_org_id())
+);
+
 CREATE OR REPLACE FUNCTION axentra_private.sync_driver_digital_credential(p_user_id uuid)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = pg_catalog, public, axentra_private
@@ -100,7 +124,9 @@ BEGIN
   END IF;
 END;
 $func$;
-REVOKE ALL ON FUNCTION axentra_private.sync_driver_digital_credential(uuid) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION axentra_private.sync_driver_digital_credential(uuid)
+  FROM PUBLIC, anon, authenticated;
+
 CREATE OR REPLACE FUNCTION public.get_driver_digital_id(p_user_id uuid DEFAULT NULL)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = pg_catalog, public
@@ -170,28 +196,8 @@ BEGIN
   );
 END;
 $func$;
-REVOKE ALL ON FUNCTION public.get_driver_digital_id(uuid) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.get_driver_digital_id(uuid)
+  FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.get_driver_digital_id(uuid) TO authenticated;
-DROP POLICY IF EXISTS "digital_id_credential_read_self_or_admin" ON public.driver_digital_credentials;
-CREATE POLICY "digital_id_credential_read_self_or_admin"
-ON public.driver_digital_credentials FOR SELECT TO authenticated
-USING (
-  (user_id = (SELECT auth.uid()) AND status = 'active'
-   AND EXISTS (SELECT 1 FROM public.user_profiles u
-               WHERE u.auth_user_id = (SELECT auth.uid())
-                 AND u.account_status = 'active' AND u.role = 'driver'))
-  OR public.is_super_admin()
-  OR (public.is_admin_or_super_admin() AND org_id = public.user_org_id())
-);
-DO $rollback$
-DECLARE r record;
-BEGIN
- FOR r IN SELECT u.auth_user_id FROM public.user_profiles u
- JOIN public.driver_digital_credentials c ON c.user_id=u.auth_user_id
- WHERE u.role IN ('admin','super_admin') AND c.status='active'
- LOOP
-  PERFORM axentra_private.sync_driver_digital_credential(r.auth_user_id);
- END LOOP;
-END;
-$rollback$;
+
 COMMIT;
