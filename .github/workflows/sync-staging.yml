@@ -45,7 +45,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/bk" && chmod 700 "$RUNNER_TEMP/bk"
           pg_dump "$STAGING_DB_URL" --format=custom --no-owner --no-privileges \
-            --schema=public -f "$RUNNER_TEMP/bk/public.dump"
+            --schema=public --schema=axentra_private -f "$RUNNER_TEMP/bk/public.dump"
           pg_dump "$STAGING_DB_URL" --format=custom --no-owner --no-privileges --data-only \
             --table=auth.users --table=auth.identities --table=storage.buckets --table=storage.objects \
             --table=supabase_migrations.schema_migrations -f "$RUNNER_TEMP/bk/platform.dump"
@@ -59,15 +59,15 @@ jobs:
           for e in $(psql "$STAGING_DB_URL" -Atc "select extname||':'||extnamespace::regnamespace from pg_extension where extname<>'plpgsql'"); do
             psql "$L" -q -c "create extension if not exists \"${e%%:*}\" with schema ${e#*:}" 2>/dev/null || echo "extension ${e%%:*} not installable locally"
           done
-          psql "$L" -q -c "drop schema public cascade; create schema public;" 2>/dev/null
+          psql "$L" -q -c "drop schema public cascade; drop schema if exists axentra_private cascade; create schema public;" 2>/dev/null
           pg_restore -l "$RUNNER_TEMP/bk/public.dump" | grep -v ' SCHEMA - public ' > "$RUNNER_TEMP/bk/public.list"
           pg_restore -d "$L" --no-owner --exit-on-error -L "$RUNNER_TEMP/bk/public.list" "$RUNNER_TEMP/bk/public.dump"
           psql "$L" -q -c "create schema if not exists supabase_migrations; create table if not exists supabase_migrations.schema_migrations (version text primary key, statements text[], name text);"
-          pg_restore -d "$L" --no-owner --data-only --disable-triggers --exit-on-error "$RUNNER_TEMP/bk/platform.dump"
+          pg_restore -d "$L" --no-owner --data-only --disable-triggers "$RUNNER_TEMP/bk/platform.dump" || echo "platform restore reported errors; digests decide"
       - name: Verify restore matches staging (row counts + content digests)
         run: |
           export L=postgresql://postgres:postgres@127.0.0.1:54322/postgres
-          Q="select string_agg(format('%s.%s', n.nspname, c.relname), ' ' order by 1) from pg_class c join pg_namespace n on n.oid=c.relnamespace where c.relkind='r' and (n.nspname='public' or (n.nspname,c.relname) in (('auth','users'),('auth','identities'),('storage','buckets'),('storage','objects'),('supabase_migrations','schema_migrations')))"
+          Q="select string_agg(format('%s.%s', n.nspname, c.relname), ' ' order by 1) from pg_class c join pg_namespace n on n.oid=c.relnamespace where c.relkind='r' and (n.nspname in ('public','axentra_private') or (n.nspname,c.relname) in (('auth','users'),('auth','identities'),('storage','buckets'),('storage','objects'),('supabase_migrations','schema_migrations')))"
           TABLES=$(psql "$STAGING_DB_URL" -Atc "$Q")
           fail=0; n=0
           for t in $TABLES; do
