@@ -11,6 +11,10 @@ export type TargetInput = {
   appEnv?: string | null;
   /** VERCEL_GIT_COMMIT_REF at build time (undefined in the browser) */
   gitBranch?: string | null;
+  /** VERCEL_ENV at build time: "production" | "preview" | "development" */
+  vercelEnv?: string | null;
+  /** VITE_ALLOW_PRODUCTION_PREVIEW: deliberate opt-in for a preview on production data */
+  allowProductionPreview?: string | null;
 };
 
 function b64urlJson(part: string): Record<string, unknown> | null {
@@ -60,5 +64,16 @@ export function checkSupabaseTarget(input: TargetInput): { ok: boolean; ref: str
     errors.push(`VITE_APP_ENV=production requires the production project, got ${ref ?? "none"}`);
   }
   if (appEnv && !["staging", "production"].includes(appEnv)) errors.push(`unsupported VITE_APP_ENV ${appEnv}`);
+  // A Vercel preview runs unreviewed code. It must not reach production data by
+  // accident (e.g. by falling back to the committed production .env), so it
+  // needs the staging project or an explicit, per-branch opt-in.
+  const vercelEnv = String(input.vercelEnv ?? "").trim().toLowerCase();
+  const optIn = String(input.allowProductionPreview ?? "").trim().toLowerCase() === "true";
+  if (vercelEnv === "preview" && ref === PRODUCTION_REF && !optIn) {
+    errors.push(
+      "Vercel preview builds must use the staging project; set preview variables for this branch " +
+        "(VITE_SUPABASE_URL/KEY + VITE_APP_ENV=staging) or VITE_ALLOW_PRODUCTION_PREVIEW=true to opt in deliberately",
+    );
+  }
   return { ok: errors.length === 0, ref, errors };
 }

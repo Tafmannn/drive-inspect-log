@@ -36,6 +36,67 @@ The `git.deploymentEnabled` rules use Vercel's documented minimatch branch patte
 - Cancelling/skipping an already-created build need not refund any deployment allowance. Read actual usage/plan limits in Vercel before assuming budget is available.
 - Existing GitHub Actions validation workflows stay in place, and frontend deployment does not apply Supabase migrations.
 
+## Previews never reach production data by accident
+
+The build check (`src/lib/supabaseTarget.ts`, run by `vite.config.ts`) fails any Vercel **preview** build that targets the production Supabase project. That includes a preview that silently fell back to the committed production `.env`. For a preview, either:
+
+- add branch-scoped preview variables in Vercel (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` for staging, `VITE_APP_ENV=staging`), as `deploy-preview/staging` has, or
+- set `VITE_ALLOW_PRODUCTION_PREVIEW=true` on that one preview branch, as a deliberate and recorded choice.
+
+Production builds from `main` are unchanged.
+
+## Releasing database migrations and Edge Functions
+
+Merging to `main` deploys only the web app. Migrations and Edge Functions are released separately, from `main`, with **Actions → Production database and functions release**:
+
+1. Write migrations **expand-first**, so the app currently live keeps working before and after they apply.
+2. Merge the migration PR. Its CI ran every SQL test on a copy of production's schema (see below).
+3. Run the release workflow. Leave the boxes unticked to see the dry run, then run it again with **apply migrations** ticked.
+4. Tick **deploy functions** when `supabase/functions` changed. `verify_jwt` for every function comes from `supabase/config.toml` (all `false`, matching production; a unit test enforces that every function is declared).
+5. Merge app code that depends on the new schema only after step 3.
+
+Never apply repository migrations with the Supabase MCP `apply_migration` tool or the SQL editor. They record a different version, and production then disagrees with Git.
+
+**One-time setup:**
+- Create a GitHub environment named `production` with yourself as required reviewer.
+- Add secrets `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD` to that environment.
+
+## Detecting production drift
+
+**Production migration drift (read-only)** runs weekly and after every migration merge. It compares production's ledger with `supabase/migrations`:
+- It **fails** when production has a migration that is not in Git.
+- It **warns** when merged migrations are still waiting for release.
+
+It needs a read-only credential, stored as repository secret `PRODUCTION_READONLY_DB_URL`. Without it, the check reports NOT EXECUTED. To create a minimal role, run this once in the production SQL editor with a strong password, then build a pooler URL for it:
+
+```sql
+CREATE ROLE ci_ledger_reader LOGIN PASSWORD '<strong password>';
+GRANT USAGE ON SCHEMA supabase_migrations TO ci_ledger_reader;
+GRANT SELECT ON supabase_migrations.schema_migrations TO ci_ledger_reader;
+```
+
+## How CI tests the database
+
+Production holds objects that no migration creates, so the historical chain cannot be replayed from an empty database. Instead, CI does this:
+
+1. Restores `supabase/bootstrap/verified-production-baseline.sql`, a reviewed, schema-only capture of production. It contains no customer data, only bucket and permission configuration.
+2. Replays only the migrations production has not recorded.
+3. Runs `supabase/tests`.
+
+The restore refuses in three cases:
+- The baseline does not match the sha256 in its manifest.
+- The baseline is not approved.
+- Production recorded a migration that is missing from Git.
+
+To rehearse it locally with Docker, run `bash scripts/free-tier/rehearse-baseline-local.sh`.
+
+**Refreshing the baseline** is optional, because new migrations replay on top automatically. Re-capture it after any change made to production outside `supabase/migrations`:
+1. Run `scripts/free-tier/export-production-baseline.sql` read-only through the Supabase MCP or SQL editor.
+2. Extract it with `scripts/staging/logical-backup/extract-mcp-result.py --ref=lynkvfduzqdyvlzgriyh`.
+3. Review it for secrets.
+4. Rehearse it locally.
+5. Update the manifest's `sha256`, `capturedAt` and approval fields.
+
 ## Policy check and rollback
 
 Run `node scripts/check-vercel-deployment-policy.mjs` before changing the rules. CI also runs this check on PRs and `main`.
