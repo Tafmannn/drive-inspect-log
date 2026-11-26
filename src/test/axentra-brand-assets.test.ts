@@ -23,11 +23,19 @@ describe("Axentra PDF banner logo", () => {
     expect(src).toContain("/brand/axentra-logo-on-dark.png");
   });
 
-  it("the email logo is a transparent PNG sized for email, and the function uses it", () => {
+  it("retains the transparent legacy dark email asset", () => {
     const email = readFileSync("public/email/axentra-logo-email-dark.png");
     expect(email[25]).toBe(6); // RGBA
     expect(email.length).toBeLessThan(200_000);
+  });
+
+  it("the approved light email mark exists and POD uses the shared light resolver", () => {
+    const logo = readFileSync("public/axentra-logo.png");
+    expect(logo.subarray(1, 4).toString()).toBe("PNG");
+    expect(logo[25]).toBe(6);
     const fn = readFileSync("supabase/functions/send-pod-email/index.ts", "utf8");
-    expect(fn).toContain("resolveEmailLogoUrl");
+    expect(fn).toContain("logoUrl: resolveLightEmailLogoUrl(operatorName, org?.logo_url, appBaseUrl(req))");
+    const brand = readFileSync("supabase/functions/_shared/emailBrand.ts", "utf8");
+    expect(brand).toContain('logoPath: "/axentra-logo.png"');
   });
 });
