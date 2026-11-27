@@ -24,7 +24,10 @@ export async function requirePackDelivery() {
 }
 
 /** Build a single financial PDF and its exact ZIP before writing anything. */
-export async function buildCompleteInvoiceDelivery(record: InvoiceRecord, settings?: OrgInvoiceSettings | null) {
+/** Plain-language progress while a pack is built ("Building POD 2 of 5…"). */
+export type DeliveryProgress = (message: string) => void;
+
+export async function buildCompleteInvoiceDelivery(record: InvoiceRecord, settings?: OrgInvoiceSettings | null, onProgress?: DeliveryProgress) {
   // Read the current financial record and persisted associations, not stale UI JSON.
   const { data: row, error: ownerError } = await supabase.from("invoices")
     .select(INVOICE_LIST_COLUMNS + ", job_id").eq("id", record.id).single();
@@ -37,9 +40,15 @@ export async function buildCompleteInvoiceDelivery(record: InvoiceRecord, settin
       Math.round(lines.reduce((sum, line) => sum + line.amount_charged, 0) * 100) !== Math.round(Number(owner.expenses_total) * 100)) {
     throw new Error("Invoice expense snapshot does not match the billed expenses. Review the invoice before issuing.");
   }
+  onProgress?.("Rendering the invoice…");
   const data = await buildInvoiceDocument(owner, { settings, withReceipts: false, expenseLines: lines });
   const pdf = await generateInvoicePdf(data);
-  const pack = await buildInvoicePack(owner, settings, undefined, { pdf, lines });
+  const pack = await buildInvoicePack(
+    owner,
+    settings,
+    onProgress ? (done, total) => onProgress(`Collecting receipts (${done} of ${total})…`) : undefined,
+    { pdf, lines },
+  );
   if (pack.failed.length) throw new Error("Invoice pack incomplete: " + pack.failed.join(", "));
   const zip = await JSZip.loadAsync(await pack.blob.arrayBuffer());
   const { data: items, error: itemError } = await supabase.from("invoice_items")
@@ -52,12 +61,15 @@ export async function buildCompleteInvoiceDelivery(record: InvoiceRecord, settin
     if (error || jobs?.length !== ids.length) throw new Error("Could not verify all invoice jobs.");
     const { getJobWithRelations } = await import("@/lib/api");
     const { generatePodPdf } = await import("@/lib/podPdf");
+    const podJobs = (jobs ?? []).filter((j) => j.status !== "aborted");
+    let podIndex = 0;
     for (const job of jobs ?? []) {
       if (job.org_id !== owner.org_id || (owner.client_id && job.client_id !== owner.client_id)) {
         throw new Error("Invoice job ownership mismatch.");
       }
       if (job.status === "aborted") continue; // no completed delivery for an abort
       if (job.status !== "completed" && job.status !== "closed") throw new Error("POD unavailable for " + (job.external_job_number || job.id));
+      onProgress?.(`Building POD ${++podIndex} of ${podJobs.length} (${job.vehicle_reg || job.external_job_number || "job"})…`);
       const full = await getJobWithRelations(job.id);
       if (full.status !== job.status || !full.inspections.some(i => i.type === "pickup") || !full.inspections.some(i => i.type === "delivery")) {
         throw new Error("Delivery evidence is incomplete for " + (job.external_job_number || job.id));
@@ -67,11 +79,12 @@ export async function buildCompleteInvoiceDelivery(record: InvoiceRecord, settin
       zip.file("PODs/POD_" + clean(job.vehicle_reg || "UNKNOWN") + "_" + clean(job.id) + ".pdf", pod);
     }
   }
+  onProgress?.("Packaging…");
   return { pdf, blob: await zip.generateAsync({ type: "blob" }), succeeded: pack.succeeded, failed: [], fileName: invoicePdfFileName(owner.invoice_number).replace(/\.pdf$/, ".zip"), owner };
 }
 
 /** Freeze the pack before publishing its PDF path. Uploads never overwrite issued bytes. */
-export async function prepareInvoiceDelivery(record: InvoiceRecord, orgId: string, settings?: OrgInvoiceSettings | null) {
+export async function prepareInvoiceDelivery(record: InvoiceRecord, orgId: string, settings?: OrgInvoiceSettings | null, onProgress?: DeliveryProgress) {
   if (record.status !== "draft") throw new Error("Only a draft can be prepared.");
   await requirePackDelivery();
   // A successful preparation is reused on retry, so another device cannot
@@ -86,12 +99,13 @@ export async function prepareInvoiceDelivery(record: InvoiceRecord, orgId: strin
     if (pdf.error || pack.error || !pdf.data?.size || !pack.data?.size) throw new Error("Previously prepared pack is unavailable; contact an administrator.");
     return current.pdf_url;
   }
-  const prepared = await buildCompleteInvoiceDelivery(record, settings);
+  const prepared = await buildCompleteInvoiceDelivery(record, settings, onProgress);
   if (prepared.owner.pdf_url !== current.pdf_url) throw new Error("Invoice was prepared on another device. Refresh and retry.");
   if (prepared.owner.org_id !== orgId) throw new Error("Invoice organisation mismatch.");
   const pdfPath = `${orgId}/pack-v1-${record.id}/${crypto.randomUUID()}/${invoicePdfFileName(prepared.owner.invoice_number)}`;
   const zipPath = pdfPath.replace(/\.pdf$/, ".zip");
   const bucket = supabase.storage.from(BUCKET);
+  onProgress?.("Uploading the pack…");
   const zipUpload = await bucket.upload(zipPath, prepared.blob, { contentType: "application/zip", upsert: false });
   if (zipUpload.error) throw new Error("Could not store invoice pack: " + zipUpload.error.message);
   const pdfUpload = await bucket.upload(pdfPath, prepared.pdf, { contentType: "application/pdf", upsert: false });

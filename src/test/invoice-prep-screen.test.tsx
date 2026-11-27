@@ -44,12 +44,20 @@ vi.mock("@/features/control/components/shared/ControlShell", () => ({
   ),
 }));
 vi.mock("@/features/control/components/shared/KpiStrip", () => ({ KpiStrip: () => null }));
-vi.mock("@/features/control/components/shared/FilterBar", () => ({ FilterBar: () => null }));
+vi.mock("@/features/control/components/shared/FilterBar", () => ({ FilterBar: ({ children }: { children: ReactNode }) => <div>{children}</div> }));
 vi.mock("@/components/ui-kit", () => ({
   WarningCallout: ({ children }: { children: ReactNode }) => <p role="alert">{children}</p>,
   RoleScope: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
-vi.mock("@/components/PodEmailConfirmDialog", () => ({ PodEmailConfirmDialog: () => null }));
+vi.mock("@/components/PodEmailConfirmDialog", () => ({
+  PodEmailConfirmDialog: ({ open, documentLabel }: { open: boolean; documentLabel: string }) =>
+    open ? <div role="dialog">Email {documentLabel}</div> : null,
+}));
+vi.mock("@/features/invoicing/components/ReadyToBillPanel", () => ({
+  ReadyToBillPanel: ({ onSelect }: { onSelect: (id: string) => void }) => (
+    <button onClick={() => onSelect("client-1")}>CJE Transport · ready to bill</button>
+  ),
+}));
 vi.mock("@/hooks/useEvidenceOverrides", () => ({
   useEvidenceOverrides: () => ({ isAcknowledged: () => false, acknowledge: vi.fn(), unacknowledge: vi.fn() }),
 }));
@@ -82,7 +90,8 @@ function job(id: string, price: number, date: string): EligibleJob {
     readiness: { ready: true, primaryReason: "Ready", blockers: [], warnings: [], alreadyInvoiced: false, evidenceLevel: "green" },
   } as EligibleJob;
 }
-const JOBS = [job("ax1042", 185, "2026-11-02"), job("ax1043", 95, "2026-11-03")];
+let JOBS = [job("ax1042", 185, "2026-11-02"), job("ax1043", 95, "2026-11-03")];
+const DEFAULT_JOBS = JOBS;
 
 const EXPENSES: BillableExpense[] = [
   { id: "e-fuel", job_id: "ax1042", date: "2026-11-02", category: "Fuel", supplier: "Shell", label: null, amount: 54.6, vat_amount: 9.1, receipts: [{ url: "r1" }] },
@@ -133,6 +142,7 @@ function pickClientAndAllJobs() {
 }
 
 beforeEach(() => {
+  JOBS = DEFAULT_JOBS;
   state.vatRegistered = false;
   state.poRequired = false;
   state.fuelPolicy = "recharged";
@@ -155,7 +165,7 @@ describe("InvoicePrepScreen", () => {
       const chosen = screen.getByLabelText("Select all");
       expect(chosen).toBeTruthy();
     });
-    fireEvent.click(screen.getByRole("button", { name: /Create Invoice/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Create Draft/ }));
     await waitFor(() => expect(state.mutateAsync).toHaveBeenCalled());
     expect(state.mutateAsync.mock.calls[0][0].jobs.map((job: EligibleJob) => job.id)).toEqual(["ax1043"]);
   });
@@ -200,7 +210,7 @@ describe("InvoicePrepScreen", () => {
     state.fuelPolicy = "included";
     renderScreen();
     pickClientAndAllJobs();
-    fireEvent.click(screen.getByRole("button", { name: /Create Invoice/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Create Draft/ }));
     await waitFor(() => expect(state.mutateAsync).toHaveBeenCalledTimes(1));
     expect(state.mutateAsync.mock.calls[0][0].expenses).toEqual([]);
   });
@@ -211,7 +221,7 @@ describe("InvoicePrepScreen", () => {
     pickClientAndAllJobs();
     const picker = within(screen.getByLabelText("3. Rechargeable Expenses"));
     fireEvent.click(picker.getAllByRole("checkbox")[0]);
-    fireEvent.click(screen.getByRole("button", { name: /Create Invoice/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Create Draft/ }));
     await waitFor(() => expect(state.mutateAsync).toHaveBeenCalled());
     expect(state.mutateAsync.mock.calls[0][0].expenses.map((e: BillableExpense) => e.id)).toEqual(["e-fuel"]);
   });
@@ -255,7 +265,7 @@ describe("InvoicePrepScreen", () => {
     renderScreen();
     pickClientAndAllJobs();
     fireEvent.change(screen.getByLabelText(/Client PO \/ reference/), { target: { value: "PO-4500123" } });
-    fireEvent.click(screen.getByRole("button", { name: /Create Invoice/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Create Draft/ }));
 
     await waitFor(() => expect(state.mutateAsync).toHaveBeenCalledTimes(1));
     const input = state.mutateAsync.mock.calls[0][0];
@@ -274,7 +284,7 @@ describe("InvoicePrepScreen", () => {
     pickClientAndAllJobs();
     const picker = within(screen.getByLabelText("3. Rechargeable Expenses"));
     fireEvent.click(picker.getAllByRole("checkbox")[0]);
-    fireEvent.click(screen.getByRole("button", { name: /Create Invoice/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Create Draft/ }));
 
     await waitFor(() => expect(state.mutateAsync).toHaveBeenCalled());
     expect(state.mutateAsync.mock.calls[0][0].expenses.map((e: BillableExpense) => e.id)).toEqual(["e-fuel2"]);
@@ -286,12 +296,12 @@ describe("InvoicePrepScreen", () => {
     pickClientAndAllJobs();
 
     expect(screen.getByLabelText(/Client PO \/ reference \(required\)/)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /Create Invoice/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Create Draft/ }));
     await Promise.resolve();
     expect(state.mutateAsync).not.toHaveBeenCalled();
 
     fireEvent.change(screen.getByLabelText(/Client PO \/ reference/), { target: { value: "PO-1" } });
-    fireEvent.click(screen.getByRole("button", { name: /Create Invoice/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Create Draft/ }));
     await waitFor(() => expect(state.mutateAsync).toHaveBeenCalledTimes(1));
   });
 
@@ -301,14 +311,61 @@ describe("InvoicePrepScreen", () => {
     pickClientAndAllJobs();
 
     const preview = within(screen.getByLabelText("4. Invoice Preview"));
-    expect((preview.getByLabelText("VAT") as HTMLInputElement).value).toBe("20");
+    // The rate is fixed at the UK standard rate, not typed per invoice.
+    expect(preview.getByText("VAT (20%)")).toBeTruthy();
+    expect(preview.queryByRole("spinbutton")).toBeNull();
     // transport 280 + net expenses (45.50 + 37.22) = 362.72; VAT 72.54; total 435.26
     expect(preview.getByText("£362.72")).toBeTruthy();
     expect(preview.getByText("£72.54")).toBeTruthy();
     expect(preview.getByText("£435.26")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: /Create Invoice/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Create Draft/ }));
     await waitFor(() => expect(state.mutateAsync).toHaveBeenCalled());
     expect(state.mutateAsync.mock.calls[0][0]).toMatchObject({ vatRegistered: true, vatRate: 20 });
+  });
+
+  it("opens a client from the Ready to bill panel", () => {
+    renderScreen();
+    fireEvent.click(screen.getByText("CJE Transport · ready to bill"));
+    expect(screen.getByText("AX1042")).toBeTruthy();
+  });
+
+  it("hides already-invoiced jobs until asked, and counts only what can be billed", () => {
+    const done = job("ax1000", 120, "2026-10-01");
+    done.readiness = { ...done.readiness!, ready: false, alreadyInvoiced: true, primaryReason: "Already invoiced" };
+    JOBS = [...DEFAULT_JOBS, done];
+    renderScreen();
+    fireEvent.click(screen.getByText("Pick CJE"));
+    expect(screen.queryByText("AX1000")).toBeNull();
+    expect(screen.getByText(/2 to invoice/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Show 1 already invoiced/ }));
+    expect(screen.getByText("AX1000")).toBeTruthy();
+  });
+
+  it("lists jobs newest first, aborted jobs by their Abort date", () => {
+    const aborted = { ...job("ax0999", 0, "2026-11-01"), status: "aborted", completed_at: null, abort_confirmed_at: "2026-11-05T09:00:00Z", abort_fee: 240 } as EligibleJob;
+    JOBS = [aborted, ...DEFAULT_JOBS];
+    renderScreen();
+    fireEvent.click(screen.getByText("Pick CJE"));
+    const refs = screen.getAllByText(/^AX\d{4}$/).map((el) => el.textContent);
+    // The hook sorts; the mock returns the order given, so this only checks the screen keeps it.
+    expect(refs).toEqual(["AX0999", "AX1042", "AX1043"]);
+  });
+
+  it("blocks creating an invoice while a ticked job has no price", () => {
+    JOBS = [job("ax1042", 185, "2026-11-02"), job("ax1044", 0, "2026-11-04")];
+    renderScreen();
+    pickClientAndAllJobs();
+    expect(screen.getByText(/AX1044 has no price/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Create Draft/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Create & Email/ })).toBeDisabled();
+  });
+
+  it("Create & Email creates the draft and goes straight to the confirm-recipient step", async () => {
+    renderScreen();
+    pickClientAndAllJobs();
+    fireEvent.click(screen.getByRole("button", { name: /Create & Email/ }));
+    await waitFor(() => expect(state.mutateAsync).toHaveBeenCalled());
+    expect(await screen.findByRole("dialog")).toHaveTextContent("Email Invoice AX26-1007");
   });
 });

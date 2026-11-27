@@ -228,7 +228,10 @@ export function useEligibleJobs(
         });
       }
 
-      return clientJobs;
+      // Newest first by the date each job became billable (completion, or the Abort
+      // confirmation), so aborted jobs sit among the others instead of at the end.
+      const when = (j: EligibleJob) => new Date(j.completed_at ?? j.abort_confirmed_at ?? 0).getTime() || 0;
+      return clientJobs.sort((a, b) => when(b) - when(a));
     },
     enabled: !!client,
     staleTime: 15_000,

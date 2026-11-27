@@ -82,6 +82,7 @@ export function useInvoiceActions(
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState<string | null>(null);
   const [emailTarget, setEmailTarget] = useState<InvoiceRecord | null>(null);
+  const [sendProgress, setSendProgress] = useState<string | null>(null);
   const [payTarget, setPayTarget] = useState<InvoiceRecord | null>(null);
   const [cancelTarget, setCancelTarget] = useState<InvoiceRecord | null>(null);
 
@@ -181,8 +182,9 @@ export function useInvoiceActions(
       if (!settings) throw new Error("Organisation settings are still loading. Try again in a moment.");
       // Once issued, the stored PDF is what gets emailed — never a re-render.
       const storedPdfPath = inv.status === "draft" && inv.document_type !== "credit_note"
-        ? await prepareInvoiceDelivery(inv, settings.orgId, settings)
+        ? await prepareInvoiceDelivery(inv, settings.orgId, settings, setSendProgress)
         : inv.status !== "draft" ? inv.pdf_url : null;
+      setSendProgress("Sending the email…");
       const pdfData = await buildInvoiceDocument(inv, { settings, withReceipts: !storedPdfPath });
       const { recipient } = await emailInvoice({
         invoiceId: inv.id,
@@ -202,6 +204,7 @@ export function useInvoiceActions(
         description: `${inv.invoice_number} sent to ${recipient}${copyCount ? ` (+${copyCount} cop${copyCount === 1 ? "y" : "ies"})` : ""}.`,
       });
     }, "Invoice email failed");
+    setSendProgress(null);
   };
 
   const confirmPayment = async () => {
@@ -256,7 +259,7 @@ export function useInvoiceActions(
         documentLabel={`Invoice ${emailTarget?.invoice_number ?? ""}`}
         sending={emailing}
         allowCopies
-        sendingNote="Preparing the invoice pack (invoice, receipts and PODs). This can take a minute — keep this screen open."
+        sendingNote={`${sendProgress ?? "Preparing the invoice pack…"} This can take a minute — keep this screen open.`}
         onConfirm={confirmEmail}
       />
 
