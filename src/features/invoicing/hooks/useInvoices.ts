@@ -43,10 +43,27 @@ export interface InvoiceRecord {
   cancelled_at?: string | null;
   cancel_reason?: string | null;
   pdf_url?: string | null;
+  /** A record of the client's own paid invoice (self-billing), not one we issued. */
+  self_billed?: boolean;
 }
 
 export const INVOICE_LIST_COLUMNS =
   "id, org_id, client_id, invoice_number, client_name, client_company, client_email, client_address, issue_date, due_date, payment_terms, line_items, subtotal, vat_rate, vat_amount, total, notes, status, created_at, client_ref, vat_registered, expenses_total, document_type, credits_invoice_id, sent_at, paid_at, payment_method, payment_reference, cancelled_at, cancel_reason, pdf_url";
+
+/**
+ * Ids of self-billed invoice records. Read separately (and treated as none on error) so
+ * the invoice list keeps working even before invoices.self_billed exists. The flag only
+ * changes which actions are offered; money is never computed from it.
+ */
+async function fetchSelfBilledInvoiceIds(): Promise<Set<string>> {
+  try {
+    const { data, error } = await supabase.from("invoices").select("id").eq("self_billed" as never, true as never);
+    if (error) return new Set();
+    return new Set(((data ?? []) as { id: string }[]).map((r) => r.id));
+  } catch {
+    return new Set();
+  }
+}
 
 export function useInvoices(limit = 25) {
   return useQuery({
@@ -54,13 +71,18 @@ export function useInvoices(limit = 25) {
     // (mutationEvents.ts) refreshes this list automatically.
     queryKey: ["invoicing", "list", limit],
     queryFn: async (): Promise<InvoiceRecord[]> => {
-      const { data, error } = await supabase
-        .from("invoices")
-        .select(INVOICE_LIST_COLUMNS)
-        .order("created_at", { ascending: false })
-        .limit(limit);
+      const [{ data, error }, selfBilled] = await Promise.all([
+        supabase
+          .from("invoices")
+          .select(INVOICE_LIST_COLUMNS)
+          .order("created_at", { ascending: false })
+          .limit(limit),
+        fetchSelfBilledInvoiceIds(),
+      ]);
       if (error) throw error;
-      return (data ?? []) as unknown as InvoiceRecord[];
+      return ((data ?? []) as unknown as InvoiceRecord[]).map((inv) =>
+        selfBilled.has(inv.id) ? { ...inv, self_billed: true } : inv,
+      );
     },
   });
 }

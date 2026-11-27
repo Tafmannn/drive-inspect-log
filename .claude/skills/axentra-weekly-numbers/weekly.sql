@@ -10,7 +10,10 @@ done as (
          -- expenses recharged on a live invoice: recovered, so credited back
          coalesce((select sum(x.amount_charged) from invoice_expenses x where x.job_id = j.id and not x.voided), 0) as recharged,
          exists (select 1 from invoice_items ii where ii.job_id = j.id and not ii.voided)
-           or exists (select 1 from invoices i where i.job_id = j.id and i.status <> 'cancelled') as invoiced
+           or exists (select 1 from invoices i where i.job_id = j.id and i.status <> 'cancelled') as invoiced,
+         -- clients who invoice themselves (e.g. Movex): their work is never "unbilled" by us.
+         -- Read via to_jsonb so the query also runs before clients.billing_method exists.
+         coalesce(to_jsonb(c)->>'billing_method', 'we_invoice') = 'self_billed' as self_billed
   from jobs j left join clients c on c.id = j.client_id
   -- prices live in job_pricing (jobs.total_price was dropped in phase 4 of the job-pricing split)
   left join job_pricing jp on jp.job_id = j.id
@@ -34,8 +37,10 @@ select json_build_object(
       'contribution_priced_jobs', round(coalesce(sum(total_price + recharged - costs) filter (where total_price > 0), 0)::numeric, 2))
     from done, w where completed_at >= w.t4 and completed_at < w.wk),
   'cash', json_build_object(
-      'unbilled_jobs', (select count(*) from done where not invoiced and total_price > 0),
-      'unbilled_value', (select round(coalesce(sum(total_price), 0)::numeric, 2) from done where not invoiced and total_price > 0),
+      'unbilled_jobs', (select count(*) from done where not invoiced and not self_billed and total_price > 0),
+      'unbilled_value', (select round(coalesce(sum(total_price), 0)::numeric, 2) from done where not invoiced and not self_billed and total_price > 0),
+      'awaiting_self_billed_jobs', (select count(*) from done where not invoiced and self_billed and total_price > 0),
+      'awaiting_self_billed_value', (select round(coalesce(sum(total_price), 0)::numeric, 2) from done where not invoiced and self_billed and total_price > 0),
       'unpriced_completed_jobs_180d', (select count(*) from done where coalesce(total_price, 0) <= 0 and completed_at >= now() - interval '180 days'),
       'draft_invoices', (select count(*) from inv where status = 'draft'),
       'draft_value', (select round(coalesce(sum(total), 0)::numeric, 2) from inv where status = 'draft'),

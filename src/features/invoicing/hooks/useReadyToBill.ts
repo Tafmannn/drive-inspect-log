@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchPricingByJobId } from "@/lib/jobPricingApi";
 import { getCurrentAbortsForJobs } from "@/features/abort/api/abortApi";
 import { invoicedAmong, ID_PAGE_SIZE } from "@/hooks/useAdminOperationsBuckets";
+import { fetchSelfBilledClientIds } from "@/lib/selfBilledClients";
 import { summariseReadyToBill, type BillableJobRow, type ReadyToBillSummary } from "../lib/readyToBill";
 
 export const READY_TO_BILL_KEY = ["invoicing", "ready-to-bill"] as const;
@@ -31,18 +32,19 @@ async function fetchBillableRows(): Promise<BillableJobRow[]> {
 
 export async function loadReadyToBill(): Promise<ReadyToBillSummary> {
   const rows = await fetchBillableRows();
-  if (rows.length === 0) return { clients: [], unlinked: 0 };
+  if (rows.length === 0) return { clients: [], selfBilled: [], unlinked: 0 };
   const ids = rows.map((r) => r.id);
   const abortedIds = rows.filter((r) => r.status === "aborted").map((r) => r.id);
   const pricedIds = rows.filter((r) => r.status !== "aborted").map((r) => r.id);
-  const [invoiced, pricing, aborts] = await Promise.all([
+  const [invoiced, pricing, aborts, selfBilled] = await Promise.all([
     invoicedAmong(ids),
     fetchPricingByJobId(pricedIds),
     getCurrentAbortsForJobs(abortedIds),
+    fetchSelfBilledClientIds(),
   ]);
   const priceByJob = new Map<string, number | null>();
   for (const [id, row] of pricing) priceByJob.set(id, row.total_price == null ? null : Number(row.total_price));
-  return summariseReadyToBill(rows, priceByJob, aborts, invoiced);
+  return summariseReadyToBill(rows, priceByJob, aborts, invoiced, selfBilled);
 }
 
 export function useReadyToBill() {

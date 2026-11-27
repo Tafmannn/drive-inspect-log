@@ -213,6 +213,14 @@ describe("InvoiceList", () => {
     expect(onReinvoice).toHaveBeenCalledWith(expect.objectContaining({ invoice_number: "AX-GONE" }));
   });
 
+  it("a self-billed record (the client's own paid invoice) offers only download and cancel", async () => {
+    renderList([inv({ invoice_number: "MVX-7781", status: "paid", self_billed: true })], { onReinvoice: vi.fn() });
+    expect(within(screen.getByText("MVX-7781").closest("tr")!).getByText("Self-billed")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Download MVX-7781" })).toBeTruthy(); // their PDF
+    const menu = await openMenu("MVX-7781");
+    expect(menu.getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Cancel this record…"]);
+  });
+
   it("renders a status badge on its own (success card)", () => {
     render(<InvoiceStatusBadge invoice={inv({ invoice_number: "A", status: "paid" })} />);
     expect(screen.getByText("Paid")).toBeTruthy();

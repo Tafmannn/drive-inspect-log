@@ -3,7 +3,7 @@
  * fuel" for a new client, and sends the choice when the form is saved.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
 import React from "react";
 
 if (typeof globalThis.ResizeObserver === "undefined") {
@@ -57,7 +57,7 @@ const client = (over: Partial<Client> = {}): Client => ({
   ...over,
 });
 
-const fuel = () => screen.getByLabelText("Fuel") as HTMLSelectElement;
+const fuel = () => within(screen.getByTestId("client-fuel-policy")).getByLabelText("Fuel") as HTMLSelectElement;
 
 describe("Fuel setting on the client form", () => {
   beforeEach(() => {
@@ -104,5 +104,40 @@ describe("Fuel setting on the client form", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create Client" }));
     await waitFor(() => expect(h.create).toHaveBeenCalledTimes(1));
     expect(h.create.mock.calls[0][0]).toMatchObject({ fuel_policy: "recharged", company: "Acme" });
+  });
+});
+
+const invoicing = () => within(screen.getByTestId("client-billing-method")).getByLabelText("Fuel") as HTMLSelectElement; // the Select mock labels every select "Fuel"
+
+describe("Invoicing (self-billing) setting on the client form", () => {
+  beforeEach(() => {
+    h.update.mockReset().mockResolvedValue({});
+    h.create.mockReset().mockResolvedValue({ id: "new-1" });
+    h.upsertRateCard.mockReset().mockResolvedValue(undefined);
+  });
+
+  it("defaults to 'we invoice them', including clients saved before the setting existed", () => {
+    render(<ClientFormModal open onOpenChange={() => {}} client={client()} />);
+    expect(invoicing().value).toBe("we_invoice");
+    expect(Array.from(invoicing().options).map((o) => o.textContent)).toEqual([
+      "We invoice them",
+      "They invoice themselves (self-billing)",
+    ]);
+  });
+
+  it("saves a client as self-billing, with help text saying what that does", async () => {
+    render(<ClientFormModal open onOpenChange={() => {}} client={client()} />);
+    fireEvent.change(invoicing(), { target: { value: "self_billed" } });
+    expect(screen.getByText(/record their invoice instead/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+    await waitFor(() => expect(h.update).toHaveBeenCalledTimes(1));
+    expect(h.update.mock.calls[0][0]).toMatchObject({ id: "c1", input: { billing_method: "self_billed" } });
+  });
+
+  it("doesn't send the setting for a client saved before it existed, unless self-billing is chosen", async () => {
+    render(<ClientFormModal open onOpenChange={() => {}} client={client()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+    await waitFor(() => expect(h.update).toHaveBeenCalledTimes(1));
+    expect(h.update.mock.calls[0][0].input).not.toHaveProperty("billing_method");
   });
 });

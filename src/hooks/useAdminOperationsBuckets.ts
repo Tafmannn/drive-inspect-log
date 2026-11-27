@@ -24,6 +24,7 @@ import { fetchPricingByJobId, type PricingRow } from "@/lib/jobPricingApi";
 import { listAcknowledgedEvidenceJobIds } from "@/lib/evidenceAckApi";
 import { findAlreadyInvoicedJobs } from "@/features/invoicing/api/createInvoice";
 import { getCurrentAbortsForJobs, type JobAbort } from "@/features/abort/api/abortApi";
+import { fetchSelfBilledClientIds } from "@/lib/selfBilledClients";
 
 /** A bucket count, or `null` when it could not be computed. */
 export type BucketCount = number | null;
@@ -165,20 +166,25 @@ async function orNull(label: string, run: () => Promise<number>): Promise<Bucket
  * lists these alongside completed jobs, so both invoicing buckets include them. Throws on any
  * failed read: an unknown fee or invoice state is never counted as zero.
  */
-async function countAbortsReadyToInvoice(): Promise<number> {
-  const ids = await fetchAllIds(() =>
-    supabase
+async function countAbortsReadyToInvoice(selfBilled: ReadonlySet<string>): Promise<number> {
+  const ids = await fetchAllIds(() => {
+    const q = supabase
       .from("jobs")
       .select("id")
       .eq("is_hidden", false)
       .eq("is_test", false)
       .eq("status", "aborted")
-      .not("client_id", "is", null)
-      .order("id"),
-  );
+      .not("client_id", "is", null);
+    return (selfBilled.size ? q.not("client_id", "in", idList(selfBilled)) : q).order("id");
+  });
   if (ids.length === 0) return 0;
   const [aborts, invoiced] = await Promise.all([getCurrentAbortsForJobs(ids), invoicedAmong(ids)]);
   return countApprovedAbortsToInvoice(ids, aborts, invoiced);
+}
+
+/** PostgREST list literal for an `in` filter: (a,b,c). Ids are uuids, so no quoting needed. */
+function idList(ids: ReadonlySet<string>): string {
+  return `(${[...ids].join(",")})`;
 }
 
 export function useAdminOperationsBuckets() {
@@ -186,6 +192,10 @@ export function useAdminOperationsBuckets() {
     queryKey: ["admin-operations-buckets"],
     queryFn: async () => {
       const { startIso, endIso } = todayBounds();
+      // Clients who invoice themselves (e.g. Movex) are never "to invoice" by us. A failed
+      // read makes both invoicing buckets unknown (null), never wrong.
+      const selfBilledP = fetchSelfBilledClientIds();
+      void selfBilledP.catch(() => undefined);
 
       const [
         todaysActive,
@@ -248,8 +258,9 @@ export function useAdminOperationsBuckets() {
         // inspections and a price above zero, that are NOT already invoiced,
         // plus aborted jobs whose Abort fee is approved and not yet invoiced.
         orNull("ready_to_invoice", async () => {
-          const ids = await fetchAllIds(() =>
-            supabase
+          const selfBilled = await selfBilledP;
+          const ids = await fetchAllIds(() => {
+            const q = supabase
               .from("jobs")
               .select("id")
               .eq("is_hidden", false)
@@ -257,9 +268,9 @@ export function useAdminOperationsBuckets() {
               .in("status", TERMINAL_STATUSES)
               .not("client_id", "is", null)
               .eq("has_pickup_inspection", true)
-              .eq("has_delivery_inspection", true)
-              .order("id"),
-          );
+              .eq("has_delivery_inspection", true);
+            return (selfBilled.size ? q.not("client_id", "in", idList(selfBilled)) : q).order("id");
+          });
           // All throw on error: an unknown price, fee or invoice state is never read as zero.
           const [completedReady, abortsReady] = await Promise.all([
             ids.length === 0
@@ -267,7 +278,7 @@ export function useAdminOperationsBuckets() {
               : Promise.all([fetchPricingByJobId(ids), invoicedAmong(ids)]).then(([pricing, invoiced]) =>
                   countReadyToInvoice(ids, pricing, invoiced),
                 ),
-            countAbortsReadyToInvoice(),
+            countAbortsReadyToInvoice(selfBilled),
           ]);
           return completedReady + abortsReady;
         }),
@@ -276,19 +287,21 @@ export function useAdminOperationsBuckets() {
         // ready_to_invoice and the weekly unbilled figure: they are never
         // invoiced, and on 2026-11-21 they were 56 of the 60 counted here.
         orNull("completed_not_invoiced", async () => {
-          const ids = await fetchAllIds(() =>
-            supabase
+          const selfBilled = await selfBilledP;
+          const ids = await fetchAllIds(() => {
+            const q = supabase
               .from("jobs")
               .select("id")
               .eq("is_hidden", false)
               .eq("is_test", false)
-              .in("status", TERMINAL_STATUSES)
-              .order("id"),
-          );
+              .in("status", TERMINAL_STATUSES);
+            // Unlinked jobs still count: they need a client before anyone can bill them.
+            return (selfBilled.size ? q.or(`client_id.is.null,client_id.not.in.${idList(selfBilled)}`) : q).order("id");
+          });
           // Approved Abort fees are counted here too, so ready_to_invoice stays a subset.
           const [notInvoiced, abortsReady] = await Promise.all([
             ids.length === 0 ? Promise.resolve(0) : invoicedAmong(ids).then((inv) => countNotInvoiced(ids, inv)),
-            countAbortsReadyToInvoice(),
+            countAbortsReadyToInvoice(selfBilled),
           ]);
           return notInvoiced + abortsReady;
         }),

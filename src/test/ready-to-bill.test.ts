@@ -51,4 +51,16 @@ describe("summariseReadyToBill", () => {
     expect(out.clients).toEqual([]);
     expect(out.unlinked).toBe(1);
   });
+
+  it("puts self-billing clients in their own group, never in Ready to bill", () => {
+    const out = summariseReadyToBill(
+      [{ id: "m1", client_id: "mov", status: "completed" }, { id: "r1", client_id: "rev", status: "completed" }],
+      new Map<string, number | null>([["m1", 110], ["r1", 120]]),
+      new Map(),
+      new Set(),
+      new Set(["mov"]),
+    );
+    expect(out.clients.map((c) => c.clientId)).toEqual(["rev"]);
+    expect(out.selfBilled).toEqual([{ clientId: "mov", jobs: 1, value: 110, unpriced: 0 }]);
+  });
 });

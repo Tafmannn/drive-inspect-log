@@ -73,4 +73,28 @@ describe("deriveBillingExceptions", () => {
     expect(a.id).toBe(b.id);
     expect(a.id).toBe("billing:job-1:unbilled");
   });
+
+  describe("self-billing clients (they invoice us)", () => {
+    const selfBilled = new Set(["client-1"]);
+    const runSB = (j: BillingJobRow) => deriveBillingExceptions([j], new Set(), undefined, NOW, selfBilled);
+
+    it("never says 'not invoiced' — we don't invoice them", () => {
+      expect(runSB(job({ completed_at: daysAgo(5) }))).toEqual([]);
+    });
+
+    it("after two weeks, chases the client's own invoice and links to recording it", () => {
+      const [e] = runSB(job({ completed_at: daysAgo(15) }));
+      expect(e).toMatchObject({
+        severity: "medium",
+        title: "Waiting for the client's own invoice",
+        actionLabel: "Record their invoice",
+        actionRoute: "/control/invoice-prep?clientId=client-1",
+      });
+    });
+
+    it("still flags a missing price (profit needs it)", () => {
+      const [e] = runSB(job({ total_price: null }));
+      expect(e.title).toBe("Completed job has no price");
+    });
+  });
 });

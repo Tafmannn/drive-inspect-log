@@ -20,6 +20,7 @@ import {
 } from "../engine/exceptionEngine";
 import { ATTENTION_THRESHOLDS } from "../config/thresholds";
 import { findAlreadyInvoicedJobs } from "@/features/invoicing/api/createInvoice";
+import { fetchSelfBilledClientIds } from "@/lib/selfBilledClients";
 import type { AttentionException, AttentionKpiData, AttentionFiltersState } from "../types/exceptionTypes";
 import { ACTIVE_STATUSES } from "@/lib/statusConfig";
 import type { Tables } from "@/integrations/supabase/types";
@@ -92,8 +93,9 @@ async function loadBilling(billingJobsRes: { data: unknown; error: unknown }) {
   for (let i = 0; i < billingIds.length; i += 100) {
     for (const id of await findAlreadyInvoicedJobs(billingIds.slice(i, i + 100))) invoicedJobIds.add(id);
   }
+  const selfBilledClientIds = billingIds.length ? await fetchSelfBilledClientIds() : new Set<string>();
 
-  return { billingJobs, staleBillingJobs, invoicedJobIds };
+  return { billingJobs, staleBillingJobs, invoicedJobIds, selfBilledClientIds };
 }
 
 export async function loadDriverLookups(docs: { related_type: string; related_id: string }[]) {
@@ -258,7 +260,7 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
 
       const inspections = await loadInspections(completedJobs);
 
-      const { billingJobs, staleBillingJobs, invoicedJobIds } = await loadBilling(billingJobsRes);
+      const { billingJobs, staleBillingJobs, invoicedJobIds, selfBilledClientIds } = await loadBilling(billingJobsRes);
 
       const orgLookup = new Map<string, string>();
       for (const o of orgs) orgLookup.set(o.id, o.name);
@@ -278,7 +280,7 @@ export function useAttentionData({ scope, filters }: UseAttentionDataOpts) {
           orgLookup,
           driverUserIdByProfileId,
         ),
-        ...deriveBillingExceptions(billingJobs, invoicedJobIds, orgLookup),
+        ...deriveBillingExceptions(billingJobs, invoicedJobIds, orgLookup, Date.now(), selfBilledClientIds),
         ...deriveStaleUnpricedSummary(staleBillingJobs, orgLookup),
       ]);
 

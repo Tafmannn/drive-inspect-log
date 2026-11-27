@@ -52,6 +52,8 @@ import { ExpensePicker } from "../components/ExpensePicker";
 import { InvoiceList, InvoiceStatusBadge } from "../components/InvoiceList";
 import { InvoiceCorrectionQueue } from "../components/InvoiceCorrectionQueue";
 import { ReadyToBillPanel } from "../components/ReadyToBillPanel";
+import { RecordSelfBillPanel } from "../components/RecordSelfBillPanel";
+import { isSelfBilled } from "@/lib/billingMethod";
 import { getInvoiceJobIds } from "../api/createInvoice";
 import { startPackInBackground, usePackState } from "../api/packPreparation";
 import { fuelPolicyInvoiceNote, rechargeCategoriesFor } from "@/lib/fuelPolicy";
@@ -312,8 +314,13 @@ export function InvoicePrepScreen() {
   const invoiceOverrides = useEvidenceOverrides("invoice-prep");
   const isOverridden = (jobId: string) => invoiceOverrides.isAcknowledged(jobId);
 
+  // Self-billing clients (e.g. Movex) invoice themselves: we record their paid invoice
+  // against the jobs instead of raising one, so evidence/readiness rules don't apply.
+  const selfBilled = isSelfBilled(selectedClient);
+
   const isJobSelectable = (job: EligibleJob) => {
     if (job.readiness?.alreadyInvoiced) return false;
+    if (selfBilled) return true;
     if (job.readiness?.ready) return true;
     // An Abort is billable only once its fee is approved: no override.
     if (job.status === "aborted") return false;
@@ -349,7 +356,12 @@ export function InvoicePrepScreen() {
   };
 
   // ── Row pieces shared by the phone cards and the desktop table ──
-  const renderStatusBadge = (job: EligibleJob) => (
+  const renderStatusBadge = (job: EligibleJob) =>
+    selfBilled && !job.readiness?.alreadyInvoiced ? (
+      <Badge variant="outline" className="text-[9px] text-muted-foreground border-muted-foreground/30">
+        Awaiting their invoice
+      </Badge>
+    ) : (
     <Badge
       variant="outline"
       className={cn(
@@ -371,7 +383,7 @@ export function InvoicePrepScreen() {
   );
 
   const renderOverride = (job: EligibleJob) =>
-    !job.readiness?.ready && !job.readiness?.alreadyInvoiced && job.status !== "aborted" ? (
+    !selfBilled && !job.readiness?.ready && !job.readiness?.alreadyInvoiced && job.status !== "aborted" ? (
       <RoleScope admin>
         <Button
           type="button"
@@ -462,6 +474,7 @@ export function InvoicePrepScreen() {
   const handleCreateInvoice = async (opts?: { thenEmail?: boolean }) => {
     if (!selectedClient || selectedJobs.length === 0 || !settings) return;
     if (unpricedSelected.length > 0) return;
+    if (isSelfBilled(selectedClient)) return; // they invoice themselves: record theirs instead
     if (poMissing) {
       toast({
         title: "PO / reference required",
@@ -709,7 +722,7 @@ export function InvoicePrepScreen() {
                 </Button>
               )}
               <span className="text-xs text-muted-foreground ml-auto">
-                {billableJobs.length} to invoice
+                {billableJobs.length} {selfBilled ? "not yet recorded" : "to invoice"}
                 {invoicedCount > 0 && (
                   <>
                     {" · "}
@@ -729,9 +742,22 @@ export function InvoicePrepScreen() {
 
           <ControlSection
             title="2. Select Jobs"
-            description="Completed moves and approved Abort-fee claims for this client"
+            description={
+              selfBilled
+                ? "Tick the jobs on their invoice"
+                : "Completed moves and approved Abort-fee claims for this client"
+            }
             flush
           >
+            {selfBilled && (
+              <div className="p-3 pb-0">
+                <WarningCallout severity="info">
+                  {(selectedClient?.company || selectedClient?.name || "This client").trim()} invoices you themselves
+                  (self-billing), so you don't raise an invoice. When their paid invoice arrives, tick its jobs
+                  and record it below — the income then shows in your accounts.
+                </WarningCallout>
+              </div>
+            )}
             {isLoading && (
               <div className="p-6 text-center text-sm text-muted-foreground">
                 Loading jobs…
@@ -974,7 +1000,18 @@ export function InvoicePrepScreen() {
         </div>
       )}
 
-      {selectedJobs.length > 0 && (
+      {selfBilled && selectedJobs.length > 0 && selectedClient && settings && (
+        <ControlSection title="3. Record their paid invoice" description="Match it to exactly what they paid">
+          <RecordSelfBillPanel
+            client={selectedClient}
+            jobs={selectedJobs}
+            orgId={settings.orgId}
+            onRecorded={() => setSelectedJobIds(new Set())}
+          />
+        </ControlSection>
+      )}
+
+      {!selfBilled && selectedJobs.length > 0 && (
         <>
           {/* Step 3: Rechargeable expenses */}
           <ControlSection

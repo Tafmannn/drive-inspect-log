@@ -47,9 +47,20 @@ export function InvoiceStatusBadge({ invoice }: { invoice: InvoiceRecord }) {
   }
   const s = STATUS_STYLE[displayStatus(invoice)] ?? STATUS_STYLE.draft;
   return (
-    <Badge variant="outline" className={cn("text-[9px]", s.className)}>
-      {s.label}
-    </Badge>
+    <>
+      <Badge variant="outline" className={cn("text-[9px]", s.className)}>
+        {s.label}
+      </Badge>
+      {invoice.self_billed && (
+        <Badge
+          variant="outline"
+          className="text-[9px] text-muted-foreground border-muted-foreground/30"
+          title="The client's own invoice (self-billing), recorded as paid"
+        >
+          Self-billed
+        </Badge>
+      )}
+    </>
   );
 }
 
@@ -113,6 +124,9 @@ export function filterInvoices(
 
 function RowActions({ inv, actions, isBusy, onReinvoice }: { inv: InvoiceRecord } & Pick<InvoiceListProps, "actions" | "isBusy" | "onReinvoice">) {
   const isCredit = inv.document_type === "credit_note";
+  // A self-billed record is the client's own paid invoice: there is nothing to email,
+  // pack, or take payment for — only their PDF to download, or the record to cancel.
+  const selfBilled = !!inv.self_billed;
   const status = displayStatus(inv);
   const working = isBusy(inv);
   return (
@@ -145,15 +159,15 @@ function RowActions({ inv, actions, isBusy, onReinvoice }: { inv: InvoiceRecord 
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          {!isCredit && (
+          {!isCredit && !selfBilled && (
             <DropdownMenuItem onSelect={() => actions.downloadPack(inv)}>
               Download pack (PDF + receipt files)
             </DropdownMenuItem>
           )}
-          {!isCredit && status === "cancelled" && onReinvoice && (
+          {!isCredit && !selfBilled && status === "cancelled" && onReinvoice && (
             <DropdownMenuItem onSelect={() => onReinvoice(inv)}>Re-invoice these jobs</DropdownMenuItem>
           )}
-          {status !== "cancelled" && (
+          {status !== "cancelled" && !selfBilled && (
             <DropdownMenuItem onSelect={() => actions.email(inv)}>Email to client</DropdownMenuItem>
           )}
           {!isCredit && status === "draft" && (
@@ -162,14 +176,14 @@ function RowActions({ inv, actions, isBusy, onReinvoice }: { inv: InvoiceRecord 
           {!isCredit && (status === "sent" || status === "overdue") && (
             <DropdownMenuItem onSelect={() => actions.recordPayment(inv)}>Record payment</DropdownMenuItem>
           )}
-          {!isCredit && status === "paid" && (
+          {!isCredit && !selfBilled && status === "paid" && (
             <DropdownMenuItem onSelect={() => actions.undoPayment(inv)}>Undo payment</DropdownMenuItem>
           )}
           {!isCredit && status !== "cancelled" && (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => actions.cancel(inv)}>
-                Cancel invoice…
+                {selfBilled ? "Cancel this record…" : "Cancel invoice…"}
               </DropdownMenuItem>
             </>
           )}

@@ -24,6 +24,7 @@ const state = vi.hoisted(() => ({
   vatRegistered: false,
   poRequired: false,
   fuelPolicy: "recharged" as "recharged" | "included" | undefined,
+  billingMethod: undefined as "we_invoice" | "self_billed" | undefined,
   mutateAsync: null as unknown as ReturnType<typeof import("vitest").vi.fn>,
 }));
 
@@ -59,6 +60,11 @@ vi.mock("@/features/invoicing/api/packPreparation", () => ({
   usePackState: () => pack.state,
   preparePackOnce: vi.fn(),
 }));
+vi.mock("@/features/invoicing/components/RecordSelfBillPanel", () => ({
+  RecordSelfBillPanel: ({ jobs }: { jobs: EligibleJob[] }) => (
+    <div>Record panel for {jobs.map((j) => j.id).join(",")}</div>
+  ),
+}));
 vi.mock("@/features/invoicing/components/ReadyToBillPanel", () => ({
   ReadyToBillPanel: ({ onSelect }: { onSelect: (id: string) => void }) => (
     <button onClick={() => onSelect("client-1")}>CJE Transport · ready to bill</button>
@@ -81,6 +87,7 @@ vi.mock("@/hooks/useClients", () => ({
         id: "client-1", org_id: "org-1", name: "Chris", company: "CJE Transport", email: "c@cje.example",
         phone: null, address: null, notes: null, is_active: true, created_at: "", updated_at: "",
         payment_terms: "Net 30", po_required: state.poRequired, fuel_policy: state.fuelPolicy,
+        billing_method: state.billingMethod,
       },
     ],
   }),
@@ -149,6 +156,7 @@ function pickClientAndAllJobs() {
 
 beforeEach(() => {
   JOBS = DEFAULT_JOBS;
+  state.billingMethod = undefined;
   state.vatRegistered = false;
   state.poRequired = false;
   state.fuelPolicy = "recharged";
@@ -384,5 +392,26 @@ describe("InvoicePrepScreen", () => {
     expect(pack.start.mock.calls[0][0]).toMatchObject({ id: "inv-1", status: "draft" });
     expect(screen.getByText(/Pack: Building POD 1 of 2 \(AB12 CDE\) — you can carry on/)).toBeTruthy();
     pack.state = undefined;
+  });
+
+  describe("a self-billing client (they invoice you, e.g. Movex)", () => {
+    beforeEach(() => {
+      state.billingMethod = "self_billed";
+    });
+
+    it("explains why there is no invoice to raise, and offers recording theirs instead", () => {
+      const blocked = job("ax1050", 110, "2026-11-05");
+      blocked.readiness = { ...blocked.readiness!, ready: false, primaryReason: "Blocked: evidence issue (red)" };
+      JOBS = [blocked];
+      renderScreen();
+      pickClientAndAllJobs();
+      expect(screen.getByText(/invoices you themselves/)).toBeTruthy();
+      expect(screen.getByText("Awaiting their invoice")).toBeTruthy();
+      // Evidence rules don't apply to recording their paid invoice.
+      expect(screen.getByText("Record panel for ax1050")).toBeTruthy();
+      expect(screen.queryByRole("button", { name: /Create Draft/ })).toBeNull();
+      expect(screen.queryByRole("button", { name: /Create & Email/ })).toBeNull();
+      expect(screen.queryByText("3. Rechargeable Expenses")).toBeNull();
+    });
   });
 });

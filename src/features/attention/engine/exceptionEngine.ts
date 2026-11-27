@@ -500,6 +500,8 @@ export function deriveBillingExceptions(
   invoicedJobIds: Set<string>,
   orgLookup?: Map<string, string>,
   nowMs: number = Date.now(),
+  /** Clients who invoice themselves: their jobs wait for the client's invoice, not ours. */
+  selfBilledClientIds: ReadonlySet<string> = new Set(),
 ): AttentionException[] {
   const out: AttentionException[] = [];
   const lookbackFrom = nowMs - T.billingLookbackDays * 86_400_000;
@@ -542,6 +544,17 @@ export function deriveBillingExceptions(
     }
 
     const days = Math.floor((nowMs - completedMs) / 86_400_000);
+    if (selfBilledClientIds.has(job.client_id)) {
+      // We never invoice these; only chase once the client's own invoice is overdue.
+      if (days < T.unbilledHighDays) continue;
+      out.push(exc({
+        ...base, severity: "medium",
+        title: "Waiting for the client's own invoice",
+        detail: `${ref} (£${Number(job.total_price).toFixed(2)}) was completed ${days} days ago. This client invoices themselves and hasn't been recorded as paid yet — record their invoice when it arrives.`,
+        actionLabel: "Record their invoice", actionRoute: `/control/invoice-prep?clientId=${job.client_id}`,
+      }, "self-billed-awaiting"));
+      continue;
+    }
     if (days < T.unbilledWarnDays) continue;
     out.push(exc({
       ...base, severity: days >= T.unbilledHighDays ? "high" : "medium",

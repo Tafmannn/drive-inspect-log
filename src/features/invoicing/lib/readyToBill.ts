@@ -28,7 +28,10 @@ export interface ClientBillSummary {
 }
 
 export interface ReadyToBillSummary {
+  /** Clients we invoice, with work waiting. */
   clients: ClientBillSummary[];
+  /** Self-billing clients (they invoice us): work waiting for their invoice to be recorded. */
+  selfBilled: ClientBillSummary[];
   /** Completed, un-invoiced jobs with no client profile linked. */
   unlinked: number;
 }
@@ -38,6 +41,7 @@ export function summariseReadyToBill(
   priceByJob: ReadonlyMap<string, number | null>,
   aborts: ReadonlyMap<string, AbortFeeInfo>,
   invoiced: ReadonlySet<string>,
+  selfBilledClientIds: ReadonlySet<string> = new Set(),
 ): ReadyToBillSummary {
   const byClient = new Map<string, ClientBillSummary>();
   let unlinked = 0;
@@ -64,6 +68,10 @@ export function summariseReadyToBill(
     else s.value = Math.round((s.value + amount) * 100) / 100;
     byClient.set(r.client_id, s);
   }
-  const clients = [...byClient.values()].sort((a, b) => b.value - a.value || b.jobs - a.jobs);
-  return { clients, unlinked };
+  const all = [...byClient.values()].sort((a, b) => b.value - a.value || b.jobs - a.jobs);
+  return {
+    clients: all.filter((c) => !selfBilledClientIds.has(c.clientId)),
+    selfBilled: all.filter((c) => selfBilledClientIds.has(c.clientId)),
+    unlinked,
+  };
 }

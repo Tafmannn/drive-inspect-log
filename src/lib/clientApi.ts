@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getOrgId } from "./orgHelper";
 import { tidyClientNames } from "./clientNames";
 import { normaliseFuelPolicy, type FuelPolicy } from "./fuelPolicy";
+import type { BillingMethod } from "./billingMethod";
 
 export interface Client {
   id: string;
@@ -24,6 +25,8 @@ export interface Client {
   po_required?: boolean;
   /** Does the client pay fuel on top ('recharged', the default) or is it in the price ('included')? */
   fuel_policy?: FuelPolicy | null;
+  /** Who raises the invoice: us ('we_invoice', the default) or the client ('self_billed'). */
+  billing_method?: BillingMethod | null;
 }
 
 /**

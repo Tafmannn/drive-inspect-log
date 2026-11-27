@@ -34,43 +34,55 @@ export function ReadyToBillPanel({ selectedClientId, onSelect }: Props) {
       </p>
     );
   }
-  if (!data || (data.clients.length === 0 && data.unlinked === 0)) {
+  if (!data || (data.clients.length === 0 && data.selfBilled.length === 0 && data.unlinked === 0)) {
     return <p className="text-xs text-muted-foreground">Nothing waiting to be invoiced.</p>;
   }
 
-  return (
-    <div className="space-y-2">
-      <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Ready to bill</p>
-      <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {data.clients.map((c) => (
-          <li key={c.clientId}>
-            <button
-              type="button"
-              onClick={() => onSelect(c.clientId)}
-              aria-pressed={selectedClientId === c.clientId}
-              className={cn(
-                "w-full min-h-[56px] rounded-lg border px-3 py-2 text-left transition-colors",
-                "flex items-center justify-between gap-3 hover:bg-muted/50 active:bg-muted",
-                selectedClientId === c.clientId ? "border-primary bg-primary/5" : "border-border",
-              )}
-            >
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-medium text-foreground">{nameOf(c.clientId)}</span>
-                <span className="block text-xs text-muted-foreground">
-                  {c.jobs} job{c.jobs === 1 ? "" : "s"} · {gbp(c.value)}
-                  {c.unpriced > 0 && (
-                    <span className="ml-1 inline-flex items-center gap-0.5 text-warning">
-                      <AlertTriangle className="h-3 w-3" aria-hidden />
-                      {c.unpriced} unpriced
-                    </span>
-                  )}
-                </span>
+  const card = (c: (typeof data.clients)[number]) => (
+    <li key={c.clientId}>
+      <button
+        type="button"
+        onClick={() => onSelect(c.clientId)}
+        aria-pressed={selectedClientId === c.clientId}
+        className={cn(
+          "w-full min-h-[56px] rounded-lg border px-3 py-2 text-left transition-colors",
+          "flex items-center justify-between gap-3 hover:bg-muted/50 active:bg-muted",
+          selectedClientId === c.clientId ? "border-primary bg-primary/5" : "border-border",
+        )}
+      >
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-medium text-foreground">{nameOf(c.clientId)}</span>
+          <span className="block text-xs text-muted-foreground">
+            {c.jobs} job{c.jobs === 1 ? "" : "s"} · {gbp(c.value)}
+            {c.unpriced > 0 && (
+              <span className="ml-1 inline-flex items-center gap-0.5 text-warning">
+                <AlertTriangle className="h-3 w-3" aria-hidden />
+                {c.unpriced} unpriced
               </span>
-              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-            </button>
-          </li>
-        ))}
-      </ul>
+            )}
+          </span>
+        </span>
+        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+      </button>
+    </li>
+  );
+
+  return (
+    <div className="space-y-3">
+      {data.clients.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Ready to bill</p>
+          <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{data.clients.map(card)}</ul>
+        </div>
+      )}
+      {data.selfBilled.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            Waiting for their own invoice (self-billing)
+          </p>
+          <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{data.selfBilled.map(card)}</ul>
+        </div>
+      )}
       {data.unlinked > 0 && (
         <Link
           to="/control/clients/link-jobs"

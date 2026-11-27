@@ -18,6 +18,10 @@ import { toast } from "@/hooks/use-toast";
 import { useClients, useCreateClient, useUpdateClient } from "@/hooks/useClients";
 import { findSimilarClients } from "@/lib/clientNames";
 import {
+  BILLING_METHODS, BILLING_METHOD_HELP, BILLING_METHOD_LABEL, DEFAULT_BILLING_METHOD,
+  normaliseBillingMethod, type BillingMethod,
+} from "@/lib/billingMethod";
+import {
   type Client,
   getClientRateCardRow,
   upsertClientRateCard,
@@ -69,6 +73,7 @@ export function ClientFormModal({ open, onOpenChange, client, initialCompany, on
     payment_terms: "",
     po_required: false,
     fuel_policy: DEFAULT_FUEL_POLICY as FuelPolicy,
+    billing_method: DEFAULT_BILLING_METHOD as BillingMethod,
     rate_card_active: false,
     rate_per_mile: "",
     minimum_charge: "",
@@ -93,6 +98,7 @@ export function ClientFormModal({ open, onOpenChange, client, initialCompany, on
         payment_terms: client.payment_terms ?? "",
         po_required: client.po_required === true,
         fuel_policy: normaliseFuelPolicy(client.fuel_policy),
+        billing_method: normaliseBillingMethod(client.billing_method),
       }));
       // Load rate card from admin-only table. Drivers will get null via RLS.
       if (canEditRateCard) {
@@ -119,6 +125,7 @@ export function ClientFormModal({ open, onOpenChange, client, initialCompany, on
         name: "", company: initialCompany ?? "", billing_email: "", client_type: "",
         email: "", phone: "", address: "", notes: "",
         payment_terms: "", po_required: false, fuel_policy: DEFAULT_FUEL_POLICY,
+        billing_method: DEFAULT_BILLING_METHOD,
         rate_card_active: false, rate_per_mile: "", minimum_charge: "",
         agreed_price: "", waiting_rate_per_hour: "", rate_card_notes: "",
       });
@@ -177,6 +184,11 @@ export function ClientFormModal({ open, onOpenChange, client, initialCompany, on
       payment_terms: form.payment_terms || null,
       po_required: form.po_required,
       fuel_policy: form.fuel_policy,
+      // Sent only once the column exists (the client row has it) or self-billing is
+      // chosen, so saving keeps working in the gap before the migration is released.
+      ...(client?.billing_method !== undefined || form.billing_method !== DEFAULT_BILLING_METHOD
+        ? { billing_method: form.billing_method }
+        : {}),
       is_active: true,
     };
 
@@ -216,7 +228,9 @@ export function ClientFormModal({ open, onOpenChange, client, initialCompany, on
     } catch (err: any) {
       toast({
         title: "Save failed",
-        description: err.message,
+        description: /billing_method/.test(String(err?.message))
+          ? "Self-billing isn't switched on in the database yet. Save without it for now, or ask for the database update to be released."
+          : err.message,
         variant: "destructive",
       });
     }
@@ -365,6 +379,24 @@ export function ClientFormModal({ open, onOpenChange, client, initialCompany, on
               placeholder="Internal notes..."
               rows={2}
             />
+          </div>
+
+          <div className="space-y-1.5" data-testid="client-billing-method">
+            <Label htmlFor="client-billing-method" className="text-xs">Invoicing</Label>
+            <Select
+              value={form.billing_method}
+              onValueChange={(v) => setForm((f) => ({ ...f, billing_method: normaliseBillingMethod(v) }))}
+            >
+              <SelectTrigger id="client-billing-method">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {BILLING_METHODS.map((m) => (
+                  <SelectItem key={m} value={m}>{BILLING_METHOD_LABEL[m]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">{BILLING_METHOD_HELP[form.billing_method]}</p>
           </div>
 
           <div className="space-y-1.5" data-testid="client-fuel-policy">
