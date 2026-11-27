@@ -15,7 +15,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { useCreateClient, useUpdateClient } from "@/hooks/useClients";
+import { useClients, useCreateClient, useUpdateClient } from "@/hooks/useClients";
+import { findSimilarClients } from "@/lib/clientNames";
 import {
   type Client,
   getClientRateCardRow,
@@ -54,6 +55,7 @@ export function ClientFormModal({ open, onOpenChange, client, initialCompany, on
   const updateMutation = useUpdateClient();
   const { isAdmin, isSuperAdmin } = useAuth();
   const canEditRateCard = isAdmin || isSuperAdmin;
+  const { data: existingClients } = useClients({ includeArchived: true });
 
   const [form, setForm] = useState({
     name: "",
@@ -132,6 +134,8 @@ export function ClientFormModal({ open, onOpenChange, client, initialCompany, on
     const n = Number(t);
     return Number.isFinite(n) && n >= 0 ? n : null;
   };
+
+  const similarClients = findSimilarClients(form.company.trim() || form.name.trim(), existingClients ?? [], client?.id);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -236,6 +240,14 @@ export function ClientFormModal({ open, onOpenChange, client, initialCompany, on
               placeholder="Company name"
               autoFocus={!isEdit}
             />
+            {similarClients.length > 0 && (
+              <p className="mt-1 text-xs text-warning" role="status">
+                Looks like an existing client:{" "}
+                {similarClients.slice(0, 3).map((c) => (c.company || c.name).trim()).join(", ")}
+                {similarClients.some((c) => c.is_active === false) ? " (some archived)" : ""}. Check this isn't a duplicate —
+                jobs split across two profiles won't show together in Invoice Prep.
+              </p>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>

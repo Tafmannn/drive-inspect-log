@@ -62,10 +62,11 @@ vi.mock("@/features/invoicing/api/invoiceDocument", () => ({
   buildInvoiceDocument: (...a: unknown[]) => h.buildInvoiceDocument(...a),
 }));
 vi.mock("@/components/PodEmailConfirmDialog", () => ({
-  PodEmailConfirmDialog: (p: { open: boolean; defaultEmail: string; documentLabel: string; onConfirm: (e: string) => void; onOpenChange: (o: boolean) => void }) =>
+  PodEmailConfirmDialog: (p: { open: boolean; sending: boolean; sendingNote?: string; defaultEmail: string; documentLabel: string; onConfirm: (e: string) => void; onOpenChange: (o: boolean) => void }) =>
     p.open ? (
       <div role="dialog" aria-label="email">
         <p>{p.documentLabel}</p>
+        {p.sending && <p role="status">{p.sendingNote}</p>}
         <button onClick={() => p.onConfirm(p.defaultEmail || "typed@client.example")}>Send email</button>
         <button onClick={() => p.onOpenChange(false)}>Close email</button>
       </div>
@@ -379,6 +380,20 @@ describe("invoice actions", () => {
     expect(h.emailInvoice.mock.calls[0][0]).toMatchObject({ invoiceId: "AX26-1007", orgId: "org-1", to: "ap@cje.example", storedPdfPath: "org-1/prepared.pdf" });
     await waitFor(() => expect(h.toasts[0]).toMatchObject({ title: "Invoice emailed", description: "AX26-1007 sent to ap@cje.example." }));
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("shows what the pack build is doing while it runs", async () => {
+    let finish: () => void = () => {};
+    h.prepareInvoiceDelivery = vi.fn((_i: unknown, _o: unknown, _s: unknown, progress: (m: string) => void) => {
+      progress("Building POD 2 of 5 (AB12 CDE)…");
+      return new Promise<string>((resolve) => { finish = () => resolve("org-1/prepared.pdf"); });
+    });
+    renderList([inv({ invoice_number: "AX26-1007" })]);
+    await choose("AX26-1007", /Email to client/);
+    fireEvent.click(await screen.findByText("Send email"));
+    expect(await screen.findByText(/Building POD 2 of 5 \(AB12 CDE\)… This can take a minute/)).toBeTruthy();
+    finish();
+    await waitFor(() => expect(h.emailInvoice).toHaveBeenCalled());
   });
 
   it("does not email a draft when pack preparation fails", async () => {

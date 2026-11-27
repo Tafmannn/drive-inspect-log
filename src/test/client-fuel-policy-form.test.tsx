@@ -26,6 +26,7 @@ vi.mock("@/hooks/use-toast", () => ({ toast: vi.fn() }));
 vi.mock("@/hooks/useClients", () => ({
   useCreateClient: () => ({ mutateAsync: h.create, isPending: false }),
   useUpdateClient: () => ({ mutateAsync: h.update, isPending: false }),
+  useClients: () => ({ data: [] }),
 }));
 vi.mock("@/lib/clientApi", () => ({
   getClientRateCardRow: vi.fn().mockResolvedValue(null),

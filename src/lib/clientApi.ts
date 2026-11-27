@@ -1,6 +1,7 @@
 // Client profile CRUD API
 import { supabase } from "@/integrations/supabase/client";
 import { getOrgId } from "./orgHelper";
+import { tidyClientNames } from "./clientNames";
 import { normaliseFuelPolicy, type FuelPolicy } from "./fuelPolicy";
 
 export interface Client {
@@ -198,7 +199,7 @@ export async function createClient(input: ClientInsert): Promise<Client> {
   const orgId = await getOrgId();
   const { data, error } = await supabase
     .from("clients")
-    .insert({ ...input, org_id: orgId } as any)
+    .insert({ ...tidyClientNames(input), org_id: orgId } as any)
     .select()
     .single();
   if (error) throw error;
@@ -211,7 +212,7 @@ export async function updateClient(
 ): Promise<Client> {
   const { data, error } = await supabase
     .from("clients")
-    .update(input as any)
+    .update(tidyClientNames(input) as any)
     .eq("id", clientId)
     .select()
     .single();

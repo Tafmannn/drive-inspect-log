@@ -51,6 +51,7 @@ import { useInvoiceActions } from "../hooks/useInvoiceActions";
 import { ExpensePicker } from "../components/ExpensePicker";
 import { InvoiceList, InvoiceStatusBadge } from "../components/InvoiceList";
 import { InvoiceCorrectionQueue } from "../components/InvoiceCorrectionQueue";
+import { ReadyToBillPanel } from "../components/ReadyToBillPanel";
 import { getInvoiceJobIds } from "../api/createInvoice";
 import { fuelPolicyInvoiceNote, rechargeCategoriesFor } from "@/lib/fuelPolicy";
 import { settingsToPdfFields } from "../api/invoiceDocument";
@@ -67,6 +68,7 @@ import {
 import type { Client } from "@/lib/clientApi";
 import { WarningCallout, RoleScope } from "@/components/ui-kit";
 import { useClients } from "@/hooks/useClients";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useEvidenceOverrides } from "@/hooks/useEvidenceOverrides";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -99,6 +101,18 @@ function shortDate(iso: string | null): string {
     month: "short",
     year: "2-digit",
   });
+}
+
+/** The date a job became billable: completion, or the Abort confirmation. */
+function jobDate(job: EligibleJob): string | null {
+  return job.completed_at ?? job.abort_confirmed_at ?? null;
+}
+
+/** "Leeds → Bristol" from whatever route ends the job has. */
+function routeText(job: EligibleJob): string {
+  const from = job.pickup_city || job.pickup_postcode;
+  const to = job.delivery_city || job.delivery_postcode;
+  return from && to ? `${from} → ${to}` : from || to || "";
 }
 
 function todayIso(): string {
@@ -171,8 +185,9 @@ export function InvoicePrepScreen() {
   // Business-level invoice settings: the VAT switch + footer identity.
   const { data: settings, isLoading: settingsLoading } = useOrgInvoiceSettings();
   const vatRegistered = settings?.vatRegistered === true;
-  // Only used while VAT registered.
-  const [vatRate, setVatRate] = useState(DEFAULT_VAT_RATE);
+  // Only used while VAT registered. Fixed at the UK standard rate — never typed per
+  // invoice, so a slip can't put a wrong VAT figure on a legal document.
+  const vatRate = DEFAULT_VAT_RATE;
 
   // Client's PO / reference for this invoice
   const [clientRef, setClientRef] = useState("");
@@ -185,7 +200,7 @@ export function InvoicePrepScreen() {
   const [isPreviewing, setIsPreviewing] = useState(false);
 
   // Every invoice + credit note (re-downloadable at any time)
-  const { data: recentInvoices, isLoading: invoicesLoading } = useInvoices(50);
+  const { data: recentInvoices, isLoading: invoicesLoading } = useInvoices(200);
   const { actions, isBusy, dialogs } = useInvoiceActions(settings);
 
   // Fetch eligible jobs
@@ -282,12 +297,11 @@ export function InvoicePrepScreen() {
     [selectedJobs, selectedExpenses, vatRegistered, vatRate]
   );
 
-  const warnings = useMemo(() => {
-    const list: string[] = [];
-    const noPrice = selectedJobs.filter((j) => j.status !== "aborted" && (!j.total_price || j.total_price <= 0)).length;
-    if (noPrice > 0) list.push(`${noPrice} job(s) have no price set — total may be inaccurate.`);
-    return list;
-  }, [selectedJobs]);
+  // A job with no price can't be invoiced: an unknown amount is never billed as £0.
+  const unpricedSelected = useMemo(
+    () => selectedJobs.filter((j) => j.status !== "aborted" && !(Number(j.total_price) > 0)),
+    [selectedJobs],
+  );
 
   const poMissing = !!selectedClient?.po_required && !clientRef.trim();
 
@@ -317,14 +331,91 @@ export function InvoicePrepScreen() {
     });
   };
 
+  // Already-invoiced jobs are history: hidden unless asked for, and never counted as work.
+  const [showInvoiced, setShowInvoiced] = useState(false);
+  const isMobile = useIsMobile();
+  const billableJobs = useMemo(() => jobs.filter((j) => !j.readiness?.alreadyInvoiced), [jobs]);
+  const invoicedCount = jobs.length - billableJobs.length;
+  const visibleJobs = showInvoiced ? jobs : billableJobs;
+  const selectableJobs = visibleJobs.filter(isJobSelectable);
+
   const toggleAll = () => {
-    const selectable = jobs.filter(isJobSelectable);
-    if (selectedJobIds.size === selectable.length && selectable.length > 0) {
+    if (selectedJobIds.size === selectableJobs.length && selectableJobs.length > 0) {
       setSelectedJobIds(new Set());
     } else {
-      setSelectedJobIds(new Set(selectable.map((j) => j.id)));
+      setSelectedJobIds(new Set(selectableJobs.map((j) => j.id)));
     }
   };
+
+  // ── Row pieces shared by the phone cards and the desktop table ──
+  const renderStatusBadge = (job: EligibleJob) => (
+    <Badge
+      variant="outline"
+      className={cn(
+        "text-[9px]",
+        job.readiness?.alreadyInvoiced
+          ? "text-muted-foreground border-muted-foreground/30 bg-muted/40"
+          : job.readiness?.ready
+          ? "text-success border-success/30 bg-success/5"
+          : isOverridden(job.id)
+          ? "text-primary border-primary/30 bg-primary/5"
+          : "text-destructive border-destructive/30 bg-destructive/5",
+      )}
+      title={job.readiness?.primaryReason}
+    >
+      {isOverridden(job.id) && !job.readiness?.ready
+        ? `Override · ${job.readiness?.primaryReason ?? "blocked"}`
+        : job.readiness?.primaryReason ?? job.status.replace(/_/g, " ")}
+    </Badge>
+  );
+
+  const renderOverride = (job: EligibleJob) =>
+    !job.readiness?.ready && !job.readiness?.alreadyInvoiced && job.status !== "aborted" ? (
+      <RoleScope admin>
+        <Button
+          type="button"
+          size="sm"
+          variant={isOverridden(job.id) ? "ghost" : "outline"}
+          className="h-7 px-2 text-[11px]"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (isOverridden(job.id)) {
+              invoiceOverrides.unacknowledge(job.id);
+              setSelectedJobIds((prev) => {
+                const next = new Set(prev);
+                next.delete(job.id);
+                return next;
+              });
+            } else {
+              invoiceOverrides.acknowledge(job.id);
+            }
+          }}
+          aria-label={
+            isOverridden(job.id)
+              ? `Remove override for job ${job.external_job_number || job.id.slice(0, 8)}`
+              : `Override readiness for job ${job.external_job_number || job.id.slice(0, 8)}`
+          }
+        >
+          {isOverridden(job.id) ? "Undo override" : "Override"}
+        </Button>
+      </RoleScope>
+    ) : null;
+
+  const renderPrice = (job: EligibleJob) =>
+    job.status === "aborted" ? (
+      job.abort_fee != null ? (
+        <span className="text-sm font-semibold tabular-nums text-foreground" title="Approved Abort fee">
+          {fmtGbp(job.abort_fee)}
+          <span className="block text-[11px] font-normal text-muted-foreground">Abort fee</span>
+        </span>
+      ) : (
+        <span className="text-xs text-warning font-medium">Fee not approved</span>
+      )
+    ) : job.total_price ? (
+      <span className="text-sm font-semibold tabular-nums text-foreground">{fmtGbp(job.total_price)}</span>
+    ) : (
+      <span className="text-xs text-warning font-medium">No price</span>
+    );
 
   // Reset selection when client changes
   const handleClientChange = (id: string | null) => {
@@ -358,9 +449,18 @@ export function InvoicePrepScreen() {
     }
   };
 
+  const createDisabled =
+    createInvoice.isPending ||
+    selectedJobs.length === 0 ||
+    unpricedSelected.length > 0 ||
+    expensesLoading ||
+    settingsLoading ||
+    !settings;
+
   // Create invoice handler
-  const handleCreateInvoice = async () => {
+  const handleCreateInvoice = async (opts?: { thenEmail?: boolean }) => {
     if (!selectedClient || selectedJobs.length === 0 || !settings) return;
+    if (unpricedSelected.length > 0) return;
     if (poMissing) {
       toast({
         title: "PO / reference required",
@@ -382,8 +482,7 @@ export function InvoicePrepScreen() {
         orgId: settings.orgId,
         clientRef,
       });
-      setCreatedInvoice(
-        draftToRecord({
+      const record = draftToRecord({
           invoiceId: result.invoiceId,
           invoiceNumber: result.invoiceNumber,
           orgId: settings.orgId,
@@ -394,8 +493,8 @@ export function InvoicePrepScreen() {
           paymentTerms: result.paymentTerms,
           vatRegistered,
           draft: result.draft,
-        })
-      );
+        });
+      setCreatedInvoice(record);
       setSelectedJobIds(new Set());
       setExpenseOverrides(new Map());
       setClientRef("");
@@ -405,8 +504,11 @@ export function InvoicePrepScreen() {
         description:
           `${result.invoiceNumber} — ${result.jobCount} job${result.jobCount !== 1 ? "s" : ""}` +
           (expenseCount ? ` + ${expenseCount} expense${expenseCount !== 1 ? "s" : ""}` : "") +
-          " invoiced.",
+          " invoiced." +
+          (opts?.thenEmail ? " Confirm the recipient to send it." : ""),
       });
+      // "Create & email": straight into the confirm-recipient step for the new draft.
+      if (opts?.thenEmail) actions.email(record);
     } catch (err) {
       toast({
         title: "Invoice Creation Failed",
@@ -516,7 +618,15 @@ export function InvoicePrepScreen() {
       />
 
       {/* Step 1: Client selection */}
-      <ControlSection title="1. Select Client" description="Choose a billing client profile">
+      <ControlSection title="1. Select Client" description="Pick a client with work waiting, or search for any client profile">
+        <div className="mb-4">
+          <ReadyToBillPanel
+            selectedClientId={selectedClientId}
+            onSelect={(id) => {
+              if (id !== selectedClientId) handleClientChange(id);
+            }}
+          />
+        </div>
         <div className="max-w-md">
           <ClientPickerCombobox
             value={selectedClientId}
@@ -594,7 +704,20 @@ export function InvoicePrepScreen() {
                 </Button>
               )}
               <span className="text-xs text-muted-foreground ml-auto">
-                {jobs.length} eligible job{jobs.length !== 1 ? "s" : ""}
+                {billableJobs.length} to invoice
+                {invoicedCount > 0 && (
+                  <>
+                    {" · "}
+                    <button
+                      type="button"
+                      className="underline underline-offset-2 hover:text-foreground"
+                      onClick={() => setShowInvoiced((v) => !v)}
+                      aria-pressed={showInvoiced}
+                    >
+                      {showInvoiced ? "Hide" : "Show"} {invoicedCount} already invoiced
+                    </button>
+                  </>
+                )}
               </span>
             </div>
           </FilterBar>
@@ -606,7 +729,7 @@ export function InvoicePrepScreen() {
           >
             {isLoading && (
               <div className="p-6 text-center text-sm text-muted-foreground">
-                Loading eligible jobs…
+                Loading jobs…
               </div>
             )}
             {!isLoading && eligibleError && (
@@ -614,161 +737,138 @@ export function InvoicePrepScreen() {
                 Could not load this client's jobs: {(eligibleError as Error).message}
               </div>
             )}
-            {!isLoading && !eligibleError && jobs.length === 0 && (
+            {!isLoading && !eligibleError && visibleJobs.length === 0 && (
               <div className="p-6 text-center text-sm text-muted-foreground">
-                No eligible jobs found for this client.
+                {invoicedCount > 0
+                  ? "Everything for this client is already invoiced."
+                  : "No jobs to invoice for this client."}
               </div>
             )}
-            {!isLoading && jobs.length > 0 && (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-10">
-                        <Checkbox
-                          checked={
-                            jobs.filter(isJobSelectable).length > 0 &&
-                            selectedJobIds.size === jobs.filter(isJobSelectable).length
-                          }
-                          onCheckedChange={toggleAll}
-                          aria-label="Select all"
-                        />
-                      </TableHead>
-                      <TableHead className="text-[11px] font-medium uppercase tracking-wider">
-                        Job
-                      </TableHead>
-                      <TableHead className="text-[11px] font-medium uppercase tracking-wider">
-                        Vehicle
-                      </TableHead>
-                      <TableHead className="text-[11px] font-medium uppercase tracking-wider">
-                        Completed / Aborted
-                      </TableHead>
-                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-right">
-                        Price
-                      </TableHead>
-                      <TableHead className="text-[11px] font-medium uppercase tracking-wider text-right">
-                        Receipts
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {jobs.map((job) => (
-                      <TableRow
-                        key={job.id}
-                        className={cn(
-                          "cursor-pointer transition-colors",
-                          selectedJobIds.has(job.id)
-                            ? "bg-primary/5 hover:bg-primary/10"
-                            : "hover:bg-muted/50"
-                        )}
-                        onClick={() => toggleJob(job.id)}
-                      >
-                        <TableCell>
-                          <Checkbox
-                            checked={selectedJobIds.has(job.id)}
-                            disabled={!isJobSelectable(job)}
-                            onCheckedChange={() => toggleJob(job.id)}
-                            aria-label={`Select job ${job.external_job_number || job.id.slice(0, 8)}`}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <div className="min-w-0 flex items-center flex-wrap gap-1.5">
-                            <span className="text-sm font-medium text-foreground">
-                              {job.external_job_number || job.id.slice(0, 8)}
-                            </span>
-                            <Badge
-                              variant="outline"
-                              className={cn(
-                                "text-[9px]",
-                                job.readiness?.alreadyInvoiced
-                                  ? "text-muted-foreground border-muted-foreground/30 bg-muted/40"
-                                  : job.readiness?.ready
-                                  ? "text-success border-success/30 bg-success/5"
-                                  : isOverridden(job.id)
-                                  ? "text-primary border-primary/30 bg-primary/5"
-                                  : "text-destructive border-destructive/30 bg-destructive/5",
-                              )}
-                              title={job.readiness?.primaryReason}
-                            >
-                              {isOverridden(job.id) && !job.readiness?.ready
-                                ? `Override · ${job.readiness?.primaryReason ?? "blocked"}`
-                                : job.readiness?.primaryReason ?? job.status.replace(/_/g, " ")}
-                            </Badge>
-                            {!job.readiness?.ready && !job.readiness?.alreadyInvoiced && job.status !== "aborted" && (
-                              <RoleScope admin>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant={isOverridden(job.id) ? "ghost" : "outline"}
-                                  className="h-6 px-2 text-[10px]"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (isOverridden(job.id)) {
-                                      invoiceOverrides.unacknowledge(job.id);
-                                      setSelectedJobIds((prev) => {
-                                        const next = new Set(prev);
-                                        next.delete(job.id);
-                                        return next;
-                                      });
-                                    } else {
-                                      invoiceOverrides.acknowledge(job.id);
-                                    }
-                                  }}
-                                  aria-label={
-                                    isOverridden(job.id)
-                                      ? `Remove override for job ${job.external_job_number || job.id.slice(0, 8)}`
-                                      : `Override readiness for job ${job.external_job_number || job.id.slice(0, 8)}`
-                                  }
-                                >
-                                  {isOverridden(job.id) ? "Undo override" : "Override"}
-                                </Button>
-                              </RoleScope>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-xs text-foreground">
-                            {job.vehicle_reg}
-                          </span>
-                          <span className="text-xs text-muted-foreground ml-1.5">
-                            {job.vehicle_make} {job.vehicle_model}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-xs text-muted-foreground">
-                            {shortDate(job.completed_at ?? job.abort_confirmed_at ?? null)}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {job.status === "aborted" ? (
-                            job.abort_fee != null ? (
-                              <span className="text-sm font-semibold tabular-nums text-foreground" title="Approved Abort fee">
-                                {fmtGbp(job.abort_fee)}
-                                <span className="block text-[11px] font-normal text-muted-foreground">Abort fee</span>
-                              </span>
-                            ) : (
-                              <span className="text-xs text-warning font-medium">Fee not approved</span>
-                            )
-                          ) : job.total_price ? (
-                            <span className="text-sm font-semibold tabular-nums text-foreground">
-                              {fmtGbp(job.total_price)}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-warning font-medium">
-                              No price
-                            </span>
+            {!isLoading && visibleJobs.length > 0 && (
+              isMobile ? (
+                /* Phone: one tappable card per job */
+                <ul className="divide-y divide-border">
+                  {visibleJobs.map((job) => {
+                    const selectable = isJobSelectable(job);
+                    const checked = selectedJobIds.has(job.id);
+                    return (
+                      <li key={job.id}>
+                        <div
+                          role="checkbox"
+                          aria-checked={checked}
+                          aria-disabled={!selectable}
+                          aria-label={`Select job ${job.external_job_number || job.id.slice(0, 8)}`}
+                          tabIndex={selectable ? 0 : -1}
+                          onClick={() => toggleJob(job.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === " " || e.key === "Enter") {
+                              e.preventDefault();
+                              toggleJob(job.id);
+                            }
+                          }}
+                          className={cn(
+                            "flex gap-3 px-4 py-3 transition-colors",
+                            selectable ? "cursor-pointer active:bg-muted" : "opacity-60",
+                            checked && "bg-primary/5",
                           )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <span className="text-xs tabular-nums text-muted-foreground">
-                            {job.receiptCount ?? 0}
-                          </span>
-                        </TableCell>
+                        >
+                          <Checkbox checked={checked} disabled={!selectable} tabIndex={-1} aria-hidden className="mt-0.5 pointer-events-none" />
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <div className="flex items-start justify-between gap-2">
+                              <span className="text-sm font-semibold text-foreground">
+                                {job.external_job_number || job.id.slice(0, 8)}
+                              </span>
+                              <span className="shrink-0 text-right">{renderPrice(job)}</span>
+                            </div>
+                            <p className="text-xs text-foreground">
+                              {job.vehicle_reg}
+                              <span className="text-muted-foreground"> {job.vehicle_make} {job.vehicle_model}</span>
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {routeText(job)}
+                              {routeText(job) ? " · " : ""}
+                              {shortDate(jobDate(job))}
+                              {(job.receiptCount ?? 0) > 0 ? ` · ${job.receiptCount} receipt${job.receiptCount === 1 ? "" : "s"}` : ""}
+                            </p>
+                            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                              {renderStatusBadge(job)}
+                              {renderOverride(job)}
+                            </div>
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                /* Tablet / desktop: table */
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-10">
+                          <Checkbox
+                            checked={
+                              selectableJobs.length > 0 &&
+                              selectedJobIds.size === selectableJobs.length
+                            }
+                            onCheckedChange={toggleAll}
+                            aria-label="Select all"
+                          />
+                        </TableHead>
+                        <TableHead className="text-[11px] font-medium uppercase tracking-wider">Job</TableHead>
+                        <TableHead className="text-[11px] font-medium uppercase tracking-wider">Vehicle</TableHead>
+                        <TableHead className="text-[11px] font-medium uppercase tracking-wider">Completed / Aborted</TableHead>
+                        <TableHead className="text-[11px] font-medium uppercase tracking-wider text-right">Price</TableHead>
+                        <TableHead className="text-[11px] font-medium uppercase tracking-wider text-right">Receipts</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+                    <TableBody>
+                      {visibleJobs.map((job) => (
+                        <TableRow
+                          key={job.id}
+                          className={cn(
+                            "cursor-pointer transition-colors",
+                            selectedJobIds.has(job.id) ? "bg-primary/5 hover:bg-primary/10" : "hover:bg-muted/50",
+                          )}
+                          onClick={() => toggleJob(job.id)}
+                        >
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedJobIds.has(job.id)}
+                              disabled={!isJobSelectable(job)}
+                              onCheckedChange={() => toggleJob(job.id)}
+                              aria-label={`Select job ${job.external_job_number || job.id.slice(0, 8)}`}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <div className="min-w-0 flex items-center flex-wrap gap-1.5">
+                              <span className="text-sm font-medium text-foreground">
+                                {job.external_job_number || job.id.slice(0, 8)}
+                              </span>
+                              {renderStatusBadge(job)}
+                              {renderOverride(job)}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-xs text-foreground">{job.vehicle_reg}</span>
+                            <span className="text-xs text-muted-foreground ml-1.5">
+                              {job.vehicle_make} {job.vehicle_model}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-xs text-muted-foreground">{shortDate(jobDate(job))}</span>
+                          </TableCell>
+                          <TableCell className="text-right">{renderPrice(job)}</TableCell>
+                          <TableCell className="text-right">
+                            <span className="text-xs tabular-nums text-muted-foreground">{job.receiptCount ?? 0}</span>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )
             )}
           </ControlSection>
         </>
@@ -876,15 +976,12 @@ export function InvoicePrepScreen() {
             />
           </ControlSection>
 
-          {/* Warnings */}
-          {warnings.length > 0 && (
-            <div className="space-y-1.5">
-              {warnings.map((w, i) => (
-                <WarningCallout key={i} severity="warning">
-                  {w}
-                </WarningCallout>
-              ))}
-            </div>
+          {unpricedSelected.length > 0 && (
+            <WarningCallout severity="critical">
+              {unpricedSelected.map((j) => jobRef(j)).join(", ")}{" "}
+              {unpricedSelected.length === 1 ? "has" : "have"} no price. Set the price on the job, or untick it,
+              before creating the invoice.
+            </WarningCallout>
           )}
 
           <KpiStrip items={kpis} className={vatRegistered ? "grid-cols-2 lg:grid-cols-5" : "grid-cols-2 lg:grid-cols-4"} />
@@ -977,19 +1074,7 @@ export function InvoicePrepScreen() {
                         <span className="font-semibold tabular-nums">{fmtGbp(draft.subtotal)}</span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground flex items-center gap-1.5">
-                          <label htmlFor="invoice-vat-rate">VAT</label>
-                          <Input
-                            id="invoice-vat-rate"
-                            type="number"
-                            min={0}
-                            max={100}
-                            value={vatRate}
-                            onChange={(e) => setVatRate(Math.min(100, Math.max(0, Number(e.target.value))))}
-                            className="w-16 h-6 text-xs text-center inline-block"
-                          />
-                          <span className="text-xs">%</span>
-                        </span>
+                        <span className="text-muted-foreground">VAT ({vatRate}%)</span>
                         <span className="font-semibold tabular-nums">{fmtGbp(draft.vatAmount)}</span>
                       </div>
                     </>
@@ -1035,22 +1120,29 @@ export function InvoicePrepScreen() {
                     Preview PDF
                   </Button>
                   <Button
+                    variant="outline"
                     onClick={() => void handleCreateInvoice()}
-                    disabled={
-                      createInvoice.isPending ||
-                      selectedJobs.length === 0 ||
-                      expensesLoading ||
-                      settingsLoading ||
-                      !settings
-                    }
+                    disabled={createDisabled}
                     className="gap-2"
                   >
                     {createInvoice.isPending ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <Send className="h-4 w-4" />
+                      <FileText className="h-4 w-4" />
                     )}
-                    Create Invoice
+                    Create Draft
+                  </Button>
+                  <Button
+                    onClick={() => void handleCreateInvoice({ thenEmail: true })}
+                    disabled={createDisabled}
+                    className="gap-2"
+                  >
+                    {createInvoice.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Mail className="h-4 w-4" />
+                    )}
+                    Create &amp; Email
                   </Button>
                 </div>
               </div>
