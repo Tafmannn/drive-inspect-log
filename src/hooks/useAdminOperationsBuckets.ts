@@ -23,6 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchPricingByJobId, type PricingRow } from "@/lib/jobPricingApi";
 import { listAcknowledgedEvidenceJobIds } from "@/lib/evidenceAckApi";
 import { findAlreadyInvoicedJobs } from "@/features/invoicing/api/createInvoice";
+import { getCurrentAbortsForJobs, type JobAbort } from "@/features/abort/api/abortApi";
 
 /** A bucket count, or `null` when it could not be computed. */
 export type BucketCount = number | null;
@@ -123,6 +124,25 @@ export function countReadyToInvoice(
   return n;
 }
 
+/**
+ * Pure: aborted jobs Invoice Prep can bill now — their current Abort fee is approved above
+ * zero and they are not on a non-cancelled invoice. An aborted job with no known Abort, or a
+ * fee still pending / rejected / nil, is not counted (it is not invoiceable yet).
+ */
+export function countApprovedAbortsToInvoice(
+  abortedIds: string[],
+  aborts: ReadonlyMap<string, Pick<JobAbort, "finance_status" | "approved_amount" | "reopened_at">>,
+  invoiced: Set<string>,
+): number {
+  let n = 0;
+  for (const id of abortedIds) {
+    if (invoiced.has(id)) continue;
+    const a = aborts.get(id);
+    if (a && !a.reopened_at && a.finance_status === "approved" && Number(a.approved_amount) > 0) n++;
+  }
+  return n;
+}
+
 /** Pure: completed jobs that are not on any non-cancelled invoice. */
 export function countNotInvoiced(completedIds: string[], invoiced: Set<string>): number {
   let n = 0;
@@ -138,6 +158,27 @@ async function orNull(label: string, run: () => Promise<number>): Promise<Bucket
     console.warn(`[buckets] ${label} could not be counted`, (e as Error).message);
     return null;
   }
+}
+
+/**
+ * Approved Abort fees waiting to be invoiced (live, client-linked aborted jobs). Invoice Prep
+ * lists these alongside completed jobs, so both invoicing buckets include them. Throws on any
+ * failed read: an unknown fee or invoice state is never counted as zero.
+ */
+async function countAbortsReadyToInvoice(): Promise<number> {
+  const ids = await fetchAllIds(() =>
+    supabase
+      .from("jobs")
+      .select("id")
+      .eq("is_hidden", false)
+      .eq("is_test", false)
+      .eq("status", "aborted")
+      .not("client_id", "is", null)
+      .order("id"),
+  );
+  if (ids.length === 0) return 0;
+  const [aborts, invoiced] = await Promise.all([getCurrentAbortsForJobs(ids), invoicedAmong(ids)]);
+  return countApprovedAbortsToInvoice(ids, aborts, invoiced);
 }
 
 export function useAdminOperationsBuckets() {
@@ -204,7 +245,8 @@ export function useAdminOperationsBuckets() {
           return ids.filter((id) => !dismissed.has(id)).length;
         }),
         // Ready to invoice — completed/closed live jobs with a client, both
-        // inspections and a price above zero, that are NOT already invoiced.
+        // inspections and a price above zero, that are NOT already invoiced,
+        // plus aborted jobs whose Abort fee is approved and not yet invoiced.
         orNull("ready_to_invoice", async () => {
           const ids = await fetchAllIds(() =>
             supabase
@@ -218,10 +260,16 @@ export function useAdminOperationsBuckets() {
               .eq("has_delivery_inspection", true)
               .order("id"),
           );
-          if (ids.length === 0) return 0;
-          // Both throw on error: an unknown price or invoice state is never read as zero.
-          const [pricing, invoiced] = await Promise.all([fetchPricingByJobId(ids), invoicedAmong(ids)]);
-          return countReadyToInvoice(ids, pricing, invoiced);
+          // All throw on error: an unknown price, fee or invoice state is never read as zero.
+          const [completedReady, abortsReady] = await Promise.all([
+            ids.length === 0
+              ? Promise.resolve(0)
+              : Promise.all([fetchPricingByJobId(ids), invoicedAmong(ids)]).then(([pricing, invoiced]) =>
+                  countReadyToInvoice(ids, pricing, invoiced),
+                ),
+            countAbortsReadyToInvoice(),
+          ]);
+          return completedReady + abortsReady;
         }),
         // Completed but not invoiced — completed/closed visible LIVE jobs with
         // no non-cancelled invoice. Test jobs are excluded, as in Invoice Prep,
@@ -237,8 +285,12 @@ export function useAdminOperationsBuckets() {
               .in("status", TERMINAL_STATUSES)
               .order("id"),
           );
-          if (ids.length === 0) return 0;
-          return countNotInvoiced(ids, await invoicedAmong(ids));
+          // Approved Abort fees are counted here too, so ready_to_invoice stays a subset.
+          const [notInvoiced, abortsReady] = await Promise.all([
+            ids.length === 0 ? Promise.resolve(0) : invoicedAmong(ids).then((inv) => countNotInvoiced(ids, inv)),
+            countAbortsReadyToInvoice(),
+          ]);
+          return notInvoiced + abortsReady;
         }),
         // Cancelled / archived
         countOrNull(

@@ -51,6 +51,7 @@ import { useInvoiceActions } from "../hooks/useInvoiceActions";
 import { ExpensePicker } from "../components/ExpensePicker";
 import { InvoiceList, InvoiceStatusBadge } from "../components/InvoiceList";
 import { InvoiceCorrectionQueue } from "../components/InvoiceCorrectionQueue";
+import { getInvoiceJobIds } from "../api/createInvoice";
 import { fuelPolicyInvoiceNote, rechargeCategoriesFor } from "@/lib/fuelPolicy";
 import { settingsToPdfFields } from "../api/invoiceDocument";
 import { downloadBlob } from "../api/receiptExport";
@@ -188,7 +189,7 @@ export function InvoicePrepScreen() {
   const { actions, isBusy, dialogs } = useInvoiceActions(settings);
 
   // Fetch eligible jobs
-  const { data: eligibleJobs, isLoading } = useEligibleJobs(selectedClient, {
+  const { data: eligibleJobs, isLoading, error: eligibleError } = useEligibleJobs(selectedClient, {
     dateFrom: dateFrom?.toISOString(),
     dateTo: dateTo?.toISOString(),
   });
@@ -213,6 +214,28 @@ export function InvoicePrepScreen() {
     setSelectedJobIds(new Set([correctionJobId]));
     correctionAutoSelected.current = correctionJobId;
   }, [correctionJobId, correctionClientId, selectedClientId, eligibleJobs]);
+
+  // Re-invoicing a cancelled invoice: once that client's eligible jobs load, tick the
+  // cancelled invoice's jobs that are invoice-ready and not on another live invoice.
+  const [reinvoice, setReinvoice] = useState<{ clientId: string; jobIds: string[]; invoiceNumber: string } | null>(null);
+  useEffect(() => {
+    if (!reinvoice || selectedClientId !== reinvoice.clientId || !eligibleJobs) return;
+    const wanted = new Set(reinvoice.jobIds);
+    const ready = eligibleJobs.filter(
+      (j) => wanted.has(j.id) && j.readiness?.ready && !j.readiness?.alreadyInvoiced,
+    );
+    setSelectedJobIds(new Set(ready.map((j) => j.id)));
+    const skipped = reinvoice.jobIds.length - ready.length;
+    toast({
+      title: ready.length > 0 ? `Re-invoicing ${reinvoice.invoiceNumber}` : `Nothing to re-invoice from ${reinvoice.invoiceNumber}`,
+      description:
+        skipped > 0
+          ? `${ready.length} job${ready.length === 1 ? "" : "s"} ticked. ${skipped} could not be: already on another invoice, not invoice-ready, or no longer this client's. Check the list below.`
+          : `${ready.length} job${ready.length === 1 ? "" : "s"} ticked. Review the lines and expenses, then create the invoice.`,
+      variant: ready.length > 0 ? undefined : "destructive",
+    });
+    setReinvoice(null);
+  }, [reinvoice, selectedClientId, eligibleJobs]);
 
   const selectedJobs = useMemo(
     () => jobs.filter((j) => selectedJobIds.has(j.id)),
@@ -310,6 +333,29 @@ export function InvoicePrepScreen() {
     setExpenseOverrides(new Map());
     setClientRef("");
     setCreatedInvoice(null);
+  };
+
+  const handleReinvoice = async (inv: InvoiceRecord) => {
+    if (!inv.client_id || !allClients?.some((c) => c.id === inv.client_id)) {
+      toast({
+        title: "Pick the client first",
+        description: `${inv.invoice_number} is not linked to an active client profile. Select the client below and tick the jobs.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      const jobIds = await getInvoiceJobIds(inv.id);
+      if (jobIds.length === 0) {
+        toast({ title: "No jobs on this invoice", description: `${inv.invoice_number} has no job lines to re-invoice.`, variant: "destructive" });
+        return;
+      }
+      handleClientChange(inv.client_id);
+      setReinvoice({ clientId: inv.client_id, jobIds, invoiceNumber: inv.invoice_number });
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (e) {
+      toast({ title: "Could not start re-invoice", description: (e as Error).message, variant: "destructive" });
+    }
   };
 
   // Create invoice handler
@@ -563,7 +609,12 @@ export function InvoicePrepScreen() {
                 Loading eligible jobs…
               </div>
             )}
-            {!isLoading && jobs.length === 0 && (
+            {!isLoading && eligibleError && (
+              <div className="p-6 text-center text-sm text-destructive" role="alert">
+                Could not load this client's jobs: {(eligibleError as Error).message}
+              </div>
+            )}
+            {!isLoading && !eligibleError && jobs.length === 0 && (
               <div className="p-6 text-center text-sm text-muted-foreground">
                 No eligible jobs found for this client.
               </div>
@@ -1021,6 +1072,7 @@ export function InvoicePrepScreen() {
           isLoading={invoicesLoading}
           actions={actions}
           isBusy={isBusy}
+          onReinvoice={handleReinvoice}
         />
       </ControlSection>
 

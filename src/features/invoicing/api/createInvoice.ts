@@ -110,6 +110,24 @@ export async function findAlreadyInvoicedJobs(jobIds: string[]): Promise<Set<str
   return ids;
 }
 
+/**
+ * The jobs an invoice billed: its multi-job lines plus a legacy single-job link. Used to
+ * re-invoice the jobs of a cancelled invoice. Throws on a failed read.
+ */
+export async function getInvoiceJobIds(invoiceId: string): Promise<string[]> {
+  const [itemsResult, invoiceResult] = await Promise.all([
+    supabase.from("invoice_items").select("job_id").eq("invoice_id", invoiceId),
+    supabase.from("invoices").select("job_id").eq("id", invoiceId).maybeSingle(),
+  ]);
+  const err = itemsResult.error ?? invoiceResult.error;
+  if (err) throw new Error(`Could not load the invoice's jobs: ${err.message}`);
+  const ids = new Set<string>();
+  for (const r of (itemsResult.data ?? []) as { job_id: string | null }[]) if (r.job_id) ids.add(r.job_id);
+  const legacy = (invoiceResult.data as { job_id: string | null } | null)?.job_id;
+  if (legacy) ids.add(legacy);
+  return [...ids];
+}
+
 /** Which of these expenses are already on a (non-cancelled) invoice. */
 export async function findAlreadyInvoicedExpenses(expenseIds: string[]): Promise<Set<string>> {
   if (expenseIds.length === 0) return new Set();

@@ -20,6 +20,9 @@ export interface EmailInvoiceInput {
   orgId: string;
   pdfData: InvoiceData;
   to: string;
+  /** Optional copies; validated again by the edge function. */
+  cc?: string[];
+  bcc?: string[];
   /**
    * Path of the PDF frozen when this invoice was issued. When set, that
    * exact file is emailed and nothing is re-rendered or overwritten.
@@ -33,6 +36,8 @@ export async function emailInvoice({
   orgId,
   pdfData,
   to,
+  cc,
+  bcc,
   storedPdfPath,
 }: EmailInvoiceInput): Promise<{ recipient: string; pdfPath: string }> {
   let path = storedPdfPath || "";
@@ -70,7 +75,14 @@ export async function emailInvoice({
   }
 
   const { data, error } = await supabase.functions.invoke("send-invoice-email", {
-    body: { to, invoiceId, downloadUrl: signed.signedUrl, ...(packPath ? { expectedPdfPath: path } : {}) },
+    body: {
+      to,
+      invoiceId,
+      downloadUrl: signed.signedUrl,
+      ...(cc?.length ? { cc } : {}),
+      ...(bcc?.length ? { bcc } : {}),
+      ...(packPath ? { expectedPdfPath: path } : {}),
+    },
   });
   if (error || !data?.sent) {
     throw new Error(

@@ -550,7 +550,7 @@ function InvoicingCard() {
         <CountRow
           icon={FileText}
           label="Ready to invoice"
-          hint="Client, price and both inspections"
+          hint="Client, price and both inspections, or an approved Abort fee"
           tone="info"
           value={ready}
           loading={isLoading}

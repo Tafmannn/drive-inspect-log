@@ -251,3 +251,19 @@ describe("operationsBuckets — Stage 6 classifier", () => {
     expect(r.byKey.cancelled_archived.jobIds).toEqual(["c"]);
   });
 });
+
+describe("countApprovedAbortsToInvoice", () => {
+  it("counts only current, approved, above-zero Abort fees that are not invoiced", async () => {
+    const { countApprovedAbortsToInvoice } = await import("@/hooks/useAdminOperationsBuckets");
+    const aborts = new Map([
+      ["ok", { finance_status: "approved" as const, approved_amount: 240, reopened_at: null }],
+      ["invoiced", { finance_status: "approved" as const, approved_amount: 240, reopened_at: null }],
+      ["pending", { finance_status: "pending_review" as const, approved_amount: null, reopened_at: null }],
+      ["nil", { finance_status: "approved" as const, approved_amount: 0, reopened_at: null }],
+      ["rejected", { finance_status: "rejected" as const, approved_amount: null, reopened_at: null }],
+      ["reopened", { finance_status: "approved" as const, approved_amount: 240, reopened_at: "2026-11-25" }],
+    ]);
+    const ids = ["ok", "invoiced", "pending", "nil", "rejected", "reopened", "unknown"];
+    expect(countApprovedAbortsToInvoice(ids, aborts, new Set(["invoiced"]))).toBe(1);
+  });
+});

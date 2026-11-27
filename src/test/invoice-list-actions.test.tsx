@@ -87,17 +87,17 @@ function inv(over: Partial<InvoiceRecord> & { invoice_number: string }): Invoice
   };
 }
 
-function Harness({ invoices, settings = SETTINGS, loading = false }: { invoices: InvoiceRecord[] | undefined; settings?: typeof SETTINGS | null; loading?: boolean }) {
+function Harness({ invoices, settings = SETTINGS, loading = false, onReinvoice }: { invoices: InvoiceRecord[] | undefined; settings?: typeof SETTINGS | null; loading?: boolean; onReinvoice?: (inv: InvoiceRecord) => void }) {
   const { actions, isBusy, dialogs } = useInvoiceActions(settings, { onChanged: (id) => h.changed.push(id) });
   return (
     <>
-      <InvoiceList invoices={invoices} isLoading={loading} actions={actions} isBusy={isBusy} />
+      <InvoiceList invoices={invoices} isLoading={loading} actions={actions} isBusy={isBusy} onReinvoice={onReinvoice} />
       {dialogs}
     </>
   );
 }
 
-function renderList(invoices: InvoiceRecord[] | undefined, extra: { settings?: typeof SETTINGS | null; loading?: boolean } = {}): ReactNode {
+function renderList(invoices: InvoiceRecord[] | undefined, extra: { settings?: typeof SETTINGS | null; loading?: boolean; onReinvoice?: (inv: InvoiceRecord) => void } = {}): ReactNode {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   render(
     <QueryClientProvider client={qc}>
@@ -187,6 +187,29 @@ describe("InvoiceList", () => {
     expect(await items("AX-PAID")).toEqual(["Download pack (PDF + receipt files)", "Email to client", "Undo payment", "Cancel invoice…"]);
     expect(await items("AX-GONE")).toEqual(["Download pack (PDF + receipt files)"]);
     expect(await items("CN26-0001")).toEqual(["Email to client"]);
+  });
+
+  it("offers re-invoicing on a cancelled invoice (never on a live one or a credit note)", async () => {
+    const onReinvoice = vi.fn();
+    renderList(
+      [
+        inv({ invoice_number: "AX-SENT", status: "sent" }),
+        inv({ invoice_number: "AX-GONE", status: "cancelled" }),
+        inv({ invoice_number: "CN26-0001", status: "cancelled", document_type: "credit_note" }),
+      ],
+      { onReinvoice },
+    );
+    const names = async (n: string) => {
+      const menu = await openMenu(n);
+      const out = menu.queryAllByRole("menuitem").map((i) => i.textContent);
+      fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+      await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+      return out;
+    };
+    expect(await names("AX-SENT")).not.toContain("Re-invoice these jobs");
+    expect(await names("CN26-0001")).not.toContain("Re-invoice these jobs");
+    await choose("AX-GONE", /Re-invoice these jobs/);
+    expect(onReinvoice).toHaveBeenCalledWith(expect.objectContaining({ invoice_number: "AX-GONE" }));
   });
 
   it("renders a status badge on its own (success card)", () => {

@@ -6,6 +6,27 @@ import { invoiceEmailSubject, renderInvoiceEmailHtml } from "../_shared/invoiceE
 import { emailDeliveryGate } from "../_shared/deliveryGuard.ts";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MAX_COPY_RECIPIENTS = 10;
+
+/**
+ * Optional cc / bcc: absent, or an array of up to 10 valid addresses. Duplicates, the main
+ * recipient, and (for bcc) anything already in cc are dropped. Returns null when invalid.
+ */
+function copyList(value: unknown, exclude: Set<string>): string[] | null {
+  if (value == null) return [];
+  if (!Array.isArray(value) || value.length > MAX_COPY_RECIPIENTS) return null;
+  const out: string[] = [];
+  for (const v of value) {
+    if (typeof v !== "string") return null;
+    const a = v.trim();
+    if (!EMAIL_RE.test(a)) return null;
+    const key = a.toLowerCase();
+    if (exclude.has(key)) continue;
+    exclude.add(key);
+    out.push(a);
+  }
+  return out;
+}
 
 function escapeHtml(s: string): string {
   return s
@@ -79,6 +100,15 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+    const seen = new Set<string>([to.trim().toLowerCase()]);
+    const cc = copyList(body?.cc, seen);
+    const bcc = copyList(body?.bcc, seen);
+    if (!cc || !bcc) {
+      return new Response(
+        JSON.stringify({ error: `cc and bcc must each be up to ${MAX_COPY_RECIPIENTS} valid email addresses` }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     if (!invoiceId || typeof invoiceId !== "string") {
       return new Response(
         JSON.stringify({ error: "invoiceId is required" }),
@@ -149,12 +179,16 @@ serve(async (req) => {
       packHref,
     });
 
-    const gate = emailDeliveryGate(to);
-    if (!gate.send) {
-      return new Response(
-        JSON.stringify({ error: "EMAIL_SUPPRESSED", detail: gate.reason }),
-        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // Every recipient, copies included, must pass the environment guard (staging never
+    // e-mails a real customer through a cc / bcc).
+    for (const recipient of [to, ...cc, ...bcc]) {
+      const gate = emailDeliveryGate(recipient);
+      if (!gate.send) {
+        return new Response(
+          JSON.stringify({ error: "EMAIL_SUPPRESSED", detail: gate.reason }),
+          { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     const resendResp = await fetch("https://api.resend.com/emails", {
@@ -166,6 +200,8 @@ serve(async (req) => {
       body: JSON.stringify({
         from: fromAddress,
         to: [to],
+        ...(cc.length ? { cc } : {}),
+        ...(bcc.length ? { bcc } : {}),
         subject,
         html,
       }),

@@ -54,6 +54,8 @@ interface InvoiceListProps {
   isLoading: boolean;
   actions: InvoiceActions;
   isBusy: (inv: InvoiceRecord, kind?: InvoiceActionKind) => boolean;
+  /** Cancelled invoices: start a new invoice for the same client with the same jobs. */
+  onReinvoice?: (inv: InvoiceRecord) => void;
 }
 
 function gbp(n: number): string {
@@ -61,7 +63,7 @@ function gbp(n: number): string {
   return n < 0 ? `-${abs}` : abs;
 }
 
-export function InvoiceList({ invoices, isLoading, actions, isBusy }: InvoiceListProps) {
+export function InvoiceList({ invoices, isLoading, actions, isBusy, onReinvoice }: InvoiceListProps) {
   if (isLoading) {
     return <div className="p-6 text-center text-sm text-muted-foreground">Loading invoices…</div>;
   }
@@ -157,6 +159,11 @@ export function InvoiceList({ invoices, isLoading, actions, isBusy }: InvoiceLis
                         {!isCredit && (
                           <DropdownMenuItem onSelect={() => actions.downloadPack(inv)}>
                             Download pack (PDF + receipt files)
+                          </DropdownMenuItem>
+                        )}
+                        {!isCredit && status === "cancelled" && onReinvoice && (
+                          <DropdownMenuItem onSelect={() => onReinvoice(inv)}>
+                            Re-invoice these jobs
                           </DropdownMenuItem>
                         )}
                         {status !== "cancelled" && (

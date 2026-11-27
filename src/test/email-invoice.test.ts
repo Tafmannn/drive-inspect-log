@@ -91,6 +91,19 @@ describe("emailInvoice", () => {
     });
   });
 
+  it("passes CC and BCC copies through to send-invoice-email", async () => {
+    await emailInvoice({ ...input, cc: ["ops@client.com"], bcc: ["me@axentra.example"] });
+    expect(invokeMock).toHaveBeenCalledWith("send-invoice-email", {
+      body: {
+        to: "billing@client.com",
+        invoiceId: "inv-1",
+        downloadUrl: "https://example.com/signed.pdf",
+        cc: ["ops@client.com"],
+        bcc: ["me@axentra.example"],
+      },
+    });
+  });
+
   it("records the stored PDF path on the invoice before sending", async () => {
     await emailInvoice(input);
 
