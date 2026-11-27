@@ -28,7 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PodEmailConfirmDialog } from "@/components/PodEmailConfirmDialog";
+import { PodEmailConfirmDialog, type EmailCopies } from "@/components/PodEmailConfirmDialog";
 import { toast } from "@/hooks/use-toast";
 import { invalidateForEvent } from "@/lib/mutationEvents";
 import { invoicePdfFileName } from "@/lib/invoicePdf";
@@ -174,7 +174,7 @@ export function useInvoiceActions(
     },
   };
 
-  const confirmEmail = async (to: string) => {
+  const confirmEmail = async (to: string, copies?: EmailCopies) => {
     const inv = emailTarget;
     if (!inv) return;
     await run(inv, "email", async () => {
@@ -190,11 +190,17 @@ export function useInvoiceActions(
         orgId: settings.orgId,
         pdfData,
         to,
+        cc: copies?.cc,
+        bcc: copies?.bcc,
         storedPdfPath,
       });
       setEmailTarget(null);
       refresh(inv.id);
-      toast({ title: "Invoice emailed", description: `${inv.invoice_number} sent to ${recipient}.` });
+      const copyCount = (copies?.cc.length ?? 0) + (copies?.bcc.length ?? 0);
+      toast({
+        title: "Invoice emailed",
+        description: `${inv.invoice_number} sent to ${recipient}${copyCount ? ` (+${copyCount} cop${copyCount === 1 ? "y" : "ies"})` : ""}.`,
+      });
     }, "Invoice email failed");
   };
 
@@ -249,6 +255,7 @@ export function useInvoiceActions(
         defaultEmail={emailTarget?.client_email ?? ""}
         documentLabel={`Invoice ${emailTarget?.invoice_number ?? ""}`}
         sending={emailing}
+        allowCopies
         onConfirm={confirmEmail}
       />
 
