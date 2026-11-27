@@ -54,6 +54,8 @@ interface PodEmailConfirmDialogProps {
   sending: boolean;
   /** Offer CC / BCC fields (invoices). Copies are passed as the second argument. */
   allowCopies?: boolean;
+  /** Shown while sending, e.g. that building the document can take a while. */
+  sendingNote?: string;
   onConfirm: (email: string, copies?: EmailCopies) => void | Promise<void>;
 }
 
@@ -64,6 +66,7 @@ export function PodEmailConfirmDialog({
   documentLabel,
   sending,
   allowCopies = false,
+  sendingNote,
   onConfirm,
 }: PodEmailConfirmDialogProps) {
   const [email, setEmail] = useState(defaultEmail);
@@ -197,6 +200,10 @@ export function PodEmailConfirmDialog({
             </div>
             <p className="text-xs text-muted-foreground">Separate several addresses with commas.</p>
           </div>
+        )}
+
+        {sending && sendingNote && (
+          <p className="text-xs text-muted-foreground" role="status">{sendingNote}</p>
         )}
 
         <DialogFooter className="gap-2 sm:gap-2">

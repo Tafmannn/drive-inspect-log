@@ -58,3 +58,20 @@ describe("invoice email CC / BCC", () => {
     expect(onConfirm).toHaveBeenCalledWith("accounts@client.example", { cc: [], bcc: [] });
   });
 });
+
+describe("sending note", () => {
+  it("tells the admin to keep the screen open while the pack is built", () => {
+    render(
+      <PodEmailConfirmDialog
+        open
+        onOpenChange={() => {}}
+        defaultEmail="a@b.co"
+        documentLabel="Invoice X"
+        sending
+        sendingNote="Preparing the invoice pack"
+        onConfirm={() => {}}
+      />,
+    );
+    expect(screen.getByRole("status").textContent).toBe("Preparing the invoice pack");
+  });
+});

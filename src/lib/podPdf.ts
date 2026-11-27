@@ -37,6 +37,35 @@ const IMAGE_LIMITS = {
 // photo-grid look, instead of the old text-only caption list.
 const THUMB_LIMITS = { size: 480, quality: 0.62 };
 
+/**
+ * Photos decoded at once while building thumbnails. A phone photo decodes to ~48 MB of
+ * pixels; loading a job's ~20 photos in parallel (and several PODs in a row for an invoice
+ * pack) made iOS Safari kill the tab mid-send. A small pool keeps peak memory bounded.
+ */
+export const THUMB_CONCURRENCY = 3;
+
+/** Run fn over items with at most `limit` in flight. Order of results is not returned. */
+export async function forEachLimited<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const item = items[next++];
+      try {
+        await fn(item);
+      } catch {
+        /* each caller records its own failure */
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+}
+
+/** Free a canvas's pixel buffer now rather than at GC (iOS counts it against the tab). */
+function releaseCanvas(canvas: HTMLCanvasElement): void {
+  canvas.width = 0;
+  canvas.height = 0;
+}
+
 const DEBUG_POD =
   typeof window !== "undefined" &&
   (window as Window & { __AXENTRA_POD_DEBUG__?: boolean }).__AXENTRA_POD_DEBUG__ === true;
@@ -139,6 +168,8 @@ async function compressImageDataUrl(
       outputType,
       preserveTransparency ? undefined : quality
     );
+    releaseCanvas(canvas);
+    img.src = "";
 
     const format = detectImageFormat(outputDataUrl);
     if (!format) return null;
@@ -154,14 +185,14 @@ async function compressImageDataUrl(
   }
 }
 
-/** Center-crop to a square (matches the app's aspect-square thumbnail tiles). */
+/** Center-crop to a square (matches the app's aspect-square thumbnail tiles). `src` may be a data or blob URL. */
 async function compressImageDataUrlSquare(
-  dataUrl: string,
+  src: string,
   size: number,
   quality: number
 ): Promise<CachedImage | null> {
   try {
-    const img = await loadHtmlImage(dataUrl);
+    const img = await loadHtmlImage(src);
     if (!img) return null;
 
     const srcSize = Math.min(img.width, img.height);
@@ -179,6 +210,8 @@ async function compressImageDataUrlSquare(
     ctx.drawImage(img, sx, sy, srcSize, srcSize, 0, 0, size, size);
 
     const outputDataUrl = canvas.toDataURL("image/jpeg", quality);
+    releaseCanvas(canvas);
+    img.src = "";
     const format = detectImageFormat(outputDataUrl);
     if (!format) return null;
 
@@ -189,6 +222,21 @@ async function compressImageDataUrlSquare(
 }
 
 const FETCH_TIMEOUT_MS = 15_000; // 15 second timeout per image
+
+/** Fetch an image's bytes (same timeout as fetchImageAsDataUrl). Null on any failure. */
+async function fetchImageBlob(url: string): Promise<Blob | null> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    const response = await fetch(url, { mode: "cors", signal: controller.signal });
+    clearTimeout(timer);
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    return blob.size > 0 ? blob : null;
+  } catch {
+    return null;
+  }
+}
 
 async function fetchImageAsDataUrl(url: string): Promise<string | null> {
   try {
@@ -255,14 +303,21 @@ async function loadThumbnail(url: string): Promise<CachedImage | null> {
     const tryUrls = resolvedUrl === url ? [url] : [resolvedUrl, url];
 
     for (const candidate of tryUrls) {
-      const dataUrl = await fetchImageAsDataUrl(candidate);
-      if (!dataUrl) continue;
-      const compressed = await compressImageDataUrlSquare(
-        dataUrl,
-        THUMB_LIMITS.size,
-        THUMB_LIMITS.quality
-      );
-      if (compressed) return compressed;
+      // Decode straight from the bytes (object URL) instead of a base64 data URL: a
+      // full-size photo as base64 is a ~6 MB string held alongside the decoded pixels.
+      const blob = await fetchImageBlob(candidate);
+      if (!blob) continue;
+      const objectUrl = URL.createObjectURL(blob);
+      try {
+        const compressed = await compressImageDataUrlSquare(
+          objectUrl,
+          THUMB_LIMITS.size,
+          THUMB_LIMITS.quality
+        );
+        if (compressed) return compressed;
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
     }
     return null;
   } catch (error) {
@@ -276,11 +331,9 @@ async function buildPhotoThumbnailCache(
 ): Promise<Map<string, CachedImage | null>> {
   const cache = new Map<string, CachedImage | null>();
 
-  await Promise.allSettled(
-    photos.map(async (p) => {
-      cache.set(p.url, await loadThumbnail(p.url));
-    })
-  );
+  await forEachLimited(photos, THUMB_CONCURRENCY, async (p) => {
+    cache.set(p.url, await loadThumbnail(p.url));
+  });
 
   // One short retry pass — mirrors buildSignatureImageCache's handling of a
   // transient network blip dropping an image from the burst above.
@@ -288,12 +341,10 @@ async function buildPhotoThumbnailCache(
   if (failed.length > 0) {
     debugLog("Retrying failed POD photo thumbnails", { count: failed.length });
     await new Promise((r) => setTimeout(r, 700));
-    await Promise.allSettled(
-      failed.map(async (p) => {
-        const image = await loadThumbnail(p.url);
-        if (image) cache.set(p.url, image);
-      })
-    );
+    await forEachLimited(failed, THUMB_CONCURRENCY, async (p) => {
+      const image = await loadThumbnail(p.url);
+      if (image) cache.set(p.url, image);
+    });
   }
 
   return cache;

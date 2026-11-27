@@ -256,6 +256,7 @@ export function useInvoiceActions(
         documentLabel={`Invoice ${emailTarget?.invoice_number ?? ""}`}
         sending={emailing}
         allowCopies
+        sendingNote="Preparing the invoice pack (invoice, receipts and PODs). This can take a minute — keep this screen open."
         onConfirm={confirmEmail}
       />
 
