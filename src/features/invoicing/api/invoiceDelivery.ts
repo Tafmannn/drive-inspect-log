@@ -117,8 +117,13 @@ export async function prepareInvoiceDelivery(record: InvoiceRecord, orgId: strin
   return pdfPath;
 }
 
-export async function markPreparedInvoiceSent(record: InvoiceRecord, orgId: string, settings?: OrgInvoiceSettings | null) {
-  const path = await prepareInvoiceDelivery(record, orgId, settings);
+export async function markPreparedInvoiceSent(
+  record: InvoiceRecord,
+  orgId: string,
+  settings?: OrgInvoiceSettings | null,
+  prepare: (record: InvoiceRecord, orgId: string, settings?: OrgInvoiceSettings | null) => Promise<string> = prepareInvoiceDelivery,
+) {
+  const path = await prepare(record, orgId, settings);
   const { data, error } = await supabase.from("invoices")
     .update({ status: "sent", sent_at: new Date().toISOString() })
     .eq("id", record.id).eq("status", "draft").eq("pdf_url", path).select("id");

@@ -45,7 +45,8 @@ import {
   PAYMENT_METHODS,
 } from "../api/invoiceLifecycle";
 import { buildInvoicePack, downloadBlob } from "../api/receiptExport";
-import { buildCompleteInvoiceDelivery, prepareInvoiceDelivery, markPreparedInvoiceSent } from "../api/invoiceDelivery";
+import { buildCompleteInvoiceDelivery, markPreparedInvoiceSent } from "../api/invoiceDelivery";
+import { preparePackOnce, usePackState } from "../api/packPreparation";
 
 export type InvoiceActionKind = "pdf" | "pack" | "email" | "sent" | "paid" | "unpaid" | "cancel";
 
@@ -83,6 +84,8 @@ export function useInvoiceActions(
   const [busy, setBusy] = useState<string | null>(null);
   const [emailTarget, setEmailTarget] = useState<InvoiceRecord | null>(null);
   const [sendProgress, setSendProgress] = useState<string | null>(null);
+  // A pack may already be building in the background (started at creation): show its progress.
+  const emailPack = usePackState(emailTarget?.id);
   const [payTarget, setPayTarget] = useState<InvoiceRecord | null>(null);
   const [cancelTarget, setCancelTarget] = useState<InvoiceRecord | null>(null);
 
@@ -144,7 +147,7 @@ export function useInvoiceActions(
       void run(inv, "sent", async () => {
         if (!settings) throw new Error("Organisation settings are still loading. Try again in a moment.");
         if (inv.document_type === "credit_note") await markInvoiceSent(inv, settings.orgId, settings);
-        else await markPreparedInvoiceSent(inv, settings.orgId, settings);
+        else await markPreparedInvoiceSent(inv, settings.orgId, settings, preparePackOnce);
         refresh(inv.id);
         toast({
           title: "Marked as sent",
@@ -182,7 +185,7 @@ export function useInvoiceActions(
       if (!settings) throw new Error("Organisation settings are still loading. Try again in a moment.");
       // Once issued, the stored PDF is what gets emailed — never a re-render.
       const storedPdfPath = inv.status === "draft" && inv.document_type !== "credit_note"
-        ? await prepareInvoiceDelivery(inv, settings.orgId, settings, setSendProgress)
+        ? await preparePackOnce(inv, settings.orgId, settings)
         : inv.status !== "draft" ? inv.pdf_url : null;
       setSendProgress("Sending the email…");
       const pdfData = await buildInvoiceDocument(inv, { settings, withReceipts: !storedPdfPath });
@@ -259,7 +262,7 @@ export function useInvoiceActions(
         documentLabel={`Invoice ${emailTarget?.invoice_number ?? ""}`}
         sending={emailing}
         allowCopies
-        sendingNote={`${sendProgress ?? "Preparing the invoice pack…"} This can take a minute — keep this screen open.`}
+        sendingNote={`${(emailPack?.state === "building" ? emailPack.message : sendProgress) ?? "Preparing the invoice pack…"} This can take a minute — keep this screen open.`}
         onConfirm={confirmEmail}
       />
 

@@ -249,7 +249,7 @@ describe("invoice actions", () => {
   it("marks a draft as sent and refreshes", async () => {
     renderList([inv({ invoice_number: "AX26-1007" })]);
     await choose("AX26-1007", /Mark as sent/);
-    await waitFor(() => expect(h.markPreparedInvoiceSent).toHaveBeenCalledWith(expect.objectContaining({ id: "AX26-1007" }), "org-1", SETTINGS));
+    await waitFor(() => expect(h.markPreparedInvoiceSent).toHaveBeenCalledWith(expect.objectContaining({ id: "AX26-1007" }), "org-1", SETTINGS, expect.any(Function)));
     expect(h.changed).toEqual(["AX26-1007"]);
     expect(h.toasts[0].title).toBe("Marked as sent");
   });

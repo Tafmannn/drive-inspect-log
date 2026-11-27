@@ -53,6 +53,12 @@ vi.mock("@/components/PodEmailConfirmDialog", () => ({
   PodEmailConfirmDialog: ({ open, documentLabel }: { open: boolean; documentLabel: string }) =>
     open ? <div role="dialog">Email {documentLabel}</div> : null,
 }));
+const pack = vi.hoisted(() => ({ start: vi.fn(), state: undefined as unknown }));
+vi.mock("@/features/invoicing/api/packPreparation", () => ({
+  startPackInBackground: (...a: unknown[]) => pack.start(...a),
+  usePackState: () => pack.state,
+  preparePackOnce: vi.fn(),
+}));
 vi.mock("@/features/invoicing/components/ReadyToBillPanel", () => ({
   ReadyToBillPanel: ({ onSelect }: { onSelect: (id: string) => void }) => (
     <button onClick={() => onSelect("client-1")}>CJE Transport · ready to bill</button>
@@ -367,5 +373,16 @@ describe("InvoicePrepScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: /Create & Email/ }));
     await waitFor(() => expect(state.mutateAsync).toHaveBeenCalled());
     expect(await screen.findByRole("dialog")).toHaveTextContent("Email Invoice AX26-1007");
+  });
+
+  it("starts building the send pack in the background as soon as the draft is created", async () => {
+    pack.state = { state: "building", message: "Building POD 1 of 2 (AB12 CDE)…" };
+    renderScreen();
+    pickClientAndAllJobs();
+    fireEvent.click(screen.getByRole("button", { name: /Create Draft/ }));
+    await waitFor(() => expect(pack.start).toHaveBeenCalled());
+    expect(pack.start.mock.calls[0][0]).toMatchObject({ id: "inv-1", status: "draft" });
+    expect(screen.getByText(/Pack: Building POD 1 of 2 \(AB12 CDE\) — you can carry on/)).toBeTruthy();
+    pack.state = undefined;
   });
 });

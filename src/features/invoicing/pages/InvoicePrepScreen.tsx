@@ -53,6 +53,7 @@ import { InvoiceList, InvoiceStatusBadge } from "../components/InvoiceList";
 import { InvoiceCorrectionQueue } from "../components/InvoiceCorrectionQueue";
 import { ReadyToBillPanel } from "../components/ReadyToBillPanel";
 import { getInvoiceJobIds } from "../api/createInvoice";
+import { startPackInBackground, usePackState } from "../api/packPreparation";
 import { fuelPolicyInvoiceNote, rechargeCategoriesFor } from "@/lib/fuelPolicy";
 import { settingsToPdfFields } from "../api/invoiceDocument";
 import { downloadBlob } from "../api/receiptExport";
@@ -495,6 +496,9 @@ export function InvoicePrepScreen() {
           draft: result.draft,
         });
       setCreatedInvoice(record);
+      // Build the send pack (invoice, receipts, PODs) now, while the admin reviews, so
+      // Send / Mark as sent only has to reuse it.
+      startPackInBackground(record, settings.orgId, settings);
       setSelectedJobIds(new Set());
       setExpenseOverrides(new Map());
       setClientRef("");
@@ -578,6 +582,7 @@ export function InvoicePrepScreen() {
   const createdRecord = createdInvoice
     ? recentInvoices?.find((i) => i.id === createdInvoice.id) ?? createdInvoice
     : null;
+  const createdPack = usePackState(createdRecord?.id);
 
   // KPIs
   const kpis: KpiItem[] = [
@@ -892,6 +897,23 @@ export function InvoicePrepScreen() {
                 {createdRecord.status === "draft" &&
                   " · Email it, or mark it as sent once you have delivered it — that locks the invoice."}
               </p>
+              {createdRecord.status === "draft" && createdPack && (
+                <p
+                  role="status"
+                  className={cn(
+                    "mt-1 flex items-center gap-1.5 text-xs",
+                    createdPack.state === "failed" ? "text-warning" : "text-muted-foreground",
+                  )}
+                >
+                  {createdPack.state === "building" && <Loader2 className="h-3 w-3 animate-spin" aria-hidden />}
+                  {createdPack.state === "ready" && <CheckCircle2 className="h-3 w-3 text-success" aria-hidden />}
+                  {createdPack.state === "building"
+                    ? `Pack: ${createdPack.message.replace(/…$/, "")} — you can carry on; it's ready before you send.`
+                    : createdPack.state === "ready"
+                    ? "Pack ready (invoice, receipts and PODs) — sending will be quick."
+                    : `Pack couldn't be prepared yet (${createdPack.error}). It will be tried again when you send.`}
+                </p>
+              )}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
